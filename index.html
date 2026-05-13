@@ -1718,17 +1718,13 @@
                 <div class="card">
                     <div class="flex-between"
                         style="border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 20px; flex-wrap: wrap;">
-                        <h2 class="card-title"
-                            style="border:none; margin:0; padding:0; display: flex; align-items: center; gap: 8px;">
-                            <span data-i18n="title-inventory">Inventory Tracking</span>
-                        </h2>
+                        <h2 class="card-title" style="border:none; margin:0; padding:0;" data-i18n="title-inventory">
+                            Inventory Tracking</h2>
                         <div style="display:flex; gap:10px; align-items:center;">
                             <input type="text" id="wh-search" onkeyup="renderWarehouse()"
-                                placeholder="🔍 Search items..."
-                                style="width: 200px; padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main);"
+                                placeholder="🔍 Search items..." style="width: 200px; padding: 8px 12px;"
                                 data-i18n="placeholder-search">
-                            <button onclick="exportWarehousePDF()" class="btn-primary"
-                                style="padding: 10px 20px; font-weight:600; box-shadow: var(--shadow-sm);"
+                            <button onclick="exportWarehousePDF()" class="btn-outline" style="padding: 8px 12px;"
                                 data-i18n="btn-restock-pdf">📄 Restock PDF</button>
                         </div>
                     </div>
@@ -2014,20 +2010,16 @@
                     <div class="card-header-flex">
                         <h2 class="card-title in-flex"><span data-i18n="title-payroll-ledger">Payroll & Finance
                                 Ledger</span> (<span class="display-current-month"></span>)</h2>
-                        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; background: var(--input-bg); padding: 6px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);"
-                            class="admin-only">
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;" class="admin-only">
                             <select id="export-lang"
-                                style="padding: 8px 12px; border: none; border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: 600; cursor: pointer; background: transparent; color: var(--text-main); outline: none;">
-                                <option value="ar">🇸🇦 بالعربية</option>
-                                <option value="en">🇺🇸 English</option>
+                                style="padding: 10px 14px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 0.85rem; font-weight: 500; cursor: pointer; background: var(--input-bg); color: var(--text-main);">
+                                <option value="en">Export English</option>
+                                <option value="ar">تصدير بالعربية</option>
                             </select>
-                            <div style="width: 1px; height: 20px; background: var(--border-color);"></div>
-                            <button class="btn-outline" onclick="exportToExcel()"
-                                style="border:none; padding: 8px 12px; font-weight:600;">📊 <span
+                            <button class="btn-outline" onclick="exportToExcel()">📊 <span
                                     data-i18n="btn-excel">Excel</span></button>
-                            <button class="btn-primary" onclick="exportToPDF()"
-                                style="padding: 8px 16px; font-weight:600; box-shadow: var(--shadow-sm);">📄 <span
-                                    data-i18n="btn-pdf">PDF Report</span></button>
+                            <button class="btn-outline" onclick="exportToPDF()">📄 <span
+                                    data-i18n="btn-pdf">PDF</span></button>
                         </div>
                     </div>
                     <div class="table-container">
@@ -2384,7 +2376,6 @@
                 }
             }
 
-            currentUser.isKinan = isKinan;
             currentUser.role = isAdmin ? 'admin' : 'worker';
 
             document.body.className = 'theme-burgeroov'; // reset all dynamic classes
@@ -2655,8 +2646,8 @@
         }
 
         function deleteManager(email) {
-            if (!currentUser.isKinan) return alert(t('only-master-admin') || "Only the ultimate admin can remove managers.");
-            if (email === 'kinan.rahal@hotmail.com') return alert(t('cannot-remove-master') || "Cannot remove master admin.");
+            if (!currentUser.isKinan) return alert("Only the ultimate admin can remove managers.");
+            if (email === 'kinan.rahal@hotmail.com') return alert("Cannot remove master admin.");
             if (confirm(`Remove ${email} from Managers?`)) {
                 appData.burgeroov.admins = appData.burgeroov.admins.filter(e => e !== email);
                 saveData();
@@ -2808,34 +2799,25 @@
             const data = getCompanyData().warehouse;
             if (!data || data.length === 0) return alert("Warehouse is empty.");
 
-            const lang = currentAppLang;
-            const direction = lang === 'ar' ? 'rtl' : 'ltr';
-            const headerColor = '#452b1b';
-            const printTitle = lang === 'ar' ? 'تقرير توريد وجرد المستودع' : 'Burgeroov Warehouse & Restock Report';
-
             let rowsHtml = '';
             let criticalList = [];
-            let totalItems = data.length;
-            let lowStockCount = 0;
 
             data.forEach(i => {
                 const isLow = i.currentStock <= i.riskAmount;
                 const toOrder = Math.max(0, i.maxStock - i.currentStock);
 
                 if (isLow) {
-                    lowStockCount++;
-                    criticalList.push(`<li style="margin-bottom:8px;"><strong>${i.name}</strong>: ${lang === 'ar' ? 'نقص حاد! اطلب' : 'Critical! Order'} <strong>${toOrder}</strong></li>`);
+                    criticalList.push(`<li style="margin-bottom:6px;"><strong>${i.name}</strong>: Need to order <strong>${toOrder}</strong></li>`);
                 }
 
-                const rowBg = isLow ? 'background-color:#fff5f5; color:#c53030; font-weight:bold;' : '';
-                const statusBadge = isLow ? `<span style="background:#feb2b2; padding:2px 6px; border-radius:4px; font-size:10px;">${lang === 'ar' ? 'نقص' : 'LOW'}</span>` : `<span style="background:#c6f6d5; padding:2px 6px; border-radius:4px; font-size:10px; color:#22543d;">${lang === 'ar' ? 'متوفر' : 'OK'}</span>`;
+                const rowBg = isLow ? 'background-color:#fef2f2; color:#dc2626; font-weight:bold;' : '';
+                const nameDisplay = isLow ? `&#x1F6A8; ${i.name}` : i.name;
 
                 rowsHtml += `
                     <tr style="${rowBg}">
-                        <td style="padding:10px; border:1px solid #e2e8f0;">${i.name}</td>
-                        <td style="padding:10px; border:1px solid #e2e8f0; text-align:center;">${statusBadge}</td>
-                        <td style="padding:10px; border:1px solid #e2e8f0; text-align:center;">${i.currentStock} / ${i.maxStock}</td>
-                        <td style="padding:10px; border:1px solid #e2e8f0; text-align:center; background:${toOrder > 0 ? '#fffaf0' : 'transparent'};">${toOrder}</td>
+                        <td style="padding:8px; border:1px solid #ccc;">${nameDisplay}</td>
+                        <td style="padding:8px; border:1px solid #ccc; text-align:center;">${i.currentStock} / ${i.maxStock}</td>
+                        <td style="padding:8px; border:1px solid #ccc; text-align:center;">${toOrder}</td>
                     </tr>
                 `;
             });
@@ -2843,71 +2825,49 @@
             let criticalHtml = '';
             if (criticalList.length > 0) {
                 criticalHtml = `
-                    <div style="margin-top:25px; border:2px solid #e53e3e; padding:18px; border-radius:12px; background-color:#fff5f5;">
-                        <h3 style="color:#c53030; margin-top:0; font-size:17px; display:flex; align-items:center; gap:8px;">🚨 ${lang === 'ar' ? 'أصناف تحتاج طلب فوري' : 'CRITICAL RESTOCK ORDERS'}</h3>
-                        <ul style="color:#c53030; margin-bottom:0; font-size:14px; list-style-type:none; padding:0;">
+                    <div style="margin-top:30px; border:2px solid #dc2626; padding:15px; border-radius:8px; background-color:#fef2f2;">
+                        <h3 style="color:#dc2626; margin-top:0; font-size:16px;">&#x1F6A8; CRITICAL RESTOCK ORDERS</h3>
+                        <ul style="color:#dc2626; margin-bottom:0; font-size:14px; list-style-type:square;">
                             ${criticalList.join('')}
                         </ul>
                     </div>
                 `;
             }
 
-            const printHTML = `<!DOCTYPE html><html dir="${direction}" lang="${lang}"><head><meta charset="UTF-8">
-                <title>${printTitle}</title>
+            const printHTML = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+                <title>Burgeroov Restock Report</title>
                 <style>
-                    @page { size: portrait; margin: 10mm !important; }
-                    @media print { html, body { margin: 0 !important; padding: 0 !important; } }
-                    body { font-family: 'Segoe UI', Tahoma, sans-serif; color: #2d3748; padding: 10mm; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid ${headerColor}; padding-bottom: 12px; margin-bottom: 25px; }
-                    .header h1 { color: ${headerColor}; margin: 0; font-size: 22px; font-weight: 800; }
-                    .header .meta { text-align: ${lang === 'ar' ? 'left' : 'right'}; font-size: 12px; color: #718096; }
-                    
-                    .summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 25px; }
-                    .summary-box { background: #edf2f7; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #e2e8f0; }
-                    .summary-box .label { font-size: 11px; font-weight: 700; color: #4a5568; text-transform: uppercase; margin-bottom: 5px; }
-                    .summary-box .value { font-size: 20px; font-weight: 800; color: ${headerColor}; }
-                    
-                    table { width: 100%; border-collapse: collapse; font-size: 12px; }
-                    th { background-color: ${headerColor}; color: #fff; padding: 12px; border: 1px solid #cbd5e1; text-align: ${lang === 'ar' ? 'right' : 'left'}; }
-                    td { padding: 10px; border: 1px solid #e2e8f0; }
-                    tr:nth-child(even) td { background-color: #f7fafc; }
-                    .footer { margin-top: 40px; font-size: 10px; color: #a0aec0; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+                    @page { size: portrait; margin: 0mm !important; }
+                    @page :left { margin: 0mm !important; }
+                    @page :right { margin: 0mm !important; }
+                    @page :first { margin: 0mm !important; }
+                    @page :blank { margin: 0mm !important; }
+                    @media print {
+                        html, body { margin: 0 !important; padding: 0 !important; }
+                    }
+                    html { margin: 0; padding: 0; }
+                    body { font-family: Arial, sans-serif; color: #1e293b; padding: 15mm; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    h2 { color: #452b1b; border-bottom: 2px solid #452b1b; padding-bottom: 10px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+                    th { background-color: #452b1b; color: #fff; padding: 10px; border: 1px solid #ccc; text-align: left; }
+                    td { padding: 8px 10px; border: 1px solid #ccc; }
+                    tr:nth-child(even) td { background-color: #f8fafc; }
+                    .footer { margin-top: 30px; font-size: 10px; color: #64748b; text-align: right; }
                 </style></head><body>
-                <div class="header">
-                    <h1>📦 ${printTitle}</h1>
-                    <div class="meta">
-                        <div>${lang === 'ar' ? 'تاريخ التقرير' : 'Report Date'}: ${new Date().toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}</div>
-                        <div style="font-weight:bold; color:${headerColor};">Burgeroov Operations</div>
-                    </div>
-                </div>
-
-                <div class="summary-grid">
-                    <div class="summary-box">
-                        <div class="label">${lang === 'ar' ? 'إجمالي الأصناف' : 'Total Tracked Items'}</div>
-                        <div class="value">${totalItems}</div>
-                    </div>
-                    <div class="summary-box" style="${lowStockCount > 0 ? 'background:#fff5f5; border-color:#feb2b2;' : ''}">
-                        <div class="label">${lang === 'ar' ? 'أصناف منخفضة' : 'Low Stock Items'}</div>
-                        <div class="value" style="${lowStockCount > 0 ? 'color:#c53030;' : ''}">${lowStockCount}</div>
-                    </div>
-                </div>
-
+                <h2>Burgeroov Restock Report</h2>
+                <p style="color:#64748b; font-size:13px;">Generated: ${new Date().toLocaleString()}</p>
                 <table>
                     <thead>
                         <tr>
-                            <th>${lang === 'ar' ? 'اسم الصنف' : 'Product Name'}</th>
-                            <th style="text-align:center;">${lang === 'ar' ? 'الحالة' : 'Status'}</th>
-                            <th style="text-align:center;">${lang === 'ar' ? 'المتوفر / الكلي' : 'Current / Max'}</th>
-                            <th style="text-align:center;">${lang === 'ar' ? 'الكمية المطلوبة' : 'Order Qty'}</th>
+                            <th>Product Name</th>
+                            <th style="text-align:center;">Currently Left</th>
+                            <th style="text-align:center;">Amount to Order</th>
                         </tr>
                     </thead>
                     <tbody>${rowsHtml}</tbody>
                 </table>
                 ${criticalHtml}
 
-                <div class="footer">
-                    Burgeroov Management Portal - Warehouse Inventory Control - ${new Date().toLocaleDateString()}
-                </div>
                 </body></html>`;
 
             const blob = new Blob([printHTML], { type: 'text/html' });
@@ -2917,7 +2877,7 @@
             document.body.appendChild(iframe);
             iframe.onload = function () { setTimeout(function () { iframe.contentWindow.print(); }, 300); };
             iframe.src = blobUrl;
-            setTimeout(() => { URL.revokeObjectURL(blobUrl); document.body.removeChild(iframe); }, 15000);
+            setTimeout(() => { URL.revokeObjectURL(blobUrl); document.body.removeChild(iframe); }, 10000);
         }
 
         // --- UTILITIES ---
@@ -3121,78 +3081,28 @@
             const t = translations[lang];
             if (data.length === 0) { alert(lang === 'ar' ? "لا توجد سجلات." : "No records to export."); return; }
 
-            // Calculate Totals for Summary
-            const totalBase = data.reduce((sum, row) => sum + (parseFloat(row[t.baseIncome]) || 0), 0);
-            const totalRewards = data.reduce((sum, row) => sum + (parseFloat(row[t.rewards]) || 0), 0);
-            const totalViolations = data.reduce((sum, row) => sum + (parseFloat(row[t.violations]) || 0), 0);
-            const totalPaid = data.reduce((sum, row) => sum + (parseFloat(row[t.paid]) || 0), 0);
-            const totalRemaining = data.reduce((sum, row) => sum + (parseFloat(row[t.remaining]) || 0), 0);
-
             const headerColor = '#452b1b';
-            const printTitle = lang === 'ar' ? `تقرير بورجروف المالي (${currentGlobalMonth})` : `BURGEROOV Financial Report (${currentGlobalMonth})`;
-            const direction = lang === 'ar' ? 'rtl' : 'ltr';
-            const textAlign = lang === 'ar' ? 'right' : 'left';
+            const printTitle = lang === 'ar' ? `تقرير BURGEROOV المالي (${currentGlobalMonth})` : `BURGEROOV Financial Report (${currentGlobalMonth})`;
+            const direction = lang === 'ar' ? 'rtl' : 'ltr'; const textAlign = lang === 'ar' ? 'right' : 'left';
 
             const printHTML = `
                 <!DOCTYPE html><html dir="${direction}" lang="${lang}"><head><meta charset="UTF-8"><title>${printTitle}</title>
                 <style>
-                    @page { size: landscape; margin: 8mm !important; }
-                    @media print { html, body { margin: 0 !important; padding: 0 !important; } }
-                    body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; color: #1e293b; padding: 10mm; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid ${headerColor}; padding-bottom: 12px; margin-bottom: 25px; }
-                    .header h1 { color: ${headerColor}; margin: 0; font-size: 26px; font-weight: 800; }
-                    .header .meta { text-align: ${lang === 'ar' ? 'left' : 'right'}; font-size: 13px; color: #64748b; font-weight: 500; }
-                    
-                    .summary-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 30px; }
-                    .summary-box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 10px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-                    .summary-box .label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; }
-                    .summary-box .value { font-size: 18px; font-weight: 800; color: ${headerColor}; }
-                    
-                    table { width: 100%; border-collapse: collapse; font-size: 10.5px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border-radius: 8px; overflow: hidden; }
-                    th { background-color: ${headerColor}; color: white; padding: 12px 10px; border: 1px solid #cbd5e1; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+                    @page { size: landscape; margin: 0 !important; }
+                    @media print {
+                        html, body { margin: 0 !important; padding: 0 !important; }
+                    }
+                    body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; color: #1e293b; padding: 15mm; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    h2 { color: ${headerColor}; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; text-align: ${textAlign}; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 11px; text-align: ${textAlign}; }
+                    th { background-color: ${headerColor}; color: white; padding: 10px; border: 1px solid #cbd5e1; }
                     td { padding: 8px 10px; border: 1px solid #e2e8f0; }
                     tr:nth-child(even) td { background-color: #f8fafc; }
-                    tr:hover td { background-color: #f1f5f9; }
-                    .footer { margin-top: 40px; font-size: 11px; color: #94a3b8; display: flex; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+                    .footer { margin-top: 30px; font-size: 10px; color: #64748b; text-align: ${lang === 'ar' ? 'left' : 'right'}; }
                 </style></head><body>
-                <div class="header">
-                    <h1>💰 ${printTitle}</h1>
-                    <div class="meta">
-                        <div>${t.generatedOn} ${new Date().toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}</div>
-                        <div style="color:${headerColor}; font-weight:bold;">Burgeroov Portal v2.0</div>
-                    </div>
-                </div>
-                
-                <div class="summary-grid">
-                    <div class="summary-box">
-                        <div class="label">${t.baseIncome}</div>
-                        <div class="value">SAR ${totalBase.toLocaleString()}</div>
-                    </div>
-                    <div class="summary-box">
-                        <div class="label">${t.rewards}</div>
-                        <div class="value" style="color:#16a34a">+ SAR ${totalRewards.toLocaleString()}</div>
-                    </div>
-                    <div class="summary-box">
-                        <div class="label">${t.violations}</div>
-                        <div class="value" style="color:#dc2626">- SAR ${totalViolations.toLocaleString()}</div>
-                    </div>
-                    <div class="summary-box" style="background:#fff7ed; border-color:#fdba74;">
-                        <div class="label">${t.paid}</div>
-                        <div class="value" style="color:#c2410c">SAR ${totalPaid.toLocaleString()}</div>
-                    </div>
-                    <div class="summary-box" style="background:#eff6ff; border-color:#93c5fd;">
-                        <div class="label">${t.remaining}</div>
-                        <div class="value" style="color:#1d4ed8">SAR ${totalRemaining.toLocaleString()}</div>
-                    </div>
-                </div>
-
-                <table><thead><tr>${Object.keys(data[0]).map(key => `<th>${key}</th>`).join('')}</tr></thead>
+                <h2>${printTitle}</h2><table><thead><tr>${Object.keys(data[0]).map(key => `<th>${key}</th>`).join('')}</tr></thead>
                 <tbody>${data.map(row => `<tr>${Object.values(row).map(val => `<td>${val}</td>`).join('')}</tr>`).join('')}</tbody></table>
-                
-                <div class="footer">
-                    <span>${t.reportTitle} - ${currentGlobalMonth}</span>
-                    <span>${new Date().toLocaleDateString()}</span>
-                </div>
+                <div class="footer">${t.generatedOn} ${new Date().toLocaleString()}</div>
                 </body></html>
             `;
 
@@ -4775,8 +4685,6 @@
                 "not-fixed-apply-btn": "Not Fixed (Apply)",
                 "not-linked-worker": "Your account is not linked to any worker profile yet.",
                 "delete-worker-btn": "Delete Worker",
-                "only-master-admin": "Only the ultimate admin (Kinan) can remove other managers.",
-                "cannot-remove-master": "Cannot remove the master admin account.",
 
                 // Operations Section
                 "title-manager-access": "Manager Access Control",
@@ -5004,8 +4912,6 @@
                 "not-fixed-apply-btn": "لم يتم الإصلاح (تطبيق)",
                 "not-linked-worker": "حسابك غير مرتبط بأي ملف موظف بعد.",
                 "delete-worker-btn": "حذف الموظف",
-                "only-master-admin": "فقط المسؤول الرئيسي (كنان) يمكنه إزالة المديرين الآخرين.",
-                "cannot-remove-master": "لا يمكن إزالة حساب المسؤول الرئيسي.",
 
                 // Ranks
                 "title-ranks-eval": "تقييم وترتيب الموظفين (عرض 90 يوم)",
