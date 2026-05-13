@@ -2539,17 +2539,18 @@
             let mostUrgentTask = null;
             let minDiff = Infinity;
 
-            timers.forEach(t => {
-                const deadline = parseInt(t.getAttribute('data-deadline'));
+            // FIX: Use 'timerEl' instead of 't' so it doesn't break the t() translation function
+            timers.forEach(timerEl => {
+                const deadline = parseInt(timerEl.getAttribute('data-deadline'));
                 const diff = deadline - Date.now();
                 if (diff <= 0) {
-                    t.innerHTML = `🚨 ${t('status-late')}`;
-                    t.style.color = 'var(--danger)';
+                    timerEl.innerHTML = `🚨 ${t('status-late')}`;
+                    timerEl.style.color = 'var(--danger)';
                 } else {
                     const m = Math.floor(diff / 60000);
                     const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-                    t.innerHTML = `⏳ ${t('status-time-remaining')} ${m}:${s}`;
-                    t.style.color = 'var(--warning)';
+                    timerEl.innerHTML = `⏳ ${t('status-time-remaining')} ${m}:${s}`;
+                    timerEl.style.color = 'var(--warning)';
                 }
             });
 
@@ -2575,42 +2576,47 @@
                 }
             }
 
-            if (mostUrgentTask) {
-                banner.style.display = 'block';
-                taskNameDisplay.textContent = mostUrgentTask.title;
-                const diff = mostUrgentTask.diff;
-                if (diff <= 0) {
-                    timerDisplay.textContent = t('status-late');
-                    timerDisplay.style.color = 'var(--danger)';
+            // Ensure the banner elements actually exist before trying to update them
+            if (banner && timerDisplay && taskNameDisplay) {
+                if (mostUrgentTask) {
+                    banner.style.display = 'block';
+                    taskNameDisplay.textContent = mostUrgentTask.title;
+                    const diff = mostUrgentTask.diff;
+                    if (diff <= 0) {
+                        timerDisplay.textContent = t('status-late');
+                        timerDisplay.style.color = 'var(--danger)';
+                    } else {
+                        const m = Math.floor(diff / 60000);
+                        const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+                        timerDisplay.textContent = `${m}:${s}`;
+                        timerDisplay.style.color = 'var(--warning)';
+                    }
                 } else {
-                    const m = Math.floor(diff / 60000);
-                    const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-                    timerDisplay.textContent = `${m}:${s}`;
-                    timerDisplay.style.color = 'var(--warning)';
+                    banner.style.display = 'none';
                 }
-            } else {
-                banner.style.display = 'none';
             }
         }
 
         function updateViolationTimers() {
             let expiredSomething = false;
             const timers = document.querySelectorAll('.viol-timer');
-            timers.forEach(t => {
-                const deadline = parseInt(t.getAttribute('data-deadline'));
+
+            // FIX: Changed 't' to 'timerEl'
+            timers.forEach(timerEl => {
+                const deadline = parseInt(timerEl.getAttribute('data-deadline'));
                 const diff = deadline - Date.now();
                 if (diff <= 0) {
-                    t.classList.remove('viol-timer');
-                    t.innerHTML = '🚨 Applied (Time Expired)';
-                    t.style.color = 'var(--danger)';
-                    const parent = t.closest('.flex-between');
+                    timerEl.classList.remove('viol-timer');
+                    timerEl.innerHTML = '🚨 Applied (Time Expired)';
+                    timerEl.style.color = 'var(--danger)';
+                    const parent = timerEl.closest('.flex-between');
                     if (parent && parent.children[1]) parent.children[1].innerHTML = '';
                     expiredSomething = true;
                 } else {
                     const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
                     const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
                     const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-                    t.innerHTML = `⏳ Pending (${h}h ${m}m ${s}s left)`;
+                    timerEl.innerHTML = `⏳ Pending (${h}h ${m}m ${s}s left)`;
                 }
             });
 
