@@ -3818,6 +3818,9 @@
             if (!workerId) return;
             const worker = getCompanyData().workers.find(w => w.id === workerId);
             if (worker && worker.activeOrder) {
+                if (worker.activeOrder.status === 'preparing') {
+                    worker.activeOrder.prepEndTime = Date.now();
+                }
                 worker.activeOrder.status = 'picked_up';
                 worker.activeOrder.startTime = Date.now(); // Restart timer exactly when picked up
                 saveData();
@@ -3829,19 +3832,9 @@
             if (!workerId) workerId = activeDriverId;
             if (!workerId) return;
             const worker = getCompanyData().workers.find(w => w.id === workerId);
-            if (worker && worker.activeOrder) {
-                worker.activeOrder.status = 'ready';
-                saveData();
-            }
-        }
-
-        // NEW: Allows Manager to skip the prep timer and alert the driver immediately
-        function markOrderReady(workerId) {
-            if (!workerId) workerId = activeDriverId;
-            if (!workerId) return;
-            const worker = getCompanyData().workers.find(w => w.id === workerId);
             if (worker && worker.activeOrder && worker.activeOrder.status === 'preparing') {
                 worker.activeOrder.status = 'ready';
+                worker.activeOrder.prepEndTime = Date.now(); // Log exactly when kitchen finished
                 saveData();
             }
         }
@@ -3858,12 +3851,22 @@
             const worker = getCompanyData().workers.find(w => w.id === workerId);
             if (isSuccess && worker.activeOrder) {
                 const stats = getMonthlyStats(worker, currentGlobalMonth);
+
+                // Fallback if driver picks up directly without manager marking it ready
+                let prepEnd = worker.activeOrder.prepEndTime;
+                if (!prepEnd && worker.activeOrder.prepTimeMs > 0) {
+                    prepEnd = worker.activeOrder.startTime;
+                }
+
                 stats.deliveriesList.unshift({
                     id: Date.now().toString(),
                     date: formatTimestamp(),
                     startTime: worker.activeOrder.startTime,
                     endTime: Date.now(),
-                    allocatedMs: worker.activeOrder.allocatedMs
+                    allocatedMs: worker.activeOrder.allocatedMs,
+                    prepStartTime: worker.activeOrder.prepStartTime || null,
+                    prepTimeMs: worker.activeOrder.prepTimeMs || 0,
+                    prepEndTime: prepEnd || null
                 });
             }
             worker.activeOrder = null;
@@ -4077,6 +4080,19 @@
                     if (diff > 0) statusHtml = `<span style="color:var(--danger)">Late by ${formatDuration(diff)} ❌</span>`;
                     else statusHtml = `<span style="color:var(--success)">On time ✅</span>`;
 
+                    let prepHtml = '';
+                    if (order.prepTimeMs > 0 && order.prepStartTime && order.prepEndTime) {
+                        const prepDuration = order.prepEndTime - order.prepStartTime;
+                        const prepDiff = prepDuration - order.prepTimeMs;
+                        const prepTimeTaken = formatDuration(prepDuration);
+
+                        if (prepDiff > 0) {
+                            prepHtml = `<div style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;">Kitchen Prep: <strong>${prepTimeTaken}</strong> <span style="color:var(--danger)">(Late by ${formatDuration(prepDiff)}) ❌</span></div>`;
+                        } else {
+                            prepHtml = `<div style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;">Kitchen Prep: <strong>${prepTimeTaken}</strong> <span style="color:var(--success)">(On time) ✅</span></div>`;
+                        }
+                    }
+
                     let delBtn = isAdmin ? `<button onclick="deleteDeliveryRecord('${worker.id}', '${order.id}')" class="btn-outline-danger admin-only" style="padding: 2px 6px; font-size: 0.7rem; border:none; text-decoration:underline;">Undo/Delete</button>` : '';
 
                     const div = document.createElement('div');
@@ -4089,8 +4105,9 @@
                                 ${delBtn}
                             </div>
                         </div>
-                        <div style="font-size:0.95rem; color:var(--text-main);">Delivered in: <strong>${timeTaken}</strong></div>
-                        <div style="font-size:0.85rem; margin-top:4px;">Status: ${statusHtml}</div>
+                        <div style="font-size:0.95rem; color:var(--text-main);">Delivery Time: <strong>${timeTaken}</strong></div>
+                        ${prepHtml}
+                        <div style="font-size:0.85rem; margin-top:4px;">Delivery Status: ${statusHtml}</div>
                     `;
                     ordersList.appendChild(div);
                 });
