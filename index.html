@@ -1411,26 +1411,25 @@
 
                 <!-- Manager Access Control -->
                 <div class="card">
-                    <h2 class="card-title" data-i18n="title-manager-access">Manager Access Control</h2>
+                    <h2 class="card-title">Manager Access Control</h2>
                     <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">Promote users to
                         global Admin status.</p>
                     <div class="form-group flex-between">
-                        <input type="email" id="new-manager-email" data-i18n="placeholder-email"
-                            placeholder="Enter email to promote...">
-                        <button onclick="addManager()" data-i18n="th-action">Promote</button>
+                        <input type="email" id="new-manager-email" placeholder="Enter email to promote...">
+                        <button onclick="addManager()">Promote</button>
                     </div>
                     <ul id="managers-list" style="list-style: none; margin-top: 16px;"></ul>
                 </div>
 
                 <!-- Worker Department Access Control -->
                 <div class="card">
-                    <h2 class="card-title" data-i18n="title-worker-access">Worker Department Access</h2>
+                    <h2 class="card-title">Worker Department Access</h2>
                     <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">Grant a specific
                         worker editing powers over a specific department.</p>
                     <div class="form-group">
-                        <label data-i18n="label-assign-to">Select Worker</label>
+                        <label>Select Worker</label>
                         <select id="perm-worker-select" onchange="loadWorkerPerms()">
-                            <option value="" data-i18n="opt-choose-emp">-- Choose Employee --</option>
+                            <option value="">-- Choose Employee --</option>
                         </select>
                     </div>
                     <div class="grid-2-col" style="margin-bottom: 16px;">
@@ -1452,11 +1451,10 @@
 
                 <!-- Branches Card -->
                 <div class="card">
-                    <h2 class="card-title" data-i18n="title-branches">Facility / Branches</h2>
+                    <h2 class="card-title">Facility / Branches</h2>
                     <div class="form-group flex-between">
-                        <input type="text" id="new-branch-name" data-i18n="placeholder-reason"
-                            placeholder="Enter branch name...">
-                        <button onclick="addBranch()" data-i18n="btn-save-shortcut">Add</button>
+                        <input type="text" id="new-branch-name" placeholder="Enter branch name...">
+                        <button onclick="addBranch()">Add</button>
                     </div>
                     <ul id="branches-list" style="list-style: none; margin-top: 16px;"></ul>
                 </div>
@@ -1478,23 +1476,21 @@
 
                 <!-- Add Worker Card -->
                 <div class="card">
-                    <h2 class="card-title" data-i18n="title-register-emp">Register Employee</h2>
-                    <div class="form-group"><label data-i18n="label-full-name">Full Name</label><input type="text"
-                            id="w-name" data-i18n="placeholder-desc-task" placeholder="e.g. Ahmed Ali"></div>
-                    <div class="form-group"><label data-i18n="placeholder-email">App Account Email</label><input
-                            type="email" id="w-email" data-i18n="placeholder-email" placeholder="Worker's Login Email">
-                    </div>
-                    <div class="form-group"><label data-i18n="label-role">Role / Position</label><input type="text"
-                            id="w-role" data-i18n="label-role" placeholder="e.g. Head Chef, Manager, Driver..."></div>
+                    <h2 class="card-title">Register Employee</h2>
+                    <div class="form-group"><label>Full Name</label><input type="text" id="w-name"
+                            placeholder="e.g. Ahmed Ali"></div>
+                    <div class="form-group"><label>App Account Email</label><input type="email" id="w-email"
+                            placeholder="Worker's Login Email"></div>
+                    <div class="form-group"><label>Role / Position</label><input type="text" id="w-role"
+                            placeholder="e.g. Head Chef, Manager, Driver..."></div>
                     <div class="grid-2-col">
                         <div class="form-group"><label>Start Time</label><input type="time" id="w-start-time"></div>
                         <div class="form-group"><label>End Time</label><input type="time" id="w-end-time"></div>
                     </div>
                     <div class="grid-2-col">
-                        <div class="form-group"><label data-i18n="th-base-salary">Base Salary (SAR)</label><input
-                                type="number" id="w-income" data-i18n="placeholder-amount" placeholder="0.00"></div>
-                        <div class="form-group"><label data-i18n="title-branches">Branch</label><select
-                                id="w-branch"></select></div>
+                        <div class="form-group"><label>Base Salary (SAR)</label><input type="number" id="w-income"
+                                placeholder="0.00"></div>
+                        <div class="form-group"><label>Branch</label><select id="w-branch"></select></div>
                     </div>
                     <button onclick="addWorker()" style="width: 100%; padding: 12px; margin-top: 8px;">Create
                         Record</button>
@@ -1505,14 +1501,14 @@
             <div>
                 <!-- Daily Notes & Management Card -->
                 <div class="card admin-only">
-                    <h2 class="card-title" data-i18n="title-ops-tracking">Daily Operations Tracking</h2>
+                    <h2 class="card-title">Daily Operations Tracking</h2>
 
                     <div class="form-group"
                         style="margin-bottom: 24px; padding: 16px; background: var(--input-bg); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-                        <label style="color: var(--primary);" data-i18n="label-assign-to">Select Employee Record</label>
+                        <label style="color: var(--primary);">Select Employee Record</label>
                         <select id="ops-worker-select" onchange="handleOpsWorkerChange()"
                             style="font-size: 1rem; padding: 12px;">
-                            <option value="" data-i18n="opt-choose-emp">-- Choose Employee --</option>
+                            <option value="">-- Choose Employee --</option>
                         </select>
                     </div>
 
@@ -1520,35 +1516,30 @@
 
                         <!-- Daily Log Form -->
                         <div class="management-form-area">
-                            <h3 style="margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;"
-                                data-i18n="title-ops-tracking">
+                            <h3
+                                style="margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
                                 Log Daily Performance / Vacation</h3>
                             <div class="grid-2-col">
-                                <div class="form-group"><label data-i18n="today-label">Start Date</label><input
-                                        type="date" id="log-date"></div>
+                                <div class="form-group"><label>Start Date</label><input type="date" id="log-date"></div>
                                 <div class="form-group">
-                                    <label data-i18n="label-urgency-level">Note Type</label>
+                                    <label>Note Type</label>
                                     <select id="log-type" onchange="toggleVacationDays()">
                                         <option value="good">Good Note ✅ (100% Score)</option>
                                         <option value="bad">Bad Note ❌ (2.5% Score)</option>
-                                        <option value="vacation" data-i18n="vacation">Vacation 🌴 (No Score)</option>
+                                        <option value="vacation">Vacation 🌴 (No Score)</option>
                                     </select>
                                 </div>
                             </div>
 
                             <div class="form-group" id="vacation-days-group" style="display: none; margin-top: 10px;">
-                                <label data-i18n="placeholder-stock-amt">Number of Consecutive Vacation Days</label>
-                                <input type="number" id="vacation-days" data-i18n="placeholder-stock-amt"
-                                    placeholder="e.g. 20" min="1" value="1">
+                                <label>Number of Consecutive Vacation Days</label>
+                                <input type="number" id="vacation-days" placeholder="e.g. 20" min="1" value="1">
                             </div>
 
-                            <div class="form-group" style="margin-top: 20px;"><label
-                                    data-i18n="placeholder-reason">Supervisor Notes</label><textarea id="log-note"
-                                    rows="2" data-i18n="placeholder-desc-task"
-                                    placeholder="Enter optional observations..."></textarea>
+                            <div class="form-group" style="margin-top: 20px;"><label>Supervisor Notes</label><textarea
+                                    id="log-note" rows="2" placeholder="Enter optional observations..."></textarea>
                             </div>
-                            <button onclick="addDailyLog()" style="width: 100%; padding: 12px;"
-                                data-i18n="btn-assign-task">Submit Record</button>
+                            <button onclick="addDailyLog()" style="width: 100%; padding: 12px;">Submit Record</button>
                         </div>
 
                         <!-- History -->
@@ -1562,14 +1553,14 @@
 
                 <!-- Quick Roster Overview -->
                 <div class="card">
-                    <h2 class="card-title" data-i18n="title-ops-directory">Ops Directory</h2>
+                    <h2 class="card-title">Ops Directory</h2>
                     <div class="table-container">
                         <table id="ops-workers-table">
                             <thead>
                                 <tr>
-                                    <th data-i18n="th-emp-branch">Employee & Role</th>
-                                    <th data-i18n="avg-perf">Avg Perf</th>
-                                    <th class="admin-only" data-i18n="th-action">Manage</th>
+                                    <th>Employee & Role</th>
+                                    <th>Avg Perf</th>
+                                    <th class="admin-only">Manage</th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
@@ -2230,8 +2221,7 @@
             const todayDateDisplay = document.getElementById('today-date-display');
             if (todayDateDisplay) {
                 const options = { year: 'numeric', month: 'long', day: 'numeric' };
-                const dateStr = new Date().toLocaleDateString(currentAppLang === "ar" ? 'ar-SA' : 'en-US', options);
-                todayDateDisplay.textContent = `(${t('today-label')}: ${dateStr})`;
+                todayDateDisplay.textContent = "(Today: " + new Date().toLocaleDateString('en-US', options) + ")";
             }
         }
 
@@ -2459,7 +2449,7 @@
                             const currentTaskIds = myWorker.jobs.map(j => j.id);
                             const newTasks = currentTaskIds.filter(id => !previousTaskIds.includes(id));
                             if (newTasks.length > 0) {
-                                showInAppNotification('📋 ' + t('tab-tasks') + '!');
+                                showInAppNotification('📋 You have been assigned a new task!');
                             }
                             previousTaskIds = currentTaskIds;
                         }
@@ -2520,12 +2510,12 @@
                 const deadline = parseInt(t.getAttribute('data-deadline'));
                 const diff = deadline - Date.now();
                 if (diff <= 0) {
-                    t.innerHTML = `🚨 ${t('time-expired')}`;
+                    t.innerHTML = `🚨 LATE! Time expired.`;
                     t.style.color = 'var(--danger)';
                 } else {
                     const m = Math.floor(diff / 60000);
                     const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-                    t.innerHTML = `⏳ ${t('desc-time-remaining')}: ${m}:${s}`;
+                    t.innerHTML = `⏳ Time remaining: ${m}:${s}`;
                     t.style.color = 'var(--warning)';
                 }
             });
@@ -2539,7 +2529,7 @@
                 const diff = deadline - Date.now();
                 if (diff <= 0) {
                     t.classList.remove('viol-timer');
-                    t.innerHTML = `🚨 ${t('applied-expired-badge')}`;
+                    t.innerHTML = '🚨 Applied (Time Expired)';
                     t.style.color = 'var(--danger)';
                     const parent = t.closest('.flex-between');
                     if (parent && parent.children[1]) parent.children[1].innerHTML = '';
@@ -2548,7 +2538,7 @@
                     const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
                     const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
                     const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-                    t.innerHTML = `⏳ ${t('pending-label')} (${h}h ${m}m ${s}s ${t('left-label')})`;
+                    t.innerHTML = `⏳ Pending (${h}h ${m}m ${s}s left)`;
                 }
             });
 
@@ -2733,8 +2723,8 @@
             const lowItems = data.warehouse.filter(i => i.currentStock <= i.riskAmount);
 
             if (lowItems.length > 0) {
-                const names = lowItems.map(i => `${i.name} (${i.currentStock} ${t('left-label')})`).join(', ');
-                alertBox.innerHTML = `<span style="font-size: 1.2rem; margin-right: 10px;">🚨</span> <strong>${t('risk-alert-title') || 'CRITICAL STOCK WARNING'}:</strong> ${names}.`;
+                const names = lowItems.map(i => `${i.name} (${i.currentStock} left)`).join(', ');
+                alertBox.innerHTML = `<span style="font-size: 1.2rem; margin-right: 10px;">🚨</span> <strong>CRITICAL STOCK WARNING:</strong> ${names}. Please restock immediately.`;
                 alertBox.style.display = 'block';
             } else { alertBox.style.display = 'none'; }
         }
@@ -2751,7 +2741,7 @@
             const searchQuery = document.getElementById('wh-search').value.toLowerCase();
 
             if (!data.warehouse || data.warehouse.length === 0) {
-                list.innerHTML = `<p style="color:var(--text-muted); text-align:center; padding:20px; background:var(--input-bg); border-radius:var(--radius-md);">${t('no-manual-notes')}</p>`;
+                list.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:20px; background:var(--input-bg); border-radius:var(--radius-md);">No products currently tracked in warehouse.</p>';
                 return;
             }
 
@@ -2778,19 +2768,19 @@
                         <h3 style="margin:0; color:var(--text-main); font-size:1.15rem;">${item.name}</h3>
                         <div style="text-align:right;"><span style="font-size:1.4rem; font-weight:800; color:${isLow ? 'var(--danger)' : 'var(--primary)'}">${item.currentStock}</span> <span style="color:var(--text-muted); font-weight:600;">/ ${item.maxStock}</span></div>
                     </div>
-                    ${isLow ? `<div class="text-danger" style="font-size:0.8rem; margin-top:4px; font-weight:600;">⚠️ ${t('risk-alert-msg') || 'Below risk threshold'} (${item.riskAmount})</div>` : ''}
+                    ${isLow ? `<div class="text-danger" style="font-size:0.8rem; margin-top:4px; font-weight:600;">⚠️ Below risk threshold (${item.riskAmount})</div>` : ''}
                     <div class="wh-progress"><div class="wh-fill ${isLow ? 'low' : ''}" style="width: ${pct}%"></div></div>
                     <div class="flex-between" style="margin-top: 20px; flex-wrap:wrap; gap:10px;">
                         <div style="display:flex; gap:8px; flex:1; min-width: 200px;">
-                            <input type="number" id="wh-update-${item.id}" placeholder="${t('placeholder-stock-amt')}" style="flex:1;" min="0">
-                            <button onclick="updateWarehouseStock('${item.id}')" class="btn-success" data-i18n="tab-ops">Update</button>
+                            <input type="number" id="wh-update-${item.id}" placeholder="Type exact amount left..." style="flex:1;" min="0">
+                            <button onclick="updateWarehouseStock('${item.id}')" class="btn-success">Update</button>
                         </div>
                         <div style="display:flex; gap:8px;">
                             <button onclick="toggleDetails('wh-logs-${item.id}')" class="btn-neutral">History Log</button>
-                            ${isWHAdmin ? `<button onclick="deleteWarehouseItem('${item.id}')" class="btn-outline-danger" data-i18n="delete-btn">Delete</button>` : ''}
+                            ${isWHAdmin ? `<button onclick="deleteWarehouseItem('${item.id}')" class="btn-outline-danger">Delete</button>` : ''}
                         </div>
                     </div>
-                    <div id="wh-logs-${item.id}" class="wh-logs" style="display:none;">${logsHtml || t('no-logs-month')}</div>`;
+                    <div id="wh-logs-${item.id}" class="wh-logs" style="display:none;">${logsHtml || 'No logs yet.'}</div>`;
                 list.appendChild(div);
             });
         }
@@ -3202,59 +3192,59 @@
                 .footer { margin-top: 24px; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; }
             </style></head><body>
                 <div class="header">
-                    <div style="${textAlign === 'right' ? 'text-align:right;' : ''}">
-                        <h1>💰 ${t('title-export-fin')}</h1>
-                        <div style="font-size:13px; margin-top:4px; opacity:0.9;">${worker.name} &nbsp;•&nbsp; ${worker.role || t('unassigned')} &nbsp;•&nbsp; ${worker.branch || ''}</div>
+                    <div>
+                        <h1>💰 Financial Report</h1>
+                        <div style="font-size:13px; margin-top:4px; opacity:0.9;">${worker.name} &nbsp;•&nbsp; ${worker.role || 'Staff'} &nbsp;•&nbsp; ${worker.branch || ''}</div>
                     </div>
-                    <div class="meta" style="${textAlign === 'left' ? 'text-align:left;' : ''}">
-                        <div>${t('operating-month')}: <strong>${currentGlobalMonth}</strong></div>
-                        <div>${t('shift')}: ${worker.startTime || '--'} – ${worker.endTime || '--'}</div>
+                    <div class="meta">
+                        <div>Month: <strong>${currentGlobalMonth}</strong></div>
+                        <div>Shift: ${worker.startTime || '--'} – ${worker.endTime || '--'}</div>
                     </div>
                 </div>
 
                 <div class="summary-grid">
                     <div class="summary-card">
-                        <div class="label">${t('th-base-salary')}</div>
+                        <div class="label">Base Salary</div>
                         <div class="value" style="color:${headerColor};">SAR ${base.toLocaleString()}</div>
                     </div>
                     <div class="summary-card">
-                        <div class="label">${t('span-net-month')}</div>
+                        <div class="label">Net This Month</div>
                         <div class="value" style="color:${net >= 0 ? '#16a34a' : '#dc2626'};">SAR ${net.toLocaleString()}</div>
                     </div>
                     <div class="summary-card" style="border-color:#b45309; background:#fffbeb;">
-                        <div class="label">${t('rem-to-pay')}</div>
+                        <div class="label">Total Remaining (All-Time)</div>
                         <div class="value" style="color:#b45309;">SAR ${allTimeRemaining.toLocaleString()}</div>
                     </div>
                     <div class="summary-card">
-                        <div class="label">${t('box-rewards')}</div>
+                        <div class="label">Rewards</div>
                         <div class="value" style="color:#16a34a;">+ SAR ${rewards.toLocaleString()}</div>
                     </div>
                     <div class="summary-card">
-                        <div class="label">${t('box-violations')}</div>
+                        <div class="label">Violations</div>
                         <div class="value" style="color:#dc2626;">- SAR ${violations.toLocaleString()}</div>
                     </div>
                     <div class="summary-card">
-                        <div class="label">${t('box-custody')}</div>
+                        <div class="label">Custody</div>
                         <div class="value" style="color:#d97706;">SAR ${custodyTotal.toLocaleString()}</div>
                     </div>
                 </div>
 
-                <div class="section-title">${t('viol-deadlines')}</div>
-                <table dir="${direction}">
-                    <thead><tr><th>${t('today-label')}</th><th>${t('placeholder-reason')}</th><th>SAR</th><th>${t('th-action')}</th></tr></thead>
+                <div class="section-title">⚠️ Violations & Fix Status</div>
+                <table>
+                    <thead><tr><th>Date</th><th>Reason</th><th>Amount</th><th>Status / Fix Time</th></tr></thead>
                     <tbody>${violRows}</tbody>
                 </table>
 
-                <div class="section-title">💵 ${t('box-advances')}</div>
-                <table dir="${direction}">
-                    <thead><tr><th>${t('today-label')}</th><th>SAR</th></tr></thead>
+                <div class="section-title">💵 Advance Payments This Month</div>
+                <table>
+                    <thead><tr><th>Date</th><th>Amount Paid</th></tr></thead>
                     <tbody>${payRows}</tbody>
-                    <tfoot><tr class="highlight-row"><td style="padding:8px 10px; border:1px solid #e2e8f0;">${t('span-total')}</td><td style="padding:8px 10px; border:1px solid #e2e8f0; color:#0284c7;">SAR ${paid.toLocaleString()}</td></tr></tfoot>
+                    <tfoot><tr class="highlight-row"><td style="padding:8px 10px; border:1px solid #e2e8f0;">Total Paid</td><td style="padding:8px 10px; border:1px solid #e2e8f0; color:#0284c7;">SAR ${paid.toLocaleString()}</td></tr></tfoot>
                 </table>
 
-                <div class="footer" style="flex-direction: ${direction === 'rtl' ? 'row-reverse' : 'row'};">
-                    <span>${t('app-title')}</span>
-                    <span>${t('generatedOn')} ${new Date().toLocaleString(currentAppLang === 'ar' ? 'ar-SA' : 'en-US')}</span>
+                <div class="footer">
+                    <span>Burgeroov Management Portal</span>
+                    <span>Generated: ${new Date().toLocaleString()}</span>
                 </div>
             </body></html>`;
 
@@ -3375,7 +3365,7 @@
             const workers = getVisibleWorkers();
 
             if (workers.length === 0 && (!currentUser || currentUser.role !== 'admin')) {
-                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">${t('not-linked-worker')}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">Your account is not linked to any worker profile yet.</td></tr>`;
                 return;
             }
 
@@ -3404,8 +3394,8 @@
                             <span style="font-size:0.7rem; color:var(--primary);">▼ Log</span>
                         </div>
                         <div class="breakdown-details" id="${detailsId}" style="max-height: 200px; overflow-y:auto; margin-top: 10px;">
-                            <strong style="display:block; border-bottom:1px solid var(--border-color); margin-bottom:8px; padding-bottom:4px; color:var(--text-main);">${t('desc-active-drivers')}</strong>
-                            ${relevantLogs.length === 0 ? `<em style="color:var(--text-muted)">${t('no-logs-month')}</em>` : relevantLogs.map(l => `
+                            <strong style="display:block; border-bottom:1px solid var(--border-color); margin-bottom:8px; padding-bottom:4px; color:var(--text-main);">Last 90 Days Log</strong>
+                            ${relevantLogs.length === 0 ? '<em style="color:var(--text-muted)">No logs found.</em>' : relevantLogs.map(l => `
                                 <div class="breakdown-row" style="padding:4px 0; border-bottom:1px solid rgba(0,0,0,0.05);">
                                     <span style="color:var(--text-muted); font-size:0.75rem;">${l.date}</span> 
                                     <span style="${l.noteType === 'vacation' ? 'color:var(--warning)' : (l.score == 100 ? 'color:var(--success)' : 'color:var(--danger)')}">
@@ -4210,24 +4200,24 @@
             if (!worker) return;
             let displayLogs = getLogsForMonth(worker, currentGlobalMonth);
 
-            if (displayLogs.length === 0) { if (hist) hist.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:24px;background:var(--input-bg);border-radius:var(--radius-md);">${t('no-logs-month')}</p>`; return; }
+            if (displayLogs.length === 0) { if (hist) hist.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:24px;background:var(--input-bg);border-radius:var(--radius-md);">No logs found for this month.</p>`; return; }
 
             displayLogs.forEach(log => {
                 const div = document.createElement('div'); div.className = 'log-entry';
 
                 let typeBadge = '';
                 if (log.noteType === 'vacation' || log.score === 'vacation') {
-                    typeBadge = `<span class="badge" style="background:var(--warning); color:var(--text-main);">${t('vacation')}</span>`;
+                    typeBadge = `<span class="badge" style="background:var(--warning); color:var(--text-main);">Vacation 🌴</span>`;
                 } else if (log.noteType === 'good' || log.score == 100) {
-                    typeBadge = `<span class="badge badge-good">${t('good-note-badge')}</span>`;
+                    typeBadge = `<span class="badge badge-good">Good Note ✅</span>`;
                 } else {
-                    typeBadge = `<span class="badge badge-bad">${t('bad-note-badge')}</span>`;
+                    typeBadge = `<span class="badge badge-bad">Bad Note ❌</span>`;
                 }
 
-                let delBtn = isAdmin ? `<button class="btn-outline-danger admin-only" style="padding:4px 8px;font-size:0.75rem;border:none;text-decoration:underline;" onclick="deleteLog('${worker.id}', '${log.date}')">${t('delete-btn')}</button>` : '';
+                let delBtn = isAdmin ? `<button class="btn-outline-danger admin-only" style="padding:4px 8px;font-size:0.75rem;border:none;text-decoration:underline;" onclick="deleteLog('${worker.id}', '${log.date}')">Delete</button>` : '';
                 div.innerHTML = `
                     <div class="flex-between log-date"><strong style="color:var(--text-main);">📅 ${log.date}</strong><div style="display:flex;align-items:center;gap:8px;">${typeBadge} ${delBtn}</div></div>
-                    <div class="log-note-text">${log.note ? log.note : `<em style="color:var(--text-muted);">${t('no-manual-notes')}</em>`}</div>`;
+                    <div class="log-note-text">${log.note ? log.note : '<em style="color:var(--text-muted);">No manual notes.</em>'}</div>`;
                 if (hist) hist.appendChild(div);
             });
         }
@@ -4434,14 +4424,6 @@
             }
         }
 
-        // Translation Helper Function
-        function t(key) {
-            if (!uiTranslations[currentAppLang] || !uiTranslations[currentAppLang][key]) {
-                return uiTranslations["en"][key] || key;
-            }
-            return uiTranslations[currentAppLang][key];
-        }
-
         // SUMMARY TAB RENDERING
         function renderSummaryTable() {
             const container = document.getElementById('summary-cards-container');
@@ -4481,19 +4463,19 @@
                 let violCellHtml = '';
                 const violList = stats.violationsList || [];
                 if (violList.length === 0) {
-                    violCellHtml = `<div style="color:var(--success); font-size:0.9rem; font-weight:600; padding: 12px; background:var(--success-bg); border-radius:8px; border:1px solid var(--success-border); text-align:center;">${t('no-viol-month')}</div>`;
+                    violCellHtml = `<div style="color:var(--success); font-size:0.9rem; font-weight:600; padding: 12px; background:var(--success-bg); border-radius:8px; border:1px solid var(--success-border); text-align:center;">✅ No violations recorded this month.</div>`;
                 } else {
                     violList.forEach(v => {
                         let badge = '';
                         if (v.status === 'waived') {
                             badge = `<div style="margin-bottom:8px; padding:10px 12px; background:var(--success-bg); border:1px solid var(--success-border); border-radius:8px; font-size:0.85rem;">
                                 <div style="font-weight:600; color:var(--text-main); margin-bottom:4px;">✅ ${v.reason}</div>
-                                <div style="color:var(--success);">${t('fixed-waived')}</div>
+                                <div style="color:var(--success);">Fixed – Waived ✔</div>
                             </div>`;
                         } else if (v.status === 'active' || !v.status) {
                             badge = `<div style="margin-bottom:8px; padding:10px 12px; background:var(--danger-bg); border:1px solid var(--danger-border); border-radius:8px; font-size:0.85rem;">
                                 <div style="font-weight:600; color:var(--text-main); margin-bottom:4px;">🚨 ${v.reason}</div>
-                                <div style="color:var(--danger); font-weight:500;">${t('penalty-applied')} – SAR ${parseFloat(v.amount).toLocaleString()}</div>
+                                <div style="color:var(--danger); font-weight:500;">Penalty Applied – SAR ${parseFloat(v.amount).toLocaleString()}</div>
                             </div>`;
                         } else if (v.status === 'pending') {
                             const deadline = v.timestamp + (v.graceDays * 86400000);
@@ -4501,7 +4483,7 @@
                             if (timeLeft <= 0) {
                                 badge = `<div style="margin-bottom:8px; padding:10px 12px; background:var(--danger-bg); border:1px solid var(--danger-border); border-radius:8px; font-size:0.85rem;">
                                     <div style="font-weight:600; color:var(--text-main); margin-bottom:4px;">🚨 ${v.reason}</div>
-                                    <div style="color:var(--danger); font-weight:500;">${t('time-expired')} – ${t('penalty-applied')} (SAR ${parseFloat(v.amount).toLocaleString()})</div>
+                                    <div style="color:var(--danger); font-weight:500;">Time Expired – Penalty Applied (SAR ${parseFloat(v.amount).toLocaleString()})</div>
                                 </div>`;
                             } else {
                                 const totalHours = Math.floor(timeLeft / 3600000);
@@ -4509,13 +4491,13 @@
                                 const hoursLeft = totalHours % 24;
                                 const minsLeft = Math.floor((timeLeft % 3600000) / 60000);
                                 let timeStr = '';
-                                if (daysLeft > 0) timeStr = `${daysLeft}d ${hoursLeft}h ${t('left-label')}`;
-                                else if (hoursLeft > 0) timeStr = `${hoursLeft}h ${minsLeft}m ${t('left-label')}`;
-                                else timeStr = `${minsLeft}m ${t('left-label')}`;
+                                if (daysLeft > 0) timeStr = `${daysLeft}d ${hoursLeft}h left`;
+                                else if (hoursLeft > 0) timeStr = `${hoursLeft}h ${minsLeft}m left`;
+                                else timeStr = `${minsLeft}m left`;
                                 badge = `<div style="margin-bottom:8px; padding:10px 12px; background:var(--warning-bg); border:1px solid var(--warning-border); border-radius:8px; font-size:0.85rem;">
                                     <div style="font-weight:600; color:var(--text-main); margin-bottom:4px;">⚠️ ${v.reason}</div>
-                                    <div style="color:var(--warning); font-weight:600;">⏳ ${t('fix-within')} ${timeStr}</div>
-                                    <div style="color:var(--text-muted); font-size:0.75rem; margin-top:2px;">${t('penalty-if-not-fixed')} SAR ${parseFloat(v.amount).toLocaleString()}</div>
+                                    <div style="color:var(--warning); font-weight:600;">⏳ Fix within: ${timeStr}</div>
+                                    <div style="color:var(--text-muted); font-size:0.75rem; margin-top:2px;">Penalty if not fixed: SAR ${parseFloat(v.amount).toLocaleString()}</div>
                                 </div>`;
                             }
                         }
@@ -4535,30 +4517,30 @@
                             </div>
                         </div>
                         <div style="text-align:right; background:var(--input-bg); padding:12px 16px; border-radius:8px; border:1px solid var(--border-color);">
-                            <div style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; font-weight:600; letter-spacing:0.5px; margin-bottom:4px;">${t('rem-to-pay')}</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; font-weight:600; letter-spacing:0.5px; margin-bottom:4px;">Remaining To Pay (All-Time)</div>
                             <div style="font-size:1.4rem; font-weight:800; color:var(--primary);">SAR ${remainingAllTime.toLocaleString()}</div>
                         </div>
                     </div>
 
                     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap:12px; margin-bottom:20px;">
                         <div style="background:var(--input-bg); padding:16px 12px; border-radius:8px; text-align:center; border:1px solid var(--border-color);">
-                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">${t('good-notes')}</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">Good Notes</div>
                             <div style="font-size:1.4rem; font-weight:700; color:var(--success); line-height:1;">${goodCount}</div>
                         </div>
                         <div style="background:var(--input-bg); padding:16px 12px; border-radius:8px; text-align:center; border:1px solid var(--border-color);">
-                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">${t('bad-notes')}</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">Bad Notes</div>
                             <div style="font-size:1.4rem; font-weight:700; color:var(--danger); line-height:1;">${badCount}</div>
                         </div>
                         <div style="background:var(--input-bg); padding:16px 12px; border-radius:8px; text-align:center; border:1px solid var(--border-color);">
-                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">${t('deliveries')}</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">Deliveries</div>
                             <div style="font-size:1.4rem; font-weight:700; color:var(--warning); line-height:1;">${deliveries}</div>
                         </div>
                         <div style="background:var(--input-bg); padding:16px 12px; border-radius:8px; text-align:center; border:1px solid var(--border-color);">
-                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">${t('tasks-done')}</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">Tasks Done</div>
                             <div style="font-size:1.4rem; font-weight:700; color:var(--primary); line-height:1;">${tasksDoneThisMonth}</div>
                         </div>
                         <div style="background:var(--input-bg); padding:16px 12px; border-radius:8px; text-align:center; border:1px solid var(--border-color);">
-                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">${t('avg-perf')}</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">Avg Perf</div>
                             <div style="font-size:1.4rem; font-weight:700; color:var(--text-main); line-height:1;">${avg}</div>
                         </div>
                     </div>
@@ -4566,15 +4548,15 @@
                     <div style="display:flex; gap:16px; flex-wrap:wrap;">
                         <div style="flex:2; min-width:300px; background:var(--input-bg); padding:16px; border-radius:8px; border:1px solid var(--border-color);">
                             <div style="font-size:0.95rem; font-weight:600; color:var(--text-main); margin-bottom:12px; display:flex; align-items:center; gap:8px;">
-                                ⚠️ ${t('viol-deadlines')}
+                                ⚠️ Violations & Fix Deadlines
                             </div>
                             <div style="max-height:200px; overflow-y:auto; padding-right:4px;">
                                 ${violCellHtml}
                             </div>
                         </div>
                         <div style="flex:1; min-width:200px; background:var(--input-bg); padding:20px 16px; border-radius:8px; border:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; text-align:center;">
-                            <div style="font-size:0.9rem; font-weight:600; color:var(--text-main); margin-bottom:8px;">${t('company-costs')}</div>
-                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:16px; line-height:1.4;">${t('costs-desc')}</div>
+                            <div style="font-size:0.9rem; font-weight:600; color:var(--text-main); margin-bottom:8px;">Company Costs</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:16px; line-height:1.4;">Costs associated with this employee this month.</div>
                             <div style="font-size:1.4rem; font-weight:700; color:var(--danger); background:var(--danger-bg); padding:10px; border-radius:6px; border:1px solid var(--danger-border);">SAR ${costs.toLocaleString()}</div>
                         </div>
                     </div>
@@ -4588,7 +4570,6 @@
         // =============================================
         const uiTranslations = {
             en: {
-                "today-label": "Today",
                 // Auth Screen
                 "auth-title-login": "Login to Dashboard",
                 "auth-title-signup": "Create Viewer Account",
@@ -4615,76 +4596,6 @@
                 "tab-drivers": "🚚 Drivers",
                 "tab-finance": "💰 Financial",
                 "tab-summary": "📊 Summary",
-
-                // Operations Section
-                "title-manager-access": "Manager Access Control",
-                "title-worker-access": "Worker Department Access",
-                "title-branches": "Facility / Branches",
-                "title-violation-rules": "Violation Rules System",
-                "title-register-emp": "Register Employee",
-                "title-ops-tracking": "Daily Operations Tracking",
-                "title-ops-directory": "Ops Directory",
-                "label-full-name": "Full Name",
-                "label-role": "Role / Position",
-
-                // Financial Section
-                "title-fin-adj": "Financial Adjustments",
-                "title-payroll-ledger": "Payroll & Finance Ledger",
-                "stat-total-due": "Total Due (All-Time)",
-                "box-advances": "Paid This Month (Advances)",
-                "box-rewards": "Rewards & Bonuses",
-                "box-violations": "Violations (Deductions)",
-                "box-custody": "Custody Management",
-                "box-costs": "Company Costs (Tracking)",
-                "box-initial-bal": "Initial Carried Balance",
-                "btn-export-pdf": "📄 Download PDF",
-
-                // Warehouse & Drivers
-                "title-inventory": "Inventory Tracking",
-                "btn-restock-pdf": "📄 Restock PDF",
-                "placeholder-search": "🔍 Search items...",
-                "title-active-drivers": "Active Drivers",
-                "title-driver-ctrl": "Driver Delivery Control",
-
-                // Summary
-                "title-summary-main": "Monthly Summary & Continuous Balance",
-                "rem-to-pay": "Remaining To Pay (All-Time)",
-                "good-notes": "Good Notes",
-                "bad-notes": "Bad Notes",
-                "deliveries": "Deliveries",
-                "tasks-done": "Tasks Done",
-                "avg-perf": "Avg Perf",
-                "viol-deadlines": "Violations & Fix Deadlines",
-                "company-costs": "Company Costs",
-                "costs-desc": "Costs associated with this employee this month.",
-                "no-viol-month": "✅ No violations recorded this month.",
-                "fixed-waived": "Fixed – Waived ✔",
-                "penalty-applied": "Penalty Applied",
-                "time-expired": "Time Expired",
-                "fix-within": "Fix within:",
-                "penalty-if-not-fixed": "Penalty if not fixed:",
-                "vacation": "Vacation 🌴",
-                "good-note-badge": "Good Note ✅",
-                "bad-note-badge": "Bad Note ❌",
-                "no-manual-notes": "No manual notes.",
-                "no-logs-month": "No logs found for this month.",
-                "base-label": "Base:",
-                "rewards-label": "Rewards:",
-                "violations-label": "Violations:",
-                "paid-advance-label": "Paid Advance:",
-                "undo-btn": "Undo",
-                "delete-btn": "Delete",
-                "given-label": "Given:",
-                "returned-label": "Returned:",
-                "waived-fixed-badge": "✅ Waived (Fixed)",
-                "penalty-applied-badge": "🚨 Penalty Applied",
-                "applied-expired-badge": "🚨 Applied (Time Expired)",
-                "pending-label": "Pending",
-                "left-label": "left",
-                "fixed-waive-btn": "Fixed (Waive)",
-                "not-fixed-apply-btn": "Not Fixed (Apply)",
-                "not-linked-worker": "Your account is not linked to any worker profile yet.",
-                "delete-worker-btn": "Delete Worker",
 
                 // Operations Section
                 "title-manager-access": "Manager Access Control",
@@ -4875,43 +4786,6 @@
 
                 // الملخص
                 "title-summary-main": "الملخص الشهري والرصيد المستمر",
-                "rem-to-pay": "إجمالي المتبقي (كلي)",
-                "good-notes": "ملاحظات جيدة",
-                "bad-notes": "ملاحظات سلبية",
-                "deliveries": "التوصيلات",
-                "tasks-done": "مهام منجزة",
-                "avg-perf": "متوسط الأداء",
-                "viol-deadlines": "المخالفات ومواعيد الإصلاح",
-                "company-costs": "تكاليف الشركة",
-                "costs-desc": "التكاليف المرتبطة بهذا الموظف هذا الشهر.",
-                "no-viol-month": "✅ لا توجد مخالفات مسجلة هذا الشهر.",
-                "fixed-waived": "تم الإصلاح - إعفاء ✔",
-                "penalty-applied": "تم تطبيق الجزاء",
-                "time-expired": "انتهت المهلة",
-                "fix-within": "أصلح خلال:",
-                "penalty-if-not-fixed": "الجزاء في حال عدم الإصلاح:",
-                "vacation": "إجازة 🌴",
-                "good-note-badge": "ملاحظة جيدة ✅",
-                "bad-note-badge": "ملاحظة سلبية ❌",
-                "no-manual-notes": "لا توجد ملاحظات يدوية.",
-                "no-logs-month": "لا توجد سجلات لهذا الشهر.",
-                "base-label": "الأساسي:",
-                "rewards-label": "المكافآت:",
-                "violations-label": "المخالفات:",
-                "paid-advance-label": "سلفة مدفوعة:",
-                "undo-btn": "تراجع",
-                "delete-btn": "حذف",
-                "given-label": "تم الإعطاء:",
-                "returned-label": "تم الاسترداد:",
-                "waived-fixed-badge": "✅ معفى (تم الإصلاح)",
-                "penalty-applied-badge": "🚨 تم تطبيق العقوبة",
-                "applied-expired-badge": "🚨 تم التطبيق (انتهى الوقت)",
-                "pending-label": "قيد الانتظار",
-                "left-label": "متبقي",
-                "fixed-waive-btn": "تم الإصلاح (إعفاء)",
-                "not-fixed-apply-btn": "لم يتم الإصلاح (تطبيق)",
-                "not-linked-worker": "حسابك غير مرتبط بأي ملف موظف بعد.",
-                "delete-worker-btn": "حذف الموظف",
 
                 // Ranks
                 "title-ranks-eval": "تقييم وترتيب الموظفين (عرض 90 يوم)",
@@ -5029,25 +4903,12 @@
                     // معالجة حقول الإدخال (Placeholder)
                     if (el.tagName === "INPUT" && el.hasAttribute("placeholder")) {
                         el.placeholder = translation;
-                    } else if (el.tagName === "INPUT" && el.type === "button") {
-                        el.value = translation;
-                    } else if (el.tagName === "BUTTON") {
-                        // Preserve icon/emoji if present
-                        const existingIcon = el.innerHTML.match(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}]/u);
-                        if (existingIcon && !translation.includes(existingIcon[0])) {
-                            el.innerHTML = existingIcon[0] + " " + translation;
-                        } else {
-                            el.innerHTML = translation;
-                        }
                     } else {
                         // معالجة النصوص العادية
                         el.innerHTML = translation;
                     }
                 }
             });
-
-            // Update any dynamic displays that depend on currentAppLang
-            setTodayDisplay();
         }
 
         function toggleLanguage() {
