@@ -1814,7 +1814,6 @@
                                     <select id="driver-order-status" onchange="toggleDriverPrepTime()">
                                         <option value="ready">🟢 Ready Now</option>
                                         <option value="preparing">🟡 Preparing</option>
-                                        <option value="not_ready">🔴 Not Ready</option>
                                     </select>
                                 </div>
                                 <div class="form-group" id="driver-prep-time-group"
@@ -3811,9 +3810,36 @@
             }
         }
 
+        function forceOrderReady(workerId) {
+            if (!confirm("Force this order to Ready status immediately?")) return;
+            if (!workerId) workerId = activeDriverId;
+            if (!workerId) return;
+            const worker = getCompanyData().workers.find(w => w.id === workerId);
+            if (worker && worker.activeOrder) {
+                worker.activeOrder.status = 'ready';
+                saveData();
+            }
+        }
+
+        // NEW: Allows Manager to skip the prep timer and alert the driver immediately
+        function markOrderReady(workerId) {
+            if (!workerId) workerId = activeDriverId;
+            if (!workerId) return;
+            const worker = getCompanyData().workers.find(w => w.id === workerId);
+            if (worker && worker.activeOrder && worker.activeOrder.status === 'preparing') {
+                worker.activeOrder.status = 'ready';
+                saveData();
+            }
+        }
+
         function finishDriverOrder(isSuccess, workerId) {
             if (!workerId) workerId = activeDriverId;
             if (!workerId) return;
+
+            // Ask for confirmation before cancelling an order
+            if (!isSuccess && !confirm("Are you sure you want to completely cancel this order?")) {
+                return;
+            }
 
             const worker = getCompanyData().workers.find(w => w.id === workerId);
             if (isSuccess && worker.activeOrder) {
@@ -3993,12 +4019,29 @@
                 // Inject Panel Action Buttons
                 const panelActions = document.getElementById('panel-driver-actions');
                 let html = '';
+
+                // Check if user is a Master Admin OR has the 'Drivers Admin' permission
+                const isManager = currentUser && (currentUser.role === 'admin' || document.body.classList.contains('perm-drivers'));
+
+                // 1. Force Ready Button (Managers Only, when preparing)
+                if (isManager && worker.activeOrder.status === 'preparing') {
+                    html += `<div style="width: 100%; text-align: center; margin-bottom: 12px;">
+                                <button onclick="forceOrderReady('${worker.id}')" class="btn-info" style="padding: 12px 24px; width: 100%;">🟢 Force Kitchen Ready</button>
+                             </div>`;
+                }
+
+                // 2. Pickup / Deliver Buttons (Visible to Driver & Managers)
                 if (worker.activeOrder.status !== 'picked_up') {
                     html += `<button onclick="pickupDriverOrder('${worker.id}')" class="btn-warning" style="padding: 12px 24px;">📦 Mark as Received/Picked Up</button>`;
                 } else {
-                    html += `<button onclick="finishDriverOrder(true, '${worker.id}')" class="btn-success" style="padding: 12px 24px;">✅ Order Delivered Successfully</button>`;
+                    html += `<button onclick="finishDriverOrder(true, '${worker.id}')" class="btn-success" style="padding: 12px 24px;">✅ Order Delivered</button>`;
                 }
-                html += `<button onclick="finishDriverOrder(false, '${worker.id}')" class="btn-danger admin-only" style="padding: 12px 24px;">❌ Cancel Order (Admin)</button>`;
+
+                // 3. Cancel Button (Managers Only, ALWAYS available at any stage)
+                if (isManager) {
+                    html += `<button onclick="finishDriverOrder(false, '${worker.id}')" class="btn-danger" style="padding: 12px 24px;">❌ Cancel Order</button>`;
+                }
+
                 panelActions.innerHTML = html;
 
                 updateActiveDriverTimer();
