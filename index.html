@@ -2367,6 +2367,7 @@
                 }
             }
 
+            currentUser.isKinan = isKinan;
             currentUser.role = isAdmin ? 'admin' : 'worker';
 
             document.body.className = 'theme-burgeroov'; // reset all dynamic classes
@@ -2637,8 +2638,8 @@
         }
 
         function deleteManager(email) {
-            if (!currentUser.isKinan) return alert("Only the ultimate admin can remove managers.");
-            if (email === 'kinan.rahal@hotmail.com') return alert("Cannot remove master admin.");
+            if (!currentUser.isKinan) return alert(t('only-master-admin') || "Only the ultimate admin can remove managers.");
+            if (email === 'kinan.rahal@hotmail.com') return alert(t('cannot-remove-master') || "Cannot remove master admin.");
             if (confirm(`Remove ${email} from Managers?`)) {
                 appData.burgeroov.admins = appData.burgeroov.admins.filter(e => e !== email);
                 saveData();
@@ -4676,6 +4677,8 @@
                 "not-fixed-apply-btn": "Not Fixed (Apply)",
                 "not-linked-worker": "Your account is not linked to any worker profile yet.",
                 "delete-worker-btn": "Delete Worker",
+                "only-master-admin": "Only the ultimate admin (Kinan) can remove other managers.",
+                "cannot-remove-master": "Cannot remove the master admin account.",
 
                 // Operations Section
                 "title-manager-access": "Manager Access Control",
@@ -4903,6 +4906,8 @@
                 "not-fixed-apply-btn": "لم يتم الإصلاح (تطبيق)",
                 "not-linked-worker": "حسابك غير مرتبط بأي ملف موظف بعد.",
                 "delete-worker-btn": "حذف الموظف",
+                "only-master-admin": "فقط المسؤول الرئيسي (كنان) يمكنه إزالة المديرين الآخرين.",
+                "cannot-remove-master": "لا يمكن إزالة حساب المسؤول الرئيسي.",
 
                 // Ranks
                 "title-ranks-eval": "تقييم وترتيب الموظفين (عرض 90 يوم)",
