@@ -1389,6 +1389,29 @@
         </div>
 
         <!-- Global Month Selector -->
+        <div id="driver-order-timer-banner"
+            style="display:none; margin: 12px auto; max-width: 1400px; width: calc(100% - 40px); padding: 16px; border-radius: 12px; background: var(--card-bg); border: 1px solid var(--danger); box-shadow: 0 4px 12px rgba(220, 38, 38, 0.15); border-left: 6px solid var(--danger);">
+            <div class="flex-between" style="align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div style="font-size:1.8rem;">🛵</div>
+                    <div>
+                        <div style="font-weight:800; color:var(--text-main); font-size:1.1rem;"
+                            data-i18n="msg-active-delivery">Active Delivery Order!</div>
+                        <div id="driver-order-banner-details"
+                            style="font-size:0.95rem; color:var(--primary); font-weight:600; margin-top:2px;"></div>
+                        <div id="driver-order-banner-status"
+                            style="font-size:0.85rem; color:var(--text-muted); font-weight: 600; margin-top:4px;"></div>
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
+                    <div id="driver-order-banner-time"
+                        style="font-size:1.8rem; font-weight:800; color:var(--danger); font-family: monospace;"></div>
+                    <div id="driver-banner-actions" style="display:flex; gap:8px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="month-bar" style="margin-top: 24px">
             <h2>
                 <span data-i18n="operating-month">📅 Operating Month</span>
@@ -1778,6 +1801,29 @@
                         <div class="management-form-area drivers-admin">
                             <h3 style="margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;"
                                 data-i18n="title-assign-order">Assign New Order Delivery</h3>
+
+                            <div class="form-group">
+                                <label>Order Details / Items</label>
+                                <textarea id="driver-order-details" rows="2"
+                                    placeholder="e.g. 2x Beef Burger, 1x Pepsi..."></textarea>
+                            </div>
+
+                            <div class="grid-2-col" style="align-items: end; margin-bottom: 16px;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label>Kitchen Status</label>
+                                    <select id="driver-order-status" onchange="toggleDriverPrepTime()">
+                                        <option value="ready">🟢 Ready Now</option>
+                                        <option value="preparing">🟡 Preparing</option>
+                                        <option value="not_ready">🔴 Not Ready</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" id="driver-prep-time-group"
+                                    style="display: none; margin-bottom: 0;">
+                                    <label>Prep Time Needed (Mins)</label>
+                                    <input type="number" id="driver-prep-time" placeholder="e.g. 10" min="1">
+                                </div>
+                            </div>
+
                             <div class="grid-2-col" style="align-items: end;">
                                 <div class="form-group" style="margin-bottom: 0;">
                                     <label data-i18n="label-time-deliver">Time to Deliver (Minutes)</label>
@@ -1786,28 +1832,27 @@
                                 </div>
                                 <button onclick="startDriverOrder()" class="btn-warning"
                                     style="width: 100%; padding: 12px; font-size:1rem;"
-                                    data-i18n="btn-start-delivery">🚀 Start Delivery</button>
+                                    data-i18n="btn-start-delivery">🚀 Assign to Driver</button>
                             </div>
                         </div>
 
-                        <!-- Active Order Display -->
                         <div id="driver-active-order" style="display: none; text-align: center;" class="stat-box">
                             <h3 style="color: var(--text-main); margin-bottom: 5px;" data-i18n="title-current-order">
-                                Currently Delivering Order</h3>
+                                Currently Assigned Order</h3>
+
+                            <div id="panel-order-details"
+                                style="font-size:1rem; font-weight:700; color:var(--primary); margin-bottom: 10px;">
+                            </div>
+
                             <div class="timer-box" id="driver-timer-box">
                                 <span class="timer-text" id="driver-timer-display">00:00:00</span>
                             </div>
                             <p id="driver-timer-status"
-                                style="font-size: 0.85rem; margin-top: 5px; color: var(--text-muted);"
-                                data-i18n="desc-time-remaining">Time remaining</p>
+                                style="font-size: 0.9rem; font-weight:600; margin-top: 5px; color: var(--text-muted);">
+                            </p>
 
-                            <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;"
-                                class="drivers-admin">
-                                <button onclick="finishDriverOrder(true)" class="btn-success"
-                                    style="padding: 12px 24px;" data-i18n="btn-order-success">✅ Order Delivered
-                                    Successfully</button>
-                                <button onclick="finishDriverOrder(false)" class="btn-danger"
-                                    style="padding: 12px 24px;" data-i18n="btn-order-cancel">❌ Cancel Order</button>
+                            <div id="panel-driver-actions"
+                                style="margin-top: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
                             </div>
                         </div>
 
@@ -3718,21 +3763,59 @@
             renderDriversList();
         }
 
+        function toggleDriverPrepTime() {
+            const status = document.getElementById('driver-order-status').value;
+            document.getElementById('driver-prep-time-group').style.display = (status === 'preparing') ? 'block' : 'none';
+        }
+
         function startDriverOrder() {
             if (!activeDriverId) return;
             const mins = parseInt(document.getElementById('driver-order-time').value);
+            const details = document.getElementById('driver-order-details').value.trim();
+            const status = document.getElementById('driver-order-status').value;
+            let prepMins = 0;
+
             if (isNaN(mins) || mins <= 0) { alert("Enter valid delivery time in minutes."); return; }
+            if (!details) { alert("Please enter the order details/items."); return; }
+            if (status === 'preparing') {
+                prepMins = parseInt(document.getElementById('driver-prep-time').value);
+                if (isNaN(prepMins) || prepMins <= 0) { alert("Enter valid prep time in minutes."); return; }
+            }
 
             const worker = getCompanyData().workers.find(w => w.id === activeDriverId);
-            worker.activeOrder = { startTime: Date.now(), allocatedMs: mins * 60 * 1000 };
+            worker.activeOrder = {
+                startTime: Date.now(),
+                allocatedMs: mins * 60 * 1000,
+                details: details,
+                status: status,
+                prepStartTime: Date.now(),
+                prepTimeMs: prepMins * 60 * 1000
+            };
+
             document.getElementById('driver-order-time').value = '';
+            document.getElementById('driver-order-details').value = '';
+            if (document.getElementById('driver-prep-time')) document.getElementById('driver-prep-time').value = '';
+            document.getElementById('driver-order-status').value = 'ready';
+            toggleDriverPrepTime();
             saveData();
         }
 
-        function finishDriverOrder(isSuccess) {
-            if (!activeDriverId) return;
-            const worker = getCompanyData().workers.find(w => w.id === activeDriverId);
+        function pickupDriverOrder(workerId) {
+            if (!workerId) workerId = activeDriverId;
+            if (!workerId) return;
+            const worker = getCompanyData().workers.find(w => w.id === workerId);
+            if (worker && worker.activeOrder) {
+                worker.activeOrder.status = 'picked_up';
+                worker.activeOrder.startTime = Date.now(); // Restart timer exactly when picked up
+                saveData();
+            }
+        }
 
+        function finishDriverOrder(isSuccess, workerId) {
+            if (!workerId) workerId = activeDriverId;
+            if (!workerId) return;
+
+            const worker = getCompanyData().workers.find(w => w.id === workerId);
             if (isSuccess && worker.activeOrder) {
                 const stats = getMonthlyStats(worker, currentGlobalMonth);
                 stats.deliveriesList.unshift({
@@ -3748,7 +3831,7 @@
         }
 
         function deleteDeliveryRecord(workerId, deliveryId) {
-            if (!confirm(t('confirm-delete-delivery'))) return;
+            if (!confirm(t('confirm-delete-delivery') || "Delete delivery record?")) return;
             const worker = getCompanyData().workers.find(w => w.id === workerId);
             const stats = getMonthlyStats(worker, currentGlobalMonth);
             stats.deliveriesList = stats.deliveriesList.filter(d => d.id !== deliveryId);
@@ -3756,7 +3839,7 @@
         }
 
         function deleteLegacyDelivery(workerId) {
-            if (!confirm(t('confirm-remove-legacy'))) return;
+            if (!confirm(t('confirm-remove-legacy') || "Remove legacy record?")) return;
             const worker = getCompanyData().workers.find(w => w.id === workerId);
             const stats = getMonthlyStats(worker, currentGlobalMonth);
             if (stats.legacyDeliveries > 0) {
@@ -3768,66 +3851,77 @@
         function updateActiveDriverTimer() {
             const now = Date.now();
 
-            // 1. Manager View Update (If manager has selected a driver from sidebar)
+            function calcTime(order) {
+                let displayTime = '--:--';
+                let isLate = false;
+                let statusText = '';
+                let boxColor = 'var(--text-main)';
+
+                if (order.status === 'preparing') {
+                    const diff = (order.prepStartTime + order.prepTimeMs) - now;
+                    isLate = diff <= 0;
+                    const absDiff = Math.abs(diff);
+                    const h = Math.floor(absDiff / 3600000).toString().padStart(2, '0');
+                    const m = Math.floor((absDiff % 3600000) / 60000).toString().padStart(2, '0');
+                    const s = Math.floor((absDiff % 60000) / 1000).toString().padStart(2, '0');
+                    displayTime = isLate ? `-${h !== '00' ? h + ':' : ''}${m}:${s}` : `${h !== '00' ? h + ':' : ''}${m}:${s}`;
+                    statusText = isLate ? '🚨 Late (Kitchen Prep)' : '🟡 Kitchen is Preparing...';
+                    boxColor = isLate ? 'var(--danger)' : 'var(--warning)';
+                } else if (order.status === 'not_ready') {
+                    statusText = '🔴 Kitchen Not Ready';
+                } else if (order.status === 'ready') {
+                    statusText = '🟢 Ready for Pickup!';
+                    boxColor = 'var(--success)';
+                } else if (order.status === 'picked_up') {
+                    const diff = (order.startTime + order.allocatedMs) - now;
+                    isLate = diff <= 0;
+                    const absDiff = Math.abs(diff);
+                    const h = Math.floor(absDiff / 3600000).toString().padStart(2, '0');
+                    const m = Math.floor((absDiff % 3600000) / 60000).toString().padStart(2, '0');
+                    const s = Math.floor((absDiff % 60000) / 1000).toString().padStart(2, '0');
+                    displayTime = isLate ? `-${h !== '00' ? h + ':' : ''}${m}:${s}` : `${h !== '00' ? h + ':' : ''}${m}:${s}`;
+                    statusText = isLate ? '🚨 LATE (Delivering)' : '🛵 Delivering to Customer...';
+                    boxColor = isLate ? 'var(--danger)' : 'var(--info)';
+                }
+                return { displayTime, statusText, boxColor, isLate };
+            }
+
+            // 1. Update Manager Panel
             if (activeDriverId) {
                 const worker = getCompanyData().workers.find(w => w.id === activeDriverId);
-                const timerBox = document.getElementById('driver-timer-box');
-                const timerDisplay = document.getElementById('driver-timer-display');
-                const statusDisplay = document.getElementById('driver-timer-status');
-
                 if (worker && worker.activeOrder) {
-                    const order = worker.activeOrder;
-                    const diff = (order.startTime + order.allocatedMs) - now;
-
-                    if (diff > 0) {
-                        const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
-                        const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
-                        const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-                        timerDisplay.textContent = `${h !== '00' ? h + ':' : ''}${m}:${s}`;
-                        timerBox.classList.remove('timer-late');
-                        statusDisplay.textContent = t('desc-time-remaining');
-                    } else {
-                        const late = Math.abs(diff);
-                        const h = Math.floor(late / 3600000).toString().padStart(2, '0');
-                        const m = Math.floor((late % 3600000) / 60000).toString().padStart(2, '0');
-                        const s = Math.floor((late % 60000) / 1000).toString().padStart(2, '0');
-                        timerDisplay.textContent = `-${h !== '00' ? h + ':' : ''}${m}:${s}`;
-                        timerBox.classList.add('timer-late');
-                        statusDisplay.textContent = t('status-late');
-                    }
+                    const res = calcTime(worker.activeOrder);
+                    document.getElementById('driver-timer-display').textContent = res.displayTime;
+                    document.getElementById('driver-timer-status').textContent = res.statusText;
+                    document.getElementById('driver-timer-status').style.color = res.boxColor;
+                    document.getElementById('driver-timer-box').style.borderColor = res.boxColor;
+                    document.getElementById('driver-timer-display').style.color = res.boxColor;
                 }
             }
 
-            // 2. Persistent Driver Banner Update (For Logged-in Driver anywhere in the app)
+            // 2. Update Persistent Driver Banner
             const driverBanner = document.getElementById('driver-order-timer-banner');
             if (currentUser && currentUser.role === 'worker') {
                 const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
-
                 if (myWorker && myWorker.activeOrder) {
                     const order = myWorker.activeOrder;
-                    const diff = (order.startTime + order.allocatedMs) - now;
-                    const bannerTime = document.getElementById('driver-order-banner-time');
-                    const bannerStatus = document.getElementById('driver-order-banner-status');
+                    const res = calcTime(order);
 
-                    if (diff > 0) {
-                        const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
-                        const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
-                        const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-                        bannerTime.textContent = `${h !== '00' ? h + ':' : ''}${m}:${s}`;
-                        driverBanner.style.borderLeftColor = 'var(--warning)';
-                        driverBanner.style.borderColor = 'var(--border-color)';
-                        bannerTime.style.color = 'var(--warning)';
-                        bannerStatus.textContent = t('desc-time-remaining');
+                    document.getElementById('driver-order-banner-details').textContent = order.details;
+                    document.getElementById('driver-order-banner-status').textContent = res.statusText;
+                    document.getElementById('driver-order-banner-status').style.color = res.boxColor;
+
+                    const bannerTime = document.getElementById('driver-order-banner-time');
+                    bannerTime.textContent = res.displayTime;
+                    bannerTime.style.color = res.boxColor;
+                    driverBanner.style.borderLeftColor = res.boxColor;
+
+                    // Inject Action Buttons into the Banner based on state
+                    const actionDiv = document.getElementById('driver-banner-actions');
+                    if (order.status !== 'picked_up') {
+                        actionDiv.innerHTML = `<button onclick="pickupDriverOrder('${myWorker.id}')" class="btn-warning" style="padding:10px 16px; font-size:0.9rem; border-radius:8px;">📦 Receive Order</button>`;
                     } else {
-                        const late = Math.abs(diff);
-                        const h = Math.floor(late / 3600000).toString().padStart(2, '0');
-                        const m = Math.floor((late % 3600000) / 60000).toString().padStart(2, '0');
-                        const s = Math.floor((late % 60000) / 1000).toString().padStart(2, '0');
-                        bannerTime.textContent = `-${h !== '00' ? h + ':' : ''}${m}:${s}`;
-                        driverBanner.style.borderLeftColor = 'var(--danger)';
-                        driverBanner.style.borderColor = 'var(--danger-border)';
-                        bannerTime.style.color = 'var(--danger)';
-                        bannerStatus.textContent = t('status-late');
+                        actionDiv.innerHTML = `<button onclick="finishDriverOrder(true, '${myWorker.id}')" class="btn-success" style="padding:10px 16px; font-size:0.9rem; border-radius:8px;">✅ Delivered</button>`;
                     }
                     driverBanner.style.display = 'block';
                 } else {
@@ -3854,7 +3948,7 @@
             });
 
             if (drivers.length === 0) {
-                list.innerHTML = `<p style="color:var(--text-muted); font-size:0.85rem;">${t('msg-no-drivers')}</p>`;
+                list.innerHTML = `<p style="color:var(--text-muted); font-size:0.85rem;">No drivers found.</p>`;
                 return;
             }
 
@@ -3868,7 +3962,7 @@
                 div.style.borderColor = isSelected ? 'var(--primary)' : 'var(--border-color)';
                 div.style.borderWidth = isSelected ? '2px' : '1px';
 
-                let statusBadge = isBusy ? `<span class="badge" style="background:var(--warning);">${t('status-in-transit')}</span>` : `<span class="badge" style="background:var(--success);">${t('status-available')}</span>`;
+                let statusBadge = isBusy ? `<span class="badge" style="background:var(--warning);">In Transit</span>` : `<span class="badge" style="background:var(--success);">Available</span>`;
 
                 div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><strong style="color:var(--text-main);">${d.name}</strong>${statusBadge}</div>`;
                 div.onclick = () => selectDriver(d.id);
@@ -3882,7 +3976,7 @@
 
             mngArea.style.display = 'block';
             const worker = getCompanyData().workers.find(w => w.id === activeDriverId);
-            document.getElementById('active-driver-name').textContent = `${t('label-managing')}${worker.name}`;
+            document.getElementById('active-driver-name').textContent = `${t('label-managing') || 'Managing: '}${worker.name}`;
 
             const stats = getMonthlyStats(worker, currentGlobalMonth);
             const totalDels = (stats.deliveriesList ? stats.deliveriesList.length : 0) + (stats.legacyDeliveries || 0);
@@ -3891,7 +3985,24 @@
             const formArea = document.querySelector('#view-drivers .management-form-area');
             const activeArea = document.getElementById('driver-active-order');
 
-            if (worker.activeOrder) { formArea.style.display = 'none'; activeArea.style.display = 'block'; updateActiveDriverTimer(); }
+            if (worker.activeOrder) {
+                formArea.style.display = 'none';
+                activeArea.style.display = 'block';
+                document.getElementById('panel-order-details').textContent = worker.activeOrder.details;
+
+                // Inject Panel Action Buttons
+                const panelActions = document.getElementById('panel-driver-actions');
+                let html = '';
+                if (worker.activeOrder.status !== 'picked_up') {
+                    html += `<button onclick="pickupDriverOrder('${worker.id}')" class="btn-warning" style="padding: 12px 24px;">📦 Mark as Received/Picked Up</button>`;
+                } else {
+                    html += `<button onclick="finishDriverOrder(true, '${worker.id}')" class="btn-success" style="padding: 12px 24px;">✅ Order Delivered Successfully</button>`;
+                }
+                html += `<button onclick="finishDriverOrder(false, '${worker.id}')" class="btn-danger admin-only" style="padding: 12px 24px;">❌ Cancel Order (Admin)</button>`;
+                panelActions.innerHTML = html;
+
+                updateActiveDriverTimer();
+            }
             else { formArea.style.display = 'block'; activeArea.style.display = 'none'; }
 
             const isAdmin = currentUser && currentUser.role === 'admin';
