@@ -1372,16 +1372,19 @@
         <div id="global-stock-alerts"></div>
 
         <!-- Persistent Worker Task Timer -->
-        <div id="worker-task-timer-banner" style="display:none; margin: 12px 0; padding: 16px; border-radius: 12px; background: var(--card-bg); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);">
+        <div id="worker-task-timer-banner"
+            style="display:none; margin: 12px 0; padding: 16px; border-radius: 12px; background: var(--card-bg); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);">
             <div class="flex-between" style="align-items: center;">
                 <div style="display:flex; align-items:center; gap:12px;">
                     <div style="font-size:1.5rem;">⏳</div>
                     <div>
-                        <div id="worker-timer-title" style="font-weight:700; color:var(--text-main); font-size:1rem;" data-i18n="msg-task-timer-worker">Active Task Deadline</div>
+                        <div id="worker-timer-title" style="font-weight:700; color:var(--text-main); font-size:1rem;"
+                            data-i18n="msg-task-timer-worker">Active Task Deadline</div>
                         <div id="worker-timer-task-name" style="font-size:0.85rem; color:var(--text-muted);"></div>
                     </div>
                 </div>
-                <div id="worker-timer-display" style="font-size:1.4rem; font-weight:800; color:var(--warning); font-family: monospace;"></div>
+                <div id="worker-timer-display"
+                    style="font-size:1.4rem; font-weight:800; color:var(--warning); font-family: monospace;"></div>
             </div>
         </div>
 
@@ -1426,7 +1429,8 @@
                 <!-- Manager Access Control -->
                 <div class="card">
                     <h2 class="card-title" data-i18n="title-manager-access">Manager Access Control</h2>
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">Promote users to global Admin status.</p>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">Promote users to
+                        global Admin status.</p>
                     <div class="form-group flex-between">
                         <input type="email" id="new-manager-email" placeholder="Enter email to promote...">
                         <button onclick="addManager()">Promote</button>
@@ -1437,7 +1441,8 @@
                 <!-- Worker Department Access Control -->
                 <div class="card">
                     <h2 class="card-title" data-i18n="title-worker-access">Worker Department Access</h2>
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">Grant a specific worker editing powers over a specific department.</p>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">Grant a specific
+                        worker editing powers over a specific department.</p>
                     <div class="form-group">
                         <label data-i18n="label-select-emp">Select Worker</label>
                         <select id="perm-worker-select" onchange="loadWorkerPerms()">
@@ -1445,14 +1450,20 @@
                         </select>
                     </div>
                     <div class="grid-2-col" style="margin-bottom: 16px;">
-                        <label style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
-                            <input type="checkbox" id="perm-wh" style="width:auto;"> <span data-i18n="tab-warehouse">Warehouse</span>
+                        <label
+                            style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                            <input type="checkbox" id="perm-wh" style="width:auto;"> <span
+                                data-i18n="tab-warehouse">Warehouse</span>
                         </label>
-                        <label style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
-                            <input type="checkbox" id="perm-drv" style="width:auto;"> <span data-i18n="tab-drivers">Drivers</span>
+                        <label
+                            style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                            <input type="checkbox" id="perm-drv" style="width:auto;"> <span
+                                data-i18n="tab-drivers">Drivers</span>
                         </label>
-                        <label style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
-                            <input type="checkbox" id="perm-fin" style="width:auto;"> <span data-i18n="tab-finance">Finance</span>
+                        <label
+                            style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                            <input type="checkbox" id="perm-fin" style="width:auto;"> <span
+                                data-i18n="tab-finance">Finance</span>
                         </label>
                     </div>
                     <button onclick="saveWorkerPerms()" style="width: 100%;">Save Permissions</button>
@@ -1471,10 +1482,13 @@
                 <!-- Violation Rules Editor -->
                 <div class="card">
                     <h2 class="card-title" data-i18n="title-violation-rules">Violation Rules System</h2>
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">Define standard penalties to quickly apply them later.</p>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">Define standard
+                        penalties to quickly apply them later.</p>
                     <div class="form-group flex-between">
-                        <input type="text" id="new-vrule-name" placeholder="e.g. Late 15 mins" style="flex-grow: 1; margin-right: 8px;">
-                        <input type="number" id="new-vrule-amount" placeholder="SAR" style="width: 90px; margin-right: 8px;">
+                        <input type="text" id="new-vrule-name" placeholder="e.g. Late 15 mins"
+                            style="flex-grow: 1; margin-right: 8px;">
+                        <input type="number" id="new-vrule-amount" placeholder="SAR"
+                            style="width: 90px; margin-right: 8px;">
                         <button onclick="addViolationRule()">Add</button>
                     </div>
                     <ul id="vrule-list" style="list-style: none; margin-top: 16px;"></ul>
@@ -1483,9 +1497,12 @@
                 <!-- Add Worker Card -->
                 <div class="card">
                     <h2 class="card-title" data-i18n="title-register-emp">Register Employee</h2>
-                    <div class="form-group"><label data-i18n="label-full-name">Full Name</label><input type="text" id="w-name" placeholder="e.g. Ahmed Ali"></div>
-                    <div class="form-group"><label>App Account Email</label><input type="email" id="w-email" placeholder="Worker's Login Email"></div>
-                    <div class="form-group"><label data-i18n="label-role">Role / Position</label><input type="text" id="w-role" placeholder="e.g. Head Chef, Manager, Driver..."></div>
+                    <div class="form-group"><label data-i18n="label-full-name">Full Name</label><input type="text"
+                            id="w-name" placeholder="e.g. Ahmed Ali"></div>
+                    <div class="form-group"><label>App Account Email</label><input type="email" id="w-email"
+                            placeholder="Worker's Login Email"></div>
+                    <div class="form-group"><label data-i18n="label-role">Role / Position</label><input type="text"
+                            id="w-role" placeholder="e.g. Head Chef, Manager, Driver..."></div>
                     <div class="grid-2-col">
                         <div class="form-group"><label>Start Time</label><input type="time" id="w-start-time"></div>
                         <div class="form-group"><label>End Time</label><input type="time" id="w-end-time"></div>
