@@ -2827,10 +2827,21 @@
             if (diff === 0) { inputEl.value = ''; return; }
 
             item.currentStock = newStock;
-            if (newStock > item.maxStock) { item.maxStock = newStock; }
+            // Max stock cap stays strictly original. It no longer auto-increases!
 
             item.logs.unshift({ date: formatTimestamp(), amount: newStock, difference: diff, note: diff > 0 ? 'Refill' : 'Consumption' });
             inputEl.value = ''; saveData();
+        }
+
+        function editMaxStock(itemId) {
+            const item = getCompanyData().warehouse.find(i => i.id === itemId);
+            if (!item) return;
+            const newMax = prompt(t('desc-edit-max') || `Enter new Max / Full Stock for ${item.name}:`, item.maxStock);
+            const parsed = parseFloat(newMax);
+            if (!isNaN(parsed) && parsed > 0) {
+                item.maxStock = parsed;
+                saveData();
+            }
         }
 
         function deleteWarehouseItem(itemId) {
@@ -2894,16 +2905,19 @@
                     </div>
                     ${isLow ? `<div class="text-danger" style="font-size:0.8rem; margin-top:4px; font-weight:600;">⚠️ ${t('label-currently-left')} (${item.riskAmount})</div>` : ''}
                     <div class="wh-progress"><div class="wh-fill ${isLow ? 'low' : ''}" style="width: ${pct}%"></div></div>
+                    
                     <div class="flex-between" style="margin-top: 20px; flex-wrap:wrap; gap:10px;">
                         <div style="display:flex; gap:8px; flex:1; min-width: 200px;">
                             <input type="number" id="wh-update-${item.id}" placeholder="${t('placeholder-product-name')}" style="flex:1;" min="0">
-                            <button onclick="updateWarehouseStock('${item.id}')" class="btn-success">${t('btn-log-payment')}</button>
+                            <button onclick="updateWarehouseStock('${item.id}')" class="btn-success">${t('btn-log-payment') || 'Update'}</button>
                         </div>
                         <div style="display:flex; gap:8px;">
                             <button onclick="toggleDetails('wh-logs-${item.id}')" class="btn-neutral">History Log</button>
+                            ${isWHAdmin ? `<button onclick="editMaxStock('${item.id}')" class="btn-outline">✏️ Edit Max</button>` : ''}
                             ${isWHAdmin ? `<button onclick="deleteWarehouseItem('${item.id}')" class="btn-outline-danger">${t('btn-remove')}</button>` : ''}
                         </div>
                     </div>
+
                     <div id="wh-logs-${item.id}" class="wh-logs" style="display:none;">${logsHtml || 'No logs yet.'}</div>`;
                 list.appendChild(div);
             });
@@ -5268,12 +5282,13 @@
         function toggleLanguage() {
             currentAppLang = currentAppLang === "en" ? "ar" : "en";
             localStorage.setItem("burgeroov_lang", currentAppLang);
-            applyTranslations();
+
             if (typeof renderAll === "function") renderAll();
+            applyTranslations();
         }
 
         // تنفيذ الترجمة عند تحميل الصفحة
-        document.addEventListener("DOMContentLoaded", applyTranslations);
+        applyTranslations();
     </script>
 </body>
 
