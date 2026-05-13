@@ -2408,7 +2408,6 @@
                 if (!w.monthlyStats) w.monthlyStats = {};
                 Object.keys(w.monthlyStats).forEach(month => {
                     let ms = w.monthlyStats[month];
-                    if (!ms.custodyList) ms.custodyList = [];
                     if (!ms.violationsList) ms.violationsList = [];
                     if (!ms.rewardsList) ms.rewardsList = [];
                     if (!ms.paymentsList) ms.paymentsList = [];
@@ -2440,22 +2439,34 @@
                     // FEATURE 1: Seed previousTaskIds on first load so we don't false-fire on login
                     if (currentUser && currentUser.role === 'worker') {
                         const myWorker = appData.burgeroov.workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
-                        if (myWorker && myWorker.jobs) {
-                            previousTaskIds = myWorker.jobs.map(j => j.id);
+                        if (myWorker) {
+                            if (myWorker.jobs) previousTaskIds = myWorker.jobs.map(j => j.id);
+                            // Track initial active order time to avoid false notification on login
+                            window.previousOrderStartTime = myWorker.activeOrder ? myWorker.activeOrder.startTime : null;
                         }
                     }
                     isInitialLoad = false;
                 } else {
-                    // FEATURE 1: On subsequent data updates, detect newly assigned tasks for worker role
+                    // Detect newly assigned tasks or delivery orders for worker role
                     if (currentUser && currentUser.role === 'worker') {
                         const myWorker = appData.burgeroov.workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
-                        if (myWorker && myWorker.jobs) {
-                            const currentTaskIds = myWorker.jobs.map(j => j.id);
-                            const newTasks = currentTaskIds.filter(id => !previousTaskIds.includes(id));
-                            if (newTasks.length > 0) {
-                                showInAppNotification('📋 You have been assigned a new task!');
+                        if (myWorker) {
+                            // 1. Task Check
+                            if (myWorker.jobs) {
+                                const currentTaskIds = myWorker.jobs.map(j => j.id);
+                                const newTasks = currentTaskIds.filter(id => !previousTaskIds.includes(id));
+                                if (newTasks.length > 0) {
+                                    showInAppNotification('📋 ' + (t('title-tasks-board') || 'You have been assigned a new task!'));
+                                }
+                                previousTaskIds = currentTaskIds;
                             }
-                            previousTaskIds = currentTaskIds;
+
+                            // 2. Delivery Order Check
+                            const currentOrderStart = myWorker.activeOrder ? myWorker.activeOrder.startTime : null;
+                            if (currentOrderStart && currentOrderStart !== window.previousOrderStartTime) {
+                                showInAppNotification('🛵 ' + (t('title-current-order') || 'You have a new delivery order!'));
+                            }
+                            window.previousOrderStartTime = currentOrderStart;
                         }
                     }
                 }
@@ -2512,17 +2523,17 @@
             let mostUrgentTask = null;
             let minDiff = Infinity;
 
-            timers.forEach(t => {
-                const deadline = parseInt(t.getAttribute('data-deadline'));
+            timers.forEach(timerEl => {
+                const deadline = parseInt(timerEl.getAttribute('data-deadline'));
                 const diff = deadline - Date.now();
                 if (diff <= 0) {
-                    t.innerHTML = `🚨 ${t('status-late')}`;
-                    t.style.color = 'var(--danger)';
+                    timerEl.innerHTML = `🚨 ${t('status-late')}`;
+                    timerEl.style.color = 'var(--danger)';
                 } else {
                     const m = Math.floor(diff / 60000);
                     const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-                    t.innerHTML = `⏳ ${t('status-time-remaining')} ${m}:${s}`;
-                    t.style.color = 'var(--warning)';
+                    timerEl.innerHTML = `⏳ ${t('status-time-remaining')} ${m}:${s}`;
+                    timerEl.style.color = 'var(--warning)';
                 }
             });
 
@@ -2549,41 +2560,45 @@
             }
 
             if (mostUrgentTask) {
-                banner.style.display = 'block';
-                taskNameDisplay.textContent = mostUrgentTask.title;
+                if (banner) banner.style.display = 'block';
+                if (taskNameDisplay) taskNameDisplay.textContent = mostUrgentTask.title;
                 const diff = mostUrgentTask.diff;
                 if (diff <= 0) {
-                    timerDisplay.textContent = t('status-late');
-                    timerDisplay.style.color = 'var(--danger)';
+                    if (timerDisplay) {
+                        timerDisplay.textContent = t('status-late');
+                        timerDisplay.style.color = 'var(--danger)';
+                    }
                 } else {
                     const m = Math.floor(diff / 60000);
                     const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-                    timerDisplay.textContent = `${m}:${s}`;
-                    timerDisplay.style.color = 'var(--warning)';
+                    if (timerDisplay) {
+                        timerDisplay.textContent = `${m}:${s}`;
+                        timerDisplay.style.color = 'var(--warning)';
+                    }
                 }
             } else {
-                banner.style.display = 'none';
+                if (banner) banner.style.display = 'none';
             }
         }
 
         function updateViolationTimers() {
             let expiredSomething = false;
             const timers = document.querySelectorAll('.viol-timer');
-            timers.forEach(t => {
-                const deadline = parseInt(t.getAttribute('data-deadline'));
+            timers.forEach(timerEl => {
+                const deadline = parseInt(timerEl.getAttribute('data-deadline'));
                 const diff = deadline - Date.now();
                 if (diff <= 0) {
-                    t.classList.remove('viol-timer');
-                    t.innerHTML = '🚨 Applied (Time Expired)';
-                    t.style.color = 'var(--danger)';
-                    const parent = t.closest('.flex-between');
+                    timerEl.classList.remove('viol-timer');
+                    timerEl.innerHTML = '🚨 Applied (Time Expired)';
+                    timerEl.style.color = 'var(--danger)';
+                    const parent = timerEl.closest('.flex-between');
                     if (parent && parent.children[1]) parent.children[1].innerHTML = '';
                     expiredSomething = true;
                 } else {
                     const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
                     const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
                     const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-                    t.innerHTML = `⏳ Pending (${h}h ${m}m ${s}s left)`;
+                    timerEl.innerHTML = `⏳ Pending (${h}h ${m}m ${s}s left)`;
                 }
             });
 
@@ -2637,6 +2652,17 @@
                         updated = true;
                     }
                 }
+                w.logs.sort((a, b) => new Date(b.date) - new Date(a.date));
+            });
+            if (updated) saveData();
+        }
+
+        // --- PERMISSION FILTERING ---
+        function getVisibleWorkers() {
+            const workers = getCompanyData().workers;
+            if (currentUser && currentUser.role === 'admin') {
+                return workers;
+            } else {          }
                 w.logs.sort((a, b) => new Date(b.date) - new Date(a.date));
             });
             if (updated) saveData();
@@ -2979,11 +3005,11 @@
         // --- UI NAVIGATION & GLOBALS ---
         function switchTab(tab) {
             currentTab = tab;
-            ['ops', 'ranks', 'tasks', 'warehouse', 'drivers', 'finance', 'summary'].forEach(t => {
-                const tabBtn = document.getElementById(`tab-${t}`);
-                const viewSec = document.getElementById(`view-${t}`);
-                if (tabBtn) tabBtn.classList.toggle('active-tab', tab === t);
-                if (viewSec) viewSec.classList.toggle('active-view', tab === t);
+            ['ops', 'ranks', 'tasks', 'warehouse', 'drivers', 'finance', 'summary'].forEach(tabId => {
+                const tabBtn = document.getElementById(`tab-${tabId}`);
+                const viewSec = document.getElementById(`view-${tabId}`);
+                if (tabBtn) tabBtn.classList.toggle('active-tab', tab === tabId);
+                if (viewSec) viewSec.classList.toggle('active-view', tab === tabId);
             });
             renderAll();
         }
