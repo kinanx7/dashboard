@@ -1415,7 +1415,8 @@
                     <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">Promote users to
                         global Admin status.</p>
                     <div class="form-group flex-between">
-                        <input type="email" id="new-manager-email" data-i18n="placeholder-email" placeholder="Enter email to promote...">
+                        <input type="email" id="new-manager-email" data-i18n="placeholder-email"
+                            placeholder="Enter email to promote...">
                         <button onclick="addManager()" data-i18n="th-action">Promote</button>
                     </div>
                     <ul id="managers-list" style="list-style: none; margin-top: 16px;"></ul>
@@ -1453,7 +1454,8 @@
                 <div class="card">
                     <h2 class="card-title" data-i18n="title-branches">Facility / Branches</h2>
                     <div class="form-group flex-between">
-                        <input type="text" id="new-branch-name" data-i18n="placeholder-reason" placeholder="Enter branch name...">
+                        <input type="text" id="new-branch-name" data-i18n="placeholder-reason"
+                            placeholder="Enter branch name...">
                         <button onclick="addBranch()" data-i18n="btn-save-shortcut">Add</button>
                     </div>
                     <ul id="branches-list" style="list-style: none; margin-top: 16px;"></ul>
@@ -1477,20 +1479,22 @@
                 <!-- Add Worker Card -->
                 <div class="card">
                     <h2 class="card-title" data-i18n="title-register-emp">Register Employee</h2>
-                    <div class="form-group"><label data-i18n="label-full-name">Full Name</label><input type="text" id="w-name"
-                            data-i18n="placeholder-desc-task" placeholder="e.g. Ahmed Ali"></div>
-                    <div class="form-group"><label data-i18n="placeholder-email">App Account Email</label><input type="email" id="w-email"
-                            data-i18n="placeholder-email" placeholder="Worker's Login Email"></div>
-                    <div class="form-group"><label data-i18n="label-role">Role / Position</label><input type="text" id="w-role"
-                            data-i18n="label-role" placeholder="e.g. Head Chef, Manager, Driver..."></div>
+                    <div class="form-group"><label data-i18n="label-full-name">Full Name</label><input type="text"
+                            id="w-name" data-i18n="placeholder-desc-task" placeholder="e.g. Ahmed Ali"></div>
+                    <div class="form-group"><label data-i18n="placeholder-email">App Account Email</label><input
+                            type="email" id="w-email" data-i18n="placeholder-email" placeholder="Worker's Login Email">
+                    </div>
+                    <div class="form-group"><label data-i18n="label-role">Role / Position</label><input type="text"
+                            id="w-role" data-i18n="label-role" placeholder="e.g. Head Chef, Manager, Driver..."></div>
                     <div class="grid-2-col">
                         <div class="form-group"><label>Start Time</label><input type="time" id="w-start-time"></div>
                         <div class="form-group"><label>End Time</label><input type="time" id="w-end-time"></div>
                     </div>
                     <div class="grid-2-col">
-                        <div class="form-group"><label data-i18n="th-base-salary">Base Salary (SAR)</label><input type="number" id="w-income"
-                                data-i18n="placeholder-amount" placeholder="0.00"></div>
-                        <div class="form-group"><label data-i18n="title-branches">Branch</label><select id="w-branch"></select></div>
+                        <div class="form-group"><label data-i18n="th-base-salary">Base Salary (SAR)</label><input
+                                type="number" id="w-income" data-i18n="placeholder-amount" placeholder="0.00"></div>
+                        <div class="form-group"><label data-i18n="title-branches">Branch</label><select
+                                id="w-branch"></select></div>
                     </div>
                     <button onclick="addWorker()" style="width: 100%; padding: 12px; margin-top: 8px;">Create
                         Record</button>
@@ -1516,11 +1520,12 @@
 
                         <!-- Daily Log Form -->
                         <div class="management-form-area">
-                            <h3
-                                style="margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;" data-i18n="title-ops-tracking">
+                            <h3 style="margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;"
+                                data-i18n="title-ops-tracking">
                                 Log Daily Performance / Vacation</h3>
                             <div class="grid-2-col">
-                                <div class="form-group"><label data-i18n="today-label">Start Date</label><input type="date" id="log-date"></div>
+                                <div class="form-group"><label data-i18n="today-label">Start Date</label><input
+                                        type="date" id="log-date"></div>
                                 <div class="form-group">
                                     <label data-i18n="label-urgency-level">Note Type</label>
                                     <select id="log-type" onchange="toggleVacationDays()">
@@ -1533,13 +1538,17 @@
 
                             <div class="form-group" id="vacation-days-group" style="display: none; margin-top: 10px;">
                                 <label data-i18n="placeholder-stock-amt">Number of Consecutive Vacation Days</label>
-                                <input type="number" id="vacation-days" data-i18n="placeholder-stock-amt" placeholder="e.g. 20" min="1" value="1">
+                                <input type="number" id="vacation-days" data-i18n="placeholder-stock-amt"
+                                    placeholder="e.g. 20" min="1" value="1">
                             </div>
 
-                            <div class="form-group" style="margin-top: 20px;"><label data-i18n="placeholder-reason">Supervisor Notes</label><textarea
-                                    id="log-note" rows="2" data-i18n="placeholder-desc-task" placeholder="Enter optional observations..."></textarea>
+                            <div class="form-group" style="margin-top: 20px;"><label
+                                    data-i18n="placeholder-reason">Supervisor Notes</label><textarea id="log-note"
+                                    rows="2" data-i18n="placeholder-desc-task"
+                                    placeholder="Enter optional observations..."></textarea>
                             </div>
-                            <button onclick="addDailyLog()" style="width: 100%; padding: 12px;" data-i18n="btn-assign-task">Submit Record</button>
+                            <button onclick="addDailyLog()" style="width: 100%; padding: 12px;"
+                                data-i18n="btn-assign-task">Submit Record</button>
                         </div>
 
                         <!-- History -->
@@ -1709,14 +1718,13 @@
                 <div class="card">
                     <div class="flex-between"
                         style="border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 20px; flex-wrap: wrap;">
-                        <h2 class="card-title" style="border:none; margin:0; padding:0; display: flex; align-items: center; gap: 8px;">
-                            <span data-i18n="title-inventory">Inventory Tracking</span>
-                        </h2>
+                        <h2 class="card-title" style="border:none; margin:0; padding:0;" data-i18n="title-inventory">
+                            Inventory Tracking</h2>
                         <div style="display:flex; gap:10px; align-items:center;">
                             <input type="text" id="wh-search" onkeyup="renderWarehouse()"
-                                placeholder="🔍 Search items..." style="width: 200px; padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main);"
+                                placeholder="🔍 Search items..." style="width: 200px; padding: 8px 12px;"
                                 data-i18n="placeholder-search">
-                            <button onclick="exportWarehousePDF()" class="btn-primary" style="padding: 10px 20px; font-weight:600; box-shadow: var(--shadow-sm);"
+                            <button onclick="exportWarehousePDF()" class="btn-outline" style="padding: 8px 12px;"
                                 data-i18n="btn-restock-pdf">📄 Restock PDF</button>
                         </div>
                     </div>
@@ -2032,19 +2040,6 @@
                     </div>
                 </div>
 
-                <!-- Finance PDF Export: Visible to ALL roles (workers + admins) -->
-                <div
-                    style="margin-top: 16px; padding: 16px; background: var(--input-bg); border-radius: var(--radius-md); border: 1px solid var(--border-color); display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                    <div style="flex:1; min-width:180px;">
-                        <div style="font-weight:600; color:var(--text-main); font-size:0.95rem;"
-                            data-i18n="title-export-fin">📄 Export Financial Report</div>
-                        <div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;"
-                            data-i18n="desc-export-fin">Download a PDF copy of this financial record.</div>
-                    </div>
-                    <button onclick="exportWorkerFinancePDF()"
-                        style="background:var(--primary); color:#fff; padding:12px 20px; font-size:0.95rem; white-space:nowrap;"
-                        data-i18n="btn-export-pdf">📄 Download PDF</button>
-                </div>
 
             </div>
 
@@ -2793,34 +2788,25 @@
             const data = getCompanyData().warehouse;
             if (!data || data.length === 0) return alert("Warehouse is empty.");
 
-            const lang = currentAppLang;
-            const direction = lang === 'ar' ? 'rtl' : 'ltr';
-            const headerColor = '#452b1b';
-            const printTitle = lang === 'ar' ? 'تقرير توريد وجرد المستودع' : 'Burgeroov Warehouse & Restock Report';
-
             let rowsHtml = '';
             let criticalList = [];
-            let totalItems = data.length;
-            let lowStockCount = 0;
 
             data.forEach(i => {
                 const isLow = i.currentStock <= i.riskAmount;
                 const toOrder = Math.max(0, i.maxStock - i.currentStock);
 
                 if (isLow) {
-                    lowStockCount++;
-                    criticalList.push(`<li style="margin-bottom:8px;"><strong>${i.name}</strong>: ${lang === 'ar' ? 'نقص حاد! اطلب' : 'Critical! Order'} <strong>${toOrder}</strong></li>`);
+                    criticalList.push(`<li style="margin-bottom:6px;"><strong>${i.name}</strong>: Need to order <strong>${toOrder}</strong></li>`);
                 }
 
-                const rowBg = isLow ? 'background-color:#fff5f5; color:#c53030; font-weight:bold;' : '';
-                const statusBadge = isLow ? `<span style="background:#feb2b2; padding:2px 6px; border-radius:4px; font-size:10px;">${lang === 'ar' ? 'نقص' : 'LOW'}</span>` : `<span style="background:#c6f6d5; padding:2px 6px; border-radius:4px; font-size:10px; color:#22543d;">${lang === 'ar' ? 'متوفر' : 'OK'}</span>`;
+                const rowBg = isLow ? 'background-color:#fef2f2; color:#dc2626; font-weight:bold;' : '';
+                const nameDisplay = isLow ? `&#x1F6A8; ${i.name}` : i.name;
 
                 rowsHtml += `
                     <tr style="${rowBg}">
-                        <td style="padding:10px; border:1px solid #e2e8f0;">${i.name}</td>
-                        <td style="padding:10px; border:1px solid #e2e8f0; text-align:center;">${statusBadge}</td>
-                        <td style="padding:10px; border:1px solid #e2e8f0; text-align:center;">${i.currentStock} / ${i.maxStock}</td>
-                        <td style="padding:10px; border:1px solid #e2e8f0; text-align:center; background:${toOrder > 0 ? '#fffaf0' : 'transparent'};">${toOrder}</td>
+                        <td style="padding:8px; border:1px solid #ccc;">${nameDisplay}</td>
+                        <td style="padding:8px; border:1px solid #ccc; text-align:center;">${i.currentStock} / ${i.maxStock}</td>
+                        <td style="padding:8px; border:1px solid #ccc; text-align:center;">${toOrder}</td>
                     </tr>
                 `;
             });
@@ -2828,52 +2814,59 @@
             let criticalHtml = '';
             if (criticalList.length > 0) {
                 criticalHtml = `
-                    <div style="margin-top:25px; border:2px solid #e53e3e; padding:18px; border-radius:12px; background-color:#fff5f5;">
-                        <h3 style="color:#c53030; margin-top:0; font-size:17px; display:flex; align-items:center; gap:8px;">🚨 ${lang === 'ar' ? 'أصناف تحتاج طلب فوري' : 'CRITICAL RESTOCK ORDERS'}</h3>
-                        <ul style="color:#c53030; margin-bottom:0; font-size:14px; list-style-type:none; padding:0;">
+                    <div style="margin-top:30px; border:2px solid #dc2626; padding:15px; border-radius:8px; background-color:#fef2f2;">
+                        <h3 style="color:#dc2626; margin-top:0; font-size:16px;">&#x1F6A8; CRITICAL RESTOCK ORDERS</h3>
+                        <ul style="color:#dc2626; margin-bottom:0; font-size:14px; list-style-type:square;">
                             ${criticalList.join('')}
                         </ul>
                     </div>
                 `;
             }
 
+            const lang = currentAppLang;
+            const direction = lang === 'ar' ? 'rtl' : 'ltr';
+            const headerColor = '#452b1b';
+            const totalItems = data.length;
+            const lowStockCount = data.filter(i => i.currentStock <= i.riskAmount).length;
+            const printTitle = lang === 'ar' ? 'تقرير توريد وجرد المستودع' : 'Burgeroov Warehouse & Restock Report';
+
             const printHTML = `<!DOCTYPE html><html dir="${direction}" lang="${lang}"><head><meta charset="UTF-8">
                 <title>${printTitle}</title>
                 <style>
                     @page { size: portrait; margin: 10mm !important; }
                     @media print { html, body { margin: 0 !important; padding: 0 !important; } }
-                    body { font-family: 'Segoe UI', Tahoma, sans-serif; color: #2d3748; padding: 10mm; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid ${headerColor}; padding-bottom: 12px; margin-bottom: 25px; }
+                    body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; color: #1e293b; padding: 10mm; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    
+                    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid ${headerColor}; padding-bottom: 12px; margin-bottom: 20px; }
                     .header h1 { color: ${headerColor}; margin: 0; font-size: 22px; font-weight: 800; }
-                    .header .meta { text-align: ${lang === 'ar' ? 'left' : 'right'}; font-size: 12px; color: #718096; }
+                    .header .meta { text-align: ${lang === 'ar' ? 'left' : 'right'}; font-size: 12px; color: #64748b; font-weight: 600; }
                     
-                    .summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 25px; }
-                    .summary-box { background: #edf2f7; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #e2e8f0; }
-                    .summary-box .label { font-size: 11px; font-weight: 700; color: #4a5568; text-transform: uppercase; margin-bottom: 5px; }
-                    .summary-box .value { font-size: 20px; font-weight: 800; color: ${headerColor}; }
+                    .stats-container { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; margin-bottom: 25px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; text-align: center; }
+                    .stat-item .label { font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
+                    .stat-item .value { font-size: 24px; font-weight: 900; color: ${headerColor}; margin-top: 5px; }
                     
-                    table { width: 100%; border-collapse: collapse; font-size: 12px; }
-                    th { background-color: ${headerColor}; color: #fff; padding: 12px; border: 1px solid #cbd5e1; text-align: ${lang === 'ar' ? 'right' : 'left'}; }
-                    td { padding: 10px; border: 1px solid #e2e8f0; }
-                    tr:nth-child(even) td { background-color: #f7fafc; }
-                    .footer { margin-top: 40px; font-size: 10px; color: #a0aec0; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+                    table { width: 100%; border-collapse: collapse; font-size: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); border-radius: 8px; overflow: hidden; }
+                    th { background-color: ${headerColor}; color: white; padding: 10px; border: 1px solid #cbd5e1; text-align: ${lang === 'ar' ? 'right' : 'left'}; }
+                    td { padding: 8px 10px; border: 1px solid #e2e8f0; }
+                    tr:nth-child(even) td { background-color: #f8fafc; }
+                    .footer { margin-top: 30px; font-size: 10px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 10px; }
                 </style></head><body>
                 <div class="header">
                     <h1>📦 ${printTitle}</h1>
                     <div class="meta">
-                        <div>${lang === 'ar' ? 'تاريخ التقرير' : 'Report Date'}: ${new Date().toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}</div>
-                        <div style="font-weight:bold; color:${headerColor};">Burgeroov Operations</div>
+                        <div>${new Date().toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}</div>
+                        <div style="color:${headerColor};">BURGEROOV WAREHOUSE</div>
                     </div>
                 </div>
 
-                <div class="summary-grid">
-                    <div class="summary-box">
-                        <div class="label">${lang === 'ar' ? 'إجمالي الأصناف' : 'Total Tracked Items'}</div>
+                <div class="stats-container">
+                    <div class="stat-item">
+                        <div class="label">${lang === 'ar' ? 'إجمالي الأصناف' : 'Total Items'}</div>
                         <div class="value">${totalItems}</div>
                     </div>
-                    <div class="summary-box" style="${lowStockCount > 0 ? 'background:#fff5f5; border-color:#feb2b2;' : ''}">
-                        <div class="label">${lang === 'ar' ? 'أصناف منخفضة' : 'Low Stock Items'}</div>
-                        <div class="value" style="${lowStockCount > 0 ? 'color:#c53030;' : ''}">${lowStockCount}</div>
+                    <div class="stat-item" style="${lowStockCount > 0 ? 'background:#fff1f2; border-radius:8px;' : ''}">
+                        <div class="label" style="${lowStockCount > 0 ? 'color:#e11d48;' : ''}">${lang === 'ar' ? 'تنبيهات النقص' : 'Low Stock Alerts'}</div>
+                        <div class="value" style="${lowStockCount > 0 ? 'color:#e11d48;' : ''}">${lowStockCount}</div>
                     </div>
                 </div>
 
@@ -2881,8 +2874,7 @@
                     <thead>
                         <tr>
                             <th>${lang === 'ar' ? 'اسم الصنف' : 'Product Name'}</th>
-                            <th style="text-align:center;">${lang === 'ar' ? 'الحالة' : 'Status'}</th>
-                            <th style="text-align:center;">${lang === 'ar' ? 'المتوفر / الكلي' : 'Current / Max'}</th>
+                            <th style="text-align:center;">${lang === 'ar' ? 'المتوفر / الأقصى' : 'Current / Max'}</th>
                             <th style="text-align:center;">${lang === 'ar' ? 'الكمية المطلوبة' : 'Order Qty'}</th>
                         </tr>
                     </thead>
@@ -2891,7 +2883,7 @@
                 ${criticalHtml}
 
                 <div class="footer">
-                    Burgeroov Management Portal - Warehouse Inventory Control - ${new Date().toLocaleDateString()}
+                    Burgeroov Management Portal - Warehouse Inventory Report - ${new Date().toLocaleDateString()}
                 </div>
                 </body></html>`;
 
@@ -2902,7 +2894,7 @@
             document.body.appendChild(iframe);
             iframe.onload = function () { setTimeout(function () { iframe.contentWindow.print(); }, 300); };
             iframe.src = blobUrl;
-            setTimeout(() => { URL.revokeObjectURL(blobUrl); document.body.removeChild(iframe); }, 15000);
+            setTimeout(() => { URL.revokeObjectURL(blobUrl); document.body.removeChild(iframe); }, 10000);
         }
 
         // --- UTILITIES ---
@@ -3106,12 +3098,13 @@
             const t = translations[lang];
             if (data.length === 0) { alert(lang === 'ar' ? "لا توجد سجلات." : "No records to export."); return; }
 
-            // Calculate Totals for Summary
+            // Calculate Totals for Summary Stats
             const totalBase = data.reduce((sum, row) => sum + (parseFloat(row[t.baseIncome]) || 0), 0);
             const totalRewards = data.reduce((sum, row) => sum + (parseFloat(row[t.rewards]) || 0), 0);
             const totalViolations = data.reduce((sum, row) => sum + (parseFloat(row[t.violations]) || 0), 0);
             const totalPaid = data.reduce((sum, row) => sum + (parseFloat(row[t.paid]) || 0), 0);
             const totalRemaining = data.reduce((sum, row) => sum + (parseFloat(row[t.remaining]) || 0), 0);
+            const totalCustody = data.reduce((sum, row) => sum + (parseFloat(row[t.custody]) || 0), 0);
 
             const headerColor = '#452b1b';
             const printTitle = lang === 'ar' ? `تقرير بورجروف المالي (${currentGlobalMonth})` : `BURGEROOV Financial Report (${currentGlobalMonth})`;
@@ -3124,50 +3117,53 @@
                     @page { size: landscape; margin: 8mm !important; }
                     @media print { html, body { margin: 0 !important; padding: 0 !important; } }
                     body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; color: #1e293b; padding: 10mm; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid ${headerColor}; padding-bottom: 12px; margin-bottom: 25px; }
+                    
+                    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid ${headerColor}; padding-bottom: 12px; margin-bottom: 20px; }
                     .header h1 { color: ${headerColor}; margin: 0; font-size: 26px; font-weight: 800; }
-                    .header .meta { text-align: ${lang === 'ar' ? 'left' : 'right'}; font-size: 13px; color: #64748b; font-weight: 500; }
+                    .header .meta { text-align: ${lang === 'ar' ? 'left' : 'right'}; font-size: 13px; color: #64748b; font-weight: 600; }
                     
-                    .summary-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 30px; }
-                    .summary-box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 10px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-                    .summary-box .label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.5px; }
-                    .summary-box .value { font-size: 18px; font-weight: 800; color: ${headerColor}; }
-                    
-                    table { width: 100%; border-collapse: collapse; font-size: 10.5px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border-radius: 8px; overflow: hidden; }
-                    th { background-color: ${headerColor}; color: white; padding: 12px 10px; border: 1px solid #cbd5e1; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
-                    td { padding: 8px 10px; border: 1px solid #e2e8f0; }
+                    .stats-container { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 25px; text-align: center; }
+                    .stats-main-label { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 700; letter-spacing: 1px; }
+                    .stats-main-value { font-size: 32px; font-weight: 900; color: ${headerColor}; margin: 5px 0 15px 0; }
+                    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+                    .stat-item .label { font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600; }
+                    .stat-item .value { font-size: 15px; font-weight: 700; color: #334155; margin-top: 3px; }
+
+                    table { width: 100%; border-collapse: collapse; font-size: 10px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); border-radius: 8px; overflow: hidden; }
+                    th { background-color: ${headerColor}; color: white; padding: 12px 8px; border: 1px solid #cbd5e1; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+                    td { padding: 8px; border: 1px solid #e2e8f0; }
                     tr:nth-child(even) td { background-color: #f8fafc; }
-                    tr:hover td { background-color: #f1f5f9; }
-                    .footer { margin-top: 40px; font-size: 11px; color: #94a3b8; display: flex; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+                    
+                    .footer { margin-top: 30px; font-size: 10px; color: #94a3b8; display: flex; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 10px; }
                 </style></head><body>
                 <div class="header">
                     <h1>💰 ${printTitle}</h1>
                     <div class="meta">
                         <div>${t.generatedOn} ${new Date().toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}</div>
-                        <div style="color:${headerColor}; font-weight:bold;">Burgeroov Portal v2.0</div>
+                        <div style="color:${headerColor};">BURGEROOV OPERATIONS PORTAL</div>
                     </div>
                 </div>
                 
-                <div class="summary-grid">
-                    <div class="summary-box">
-                        <div class="label">${t.baseIncome}</div>
-                        <div class="value">SAR ${totalBase.toLocaleString()}</div>
-                    </div>
-                    <div class="summary-box">
-                        <div class="label">${t.rewards}</div>
-                        <div class="value" style="color:#16a34a">+ SAR ${totalRewards.toLocaleString()}</div>
-                    </div>
-                    <div class="summary-box">
-                        <div class="label">${t.violations}</div>
-                        <div class="value" style="color:#dc2626">- SAR ${totalViolations.toLocaleString()}</div>
-                    </div>
-                    <div class="summary-box" style="background:#fff7ed; border-color:#fdba74;">
-                        <div class="label">${t.paid}</div>
-                        <div class="value" style="color:#c2410c">SAR ${totalPaid.toLocaleString()}</div>
-                    </div>
-                    <div class="summary-box" style="background:#eff6ff; border-color:#93c5fd;">
-                        <div class="label">${t.remaining}</div>
-                        <div class="value" style="color:#1d4ed8">SAR ${totalRemaining.toLocaleString()}</div>
+                <div class="stats-container">
+                    <div class="stats-main-label">${t.remaining} (Total)</div>
+                    <div class="stats-main-value">SAR ${totalRemaining.toLocaleString()}</div>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="label">${t.baseIncome}</div>
+                            <div class="value">SAR ${totalBase.toLocaleString()}</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="label">${t.netPay} (Month)</div>
+                            <div class="value">SAR ${(totalBase + totalRewards - totalViolations).toLocaleString()}</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="label">${t.paid}</div>
+                            <div class="value" style="color:#c2410c">SAR ${totalPaid.toLocaleString()}</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="label">${t.custody}</div>
+                            <div class="value" style="color:#c084fc">SAR ${totalCustody.toLocaleString()}</div>
+                        </div>
                     </div>
                 </div>
 
