@@ -2454,25 +2454,35 @@
                     migrateMonthlyData();
                     runAutoLogger();
 
-                    // FEATURE 1: Seed previousTaskIds on first load so we don't false-fire on login
                     if (currentUser && currentUser.role === 'worker') {
                         const myWorker = appData.burgeroov.workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
-                        if (myWorker && myWorker.jobs) {
-                            previousTaskIds = myWorker.jobs.map(j => j.id);
+                        if (myWorker) {
+                            if (myWorker.jobs) previousTaskIds = myWorker.jobs.map(j => j.id);
+                            // Track initial active order time to avoid false notification on login
+                            window.previousOrderStartTime = myWorker.activeOrder ? myWorker.activeOrder.startTime : null;
                         }
                     }
                     isInitialLoad = false;
                 } else {
-                    // FEATURE 1: On subsequent data updates, detect newly assigned tasks for worker role
                     if (currentUser && currentUser.role === 'worker') {
                         const myWorker = appData.burgeroov.workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
-                        if (myWorker && myWorker.jobs) {
-                            const currentTaskIds = myWorker.jobs.map(j => j.id);
-                            const newTasks = currentTaskIds.filter(id => !previousTaskIds.includes(id));
-                            if (newTasks.length > 0) {
-                                showInAppNotification('📋 You have been assigned a new task!');
+                        if (myWorker) {
+                            // 1. Task Check
+                            if (myWorker.jobs) {
+                                const currentTaskIds = myWorker.jobs.map(j => j.id);
+                                const newTasks = currentTaskIds.filter(id => !previousTaskIds.includes(id));
+                                if (newTasks.length > 0) {
+                                    showInAppNotification('📋 ' + (t('title-tasks-board') || 'You have a new task!'));
+                                }
+                                previousTaskIds = currentTaskIds;
                             }
-                            previousTaskIds = currentTaskIds;
+
+                            // 2. Delivery Order Check
+                            const currentOrderStart = myWorker.activeOrder ? myWorker.activeOrder.startTime : null;
+                            if (currentOrderStart && currentOrderStart !== window.previousOrderStartTime) {
+                                showInAppNotification('🛵 ' + (t('title-current-order') || 'You have a new delivery order!'));
+                            }
+                            window.previousOrderStartTime = currentOrderStart;
                         }
                     }
                 }
@@ -3750,33 +3760,75 @@
         }
 
         function updateActiveDriverTimer() {
-            if (!activeDriverId) return;
-            const worker = getCompanyData().workers.find(w => w.id === activeDriverId);
-            if (!worker || !worker.activeOrder) return;
-
             const now = Date.now();
-            const order = worker.activeOrder;
-            const diff = (order.startTime + order.allocatedMs) - now;
 
-            const timerBox = document.getElementById('driver-timer-box');
-            const timerDisplay = document.getElementById('driver-timer-display');
-            const statusDisplay = document.getElementById('driver-timer-status');
+            // 1. Manager View Update (If manager has selected a driver from sidebar)
+            if (activeDriverId) {
+                const worker = getCompanyData().workers.find(w => w.id === activeDriverId);
+                const timerBox = document.getElementById('driver-timer-box');
+                const timerDisplay = document.getElementById('driver-timer-display');
+                const statusDisplay = document.getElementById('driver-timer-status');
 
-            if (diff > 0) {
-                const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
-                const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
-                const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-                timerDisplay.textContent = `${h !== '00' ? h + ':' : ''}${m}:${s}`;
-                timerBox.classList.remove('timer-late');
-                statusDisplay.textContent = t('label-time-remaining-del');
+                if (worker && worker.activeOrder) {
+                    const order = worker.activeOrder;
+                    const diff = (order.startTime + order.allocatedMs) - now;
+
+                    if (diff > 0) {
+                        const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
+                        const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+                        const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+                        timerDisplay.textContent = `${h !== '00' ? h + ':' : ''}${m}:${s}`;
+                        timerBox.classList.remove('timer-late');
+                        statusDisplay.textContent = t('desc-time-remaining');
+                    } else {
+                        const late = Math.abs(diff);
+                        const h = Math.floor(late / 3600000).toString().padStart(2, '0');
+                        const m = Math.floor((late % 3600000) / 60000).toString().padStart(2, '0');
+                        const s = Math.floor((late % 60000) / 1000).toString().padStart(2, '0');
+                        timerDisplay.textContent = `-${h !== '00' ? h + ':' : ''}${m}:${s}`;
+                        timerBox.classList.add('timer-late');
+                        statusDisplay.textContent = t('status-late');
+                    }
+                }
+            }
+
+            // 2. Persistent Driver Banner Update (For Logged-in Driver anywhere in the app)
+            const driverBanner = document.getElementById('driver-order-timer-banner');
+            if (currentUser && currentUser.role === 'worker') {
+                const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+
+                if (myWorker && myWorker.activeOrder) {
+                    const order = myWorker.activeOrder;
+                    const diff = (order.startTime + order.allocatedMs) - now;
+                    const bannerTime = document.getElementById('driver-order-banner-time');
+                    const bannerStatus = document.getElementById('driver-order-banner-status');
+
+                    if (diff > 0) {
+                        const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
+                        const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+                        const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+                        bannerTime.textContent = `${h !== '00' ? h + ':' : ''}${m}:${s}`;
+                        driverBanner.style.borderLeftColor = 'var(--warning)';
+                        driverBanner.style.borderColor = 'var(--border-color)';
+                        bannerTime.style.color = 'var(--warning)';
+                        bannerStatus.textContent = t('desc-time-remaining');
+                    } else {
+                        const late = Math.abs(diff);
+                        const h = Math.floor(late / 3600000).toString().padStart(2, '0');
+                        const m = Math.floor((late % 3600000) / 60000).toString().padStart(2, '0');
+                        const s = Math.floor((late % 60000) / 1000).toString().padStart(2, '0');
+                        bannerTime.textContent = `-${h !== '00' ? h + ':' : ''}${m}:${s}`;
+                        driverBanner.style.borderLeftColor = 'var(--danger)';
+                        driverBanner.style.borderColor = 'var(--danger-border)';
+                        bannerTime.style.color = 'var(--danger)';
+                        bannerStatus.textContent = t('status-late');
+                    }
+                    driverBanner.style.display = 'block';
+                } else {
+                    if (driverBanner) driverBanner.style.display = 'none';
+                }
             } else {
-                const late = Math.abs(diff);
-                const h = Math.floor(late / 3600000).toString().padStart(2, '0');
-                const m = Math.floor((late % 3600000) / 60000).toString().padStart(2, '0');
-                const s = Math.floor((late % 60000) / 1000).toString().padStart(2, '0');
-                timerDisplay.textContent = `-${h !== '00' ? h + ':' : ''}${m}:${s}`;
-                timerBox.classList.add('timer-late');
-                statusDisplay.textContent = t('label-late-del');
+                if (driverBanner) driverBanner.style.display = 'none';
             }
         }
 
