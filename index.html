@@ -1371,6 +1371,20 @@
         <!-- Global Low Stock Alert Banner -->
         <div id="global-stock-alerts"></div>
 
+        <!-- Persistent Worker Task Timer -->
+        <div id="worker-task-timer-banner" style="display:none; margin: 12px 0; padding: 16px; border-radius: 12px; background: var(--card-bg); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);">
+            <div class="flex-between" style="align-items: center;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div style="font-size:1.5rem;">⏳</div>
+                    <div>
+                        <div id="worker-timer-title" style="font-weight:700; color:var(--text-main); font-size:1rem;" data-i18n="msg-task-timer-worker">Active Task Deadline</div>
+                        <div id="worker-timer-task-name" style="font-size:0.85rem; color:var(--text-muted);"></div>
+                    </div>
+                </div>
+                <div id="worker-timer-display" style="font-size:1.4rem; font-weight:800; color:var(--warning); font-family: monospace;"></div>
+            </div>
+        </div>
+
         <!-- Global Month Selector -->
         <div class="month-bar" style="margin-top: 24px">
             <h2>
@@ -1412,11 +1426,10 @@
                 <!-- Manager Access Control -->
                 <div class="card">
                     <h2 class="card-title" data-i18n="title-manager-access">Manager Access Control</h2>
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">Promote users to
-                        global Admin status.</p>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">Promote users to global Admin status.</p>
                     <div class="form-group flex-between">
-                        <input type="email" id="new-manager-email" data-i18n="placeholder-email" placeholder="Enter email to promote...">
-                        <button onclick="addManager()" data-i18n="th-action">Promote</button>
+                        <input type="email" id="new-manager-email" placeholder="Enter email to promote...">
+                        <button onclick="addManager()">Promote</button>
                     </div>
                     <ul id="managers-list" style="list-style: none; margin-top: 16px;"></ul>
                 </div>
@@ -1424,26 +1437,22 @@
                 <!-- Worker Department Access Control -->
                 <div class="card">
                     <h2 class="card-title" data-i18n="title-worker-access">Worker Department Access</h2>
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">Grant a specific
-                        worker editing powers over a specific department.</p>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">Grant a specific worker editing powers over a specific department.</p>
                     <div class="form-group">
-                        <label data-i18n="label-assign-to">Select Worker</label>
+                        <label data-i18n="label-select-emp">Select Worker</label>
                         <select id="perm-worker-select" onchange="loadWorkerPerms()">
                             <option value="" data-i18n="opt-choose-emp">-- Choose Employee --</option>
                         </select>
                     </div>
                     <div class="grid-2-col" style="margin-bottom: 16px;">
-                        <label
-                            style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
-                            <input type="checkbox" id="perm-wh" style="width:auto;"> Warehouse Admin
+                        <label style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                            <input type="checkbox" id="perm-wh" style="width:auto;"> <span data-i18n="tab-warehouse">Warehouse</span>
                         </label>
-                        <label
-                            style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
-                            <input type="checkbox" id="perm-drv" style="width:auto;"> Drivers Admin
+                        <label style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                            <input type="checkbox" id="perm-drv" style="width:auto;"> <span data-i18n="tab-drivers">Drivers</span>
                         </label>
-                        <label
-                            style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
-                            <input type="checkbox" id="perm-fin" style="width:auto;"> Finance Admin
+                        <label style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                            <input type="checkbox" id="perm-fin" style="width:auto;"> <span data-i18n="tab-finance">Finance</span>
                         </label>
                     </div>
                     <button onclick="saveWorkerPerms()" style="width: 100%;">Save Permissions</button>
@@ -1453,22 +1462,19 @@
                 <div class="card">
                     <h2 class="card-title" data-i18n="title-branches">Facility / Branches</h2>
                     <div class="form-group flex-between">
-                        <input type="text" id="new-branch-name" data-i18n="placeholder-reason" placeholder="Enter branch name...">
-                        <button onclick="addBranch()" data-i18n="btn-save-shortcut">Add</button>
+                        <input type="text" id="new-branch-name" placeholder="Enter branch name...">
+                        <button onclick="addBranch()">Add</button>
                     </div>
                     <ul id="branches-list" style="list-style: none; margin-top: 16px;"></ul>
                 </div>
 
                 <!-- Violation Rules Editor -->
                 <div class="card">
-                    <h2 class="card-title">Violation Rules System</h2>
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">Define standard
-                        penalties to quickly apply them later.</p>
+                    <h2 class="card-title" data-i18n="title-violation-rules">Violation Rules System</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">Define standard penalties to quickly apply them later.</p>
                     <div class="form-group flex-between">
-                        <input type="text" id="new-vrule-name" placeholder="e.g. Late 15 mins"
-                            style="flex-grow: 1; margin-right: 8px;">
-                        <input type="number" id="new-vrule-amount" placeholder="SAR"
-                            style="width: 90px; margin-right: 8px;">
+                        <input type="text" id="new-vrule-name" placeholder="e.g. Late 15 mins" style="flex-grow: 1; margin-right: 8px;">
+                        <input type="number" id="new-vrule-amount" placeholder="SAR" style="width: 90px; margin-right: 8px;">
                         <button onclick="addViolationRule()">Add</button>
                     </div>
                     <ul id="vrule-list" style="list-style: none; margin-top: 16px;"></ul>
@@ -1477,20 +1483,17 @@
                 <!-- Add Worker Card -->
                 <div class="card">
                     <h2 class="card-title" data-i18n="title-register-emp">Register Employee</h2>
-                    <div class="form-group"><label data-i18n="label-full-name">Full Name</label><input type="text" id="w-name"
-                            data-i18n="placeholder-desc-task" placeholder="e.g. Ahmed Ali"></div>
-                    <div class="form-group"><label data-i18n="placeholder-email">App Account Email</label><input type="email" id="w-email"
-                            data-i18n="placeholder-email" placeholder="Worker's Login Email"></div>
-                    <div class="form-group"><label data-i18n="label-role">Role / Position</label><input type="text" id="w-role"
-                            data-i18n="label-role" placeholder="e.g. Head Chef, Manager, Driver..."></div>
+                    <div class="form-group"><label data-i18n="label-full-name">Full Name</label><input type="text" id="w-name" placeholder="e.g. Ahmed Ali"></div>
+                    <div class="form-group"><label>App Account Email</label><input type="email" id="w-email" placeholder="Worker's Login Email"></div>
+                    <div class="form-group"><label data-i18n="label-role">Role / Position</label><input type="text" id="w-role" placeholder="e.g. Head Chef, Manager, Driver..."></div>
                     <div class="grid-2-col">
                         <div class="form-group"><label>Start Time</label><input type="time" id="w-start-time"></div>
                         <div class="form-group"><label>End Time</label><input type="time" id="w-end-time"></div>
                     </div>
                     <div class="grid-2-col">
-                        <div class="form-group"><label data-i18n="th-base-salary">Base Salary (SAR)</label><input type="number" id="w-income"
-                                data-i18n="placeholder-amount" placeholder="0.00"></div>
-                        <div class="form-group"><label data-i18n="title-branches">Branch</label><select id="w-branch"></select></div>
+                        <div class="form-group"><label>Base Salary (SAR)</label><input type="number" id="w-income"
+                                placeholder="0.00"></div>
+                        <div class="form-group"><label>Branch</label><select id="w-branch"></select></div>
                     </div>
                     <button onclick="addWorker()" style="width: 100%; padding: 12px; margin-top: 8px;">Create
                         Record</button>
@@ -1501,14 +1504,14 @@
             <div>
                 <!-- Daily Notes & Management Card -->
                 <div class="card admin-only">
-                    <h2 class="card-title" data-i18n="title-ops-tracking">Daily Operations Tracking</h2>
+                    <h2 class="card-title">Daily Operations Tracking</h2>
 
                     <div class="form-group"
                         style="margin-bottom: 24px; padding: 16px; background: var(--input-bg); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-                        <label style="color: var(--primary);" data-i18n="label-assign-to">Select Employee Record</label>
+                        <label style="color: var(--primary);">Select Employee Record</label>
                         <select id="ops-worker-select" onchange="handleOpsWorkerChange()"
                             style="font-size: 1rem; padding: 12px;">
-                            <option value="" data-i18n="opt-choose-emp">-- Choose Employee --</option>
+                            <option value="">-- Choose Employee --</option>
                         </select>
                     </div>
 
@@ -1517,29 +1520,29 @@
                         <!-- Daily Log Form -->
                         <div class="management-form-area">
                             <h3
-                                style="margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;" data-i18n="title-ops-tracking">
+                                style="margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
                                 Log Daily Performance / Vacation</h3>
                             <div class="grid-2-col">
-                                <div class="form-group"><label data-i18n="today-label">Start Date</label><input type="date" id="log-date"></div>
+                                <div class="form-group"><label>Start Date</label><input type="date" id="log-date"></div>
                                 <div class="form-group">
-                                    <label data-i18n="label-urgency-level">Note Type</label>
+                                    <label>Note Type</label>
                                     <select id="log-type" onchange="toggleVacationDays()">
                                         <option value="good">Good Note ✅ (100% Score)</option>
                                         <option value="bad">Bad Note ❌ (2.5% Score)</option>
-                                        <option value="vacation" data-i18n="vacation">Vacation 🌴 (No Score)</option>
+                                        <option value="vacation">Vacation 🌴 (No Score)</option>
                                     </select>
                                 </div>
                             </div>
 
                             <div class="form-group" id="vacation-days-group" style="display: none; margin-top: 10px;">
-                                <label data-i18n="placeholder-stock-amt">Number of Consecutive Vacation Days</label>
-                                <input type="number" id="vacation-days" data-i18n="placeholder-stock-amt" placeholder="e.g. 20" min="1" value="1">
+                                <label>Number of Consecutive Vacation Days</label>
+                                <input type="number" id="vacation-days" placeholder="e.g. 20" min="1" value="1">
                             </div>
 
-                            <div class="form-group" style="margin-top: 20px;"><label data-i18n="placeholder-reason">Supervisor Notes</label><textarea
-                                    id="log-note" rows="2" data-i18n="placeholder-desc-task" placeholder="Enter optional observations..."></textarea>
+                            <div class="form-group" style="margin-top: 20px;"><label>Supervisor Notes</label><textarea
+                                    id="log-note" rows="2" placeholder="Enter optional observations..."></textarea>
                             </div>
-                            <button onclick="addDailyLog()" style="width: 100%; padding: 12px;" data-i18n="btn-assign-task">Submit Record</button>
+                            <button onclick="addDailyLog()" style="width: 100%; padding: 12px;">Submit Record</button>
                         </div>
 
                         <!-- History -->
@@ -1553,14 +1556,14 @@
 
                 <!-- Quick Roster Overview -->
                 <div class="card">
-                    <h2 class="card-title" data-i18n="title-ops-directory">Ops Directory</h2>
+                    <h2 class="card-title">Ops Directory</h2>
                     <div class="table-container">
                         <table id="ops-workers-table">
                             <thead>
                                 <tr>
-                                    <th data-i18n="th-emp-branch">Employee & Role</th>
-                                    <th data-i18n="avg-perf">Avg Perf</th>
-                                    <th class="admin-only" data-i18n="th-action">Manage</th>
+                                    <th>Employee & Role</th>
+                                    <th>Avg Perf</th>
+                                    <th class="admin-only">Manage</th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
@@ -2221,8 +2224,7 @@
             const todayDateDisplay = document.getElementById('today-date-display');
             if (todayDateDisplay) {
                 const options = { year: 'numeric', month: 'long', day: 'numeric' };
-                const dateStr = new Date().toLocaleDateString(currentAppLang === "ar" ? 'ar-SA' : 'en-US', options);
-                todayDateDisplay.textContent = `(${t('today-label')}: ${dateStr})`;
+                todayDateDisplay.textContent = "(Today: " + new Date().toLocaleDateString('en-US', options) + ")";
             }
         }
 
@@ -2367,8 +2369,8 @@
                 }
             }
 
-            currentUser.isKinan = isKinan;
             currentUser.role = isAdmin ? 'admin' : 'worker';
+            currentUser.isKinan = isKinan;
 
             document.body.className = 'theme-burgeroov'; // reset all dynamic classes
             if (isDarkMode) document.body.classList.add('dark-mode');
@@ -2451,7 +2453,7 @@
                             const currentTaskIds = myWorker.jobs.map(j => j.id);
                             const newTasks = currentTaskIds.filter(id => !previousTaskIds.includes(id));
                             if (newTasks.length > 0) {
-                                showInAppNotification('📋 ' + t('tab-tasks') + '!');
+                                showInAppNotification('📋 You have been assigned a new task!');
                             }
                             previousTaskIds = currentTaskIds;
                         }
@@ -2506,21 +2508,62 @@
         }
 
         function updateTaskTimers() {
-            if (currentTab !== 'tasks') return;
             const timers = document.querySelectorAll('.task-timer-display');
+            let mostUrgentTask = null;
+            let minDiff = Infinity;
+
             timers.forEach(t => {
                 const deadline = parseInt(t.getAttribute('data-deadline'));
                 const diff = deadline - Date.now();
                 if (diff <= 0) {
-                    t.innerHTML = `🚨 ${t('time-expired')}`;
+                    t.innerHTML = `🚨 ${t('status-late')}`;
                     t.style.color = 'var(--danger)';
                 } else {
                     const m = Math.floor(diff / 60000);
                     const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-                    t.innerHTML = `⏳ ${t('desc-time-remaining')}: ${m}:${s}`;
+                    t.innerHTML = `⏳ ${t('status-time-remaining')} ${m}:${s}`;
                     t.style.color = 'var(--warning)';
                 }
             });
+
+            // Update persistent banner for the current worker
+            const banner = document.getElementById('worker-task-timer-banner');
+            const timerDisplay = document.getElementById('worker-timer-display');
+            const taskNameDisplay = document.getElementById('worker-timer-task-name');
+
+            if (currentUser && currentUser.role === 'worker') {
+                const email = currentUser.email.toLowerCase();
+                const worker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === email);
+                if (worker && worker.jobs) {
+                    worker.jobs.forEach(j => {
+                        if ((j.status === 'seen' || (!j.status && j.done === false)) && j.deadlineMins > 0 && j.seenAt) {
+                            const deadlineMs = j.seenAt + (j.deadlineMins * 60000);
+                            const diff = deadlineMs - Date.now();
+                            if (diff < minDiff) {
+                                minDiff = diff;
+                                mostUrgentTask = { title: j.title, diff: diff };
+                            }
+                        }
+                    });
+                }
+            }
+
+            if (mostUrgentTask) {
+                banner.style.display = 'block';
+                taskNameDisplay.textContent = mostUrgentTask.title;
+                const diff = mostUrgentTask.diff;
+                if (diff <= 0) {
+                    timerDisplay.textContent = t('status-late');
+                    timerDisplay.style.color = 'var(--danger)';
+                } else {
+                    const m = Math.floor(diff / 60000);
+                    const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+                    timerDisplay.textContent = `${m}:${s}`;
+                    timerDisplay.style.color = 'var(--warning)';
+                }
+            } else {
+                banner.style.display = 'none';
+            }
         }
 
         function updateViolationTimers() {
@@ -2531,7 +2574,7 @@
                 const diff = deadline - Date.now();
                 if (diff <= 0) {
                     t.classList.remove('viol-timer');
-                    t.innerHTML = `🚨 ${t('applied-expired-badge')}`;
+                    t.innerHTML = '🚨 Applied (Time Expired)';
                     t.style.color = 'var(--danger)';
                     const parent = t.closest('.flex-between');
                     if (parent && parent.children[1]) parent.children[1].innerHTML = '';
@@ -2540,7 +2583,7 @@
                     const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
                     const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
                     const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-                    t.innerHTML = `⏳ ${t('pending-label')} (${h}h ${m}m ${s}s ${t('left-label')})`;
+                    t.innerHTML = `⏳ Pending (${h}h ${m}m ${s}s left)`;
                 }
             });
 
@@ -2618,9 +2661,10 @@
                 const li = document.createElement('li'); li.className = 'flex-between list-item';
                 let delBtn = '';
                 if (currentUser && currentUser.isKinan && email !== 'kinan.rahal@hotmail.com') {
-                    delBtn = `<button class="btn-outline-danger admin-only" style="padding: 2px 8px; font-size: 0.7rem;" onclick="deleteManager('${email}')">Remove</button>`;
+                    // Renamed to 'Demote' as requested
+                    delBtn = `<button class="btn-outline-danger admin-only" style="padding: 2px 8px; font-size: 0.7rem;" onclick="deleteManager('${email}')">${t('btn-remove')}</button>`;
                 } else if (email === 'kinan.rahal@hotmail.com') {
-                    delBtn = `<span class="badge" style="background:var(--primary);">Master</span>`;
+                    delBtn = `<span class="badge" style="background:var(--primary);">${t('label-master')}</span>`;
                 }
                 li.innerHTML = `<span style="font-weight: 500; font-size: 0.9rem; color: var(--text-main);">${email}</span> ${delBtn}`;
                 list.appendChild(li);
@@ -2638,11 +2682,12 @@
         }
 
         function deleteManager(email) {
-            if (!currentUser.isKinan) return alert(t('only-master-admin') || "Only the ultimate admin can remove managers.");
-            if (email === 'kinan.rahal@hotmail.com') return alert(t('cannot-remove-master') || "Cannot remove master admin.");
-            if (confirm(`Remove ${email} from Managers?`)) {
+            if (!currentUser.isKinan) return alert("Only the ultimate admin can demote managers.");
+            if (email === 'kinan.rahal@hotmail.com') return alert("Cannot demote master admin.");
+            if (confirm(`${t('btn-remove')} ${email}?`)) {
                 appData.burgeroov.admins = appData.burgeroov.admins.filter(e => e !== email);
                 saveData();
+                renderManagersList();
             }
         }
 
@@ -2712,7 +2757,7 @@
         }
 
         function deleteWarehouseItem(itemId) {
-            if (!confirm("Are you sure you want to completely remove this product from the warehouse?")) return;
+            if (!confirm(t('confirm-delete-product'))) return;
             getCompanyData().warehouse = getCompanyData().warehouse.filter(i => i.id !== itemId);
             saveData();
         }
@@ -2725,8 +2770,8 @@
             const lowItems = data.warehouse.filter(i => i.currentStock <= i.riskAmount);
 
             if (lowItems.length > 0) {
-                const names = lowItems.map(i => `${i.name} (${i.currentStock} ${t('left-label')})`).join(', ');
-                alertBox.innerHTML = `<span style="font-size: 1.2rem; margin-right: 10px;">🚨</span> <strong>${t('risk-alert-title') || 'CRITICAL STOCK WARNING'}:</strong> ${names}.`;
+                const names = lowItems.map(i => `${i.name} (${i.currentStock} ${t('label-currently-left')})`).join(', ');
+                alertBox.innerHTML = `<span style="font-size: 1.2rem; margin-right: 10px;">🚨</span> <strong>${t('msg-critical-stock')}:</strong> ${names}.`;
                 alertBox.style.display = 'block';
             } else { alertBox.style.display = 'none'; }
         }
@@ -2743,14 +2788,14 @@
             const searchQuery = document.getElementById('wh-search').value.toLowerCase();
 
             if (!data.warehouse || data.warehouse.length === 0) {
-                list.innerHTML = `<p style="color:var(--text-muted); text-align:center; padding:20px; background:var(--input-bg); border-radius:var(--radius-md);">${t('no-manual-notes')}</p>`;
+                list.innerHTML = `<p style="color:var(--text-muted); text-align:center; padding:20px; background:var(--input-bg); border-radius:var(--radius-md);">${t('no-active-tasks')}</p>`;
                 return;
             }
 
             const filteredItems = data.warehouse.filter(i => i.name.toLowerCase().includes(searchQuery));
 
             if (filteredItems.length === 0) {
-                list.innerHTML = '<p style="color:var(--text-muted); text-align:center;">No items match your search.</p>';
+                list.innerHTML = `<p style="color:var(--text-muted); text-align:center;">${t('no-items-match') || 'No items match.'}</p>`;
                 return;
             }
 
@@ -2770,19 +2815,19 @@
                         <h3 style="margin:0; color:var(--text-main); font-size:1.15rem;">${item.name}</h3>
                         <div style="text-align:right;"><span style="font-size:1.4rem; font-weight:800; color:${isLow ? 'var(--danger)' : 'var(--primary)'}">${item.currentStock}</span> <span style="color:var(--text-muted); font-weight:600;">/ ${item.maxStock}</span></div>
                     </div>
-                    ${isLow ? `<div class="text-danger" style="font-size:0.8rem; margin-top:4px; font-weight:600;">⚠️ ${t('risk-alert-msg') || 'Below risk threshold'} (${item.riskAmount})</div>` : ''}
+                    ${isLow ? `<div class="text-danger" style="font-size:0.8rem; margin-top:4px; font-weight:600;">⚠️ ${t('label-currently-left')} (${item.riskAmount})</div>` : ''}
                     <div class="wh-progress"><div class="wh-fill ${isLow ? 'low' : ''}" style="width: ${pct}%"></div></div>
                     <div class="flex-between" style="margin-top: 20px; flex-wrap:wrap; gap:10px;">
                         <div style="display:flex; gap:8px; flex:1; min-width: 200px;">
-                            <input type="number" id="wh-update-${item.id}" placeholder="${t('placeholder-stock-amt')}" style="flex:1;" min="0">
-                            <button onclick="updateWarehouseStock('${item.id}')" class="btn-success" data-i18n="tab-ops">Update</button>
+                            <input type="number" id="wh-update-${item.id}" placeholder="${t('placeholder-product-name')}" style="flex:1;" min="0">
+                            <button onclick="updateWarehouseStock('${item.id}')" class="btn-success">${t('btn-log-payment')}</button>
                         </div>
                         <div style="display:flex; gap:8px;">
                             <button onclick="toggleDetails('wh-logs-${item.id}')" class="btn-neutral">History Log</button>
-                            ${isWHAdmin ? `<button onclick="deleteWarehouseItem('${item.id}')" class="btn-outline-danger" data-i18n="delete-btn">Delete</button>` : ''}
+                            ${isWHAdmin ? `<button onclick="deleteWarehouseItem('${item.id}')" class="btn-outline-danger">${t('btn-remove')}</button>` : ''}
                         </div>
                     </div>
-                    <div id="wh-logs-${item.id}" class="wh-logs" style="display:none;">${logsHtml || t('no-logs-month')}</div>`;
+                    <div id="wh-logs-${item.id}" class="wh-logs" style="display:none;">${logsHtml || 'No logs yet.'}</div>`;
                 list.appendChild(div);
             });
         }
@@ -3194,59 +3239,59 @@
                 .footer { margin-top: 24px; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; }
             </style></head><body>
                 <div class="header">
-                    <div style="${textAlign === 'right' ? 'text-align:right;' : ''}">
-                        <h1>💰 ${t('title-export-fin')}</h1>
-                        <div style="font-size:13px; margin-top:4px; opacity:0.9;">${worker.name} &nbsp;•&nbsp; ${worker.role || t('unassigned')} &nbsp;•&nbsp; ${worker.branch || ''}</div>
+                    <div>
+                        <h1>💰 Financial Report</h1>
+                        <div style="font-size:13px; margin-top:4px; opacity:0.9;">${worker.name} &nbsp;•&nbsp; ${worker.role || 'Staff'} &nbsp;•&nbsp; ${worker.branch || ''}</div>
                     </div>
-                    <div class="meta" style="${textAlign === 'left' ? 'text-align:left;' : ''}">
-                        <div>${t('operating-month')}: <strong>${currentGlobalMonth}</strong></div>
-                        <div>${t('shift')}: ${worker.startTime || '--'} – ${worker.endTime || '--'}</div>
+                    <div class="meta">
+                        <div>Month: <strong>${currentGlobalMonth}</strong></div>
+                        <div>Shift: ${worker.startTime || '--'} – ${worker.endTime || '--'}</div>
                     </div>
                 </div>
 
                 <div class="summary-grid">
                     <div class="summary-card">
-                        <div class="label">${t('th-base-salary')}</div>
+                        <div class="label">Base Salary</div>
                         <div class="value" style="color:${headerColor};">SAR ${base.toLocaleString()}</div>
                     </div>
                     <div class="summary-card">
-                        <div class="label">${t('span-net-month')}</div>
+                        <div class="label">Net This Month</div>
                         <div class="value" style="color:${net >= 0 ? '#16a34a' : '#dc2626'};">SAR ${net.toLocaleString()}</div>
                     </div>
                     <div class="summary-card" style="border-color:#b45309; background:#fffbeb;">
-                        <div class="label">${t('rem-to-pay')}</div>
+                        <div class="label">Total Remaining (All-Time)</div>
                         <div class="value" style="color:#b45309;">SAR ${allTimeRemaining.toLocaleString()}</div>
                     </div>
                     <div class="summary-card">
-                        <div class="label">${t('box-rewards')}</div>
+                        <div class="label">Rewards</div>
                         <div class="value" style="color:#16a34a;">+ SAR ${rewards.toLocaleString()}</div>
                     </div>
                     <div class="summary-card">
-                        <div class="label">${t('box-violations')}</div>
+                        <div class="label">Violations</div>
                         <div class="value" style="color:#dc2626;">- SAR ${violations.toLocaleString()}</div>
                     </div>
                     <div class="summary-card">
-                        <div class="label">${t('box-custody')}</div>
+                        <div class="label">Custody</div>
                         <div class="value" style="color:#d97706;">SAR ${custodyTotal.toLocaleString()}</div>
                     </div>
                 </div>
 
-                <div class="section-title">${t('viol-deadlines')}</div>
-                <table dir="${direction}">
-                    <thead><tr><th>${t('today-label')}</th><th>${t('placeholder-reason')}</th><th>SAR</th><th>${t('th-action')}</th></tr></thead>
+                <div class="section-title">⚠️ Violations & Fix Status</div>
+                <table>
+                    <thead><tr><th>Date</th><th>Reason</th><th>Amount</th><th>Status / Fix Time</th></tr></thead>
                     <tbody>${violRows}</tbody>
                 </table>
 
-                <div class="section-title">💵 ${t('box-advances')}</div>
-                <table dir="${direction}">
-                    <thead><tr><th>${t('today-label')}</th><th>SAR</th></tr></thead>
+                <div class="section-title">💵 Advance Payments This Month</div>
+                <table>
+                    <thead><tr><th>Date</th><th>Amount Paid</th></tr></thead>
                     <tbody>${payRows}</tbody>
-                    <tfoot><tr class="highlight-row"><td style="padding:8px 10px; border:1px solid #e2e8f0;">${t('span-total')}</td><td style="padding:8px 10px; border:1px solid #e2e8f0; color:#0284c7;">SAR ${paid.toLocaleString()}</td></tr></tfoot>
+                    <tfoot><tr class="highlight-row"><td style="padding:8px 10px; border:1px solid #e2e8f0;">Total Paid</td><td style="padding:8px 10px; border:1px solid #e2e8f0; color:#0284c7;">SAR ${paid.toLocaleString()}</td></tr></tfoot>
                 </table>
 
-                <div class="footer" style="flex-direction: ${direction === 'rtl' ? 'row-reverse' : 'row'};">
-                    <span>${t('app-title')}</span>
-                    <span>${t('generatedOn')} ${new Date().toLocaleString(currentAppLang === 'ar' ? 'ar-SA' : 'en-US')}</span>
+                <div class="footer">
+                    <span>Burgeroov Management Portal</span>
+                    <span>Generated: ${new Date().toLocaleString()}</span>
                 </div>
             </body></html>`;
 
@@ -3367,7 +3412,7 @@
             const workers = getVisibleWorkers();
 
             if (workers.length === 0 && (!currentUser || currentUser.role !== 'admin')) {
-                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">${t('not-linked-worker')}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">Your account is not linked to any worker profile yet.</td></tr>`;
                 return;
             }
 
@@ -3396,8 +3441,8 @@
                             <span style="font-size:0.7rem; color:var(--primary);">▼ Log</span>
                         </div>
                         <div class="breakdown-details" id="${detailsId}" style="max-height: 200px; overflow-y:auto; margin-top: 10px;">
-                            <strong style="display:block; border-bottom:1px solid var(--border-color); margin-bottom:8px; padding-bottom:4px; color:var(--text-main);">${t('desc-active-drivers')}</strong>
-                            ${relevantLogs.length === 0 ? `<em style="color:var(--text-muted)">${t('no-logs-month')}</em>` : relevantLogs.map(l => `
+                            <strong style="display:block; border-bottom:1px solid var(--border-color); margin-bottom:8px; padding-bottom:4px; color:var(--text-main);">Last 90 Days Log</strong>
+                            ${relevantLogs.length === 0 ? '<em style="color:var(--text-muted)">No logs found.</em>' : relevantLogs.map(l => `
                                 <div class="breakdown-row" style="padding:4px 0; border-bottom:1px solid rgba(0,0,0,0.05);">
                                     <span style="color:var(--text-muted); font-size:0.75rem;">${l.date}</span> 
                                     <span style="${l.noteType === 'vacation' ? 'color:var(--warning)' : (l.score == 100 ? 'color:var(--success)' : 'color:var(--danger)')}">
@@ -3526,7 +3571,7 @@
             const assignSel = document.getElementById('task-worker-select');
             if (assignSel) {
                 const oldVal = assignSel.value;
-                assignSel.innerHTML = '<option value="">-- Choose Employee --</option>';
+                assignSel.innerHTML = `<option value="">-- ${t('label-select-emp')} --</option>`;
                 getCompanyData().workers.forEach(w => {
                     const opt = document.createElement('option'); opt.value = w.id; opt.textContent = w.name; assignSel.appendChild(opt);
                 });
@@ -3542,7 +3587,7 @@
             const workers = getVisibleWorkers();
 
             if (workers.length === 0 && !isAdmin) {
-                board.innerHTML = `<p style="text-align:center; color:var(--text-muted);">Your account is not linked to any worker profile yet.</p>`;
+                board.innerHTML = `<p style="text-align:center; color:var(--text-muted);">${t('not-linked-worker')}</p>`;
                 return;
             }
 
@@ -3557,36 +3602,36 @@
 
                     let statusBadge = '';
                     let actionHtml = '';
-                    let urgencyBadge = j.urgency === 'urgent' ? '<span class="badge" style="background:var(--danger); margin-left:8px;">🔴 Urgent</span>' : '';
+                    let urgencyBadge = j.urgency === 'urgent' ? `<span class="badge" style="background:var(--danger); margin-left:8px;">🔴 ${t('opt-urgency-high').replace('🔴 ', '')}</span>` : '';
                     let timeInfoHtml = '';
 
                     if (status === 'completed') {
-                        statusBadge = `<span class="badge badge-good">Completed ✅</span>`;
-                        actionHtml = isAdmin ? `<button onclick="toggleTaskDone('${worker.id}', '${j.id}')" class="btn-outline" style="font-size:0.75rem; padding:4px 8px;">Undo</button>` : '';
+                        statusBadge = `<span class="badge badge-good">${t('btn-mark-completed').replace('✅ ', '')} ✅</span>`;
+                        actionHtml = isAdmin ? `<button onclick="toggleTaskDone('${worker.id}', '${j.id}')" class="btn-outline" style="font-size:0.75rem; padding:4px 8px;">${t('btn-undo-action')}</button>` : '';
                         if (j.completedAt) {
-                            timeInfoHtml = `<div style="font-size:0.75rem; color:var(--success); margin-top:4px;">Finished: ${new Date(j.completedAt).toLocaleTimeString()}</div>`;
+                            timeInfoHtml = `<div style="font-size:0.75rem; color:var(--success); margin-top:4px;">${t('label-finished')} ${new Date(j.completedAt).toLocaleTimeString()}</div>`;
                         }
                     } else if (status === 'seen') {
-                        statusBadge = `<span class="badge" style="background:var(--warning); color:#000;">👀 Seen (In Progress)</span>`;
+                        statusBadge = `<span class="badge" style="background:var(--warning); color:#000;">👀 ${t('status-pending-sm').replace('⏳ ', '')}</span>`;
                         if (isAssignedToMe) {
-                            actionHtml = `<button onclick="completeTask('${worker.id}', '${j.id}')" class="btn-success" style="font-size:0.8rem; padding:6px 12px; width:100%;">✅ Mark as Completed</button>`;
+                            actionHtml = `<button onclick="completeTask('${worker.id}', '${j.id}')" class="btn-success" style="font-size:0.8rem; padding:6px 12px; width:100%;">${t('btn-mark-completed')}</button>`;
                         }
 
                         if (j.deadlineMins > 0 && j.seenAt) {
                             const deadlineMs = j.seenAt + (j.deadlineMins * 60000);
                             timeInfoHtml = `<div class="task-timer-display" data-deadline="${deadlineMs}" style="font-size:0.85rem; font-weight:600; margin-top:4px;"></div>`;
                         } else if (j.seenAt) {
-                            timeInfoHtml = `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">Started: ${new Date(j.seenAt).toLocaleTimeString()}</div>`;
+                            timeInfoHtml = `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">${t('label-started')} ${new Date(j.seenAt).toLocaleTimeString()}</div>`;
                         }
                     } else {
-                        statusBadge = `<span class="badge" style="background:var(--text-muted);">🆕 New</span>`;
+                        statusBadge = `<span class="badge" style="background:var(--text-muted);">🆕</span>`;
                         if (isAssignedToMe) {
-                            actionHtml = `<button onclick="seeTask('${worker.id}', '${j.id}')" class="btn-warning" style="font-size:0.8rem; padding:6px 12px; width:100%;">👁️ I Saw This Task</button>`;
+                            actionHtml = `<button onclick="seeTask('${worker.id}', '${j.id}')" class="btn-warning" style="font-size:0.8rem; padding:6px 12px; width:100%;">${t('btn-i-saw-this')}</button>`;
                         } else if (isAdmin) {
                             actionHtml = `<span style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">Worker has not seen this yet.</span>`;
                         }
                         if (j.deadlineMins > 0) {
-                            timeInfoHtml = `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">Must complete within ${j.deadlineMins} mins of seeing it.</div>`;
+                            timeInfoHtml = `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">${t('task-must-complete').replace('mins', j.deadlineMins)}</div>`;
                         }
                     }
 
@@ -3670,7 +3715,7 @@
         }
 
         function deleteDeliveryRecord(workerId, deliveryId) {
-            if (!confirm("Are you sure you want to delete this delivery record?")) return;
+            if (!confirm(t('confirm-delete-delivery'))) return;
             const worker = getCompanyData().workers.find(w => w.id === workerId);
             const stats = getMonthlyStats(worker, currentGlobalMonth);
             stats.deliveriesList = stats.deliveriesList.filter(d => d.id !== deliveryId);
@@ -3678,7 +3723,7 @@
         }
 
         function deleteLegacyDelivery(workerId) {
-            if (!confirm("Remove one legacy delivery record?")) return;
+            if (!confirm(t('confirm-remove-legacy'))) return;
             const worker = getCompanyData().workers.find(w => w.id === workerId);
             const stats = getMonthlyStats(worker, currentGlobalMonth);
             if (stats.legacyDeliveries > 0) {
@@ -3706,7 +3751,7 @@
                 const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
                 timerDisplay.textContent = `${h !== '00' ? h + ':' : ''}${m}:${s}`;
                 timerBox.classList.remove('timer-late');
-                statusDisplay.textContent = "Time remaining to deliver";
+                statusDisplay.textContent = t('label-time-remaining-del');
             } else {
                 const late = Math.abs(diff);
                 const h = Math.floor(late / 3600000).toString().padStart(2, '0');
@@ -3714,7 +3759,7 @@
                 const s = Math.floor((late % 60000) / 1000).toString().padStart(2, '0');
                 timerDisplay.textContent = `-${h !== '00' ? h + ':' : ''}${m}:${s}`;
                 timerBox.classList.add('timer-late');
-                statusDisplay.textContent = "LATE";
+                statusDisplay.textContent = t('label-late-del');
             }
         }
 
@@ -3734,7 +3779,7 @@
             });
 
             if (drivers.length === 0) {
-                list.innerHTML = `<p style="color:var(--text-muted); font-size:0.85rem;">No drivers found for your account.</p>`;
+                list.innerHTML = `<p style="color:var(--text-muted); font-size:0.85rem;">${t('msg-no-drivers')}</p>`;
                 return;
             }
 
@@ -3748,7 +3793,7 @@
                 div.style.borderColor = isSelected ? 'var(--primary)' : 'var(--border-color)';
                 div.style.borderWidth = isSelected ? '2px' : '1px';
 
-                let statusBadge = isBusy ? `<span class="badge" style="background:var(--warning);">In Transit</span>` : `<span class="badge" style="background:var(--success);">Available</span>`;
+                let statusBadge = isBusy ? `<span class="badge" style="background:var(--warning);">${t('status-in-transit')}</span>` : `<span class="badge" style="background:var(--success);">${t('status-available')}</span>`;
 
                 div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><strong style="color:var(--text-main);">${d.name}</strong>${statusBadge}</div>`;
                 div.onclick = () => selectDriver(d.id);
@@ -3758,11 +3803,11 @@
 
         function renderDriverPanel() {
             const mngArea = document.getElementById('driver-management-area');
-            if (!activeDriverId) { mngArea.style.display = 'none'; document.getElementById('active-driver-name').textContent = "Select a driver to manage"; return; }
+            if (!activeDriverId) { mngArea.style.display = 'none'; document.getElementById('active-driver-name').textContent = t('span-select-driver'); return; }
 
             mngArea.style.display = 'block';
             const worker = getCompanyData().workers.find(w => w.id === activeDriverId);
-            document.getElementById('active-driver-name').textContent = `Managing: ${worker.name}`;
+            document.getElementById('active-driver-name').textContent = `${t('label-managing')}${worker.name}`;
 
             const stats = getMonthlyStats(worker, currentGlobalMonth);
             const totalDels = (stats.deliveriesList ? stats.deliveriesList.length : 0) + (stats.legacyDeliveries || 0);
@@ -4202,24 +4247,24 @@
             if (!worker) return;
             let displayLogs = getLogsForMonth(worker, currentGlobalMonth);
 
-            if (displayLogs.length === 0) { if (hist) hist.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:24px;background:var(--input-bg);border-radius:var(--radius-md);">${t('no-logs-month')}</p>`; return; }
+            if (displayLogs.length === 0) { if (hist) hist.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:24px;background:var(--input-bg);border-radius:var(--radius-md);">No logs found for this month.</p>`; return; }
 
             displayLogs.forEach(log => {
                 const div = document.createElement('div'); div.className = 'log-entry';
 
                 let typeBadge = '';
                 if (log.noteType === 'vacation' || log.score === 'vacation') {
-                    typeBadge = `<span class="badge" style="background:var(--warning); color:var(--text-main);">${t('vacation')}</span>`;
+                    typeBadge = `<span class="badge" style="background:var(--warning); color:var(--text-main);">Vacation 🌴</span>`;
                 } else if (log.noteType === 'good' || log.score == 100) {
-                    typeBadge = `<span class="badge badge-good">${t('good-note-badge')}</span>`;
+                    typeBadge = `<span class="badge badge-good">Good Note ✅</span>`;
                 } else {
-                    typeBadge = `<span class="badge badge-bad">${t('bad-note-badge')}</span>`;
+                    typeBadge = `<span class="badge badge-bad">Bad Note ❌</span>`;
                 }
 
-                let delBtn = isAdmin ? `<button class="btn-outline-danger admin-only" style="padding:4px 8px;font-size:0.75rem;border:none;text-decoration:underline;" onclick="deleteLog('${worker.id}', '${log.date}')">${t('delete-btn')}</button>` : '';
+                let delBtn = isAdmin ? `<button class="btn-outline-danger admin-only" style="padding:4px 8px;font-size:0.75rem;border:none;text-decoration:underline;" onclick="deleteLog('${worker.id}', '${log.date}')">Delete</button>` : '';
                 div.innerHTML = `
                     <div class="flex-between log-date"><strong style="color:var(--text-main);">📅 ${log.date}</strong><div style="display:flex;align-items:center;gap:8px;">${typeBadge} ${delBtn}</div></div>
-                    <div class="log-note-text">${log.note ? log.note : `<em style="color:var(--text-muted);">${t('no-manual-notes')}</em>`}</div>`;
+                    <div class="log-note-text">${log.note ? log.note : '<em style="color:var(--text-muted);">No manual notes.</em>'}</div>`;
                 if (hist) hist.appendChild(div);
             });
         }
@@ -4391,31 +4436,31 @@
                     let statusHtml = ''; let actionBtns = ''; let isApplied = false;
 
                     if (v.status === 'waived') {
-                        statusHtml = `<span class="text-success" style="font-size: 0.8rem;">✅ Waived (Fixed)</span>`;
+                        statusHtml = `<span class="text-success" style="font-size: 0.8rem;">${t('label-fixed-waived')}</span>`;
                     } else if (v.status === 'active' || !v.status) {
-                        statusHtml = `<span class="text-danger" style="font-size: 0.8rem;">🚨 Penalty Applied</span>`;
+                        statusHtml = `<span class="text-danger" style="font-size: 0.8rem;">${t('label-penalty-applied')}${v.amount}</span>`;
                         isApplied = true;
                     } else if (v.status === 'pending') {
                         const deadline = v.timestamp + (v.graceDays * 86400000);
                         const timeLeft = deadline - Date.now();
                         if (timeLeft <= 0) {
-                            statusHtml = `<span class="text-danger" style="font-size: 0.8rem;">🚨 Applied (Time Expired)</span>`;
+                            statusHtml = `<span class="text-danger" style="font-size: 0.8rem;">${t('label-time-expired')}${v.amount})</span>`;
                             isApplied = true;
                         } else {
                             const h = Math.floor(timeLeft / 3600000).toString().padStart(2, '0');
                             const m = Math.floor((timeLeft % 3600000) / 60000).toString().padStart(2, '0');
                             const s = Math.floor((timeLeft % 60000) / 1000).toString().padStart(2, '0');
-                            statusHtml = `<span class="viol-timer text-warning" data-deadline="${deadline}" style="font-size: 0.8rem;">⏳ Pending (${h}h ${m}m ${s}s left)</span>`;
+                            statusHtml = `<span class="viol-timer text-warning" data-deadline="${deadline}" style="font-size: 0.8rem;">${t('label-fix-within')}${h}h ${m}m ${s}s</span>`;
                             if (isFinAdmin) {
                                 actionBtns = `
-                                    <button onclick="resolveViolation('${worker.id}', '${v.id}', 'waive')" class="btn-success" style="padding: 6px 12px; font-size: 0.75rem; margin-right: 4px;">Fixed (Waive)</button>
-                                    <button onclick="resolveViolation('${worker.id}', '${v.id}', 'apply')" class="btn-danger" style="padding: 6px 12px; font-size: 0.75rem;">Not Fixed (Apply)</button>
+                                    <button onclick="resolveViolation('${worker.id}', '${v.id}', 'waive')" class="btn-success" style="padding: 6px 12px; font-size: 0.75rem; margin-right: 4px;">${t('btn-fixed-waive')}</button>
+                                    <button onclick="resolveViolation('${worker.id}', '${v.id}', 'apply')" class="btn-danger" style="padding: 6px 12px; font-size: 0.75rem;">${t('btn-not-fixed-apply')}</button>
                                 `;
                             }
                         }
                     }
 
-                    let delBtn = isFinAdmin ? `<button onclick="deleteDetailedViolation('${worker.id}', '${v.id}')" class="btn-outline-danger" style="padding: 4px 8px; font-size: 0.75rem;">Delete</button>` : '';
+                    let delBtn = isFinAdmin ? `<button onclick="deleteDetailedViolation('${worker.id}', '${v.id}')" class="btn-outline-danger" style="padding: 4px 8px; font-size: 0.75rem;">${t('btn-remove')}</button>` : '';
 
                     vDiv.innerHTML = `
                         <div class="flex-between" style="margin-bottom: 8px;"><span style="font-size: 0.8rem; color: var(--text-muted);">🕒 ${v.date}</span>${delBtn}</div>
@@ -4424,14 +4469,6 @@
                     if (vHistList) vHistList.appendChild(vDiv);
                 });
             }
-        }
-
-        // Translation Helper Function
-        function t(key) {
-            if (!uiTranslations[currentAppLang] || !uiTranslations[currentAppLang][key]) {
-                return uiTranslations["en"][key] || key;
-            }
-            return uiTranslations[currentAppLang][key];
         }
 
         // SUMMARY TAB RENDERING
@@ -4443,7 +4480,7 @@
             const workersToRender = getVisibleWorkers();
 
             if (workersToRender.length === 0 && (!currentUser || currentUser.role !== 'admin')) {
-                container.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:1rem; padding: 40px;">Your account is not linked to any worker profile yet.</p>`;
+                container.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:1rem; padding: 40px;">${t('msg-not-linked')}</p>`;
                 return;
             }
 
@@ -4473,19 +4510,19 @@
                 let violCellHtml = '';
                 const violList = stats.violationsList || [];
                 if (violList.length === 0) {
-                    violCellHtml = `<div style="color:var(--success); font-size:0.9rem; font-weight:600; padding: 12px; background:var(--success-bg); border-radius:8px; border:1px solid var(--success-border); text-align:center;">${t('no-viol-month')}</div>`;
+                    violCellHtml = `<div style="color:var(--success); font-size:0.9rem; font-weight:600; padding: 12px; background:var(--success-bg); border-radius:8px; border:1px solid var(--success-border); text-align:center;">✅ No violations recorded this month.</div>`;
                 } else {
                     violList.forEach(v => {
                         let badge = '';
                         if (v.status === 'waived') {
                             badge = `<div style="margin-bottom:8px; padding:10px 12px; background:var(--success-bg); border:1px solid var(--success-border); border-radius:8px; font-size:0.85rem;">
                                 <div style="font-weight:600; color:var(--text-main); margin-bottom:4px;">✅ ${v.reason}</div>
-                                <div style="color:var(--success);">${t('fixed-waived')}</div>
+                                <div style="color:var(--success);">Fixed – Waived ✔</div>
                             </div>`;
                         } else if (v.status === 'active' || !v.status) {
                             badge = `<div style="margin-bottom:8px; padding:10px 12px; background:var(--danger-bg); border:1px solid var(--danger-border); border-radius:8px; font-size:0.85rem;">
                                 <div style="font-weight:600; color:var(--text-main); margin-bottom:4px;">🚨 ${v.reason}</div>
-                                <div style="color:var(--danger); font-weight:500;">${t('penalty-applied')} – SAR ${parseFloat(v.amount).toLocaleString()}</div>
+                                <div style="color:var(--danger); font-weight:500;">Penalty Applied – SAR ${parseFloat(v.amount).toLocaleString()}</div>
                             </div>`;
                         } else if (v.status === 'pending') {
                             const deadline = v.timestamp + (v.graceDays * 86400000);
@@ -4493,7 +4530,7 @@
                             if (timeLeft <= 0) {
                                 badge = `<div style="margin-bottom:8px; padding:10px 12px; background:var(--danger-bg); border:1px solid var(--danger-border); border-radius:8px; font-size:0.85rem;">
                                     <div style="font-weight:600; color:var(--text-main); margin-bottom:4px;">🚨 ${v.reason}</div>
-                                    <div style="color:var(--danger); font-weight:500;">${t('time-expired')} – ${t('penalty-applied')} (SAR ${parseFloat(v.amount).toLocaleString()})</div>
+                                    <div style="color:var(--danger); font-weight:500;">Time Expired – Penalty Applied (SAR ${parseFloat(v.amount).toLocaleString()})</div>
                                 </div>`;
                             } else {
                                 const totalHours = Math.floor(timeLeft / 3600000);
@@ -4501,13 +4538,13 @@
                                 const hoursLeft = totalHours % 24;
                                 const minsLeft = Math.floor((timeLeft % 3600000) / 60000);
                                 let timeStr = '';
-                                if (daysLeft > 0) timeStr = `${daysLeft}d ${hoursLeft}h ${t('left-label')}`;
-                                else if (hoursLeft > 0) timeStr = `${hoursLeft}h ${minsLeft}m ${t('left-label')}`;
-                                else timeStr = `${minsLeft}m ${t('left-label')}`;
+                                if (daysLeft > 0) timeStr = `${daysLeft}d ${hoursLeft}h left`;
+                                else if (hoursLeft > 0) timeStr = `${hoursLeft}h ${minsLeft}m left`;
+                                else timeStr = `${minsLeft}m left`;
                                 badge = `<div style="margin-bottom:8px; padding:10px 12px; background:var(--warning-bg); border:1px solid var(--warning-border); border-radius:8px; font-size:0.85rem;">
                                     <div style="font-weight:600; color:var(--text-main); margin-bottom:4px;">⚠️ ${v.reason}</div>
-                                    <div style="color:var(--warning); font-weight:600;">⏳ ${t('fix-within')} ${timeStr}</div>
-                                    <div style="color:var(--text-muted); font-size:0.75rem; margin-top:2px;">${t('penalty-if-not-fixed')} SAR ${parseFloat(v.amount).toLocaleString()}</div>
+                                    <div style="color:var(--warning); font-weight:600;">⏳ Fix within: ${timeStr}</div>
+                                    <div style="color:var(--text-muted); font-size:0.75rem; margin-top:2px;">Penalty if not fixed: SAR ${parseFloat(v.amount).toLocaleString()}</div>
                                 </div>`;
                             }
                         }
@@ -4519,7 +4556,7 @@
                 card.className = 'summary-worker-card';
                 card.style.cssText = 'background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:24px; box-shadow:var(--shadow-sm); animation: fadeIn 0.3s ease;';
                 card.innerHTML = `
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; flex-wrap:wrap; gap:16px; border-bottom:1px solid var(--border-color); padding-bottom:16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:20px; border-bottom:1px solid var(--border-color); padding-bottom:15px;">
                         <div>
                             <div style="font-size:1.3rem; font-weight:700; color:var(--text-main); margin-bottom:6px;">${worker.name}</div>
                             <div style="font-size:0.9rem; color:var(--text-muted); display:flex; align-items:center; gap:8px;">
@@ -4527,30 +4564,30 @@
                             </div>
                         </div>
                         <div style="text-align:right; background:var(--input-bg); padding:12px 16px; border-radius:8px; border:1px solid var(--border-color);">
-                            <div style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; font-weight:600; letter-spacing:0.5px; margin-bottom:4px;">${t('rem-to-pay')}</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; font-weight:600; letter-spacing:0.5px; margin-bottom:4px;">${t('th-total-remaining')}</div>
                             <div style="font-size:1.4rem; font-weight:800; color:var(--primary);">SAR ${remainingAllTime.toLocaleString()}</div>
                         </div>
                     </div>
 
                     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap:12px; margin-bottom:20px;">
                         <div style="background:var(--input-bg); padding:16px 12px; border-radius:8px; text-align:center; border:1px solid var(--border-color);">
-                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">${t('good-notes')}</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">${t('label-good-notes')}</div>
                             <div style="font-size:1.4rem; font-weight:700; color:var(--success); line-height:1;">${goodCount}</div>
                         </div>
                         <div style="background:var(--input-bg); padding:16px 12px; border-radius:8px; text-align:center; border:1px solid var(--border-color);">
-                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">${t('bad-notes')}</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">${t('label-bad-notes')}</div>
                             <div style="font-size:1.4rem; font-weight:700; color:var(--danger); line-height:1;">${badCount}</div>
                         </div>
                         <div style="background:var(--input-bg); padding:16px 12px; border-radius:8px; text-align:center; border:1px solid var(--border-color);">
-                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">${t('deliveries')}</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">${t('label-deliveries-sm')}</div>
                             <div style="font-size:1.4rem; font-weight:700; color:var(--warning); line-height:1;">${deliveries}</div>
                         </div>
                         <div style="background:var(--input-bg); padding:16px 12px; border-radius:8px; text-align:center; border:1px solid var(--border-color);">
-                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">${t('tasks-done')}</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">${t('label-tasks-done')}</div>
                             <div style="font-size:1.4rem; font-weight:700; color:var(--primary); line-height:1;">${tasksDoneThisMonth}</div>
                         </div>
                         <div style="background:var(--input-bg); padding:16px 12px; border-radius:8px; text-align:center; border:1px solid var(--border-color);">
-                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">${t('avg-perf')}</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">${t('label-avg-perf')}</div>
                             <div style="font-size:1.4rem; font-weight:700; color:var(--text-main); line-height:1;">${avg}</div>
                         </div>
                     </div>
@@ -4558,15 +4595,15 @@
                     <div style="display:flex; gap:16px; flex-wrap:wrap;">
                         <div style="flex:2; min-width:300px; background:var(--input-bg); padding:16px; border-radius:8px; border:1px solid var(--border-color);">
                             <div style="font-size:0.95rem; font-weight:600; color:var(--text-main); margin-bottom:12px; display:flex; align-items:center; gap:8px;">
-                                ⚠️ ${t('viol-deadlines')}
+                                ${t('title-my-violations')}
                             </div>
                             <div style="max-height:200px; overflow-y:auto; padding-right:4px;">
                                 ${violCellHtml}
                             </div>
                         </div>
                         <div style="flex:1; min-width:200px; background:var(--input-bg); padding:20px 16px; border-radius:8px; border:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; text-align:center;">
-                            <div style="font-size:0.9rem; font-weight:600; color:var(--text-main); margin-bottom:8px;">${t('company-costs')}</div>
-                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:16px; line-height:1.4;">${t('costs-desc')}</div>
+                            <div style="font-size:0.9rem; font-weight:600; color:var(--text-main); margin-bottom:8px;">${t('label-company-costs-sm')}</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:16px; line-height:1.4;">${t('desc-costs')}</div>
                             <div style="font-size:1.4rem; font-weight:700; color:var(--danger); background:var(--danger-bg); padding:10px; border-radius:6px; border:1px solid var(--danger-border);">SAR ${costs.toLocaleString()}</div>
                         </div>
                     </div>
@@ -4580,7 +4617,6 @@
         // =============================================
         const uiTranslations = {
             en: {
-                "today-label": "Today",
                 // Auth Screen
                 "auth-title-login": "Login to Dashboard",
                 "auth-title-signup": "Create Viewer Account",
@@ -4607,78 +4643,6 @@
                 "tab-drivers": "🚚 Drivers",
                 "tab-finance": "💰 Financial",
                 "tab-summary": "📊 Summary",
-
-                // Operations Section
-                "title-manager-access": "Manager Access Control",
-                "title-worker-access": "Worker Department Access",
-                "title-branches": "Facility / Branches",
-                "title-violation-rules": "Violation Rules System",
-                "title-register-emp": "Register Employee",
-                "title-ops-tracking": "Daily Operations Tracking",
-                "title-ops-directory": "Ops Directory",
-                "label-full-name": "Full Name",
-                "label-role": "Role / Position",
-
-                // Financial Section
-                "title-fin-adj": "Financial Adjustments",
-                "title-payroll-ledger": "Payroll & Finance Ledger",
-                "stat-total-due": "Total Due (All-Time)",
-                "box-advances": "Paid This Month (Advances)",
-                "box-rewards": "Rewards & Bonuses",
-                "box-violations": "Violations (Deductions)",
-                "box-custody": "Custody Management",
-                "box-costs": "Company Costs (Tracking)",
-                "box-initial-bal": "Initial Carried Balance",
-                "btn-export-pdf": "📄 Download PDF",
-
-                // Warehouse & Drivers
-                "title-inventory": "Inventory Tracking",
-                "btn-restock-pdf": "📄 Restock PDF",
-                "placeholder-search": "🔍 Search items...",
-                "title-active-drivers": "Active Drivers",
-                "title-driver-ctrl": "Driver Delivery Control",
-
-                // Summary
-                "title-summary-main": "Monthly Summary & Continuous Balance",
-                "rem-to-pay": "Remaining To Pay (All-Time)",
-                "good-notes": "Good Notes",
-                "bad-notes": "Bad Notes",
-                "deliveries": "Deliveries",
-                "tasks-done": "Tasks Done",
-                "avg-perf": "Avg Perf",
-                "viol-deadlines": "Violations & Fix Deadlines",
-                "company-costs": "Company Costs",
-                "costs-desc": "Costs associated with this employee this month.",
-                "no-viol-month": "✅ No violations recorded this month.",
-                "fixed-waived": "Fixed – Waived ✔",
-                "penalty-applied": "Penalty Applied",
-                "time-expired": "Time Expired",
-                "fix-within": "Fix within:",
-                "penalty-if-not-fixed": "Penalty if not fixed:",
-                "vacation": "Vacation 🌴",
-                "good-note-badge": "Good Note ✅",
-                "bad-note-badge": "Bad Note ❌",
-                "no-manual-notes": "No manual notes.",
-                "no-logs-month": "No logs found for this month.",
-                "base-label": "Base:",
-                "rewards-label": "Rewards:",
-                "violations-label": "Violations:",
-                "paid-advance-label": "Paid Advance:",
-                "undo-btn": "Undo",
-                "delete-btn": "Delete",
-                "given-label": "Given:",
-                "returned-label": "Returned:",
-                "waived-fixed-badge": "✅ Waived (Fixed)",
-                "penalty-applied-badge": "🚨 Penalty Applied",
-                "applied-expired-badge": "🚨 Applied (Time Expired)",
-                "pending-label": "Pending",
-                "left-label": "left",
-                "fixed-waive-btn": "Fixed (Waive)",
-                "not-fixed-apply-btn": "Not Fixed (Apply)",
-                "not-linked-worker": "Your account is not linked to any worker profile yet.",
-                "delete-worker-btn": "Delete Worker",
-                "only-master-admin": "Only the ultimate admin (Kinan) can remove other managers.",
-                "cannot-remove-master": "Cannot remove the master admin account.",
 
                 // Operations Section
                 "title-manager-access": "Manager Access Control",
@@ -4790,7 +4754,7 @@
                 "btn-return-custody": "Return",
                 "desc-costs": "Expenses paid by company (visas, uniforms). Does NOT affect Net Payable.",
                 "btn-add-cost": "Add Cost",
-                "btn-undo": "Undo",
+                "btn-undo-action": "Undo",
                 "desc-initial-bal": "Set an old unpaid debt owed to this worker from before this system was used.",
                 "btn-set-balance": "Set Balance",
                 "btn-excel": "Excel",
@@ -4807,7 +4771,55 @@
                 "title-my-violations": "⚠️ My Violations & Fix Deadlines",
                 "span-current-month": "Current Month:",
                 "desc-my-violations": "These are violations recorded against you by the manager this month. Violations marked <strong>⏳ Pending</strong> still have time to be fixed — fix them before the deadline to avoid the penalty.",
-                "desc-summary": "This report shows operations performance strictly for the selected month. <strong class=\"text-primary\">All-Time Continuous Remaining Balance</strong> carries over dynamically based on your logged payments. Ranks update automatically every 90 days."
+                "desc-summary": "This report shows operations performance strictly for the selected month. <strong class=\"text-primary\">All-Time Continuous Remaining Balance</strong> carries over dynamically based on your logged payments. Ranks update automatically every 90 days.",
+
+                // Extra Translations
+                "status-late": "🚨 LATE! Time expired.",
+                "status-time-remaining": "⏳ Time remaining:",
+                "btn-mark-completed": "✅ Mark as Completed",
+                "btn-i-saw-this": "👁️ I Saw This Task",
+                "task-must-complete": "Must complete within mins of seeing it.",
+                "label-assigned": "Assigned:",
+                "label-finished": "Finished:",
+                "label-started": "Started:",
+                "no-active-tasks": "No active tasks.",
+                "not-linked-worker": "Your account is not linked to any worker profile yet.",
+                "msg-task-timer-worker": "Active Task Deadline",
+                "btn-remove": "Remove",
+                "label-base-sm": "Base:",
+                "label-rewards-sm": "Rewards:",
+                "label-violations-sm": "Violations:",
+                "label-paid-advance-sm": "Paid Advance:",
+                "label-good-notes": "Good Notes",
+                "label-bad-notes": "Bad Notes",
+                "label-deliveries-sm": "Deliveries",
+                "label-tasks-done": "Tasks Done",
+                "label-avg-perf": "Avg Perf",
+                "label-company-costs-sm": "Company Costs",
+                "label-fix-violation": "Manager gave you day(s) to fix this violation.",
+                "status-waived": "✅ Waived (Fixed)",
+                "status-penalty-applied": "🚨 Penalty Applied",
+                "status-pending-sm": "⏳ Pending",
+                "btn-fixed-waive": "Fixed (Waive)",
+                "btn-not-fixed-apply": "Not Fixed (Apply)",
+                "label-master": "Master",
+                "msg-critical-stock": "CRITICAL STOCK WARNING",
+                "label-currently-left": "Currently Left",
+                "label-amount-to-order": "Amount to Order",
+                "label-finished-at": "Finished: ",
+                "label-started-at": "Started: ",
+                "btn-delete-worker": "Delete Worker",
+                "label-promote-to-a": "Promote to A",
+                "label-set-to-b": "Set to B",
+                "label-set-to-c": "Set to C",
+                "label-demote-unranked": "Demote to Unranked",
+                "label-remaining-to-pay": "Remaining To Pay (All-Time)",
+                "label-no-violations": "✅ No violations recorded this month.",
+                "label-fixed-waived": "Fixed – Waived ✔",
+                "label-penalty-applied": "Penalty Applied – SAR ",
+                "label-time-expired": "Time Expired – Penalty Applied (SAR ",
+                "label-fix-within": "⏳ Fix within: ",
+                "label-penalty-not-fixed": "Penalty if not fixed: SAR "
             },
             ar: {
                 // شاشة الدخول
@@ -4860,82 +4872,28 @@
                 "box-initial-bal": "الرصيد المرحل الأولي",
                 "btn-export-pdf": "📄 تحميل تقرير PDF",
 
-                // المستودع والسائقين
                 "title-inventory": "تتبع المخزون",
                 "btn-restock-pdf": "📄 طلب بضاعة PDF",
                 "placeholder-search": "🔍 ابحث عن صنف...",
                 "title-active-drivers": "السائقون النشطون",
                 "title-driver-ctrl": "التحكم في توصيلات السائق",
-
-                // الملخص
                 "title-summary-main": "الملخص الشهري والرصيد المستمر",
-                "rem-to-pay": "إجمالي المتبقي (كلي)",
-                "good-notes": "ملاحظات جيدة",
-                "bad-notes": "ملاحظات سلبية",
-                "deliveries": "التوصيلات",
-                "tasks-done": "مهام منجزة",
-                "avg-perf": "متوسط الأداء",
-                "viol-deadlines": "المخالفات ومواعيد الإصلاح",
-                "company-costs": "تكاليف الشركة",
-                "costs-desc": "التكاليف المرتبطة بهذا الموظف هذا الشهر.",
-                "no-viol-month": "✅ لا توجد مخالفات مسجلة هذا الشهر.",
-                "fixed-waived": "تم الإصلاح - إعفاء ✔",
-                "penalty-applied": "تم تطبيق الجزاء",
-                "time-expired": "انتهت المهلة",
-                "fix-within": "أصلح خلال:",
-                "penalty-if-not-fixed": "الجزاء في حال عدم الإصلاح:",
-                "vacation": "إجازة 🌴",
-                "good-note-badge": "ملاحظة جيدة ✅",
-                "bad-note-badge": "ملاحظة سلبية ❌",
-                "no-manual-notes": "لا توجد ملاحظات يدوية.",
-                "no-logs-month": "لا توجد سجلات لهذا الشهر.",
-                "base-label": "الأساسي:",
-                "rewards-label": "المكافآت:",
-                "violations-label": "المخالفات:",
-                "paid-advance-label": "سلفة مدفوعة:",
-                "undo-btn": "تراجع",
-                "delete-btn": "حذف",
-                "given-label": "تم الإعطاء:",
-                "returned-label": "تم الاسترداد:",
-                "waived-fixed-badge": "✅ معفى (تم الإصلاح)",
-                "penalty-applied-badge": "🚨 تم تطبيق العقوبة",
-                "applied-expired-badge": "🚨 تم التطبيق (انتهى الوقت)",
-                "pending-label": "قيد الانتظار",
-                "left-label": "متبقي",
-                "fixed-waive-btn": "تم الإصلاح (إعفاء)",
-                "not-fixed-apply-btn": "لم يتم الإصلاح (تطبيق)",
-                "not-linked-worker": "حسابك غير مرتبط بأي ملف موظف بعد.",
-                "delete-worker-btn": "حذف الموظف",
-                "only-master-admin": "فقط المسؤول الرئيسي (كنان) يمكنه إزالة المديرين الآخرين.",
-                "cannot-remove-master": "لا يمكن إزالة حساب المسؤول الرئيسي.",
-
-                // Ranks
                 "title-ranks-eval": "تقييم وترتيب الموظفين (عرض 90 يوم)",
-                "desc-ranks-eval": "انقر على السهم بجوار اسم الموظف لعرض سجل أدائه الكامل لمدة 3 أشهر. بناءً على متوسط 90 يوم، يمكنك ترقيته أو تنزيل رتبته يدوياً. (أيام الإجازات لا تؤثر على المتوسط).",
+                "desc-ranks-eval": "انقر على السهم بجوار اسم الموظف لعرض سجل أدائه الكامل لمدة 3 أشهر.",
                 "th-emp-branch": "الموظف والفرع",
                 "th-current-rank": "الرتبة الحالية",
                 "th-90day-avg": "متوسط 90 يوم",
                 "th-action": "إجراء",
-
-                // Tasks
                 "title-task-shortcuts": "اختصارات المهام",
                 "desc-task-shortcuts": "قم بإنشاء قوالب مهام سريعة.",
                 "placeholder-task-shortcut": "مثال: تنظيف المقالي...",
                 "btn-save-shortcut": "حفظ الاختصار",
                 "title-assign-tasks": "تعيين المهام",
-                "label-assign-to": "إسناد إلى",
-                "opt-choose-emp": "-- اختر الموظف --",
-                "label-task-detail": "تفاصيل المهمة (أو اختر من الاختصارات)",
-                "placeholder-desc-task": "صف المهمة...",
-                "label-urgency-level": "مستوى الأهمية",
-                "opt-urgency-normal": "🔵 أولوية عادية",
                 "opt-urgency-high": "🔴 عاجل / أولوية عالية",
                 "label-time-to-complete": "وقت الإنجاز (بالدقائق)",
                 "placeholder-task-mins": "مثال: 30 (اختياري)",
                 "btn-assign-task": "تعيين المهمة للموظف",
                 "title-tasks-board": "لوحة المهام",
-
-                // Warehouse
                 "title-add-product": "إضافة منتج جديد",
                 "desc-add-product": "سجل الأصناف لتتبع استهلاكها.",
                 "label-product-name": "اسم المنتج",
@@ -4946,9 +4904,7 @@
                 "placeholder-risk-amt": "مثال: 5",
                 "btn-add-warehouse": "إضافة للمستودع",
                 "desc-inventory": "اكتب العدد الدقيق المتبقي حالياً في المخزون واضغط تحديث.",
-
-                // Drivers
-                "desc-active-drivers": "يظهر هنا فقط الموظفون الذين لديهم المسمى \"سائق\" أو \"Driver\".",
+                "desc-active-drivers": "يظهر هنا فقط الموظفون الذين لديهم المسمى \"سائق\".",
                 "span-select-driver": "اختر سائق لإدارته",
                 "title-assign-order": "تعيين طلب توصيل جديد",
                 "label-time-deliver": "وقت التوصيل (بالدقائق)",
@@ -4960,13 +4916,11 @@
                 "btn-order-cancel": "❌ إلغاء الطلب",
                 "title-delivery-history": "سجل التوصيلات",
                 "span-total": "الإجمالي:",
-
-                // Finance Extra
                 "label-select-emp": "اختر الموظف",
                 "span-base": "الأساسي:",
                 "span-net-month": "الصافي هذا الشهر:",
                 "span-custody": "العهدة:",
-                "desc-advances": "سجل المبالغ النقدية أو الحوالات المدفوعة للموظف هذا الشهر (تُخصم من صافي الراتب).",
+                "desc-advances": "سجل المبالغ النقدية أو الحوالات المدفوعة للموظف هذا الشهر.",
                 "placeholder-amount": "المبلغ (ريال)",
                 "btn-log-payment": "تسجيل الدفعة",
                 "desc-rewards": "تزيد من صافي الراتب المستحق لهذا الشهر.",
@@ -4974,7 +4928,7 @@
                 "opt-select-rule": "-- اختر المخالفة --",
                 "placeholder-reason": "السبب / ملاحظات",
                 "label-fixing-time": "وقت الإصلاح (فترة السماح)",
-                "opt-grace-0": "لا يوجد وقت للإصلاح (تطبيق فوري)",
+                "opt-grace-0": "لا يوجد وقت للإصلاح",
                 "opt-grace-1": "1 يوم للإصلاح",
                 "opt-grace-2": "يومان للإصلاح",
                 "opt-grace-3": "3 أيام للإصلاح",
@@ -4984,10 +4938,10 @@
                 "desc-custody": "سجل المعدات أو السلف النقدية المعطاة والمستردة.",
                 "btn-give-custody": "إعطاء عهدة",
                 "btn-return-custody": "استرجاع",
-                "desc-costs": "نفقات الشركة (إقامات، زي). لا تؤثر على صافي راتب الموظف.",
+                "desc-costs": "نفقات الشركة.",
                 "btn-add-cost": "إضافة تكلفة",
-                "btn-undo": "تراجع",
-                "desc-initial-bal": "ضع أي ديون قديمة مستحقة للموظف قبل استخدام هذا النظام.",
+                "btn-undo-action": "تراجع",
+                "desc-initial-bal": "ضع أي ديون قديمة مستحقة للموظف.",
                 "btn-set-balance": "تعيين الرصيد",
                 "btn-excel": "إكسيل",
                 "btn-pdf": "PDF",
@@ -4998,16 +4952,65 @@
                 "th-total-remaining": "إجمالي المتبقي (كلي)",
                 "title-export-fin": "📄 تصدير التقرير المالي",
                 "desc-export-fin": "تنزيل نسخة PDF من هذا السجل المالي.",
-
-                // Summary Extra
                 "title-my-violations": "⚠️ مخالفاتي والمواعيد النهائية للإصلاح",
                 "span-current-month": "الشهر الحالي:",
-                "desc-my-violations": "هذه هي المخالفات المسجلة عليك من قبل المدير هذا الشهر. المخالفات التي تحمل علامة <strong>⏳ قيد الانتظار</strong> لا يزال لديك وقت لإصلاحها — أصلحها قبل انتهاء المهلة لتجنب الخصم.",
-                "desc-summary": "يعرض هذا التقرير أداء العمليات للشهر المحدد فقط. <strong class=\"text-primary\">الرصيد المتبقي المستمر</strong> يتم ترحيله ديناميكياً بناءً على الدفعات المسجلة. الرتب تتحدث تلقائياً كل 90 يوم."
+                "desc-my-violations": "هذه هي المخالفات المسجلة عليك.",
+                "desc-summary": "يعرض هذا التقرير أداء العمليات للشهر المحدد فقط.",
+                "status-late": "🚨 متأخر! انتهى الوقت.",
+                "status-time-remaining": "⏳ الوقت المتبقي:",
+                "btn-mark-completed": "✅ تم الإنجاز",
+                "btn-i-saw-this": "👁️ قرأت المهمة",
+                "task-must-complete": "يجب الإنجاز خلال دقائق من رؤيتها",
+                "label-assigned": "تم التكليف:",
+                "label-finished": "انتهى:",
+                "label-started": "بدأ:",
+                "no-active-tasks": "لا توجد مهام نشطة.",
+                "not-linked-worker": "هذا الحساب غير مرتبط بأي موظف حالياً.",
+                "msg-task-timer-worker": "الموعد النهائي للمهمة النشطة",
+                "btn-remove": "حذف",
+                "btn-undo-action": "تراجع",
+                "label-base-sm": "الأساسي:",
+                "label-rewards-sm": "المكافآت:",
+                "label-violations-sm": "المخالفات:",
+                "label-paid-advance-sm": "سلف مدفوعة:",
+                "label-good-notes": "ملاحظات إيجابية",
+                "label-bad-notes": "ملاحظات سلبية",
+                "label-deliveries-sm": "التوصيلات",
+                "label-tasks-done": "مهام منجزة",
+                "label-avg-perf": "متوسط الأداء",
+                "label-company-costs-sm": "تكاليف الشركة",
+                "label-fix-violation": "منحك المدير أياماً لإصلاح هذه المخالفة.",
+                "status-waived": "✅ تم الإعفاء (تم الإصلاح)",
+                "status-penalty-applied": "🚨 تم تطبيق الخصم",
+                "status-pending-sm": "⏳ قيد الانتظار",
+                "btn-fixed-waive": "تم الإصلاح (إعفاء)",
+                "btn-not-fixed-apply": "لم يتم الإصلاح (خصم)",
+                "label-master": "المسؤول الأول",
+                "msg-critical-stock": "تحذير: نقص حاد في المخزون",
+                "label-currently-left": "المتبقي حالياً",
+                "label-amount-to-order": "الكمية المطلوبة",
+                "label-finished-at": "انتهى: ",
+                "label-started-at": "بدأ: ",
+                "btn-delete-worker": "حذف الموظف",
+                "label-promote-to-a": "ترقية إلى A",
+                "label-set-to-b": "تعيين B",
+                "label-set-to-c": "تعيين C",
+                "label-demote-unranked": "تنزيل إلى غير مصنف",
+                "label-remaining-to-pay": "المتبقي للدفع (كلي)",
+                "label-no-violations": "✅ لا توجد مخالفات مسجلة هذا الشهر.",
+                "label-fixed-waived": "تم الإصلاح – إعفاء ✔",
+                "label-penalty-applied": "تم تطبيق الخصم – ريال ",
+                "label-time-expired": "انتهى الوقت – تم الخصم (ريال ",
+                "label-fix-within": "⏳ الإصلاح خلال: ",
+                "label-penalty-not-fixed": "الخصم في حال عدم الإصلاح: ريال "
             }
         };
 
         let currentAppLang = localStorage.getItem("burgeroov_lang") || "en";
+
+        function t(key) {
+            return (uiTranslations[currentAppLang] && uiTranslations[currentAppLang][key]) || key;
+        }
 
         function applyTranslations() {
             document.documentElement.dir = currentAppLang === "ar" ? "rtl" : "ltr";
@@ -5025,25 +5028,12 @@
                     // معالجة حقول الإدخال (Placeholder)
                     if (el.tagName === "INPUT" && el.hasAttribute("placeholder")) {
                         el.placeholder = translation;
-                    } else if (el.tagName === "INPUT" && el.type === "button") {
-                        el.value = translation;
-                    } else if (el.tagName === "BUTTON") {
-                        // Preserve icon/emoji if present
-                        const existingIcon = el.innerHTML.match(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}]/u);
-                        if (existingIcon && !translation.includes(existingIcon[0])) {
-                            el.innerHTML = existingIcon[0] + " " + translation;
-                        } else {
-                            el.innerHTML = translation;
-                        }
                     } else {
                         // معالجة النصوص العادية
                         el.innerHTML = translation;
                     }
                 }
             });
-
-            // Update any dynamic displays that depend on currentAppLang
-            setTodayDisplay();
         }
 
         function toggleLanguage() {
