@@ -12,6 +12,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <!-- FIREBASE REALTIME DATABASE SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
@@ -1439,6 +1442,7 @@
                 Financial</button>
             <button id="tab-summary" class="dept-tab" onclick="switchTab('summary')" data-i18n="tab-summary">📊
                 Summary</button>
+            <button id="tab-adverts" class="dept-tab" onclick="switchTab('adverts')">📢 Ads</button>
         </div>
 
         <!-- ========================================== -->
@@ -2152,6 +2156,31 @@
             </div>
         </div>
 
+        <div id="view-adverts" class="view-section">
+            <div style="display: grid; grid-template-columns: 1fr 350px; gap: 24px; width: 100%;">
+
+                <div class="card" style="padding:0; overflow:hidden; display:flex; flex-direction:column;">
+                    <div
+                        style="padding: 16px; border-bottom: 1px solid var(--border-color); background: var(--input-bg);">
+                        <h2 class="card-title" style="margin:0;">🗺️ Khobar Advertising Map</h2>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin: 5px 0 0 0;">Click anywhere on
+                            the map to drop a colored pin and write a note.</p>
+                    </div>
+                    <div id="promo-map" style="height: 600px; width: 100%; z-index: 1;"></div>
+                </div>
+
+                <div class="card" style="display:flex; flex-direction:column; max-height: 660px;">
+                    <h2 class="card-title">📍 Map Pins Log</h2>
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 15px;">Click a log entry to
+                        view it on the map.</p>
+                    <div id="adverts-log-list"
+                        style="overflow-y: auto; flex-grow:1; display:flex; flex-direction:column; gap:10px; padding-right: 5px;">
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
     </div> <!-- End container -->
 
     <!-- Image Modal -->
@@ -2460,6 +2489,7 @@
             if (!data.violationRules) data.violationRules = [];
             if (!data.jobCatalog) data.jobCatalog = []; // Task Templates
             if (!data.warehouse) data.warehouse = [];
+            if (!data.adverts) data.adverts = []; // NEW: Ads Map Array
 
             data.workers.forEach(w => {
                 if (!w.jobs) w.jobs = []; // Tasks assigned to worker
@@ -3070,13 +3100,18 @@
         // --- UI NAVIGATION & GLOBALS ---
         function switchTab(tab) {
             currentTab = tab;
-            ['ops', 'ranks', 'tasks', 'warehouse', 'drivers', 'finance', 'summary'].forEach(t => {
+            ['ops', 'ranks', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts'].forEach(t => {
                 const tabBtn = document.getElementById(`tab-${t}`);
                 const viewSec = document.getElementById(`view-${t}`);
                 if (tabBtn) tabBtn.classList.toggle('active-tab', tab === t);
                 if (viewSec) viewSec.classList.toggle('active-view', tab === t);
             });
             renderAll();
+
+            // Fixes Leaflet map rendering bug when switching tabs
+            if (tab === 'adverts' && promoMap) {
+                setTimeout(() => { promoMap.invalidateSize(); }, 100);
+            }
         }
 
         function getMonthlyStats(worker, monthStr) {
@@ -4321,6 +4356,134 @@
             }
         }
 
+        // --- ADVERTISEMENT MAP SYSTEM ---
+        let promoMap = null;
+        let mapLayerGroup = null;
+
+        function initPromoMap() {
+            if (promoMap) return; // Only init once
+
+            // Set coordinates to center roughly on Khobar, Saudi Arabia
+            promoMap = L.map('promo-map').setView([26.2144, 50.1971], 12);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 18
+            }).addTo(promoMap);
+
+            mapLayerGroup = L.layerGroup().addTo(promoMap);
+
+            // Handle Map Clicks
+            promoMap.on('click', function (e) {
+                // Ensure only admins/managers can drop pins
+                if (!currentUser || currentUser.role !== 'admin') {
+                    alert("Only administrators can drop marketing pins.");
+                    return;
+                }
+
+                const lat = e.latlng.lat;
+                const lng = e.latlng.lng;
+
+                const colorInput = prompt("Enter pin color (Type: Green, Yellow, or Red):", "Green");
+                if (!colorInput) return;
+
+                const color = colorInput.toLowerCase().trim();
+                if (!['green', 'yellow', 'red'].includes(color)) {
+                    alert("Invalid color! Must type Green, Yellow, or Red.");
+                    return;
+                }
+
+                const note = prompt("Enter a note or details for this location:");
+                if (note === null) return;
+
+                const newPin = {
+                    id: Date.now().toString(),
+                    lat: lat,
+                    lng: lng,
+                    color: color,
+                    note: note || "No details provided",
+                    date: formatTimestamp()
+                };
+
+                getCompanyData().adverts.push(newPin);
+                saveData(); // Triggers renderAll via Firebase sync
+            });
+        }
+
+        function deleteAdvertPin(id) {
+            if (!confirm("Delete this map pin?")) return;
+            getCompanyData().adverts = getCompanyData().adverts.filter(p => p.id !== id);
+            saveData();
+        }
+
+        function renderAdverts() {
+            if (currentTab !== 'adverts') return;
+            initPromoMap();
+
+            const pins = getCompanyData().adverts || [];
+            mapLayerGroup.clearLayers();
+            const logList = document.getElementById('adverts-log-list');
+            logList.innerHTML = '';
+
+            const colorCodes = {
+                'green': '#16a34a',
+                'yellow': '#d97706',
+                'red': '#dc2626'
+            };
+
+            const isAdmin = currentUser && currentUser.role === 'admin';
+
+            if (pins.length === 0) {
+                logList.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.9rem; padding: 20px;">No pins dropped yet. ${isAdmin ? 'Click on the map to drop one.' : ''}</p>`;
+            }
+
+            // Draw newest on top of log
+            [...pins].reverse().forEach(pin => {
+                const hexColor = colorCodes[pin.color] || '#333';
+
+                // 1. Draw Circle on Map
+                const circle = L.circleMarker([pin.lat, pin.lng], {
+                    color: hexColor,
+                    fillColor: hexColor,
+                    fillOpacity: 0.6,
+                    radius: 12,
+                    weight: 2
+                }).addTo(mapLayerGroup);
+
+                circle.bindPopup(`<div style="font-family:'Inter', sans-serif;">
+                                    <strong style="color:var(--text-main); font-size:0.9rem;">${pin.date}</strong><br>
+                                    <span style="color:var(--text-muted);">${pin.note}</span>
+                                  </div>`);
+
+                // 2. Add to Log List
+                const div = document.createElement('div');
+                div.className = 'ledger-card';
+                div.style.borderLeft = `4px solid ${hexColor}`;
+                div.style.cursor = 'pointer';
+                div.style.marginBottom = '8px';
+
+                let delBtn = isAdmin ? `<button onclick="deleteAdvertPin('${pin.id}'); event.stopPropagation();" class="btn-outline-danger" style="padding:2px 6px; font-size:0.7rem; border:none; text-decoration:underline;">Delete</button>` : '';
+
+                div.innerHTML = `
+                    <div class="flex-between" style="align-items:start;">
+                        <div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">${pin.date}</div>
+                            <div style="font-weight:600; color:var(--text-main); font-size:0.95rem; line-height:1.4;">${pin.note}</div>
+                        </div>
+                        <div>${delBtn}</div>
+                    </div>
+                `;
+
+                // Clicking the log item flies the map to that spot
+                div.onclick = () => {
+                    promoMap.flyTo([pin.lat, pin.lng], 16, { duration: 1.5 });
+                    setTimeout(() => { circle.openPopup(); }, 1500);
+                };
+
+                logList.appendChild(div);
+            });
+        }
+
         // --- RENDERING ---
         function renderAll() {
             renderBranches();
@@ -4336,6 +4499,7 @@
             else if (currentTab === 'finance') { renderFinanceTable(); renderFinDetails(); }
             else if (currentTab === 'summary') { renderSummaryTable(); }
             else if (currentTab === 'drivers') { renderDriversList(); renderDriverPanel(); }
+            else if (currentTab === 'adverts') { renderAdverts(); }
         }
 
         function renderWorkerViolationPanel() {
