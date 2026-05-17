@@ -2176,23 +2176,66 @@
         <div id="view-adverts" class="view-section">
             <div style="display: grid; grid-template-columns: 1fr 350px; gap: 24px; width: 100%;">
 
-                <div class="card" style="padding:0; overflow:hidden; display:flex; flex-direction:column;">
+                <div class="card"
+                    style="padding:0; overflow:hidden; display:flex; flex-direction:column; position: relative;">
                     <div
                         style="padding: 16px; border-bottom: 1px solid var(--border-color); background: var(--input-bg);">
                         <h2 class="card-title" style="margin:0;">🗺️ Khobar Advertising Map</h2>
-                        <p style="font-size: 0.85rem; color: var(--text-muted); margin: 5px 0 0 0;">Click anywhere on
-                            the map to drop a colored pin and write a note.</p>
                     </div>
-                    <div style="position: relative;">
-                        <div id="promo-map" style="height: 600px; width: 100%; z-index: 1;"></div>
-                        <!-- Floating Search Bar -->
+
+                    <div class="admin-only"
+                        style="position: absolute; top: 80px; left: 50%; transform: translateX(-50%); z-index: 1000; background: var(--card-bg); padding: 8px; border-radius: 30px; box-shadow: var(--shadow-md); display: flex; gap: 8px; border: 1px solid var(--border-color);">
+                        <button id="tool-pin" class="btn-success" onclick="setAdvertTool('pin')"
+                            style="border-radius: 20px; padding: 6px 16px;">📍 Drop Pin</button>
+                        <button id="tool-poly" class="btn-outline" onclick="setAdvertTool('polygon')"
+                            style="border-radius: 20px; padding: 6px 16px;">🖍️ Draw Area</button>
+                        <button id="tool-finish" class="btn-warning" onclick="finishPolygonDraw()"
+                            style="border-radius: 20px; padding: 6px 16px; display:none; font-weight:bold;">✅ Finish
+                            Area</button>
+                    </div>
+
+                    <div
+                        style="position: absolute; top: 80px; right: 15px; z-index: 1000; background: var(--card-bg); padding: 6px; border-radius: 8px; box-shadow: var(--shadow-md); display: flex; gap: 6px; border: 1px solid var(--border-color);">
+                        <input type="text" id="map-search-input" placeholder="Search location..."
+                            style="padding: 6px 10px; font-size: 0.85rem; border: none; outline: none; background: transparent; width: 150px;"
+                            onkeyup="if(event.key==='Enter') searchMapLocation()">
+                        <button onclick="searchMapLocation()" class="btn-info"
+                            style="padding: 6px 10px; font-size: 0.85rem; border-radius: 6px;">🔍</button>
+                    </div>
+
+                    <div id="promo-map" style="height: 600px; width: 100%; z-index: 1;"></div>
+
+                    <div id="map-item-modal"
+                        style="display: none; position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.6); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
                         <div
-                            style="position: absolute; top: 15px; right: 15px; z-index: 1000; background: var(--card-bg); padding: 8px; border-radius: 12px; box-shadow: var(--shadow-md); display: flex; gap: 8px; border: 1px solid var(--border-color); min-width: 300px;">
-                            <input type="text" id="map-search-input" placeholder="Search for a location..."
-                                style="flex-grow: 1; padding: 10px; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: 8px;"
-                                onkeyup="if(event.key==='Enter') searchMapLocation()">
-                            <button onclick="searchMapLocation()" class="btn-info"
-                                style="padding: 8px 16px; font-size: 0.85rem; border-radius: 8px;">🔍 Search</button>
+                            style="background: var(--card-bg); padding: 24px; border-radius: var(--radius-lg); width: 90%; max-width: 380px; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
+                            <h3
+                                style="margin-top:0; margin-bottom: 15px; color:var(--text-main); font-size: 1.2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                                📍 Save Location Details</h3>
+
+                            <label style="color:var(--text-main); font-weight:700;">Select Marker Color:</label>
+                            <div
+                                style="display:flex; gap:15px; margin-bottom: 20px; margin-top: 8px; background: var(--input-bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                <label
+                                    style="cursor:pointer; display:flex; align-items:center; gap:6px; font-weight:600; color:#16a34a;"><input
+                                        type="radio" name="pin-color" value="green" checked> 🟢 Green</label>
+                                <label
+                                    style="cursor:pointer; display:flex; align-items:center; gap:6px; font-weight:600; color:#d97706;"><input
+                                        type="radio" name="pin-color" value="yellow"> 🟡 Yellow</label>
+                                <label
+                                    style="cursor:pointer; display:flex; align-items:center; gap:6px; font-weight:600; color:#dc2626;"><input
+                                        type="radio" name="pin-color" value="red"> 🔴 Red</label>
+                            </div>
+
+                            <label style="color:var(--text-main); font-weight:700;">Location Note / Details:</label>
+                            <textarea id="map-item-note" rows="3"
+                                placeholder="e.g. Covered area with 500 flyers on Sunday..."
+                                style="margin-top: 8px;"></textarea>
+
+                            <div style="display:flex; gap:12px; margin-top:24px;">
+                                <button onclick="cancelMapItem()" class="btn-neutral" style="flex:1;">Cancel</button>
+                                <button onclick="saveMapItem()" class="btn-success" style="flex:1;">Save Marker</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -4560,10 +4603,70 @@
         let promoMap = null;
         let mapLayerGroup = null;
 
-        function initPromoMap() {
-            if (promoMap) return; // Only init once
+        // Drawing & UI State
+        let activeAdvertTool = 'pin';
+        let drawPoints = [];
+        let tempDrawLayer = null;
+        let pendingMapItem = null; // Temporarily holds the location data until the modal is saved
 
-            // Set coordinates to center roughly on Khobar, Saudi Arabia
+        function setAdvertTool(tool) {
+            activeAdvertTool = tool;
+            document.getElementById('tool-pin').className = tool === 'pin' ? 'btn-success' : 'btn-outline';
+            document.getElementById('tool-poly').className = tool === 'polygon' ? 'btn-success' : 'btn-outline';
+
+            if (tempDrawLayer && promoMap) promoMap.removeLayer(tempDrawLayer);
+            drawPoints = [];
+            tempDrawLayer = null;
+            document.getElementById('tool-finish').style.display = 'none';
+        }
+
+        // Triggered when user clicks "Finish Area"
+        function finishPolygonDraw() {
+            if (drawPoints.length < 3) return;
+
+            // Store points and open Modal
+            pendingMapItem = { type: 'polygon', points: [...drawPoints] };
+            document.getElementById('map-item-note').value = '';
+            document.getElementById('map-item-modal').style.display = 'flex';
+        }
+
+        // Close Modal without saving
+        function cancelMapItem() {
+            document.getElementById('map-item-modal').style.display = 'none';
+            pendingMapItem = null;
+            if (activeAdvertTool === 'polygon') {
+                setAdvertTool('pin'); // Reset tool state
+            }
+        }
+
+        // Triggered when user clicks "Save Marker" inside the custom modal
+        function saveMapItem() {
+            if (!pendingMapItem) return;
+
+            const color = document.querySelector('input[name="pin-color"]:checked').value;
+            const note = document.getElementById('map-item-note').value.trim() || "No details provided";
+
+            const newItem = {
+                id: Date.now().toString(),
+                type: pendingMapItem.type,
+                lat: pendingMapItem.lat || null,
+                lng: pendingMapItem.lng || null,
+                points: pendingMapItem.points || null,
+                color: color,
+                note: note,
+                date: formatTimestamp()
+            };
+
+            getCompanyData().adverts.push(newItem);
+            document.getElementById('map-item-modal').style.display = 'none';
+            pendingMapItem = null;
+            setAdvertTool('pin'); // Reset back to default
+            saveData(); // Triggers renderAll via Firebase sync
+        }
+
+        function initPromoMap() {
+            if (promoMap) return;
+
             promoMap = L.map('promo-map').setView([26.2144, 50.1971], 12);
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -4573,45 +4676,35 @@
 
             mapLayerGroup = L.layerGroup().addTo(promoMap);
 
-            // Handle Map Clicks
             promoMap.on('click', function (e) {
-                // Ensure only admins/managers can drop pins
                 if (!currentUser || currentUser.role !== 'admin') {
-                    alert("Only administrators can drop marketing pins.");
+                    alert("Only administrators can edit the map.");
                     return;
                 }
 
-                const lat = e.latlng.lat;
-                const lng = e.latlng.lng;
+                if (activeAdvertTool === 'pin') {
+                    // Store location and open Modal
+                    pendingMapItem = { type: 'pin', lat: e.latlng.lat, lng: e.latlng.lng };
+                    document.getElementById('map-item-note').value = '';
+                    document.getElementById('map-item-modal').style.display = 'flex';
 
-                const colorInput = prompt("Enter pin color (Type: Green, Yellow, or Red):", "Green");
-                if (!colorInput) return;
+                } else if (activeAdvertTool === 'polygon') {
+                    drawPoints.push([e.latlng.lat, e.latlng.lng]);
 
-                const color = colorInput.toLowerCase().trim();
-                if (!['green', 'yellow', 'red'].includes(color)) {
-                    alert("Invalid color! Must type Green, Yellow, or Red.");
-                    return;
+                    if (tempDrawLayer) promoMap.removeLayer(tempDrawLayer);
+
+                    if (drawPoints.length < 3) {
+                        tempDrawLayer = L.polyline(drawPoints, { color: 'var(--primary)', dashArray: '5, 5', weight: 3 }).addTo(promoMap);
+                    } else {
+                        tempDrawLayer = L.polygon(drawPoints, { color: 'var(--primary)', fillOpacity: 0.2, weight: 3 }).addTo(promoMap);
+                        document.getElementById('tool-finish').style.display = 'inline-block';
+                    }
                 }
-
-                const note = prompt("Enter a note or details for this location:");
-                if (note === null) return;
-
-                const newPin = {
-                    id: Date.now().toString(),
-                    lat: lat,
-                    lng: lng,
-                    color: color,
-                    note: note || "No details provided",
-                    date: formatTimestamp()
-                };
-
-                getCompanyData().adverts.push(newPin);
-                saveData(); // Triggers renderAll via Firebase sync
             });
         }
 
         function deleteAdvertPin(id) {
-            if (!confirm("Delete this map pin?")) return;
+            if (!confirm("Delete this item from the map?")) return;
             getCompanyData().adverts = getCompanyData().adverts.filter(p => p.id !== id);
             saveData();
         }
@@ -4634,28 +4727,58 @@
             const isAdmin = currentUser && currentUser.role === 'admin';
 
             if (pins.length === 0) {
-                logList.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.9rem; padding: 20px;">No pins dropped yet. ${isAdmin ? 'Click on the map to drop one.' : ''}</p>`;
+                logList.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.9rem; padding: 20px;">No pins or areas dropped yet.</p>`;
             }
 
-            // Draw newest on top of log
             [...pins].reverse().forEach(pin => {
                 const hexColor = colorCodes[pin.color] || '#333';
+                let mapElement;
+                let centerLat, centerLng;
 
-                // 1. Draw Circle on Map
-                const circle = L.circleMarker([pin.lat, pin.lng], {
-                    color: hexColor,
-                    fillColor: hexColor,
-                    fillOpacity: 0.6,
-                    radius: 12,
-                    weight: 2
-                }).addTo(mapLayerGroup);
+                // Render Polygon Area
+                if (pin.type === 'polygon' && pin.points) {
+                    mapElement = L.polygon(pin.points, {
+                        color: hexColor,
+                        fillColor: hexColor,
+                        fillOpacity: 0.3,
+                        weight: 2
+                    }).addTo(mapLayerGroup);
 
-                circle.bindPopup(`<div style="font-family:'Inter', sans-serif;">
+                    // Calculate center to place the text
+                    const bounds = mapElement.getBounds();
+                    const center = bounds.getCenter();
+                    centerLat = center.lat;
+                    centerLng = center.lng;
+
+                    // Overlay the note text directly in the middle of the drawn area
+                    L.marker(center, {
+                        icon: L.divIcon({
+                            className: 'dummy',
+                            html: `<div style="color: ${hexColor}; font-weight: 900; font-size: 1rem; text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff; text-align: center; min-width:150px; transform: translate(-50%, -50%); pointer-events:none;">${pin.note}</div>`,
+                            iconSize: [0, 0]
+                        }),
+                        interactive: false
+                    }).addTo(mapLayerGroup);
+
+                } else {
+                    // Render Standard Pin
+                    mapElement = L.circleMarker([pin.lat, pin.lng], {
+                        color: hexColor,
+                        fillColor: hexColor,
+                        fillOpacity: 0.7,
+                        radius: 12,
+                        weight: 2
+                    }).addTo(mapLayerGroup);
+                    centerLat = pin.lat;
+                    centerLng = pin.lng;
+                }
+
+                mapElement.bindPopup(`<div style="font-family:'Inter', sans-serif;">
                                     <strong style="color:var(--text-main); font-size:0.9rem;">${pin.date}</strong><br>
                                     <span style="color:var(--text-muted);">${pin.note}</span>
                                   </div>`);
 
-                // 2. Add to Log List
+                // Add to Log List
                 const div = document.createElement('div');
                 div.className = 'ledger-card';
                 div.style.borderLeft = `4px solid ${hexColor}`;
@@ -4663,21 +4786,21 @@
                 div.style.marginBottom = '8px';
 
                 let delBtn = isAdmin ? `<button onclick="deleteAdvertPin('${pin.id}'); event.stopPropagation();" class="btn-outline-danger" style="padding:2px 6px; font-size:0.7rem; border:none; text-decoration:underline;">Delete</button>` : '';
+                let iconType = pin.type === 'polygon' ? '🖍️ Area' : '📍 Pin';
 
                 div.innerHTML = `
                     <div class="flex-between" style="align-items:start;">
                         <div>
-                            <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">${pin.date}</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">${pin.date} <span style="background:var(--bg-color); padding:2px 6px; border-radius:4px; margin-left:6px;">${iconType}</span></div>
                             <div style="font-weight:600; color:var(--text-main); font-size:0.95rem; line-height:1.4;">${pin.note}</div>
                         </div>
                         <div>${delBtn}</div>
                     </div>
                 `;
 
-                // Clicking the log item flies the map to that spot
                 div.onclick = () => {
-                    promoMap.flyTo([pin.lat, pin.lng], 16, { duration: 1.5 });
-                    setTimeout(() => { circle.openPopup(); }, 1500);
+                    promoMap.flyTo([centerLat, centerLng], 15, { duration: 1.5 });
+                    setTimeout(() => { mapElement.openPopup(); }, 1500);
                 };
 
                 logList.appendChild(div);
