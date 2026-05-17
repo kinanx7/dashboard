@@ -249,6 +249,10 @@
             display: none !important;
         }
 
+        body:not(.role-admin):not(.perm-costs) .costs-admin {
+            display: none !important;
+        }
+
         /* Header HUD */
         header {
             background-color: #2d1b11;
@@ -474,17 +478,13 @@
         /* Modern HUD Tabs */
         .department-tabs {
             display: flex;
-            gap: 6px;
+            gap: 12px;
             margin: 24px auto;
             max-width: 1400px;
-            padding: 8px;
-            background: var(--card-bg);
-            border-radius: 100px;
-            box-shadow: var(--shadow-sm);
-            border: 1px solid var(--border-color);
-            flex-wrap: nowrap;
-            overflow-x: auto;
-            scrollbar-width: none;
+            padding: 0;
+            background: transparent;
+            flex-wrap: wrap;
+            justify-content: center;
         }
 
         .department-tabs::-webkit-scrollbar {
@@ -496,25 +496,28 @@
             font-size: 0.95rem;
             font-weight: 600;
             color: var(--text-muted);
-            background: transparent;
-            border: none;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
             border-radius: 100px;
             cursor: pointer;
             transition: var(--transition);
             white-space: nowrap;
-            flex: 1;
+            flex: 0 1 auto;
             text-align: center;
         }
 
         .dept-tab:hover {
             color: var(--text-main);
-            background: var(--bg-color);
+            border-color: var(--primary);
         }
 
         .dept-tab.active-tab {
             background: var(--primary);
+            border-color: var(--primary);
             color: #ffffff;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transform: translateY(-2px);
         }
 
         /* View Sections */
@@ -548,7 +551,8 @@
         #view-ranks.active-view,
         #view-tasks.active-view,
         #view-notes.active-view,
-        #view-managing.active-view {
+        #view-managing.active-view,
+        #view-costs.active-view {
             grid-template-columns: 1fr;
         }
 
@@ -1491,6 +1495,7 @@
             <button id="tab-adverts" class="dept-tab" onclick="switchTab('adverts')">📢 Ads</button>
             <button id="tab-notes" class="dept-tab" onclick="switchTab('notes')">📝 Notes</button>
             <button id="tab-managing" class="dept-tab" onclick="switchTab('managing')">💰 Sales</button>
+            <button id="tab-costs" class="dept-tab" onclick="switchTab('costs')">📉 Costs</button>
         </div>
 
         <!-- ========================================== -->
@@ -1503,44 +1508,44 @@
 
                 <!-- Manager Access Control -->
                 <div class="card">
-                    <h2 class="card-title" data-i18n="title-manager-access">Manager Access Control</h2>
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">Promote users to
-                        global Admin status.</p>
-                    <div class="form-group flex-between">
-                        <input type="email" id="new-manager-email" placeholder="Enter email to promote...">
-                        <button onclick="addManager()">Promote</button>
-                    </div>
-                    <ul id="managers-list" style="list-style: none; margin-top: 16px;"></ul>
-                </div>
+                    <h2 class="card-title">🔐 Department Access Control</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">Set entire departments
+                        to Public (everyone can see) or Restricted (only you and assigned workers).</p>
 
-                <!-- Worker Department Access Control -->
-                <div class="card">
-                    <h2 class="card-title" data-i18n="title-worker-access">Worker Department Access</h2>
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">Grant a specific
-                        worker editing powers over a specific department.</p>
+                    <div id="global-privacy-toggles"
+                        style="margin-bottom: 20px; border-bottom: 1px dashed var(--border-color); padding-bottom: 16px; display:flex; flex-direction:column; gap:10px;">
+                    </div>
+
+                    <h3 style="font-size: 0.95rem; margin-bottom: 10px;">Assign Restricted Access to Specific Worker
+                    </h3>
                     <div class="form-group">
-                        <label data-i18n="label-select-emp">Select Worker</label>
-                        <select id="perm-worker-select" onchange="loadWorkerPerms()">
-                            <option value="" data-i18n="opt-choose-emp">-- Choose Employee --</option>
+                        <select id="perm-worker-select" onchange="loadWorkerPerms()" style="padding: 10px;">
+                            <option value="">-- Choose Employee --</option>
                         </select>
                     </div>
                     <div class="grid-2-col" style="margin-bottom: 16px;">
                         <label
                             style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
-                            <input type="checkbox" id="perm-wh" style="width:auto;"> <span
-                                data-i18n="tab-warehouse">Warehouse</span>
+                            <input type="checkbox" id="perm-wh" style="width:auto;"> <span>Warehouse</span>
                         </label>
                         <label
                             style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
-                            <input type="checkbox" id="perm-fin" style="width:auto;"> <span
-                                data-i18n="tab-finance">Finance</span>
+                            <input type="checkbox" id="perm-drv" style="width:auto;"> <span>Drivers</span>
+                        </label>
+                        <label
+                            style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                            <input type="checkbox" id="perm-fin" style="width:auto;"> <span>Finance</span>
                         </label>
                         <label
                             style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
                             <input type="checkbox" id="perm-sales" style="width:auto;"> <span>Sales Tracker</span>
                         </label>
+                        <label
+                            style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                            <input type="checkbox" id="perm-costs" style="width:auto;"> <span>Costs Tracker</span>
+                        </label>
                     </div>
-                    <button onclick="saveWorkerPerms()" style="width: 100%;">Save Permissions</button>
+                    <button onclick="saveWorkerPerms()" style="width: 100%;">Save Worker Permissions</button>
                 </div>
 
                 <!-- Branches Card -->
@@ -2223,18 +2228,18 @@
                     style="padding:0; overflow:hidden; display:flex; flex-direction:column; position: relative;">
                     <div
                         style="padding: 16px; border-bottom: 1px solid var(--border-color); background: var(--input-bg);">
-                        <h2 class="card-title" style="margin:0;">🗺️ Khobar Advertising Map</h2>
-                    </div>
-
-                    <div class="admin-only"
-                        style="position: absolute; top: 80px; left: 50%; transform: translateX(-50%); z-index: 1000; background: var(--card-bg); padding: 8px; border-radius: 30px; box-shadow: var(--shadow-md); display: flex; gap: 8px; border: 1px solid var(--border-color);">
-                        <button id="tool-pin" class="btn-success" onclick="setAdvertTool('pin')"
-                            style="border-radius: 20px; padding: 6px 16px;">📍 Drop Pin</button>
-                        <button id="tool-poly" class="btn-outline" onclick="setAdvertTool('polygon')"
-                            style="border-radius: 20px; padding: 6px 16px;">🖍️ Draw Area</button>
-                        <button id="tool-finish" class="btn-warning" onclick="finishPolygonDraw()"
-                            style="border-radius: 20px; padding: 6px 16px; display:none; font-weight:bold;">✅ Finish
-                            Area</button>
+                        <div class="flex-between" style="flex-wrap: wrap; gap: 10px;">
+                            <h2 class="card-title" style="margin:0;">🗺️ Khobar Advertising Map</h2>
+                            <div style="display:flex; gap:8px;" class="admin-only">
+                                <button id="tool-pin" class="btn-success" onclick="setAdvertTool('pin')"
+                                    style="border-radius: 20px; padding: 6px 16px;">📍 Drop Pin</button>
+                                <button id="tool-poly" class="btn-outline" onclick="setAdvertTool('polygon')"
+                                    style="border-radius: 20px; padding: 6px 16px;">🖍️ Draw Area</button>
+                                <button id="tool-finish" class="btn-warning" onclick="finishPolygonDraw()"
+                                    style="border-radius: 20px; padding: 6px 16px; display:none; font-weight:bold;">✅
+                                    Finish Area</button>
+                            </div>
+                        </div>
                     </div>
 
                     <div
@@ -2255,29 +2260,24 @@
                             <h3
                                 style="margin-top:0; margin-bottom: 15px; color:var(--text-main); font-size: 1.2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
                                 📍 Save Location Details</h3>
-
                             <label style="color:var(--text-main); font-weight:700;">Select Marker Color:</label>
                             <div
                                 style="display:flex; gap:15px; margin-bottom: 20px; margin-top: 8px; background: var(--input-bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
                                 <label
                                     style="cursor:pointer; display:flex; align-items:center; gap:6px; font-weight:600; color:#16a34a;"><input
-                                        type="radio" name="pin-color" value="green" checked> 🟢 Green</label>
+                                        type="radio" name="pin-color" value="green" checked> 🟢</label>
                                 <label
                                     style="cursor:pointer; display:flex; align-items:center; gap:6px; font-weight:600; color:#d97706;"><input
-                                        type="radio" name="pin-color" value="yellow"> 🟡 Yellow</label>
+                                        type="radio" name="pin-color" value="yellow"> 🟡</label>
                                 <label
                                     style="cursor:pointer; display:flex; align-items:center; gap:6px; font-weight:600; color:#dc2626;"><input
-                                        type="radio" name="pin-color" value="red"> 🔴 Red</label>
+                                        type="radio" name="pin-color" value="red"> 🔴</label>
                             </div>
-
                             <label style="color:var(--text-main); font-weight:700;">Location Note / Details:</label>
-                            <textarea id="map-item-note" rows="3"
-                                placeholder="e.g. Covered area with 500 flyers on Sunday..."
-                                style="margin-top: 8px;"></textarea>
-
+                            <textarea id="map-item-note" rows="3" style="margin-top: 8px;"></textarea>
                             <div style="display:flex; gap:12px; margin-top:24px;">
                                 <button onclick="cancelMapItem()" class="btn-neutral" style="flex:1;">Cancel</button>
-                                <button onclick="saveMapItem()" class="btn-success" style="flex:1;">Save Marker</button>
+                                <button onclick="saveMapItem()" class="btn-success" style="flex:1;">Save</button>
                             </div>
                         </div>
                     </div>
@@ -2285,8 +2285,6 @@
 
                 <div class="card" style="display:flex; flex-direction:column; max-height: 660px;">
                     <h2 class="card-title">📍 Map Pins Log</h2>
-                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 15px;">Click a log entry to
-                        view it on the map.</p>
                     <div id="adverts-log-list"
                         style="overflow-y: auto; flex-grow:1; display:flex; flex-direction:column; gap:10px; padding-right: 5px;">
                     </div>
@@ -2298,8 +2296,6 @@
         <div id="view-notes" class="view-section">
             <div class="card" style="width: 100%;">
                 <h2 class="card-title">📝 Team Communication & Notes</h2>
-                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 20px;">Public notes are visible to
-                    everyone and allow replies. Private notes are secure.</p>
 
                 <div class="admin-only"
                     style="background: var(--input-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 30px; box-shadow: var(--shadow-sm);">
@@ -2336,8 +2332,7 @@
                         style="width: 100%; margin-top: 16px; font-size: 1.05rem; padding: 14px;">Post Note</button>
                 </div>
 
-                <div id="manage-notes-feed" style="display:flex; flex-direction:column; gap:20px;">
-                </div>
+                <div id="manage-notes-feed" style="display:flex; flex-direction:column; gap:20px;"></div>
             </div>
         </div>
 
@@ -2346,9 +2341,13 @@
                 <div class="flex-between" style="margin-bottom: 16px; flex-wrap: wrap;">
                     <h2 class="card-title" style="margin:0; border:none; padding:0;">💰 Advanced Sales Analytics</h2>
                     <div
-                        style="display: flex; gap: 8px; background: var(--input-bg); padding: 6px; border-radius: 100px; border: 1px solid var(--border-color);">
-                        <button id="tf-day" onclick="setSalesTimeframe('day')"
-                            style="border-radius:100px; padding: 6px 16px; background:var(--primary); color:white;">Today</button>
+                        style="display: flex; gap: 8px; background: var(--input-bg); padding: 6px; border-radius: 100px; border: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
+                        <div style="display: flex; gap: 4px; align-items: center;">
+                            <button id="tf-day" onclick="setSalesTimeframe('day')"
+                                style="border-radius:100px; padding: 6px 16px; background:var(--primary); color:white;">Daily</button>
+                            <input type="date" id="sales-date-picker" onchange="renderManaging()"
+                                style="padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-color); font-size: 0.85rem; height: 32px; background: var(--card-bg); color: var(--text-main);">
+                        </div>
                         <button id="tf-week" onclick="setSalesTimeframe('week')"
                             style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">Week</button>
                         <button id="tf-month" onclick="setSalesTimeframe('month')"
@@ -2359,37 +2358,29 @@
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: stretch;">
-
                     <div style="display:flex; flex-direction:column; gap:20px;">
                         <div
                             style="background: var(--input-bg); padding: 30px; border-radius: 16px; border: 1px solid var(--border-color); text-align: center; height:100%;">
                             <div
-                                style="font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">
+                                style="font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">
                                 Selected Timeframe Total</div>
                             <div
                                 style="font-size: 3.5rem; font-weight: 800; color: var(--primary); margin-bottom: 30px;">
                                 SAR <span id="sales-grand-total">0.00</span></div>
-
-                            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Click a payment
-                                method to exclude it from the total above.</p>
                             <div id="sales-method-toggles"
-                                style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
-                            </div>
+                                style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;"></div>
                         </div>
                     </div>
 
                     <div
                         style="background: var(--input-bg); padding: 20px; border-radius: 16px; border: 1px solid var(--border-color); display:flex; flex-direction:column;">
                         <h3 style="font-size: 1rem; color: var(--text-main); margin:0;">Sales Trend</h3>
-                        <div id="sales-histogram" class="histogram-container">
-                        </div>
+                        <div id="sales-histogram" class="histogram-container"></div>
                     </div>
-
                 </div>
 
                 <div
                     style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: stretch; margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 30px;">
-
                     <div>
                         <h3 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--text-main);">Log a New
                             Transaction</h3>
@@ -2402,21 +2393,18 @@
                                 </div>
                                 <div style="flex: 1; min-width: 120px;">
                                     <select id="new-sale-method"
-                                        style="height: 100%; font-size: 1rem; font-weight: 600; padding: 14px;">
-                                    </select>
+                                        style="height: 100%; font-size: 1rem; font-weight: 600; padding: 14px;"></select>
                                 </div>
                             </div>
                             <button onclick="logSaleTransaction()" class="btn-success"
                                 style="font-size: 1.1rem; padding: 14px; font-weight: 800; width:100%; margin-top: 12px;">✅
                                 Log Sale</button>
                         </div>
-
                         <div class="admin-only" style="margin-top: 30px;">
                             <h3 style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 10px;">Admin: Manage
                                 Income Sources</h3>
                             <div style="display: flex; gap: 8px;">
-                                <input type="text" id="new-income-source"
-                                    placeholder="Add new source (e.g. UberEats)..."
+                                <input type="text" id="new-income-source" placeholder="Add new source..."
                                     style="flex:1; padding: 10px; font-size: 0.9rem;">
                                 <button onclick="addIncomeSource()" class="btn-outline">Add Source</button>
                             </div>
@@ -2435,9 +2423,117 @@
                             style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; padding-right: 5px;">
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
 
+        <div id="view-costs" class="view-section costs-admin">
+            <div class="card" style="width: 100%; border-top: 4px solid var(--danger);">
+                <div class="flex-between" style="margin-bottom: 16px; flex-wrap: wrap;">
+                    <h2 class="card-title" style="margin:0; border:none; padding:0;">📉 Costs & P&L Dashboard</h2>
+                    <div
+                        style="display: flex; gap: 8px; background: var(--input-bg); padding: 6px; border-radius: 100px; border: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
+                        <div style="display: flex; gap: 4px; align-items: center;">
+                            <button id="cost-tf-day" onclick="setCostsTimeframe('day')"
+                                style="border-radius:100px; padding: 6px 16px; background:var(--primary); color:white;">Daily</button>
+                            <input type="date" id="costs-date-picker" onchange="renderCosts()"
+                                style="padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-color); font-size: 0.85rem; height: 32px; background: var(--card-bg); color: var(--text-main);">
+                        </div>
+                        <button id="cost-tf-week" onclick="setCostsTimeframe('week')"
+                            style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">Week</button>
+                        <button id="cost-tf-month" onclick="setCostsTimeframe('month')"
+                            style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">Month</button>
+                        <button id="cost-tf-year" onclick="setCostsTimeframe('year')"
+                            style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">Year</button>
+                    </div>
                 </div>
 
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: stretch;">
+                    <div style="display:flex; flex-direction:column; gap:20px;">
+                        <div
+                            style="text-align: center; background: var(--input-bg); padding: 30px; border-radius: 16px; box-shadow: var(--shadow-sm); border: 1px solid var(--border-color); height:100%;">
+                            <div
+                                style="font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">
+                                Net Profit (<span id="pl-timeframe-label">Today</span>)</div>
+                            <div id="pl-net-profit" style="font-size: 3.5rem; font-weight: 800; margin-bottom: 5px;">SAR
+                                0.00</div>
+                            <div id="pl-status-message" style="font-size: 1rem; font-weight: 600;"></div>
+                        </div>
+                    </div>
+
+                    <div
+                        style="background: var(--input-bg); padding: 20px; border-radius: 16px; border: 1px solid var(--border-color); display:flex; flex-direction:column;">
+                        <h3 style="font-size: 1rem; color: var(--text-main); margin:0; text-align:center;">Sales vs
+                            Costs</h3>
+                        <div
+                            style="display:flex; align-items:flex-end; justify-content:center; gap: 40px; height: 200px; margin-top: 20px; padding-bottom: 10px; border-bottom: 2px solid var(--border-color);">
+                            <div
+                                style="display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; width: 80px;">
+                                <div id="pl-sales-label"
+                                    style="font-weight:700; color:var(--success); margin-bottom:8px;">SAR 0</div>
+                                <div id="pl-sales-bar"
+                                    style="width:100%; background:var(--success); border-radius:8px 8px 0 0; transition:height 0.8s ease; height:0%;">
+                                </div>
+                                <div style="margin-top:8px; font-weight:600; color:var(--text-muted);">Sales</div>
+                            </div>
+                            <div
+                                style="display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; width: 80px;">
+                                <div id="pl-costs-label"
+                                    style="font-weight:700; color:var(--danger); margin-bottom:8px;">SAR 0</div>
+                                <div id="pl-costs-bar"
+                                    style="width:100%; background:var(--danger); border-radius:8px 8px 0 0; transition:height 0.8s ease; height:0%;">
+                                </div>
+                                <div style="margin-top:8px; font-weight:600; color:var(--text-muted);">Costs</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: stretch; margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 30px;">
+                    <div>
+                        <h3 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--text-main);">Log a New
+                            Cost/Expense</h3>
+                        <div
+                            style="background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
+                            <div style="display: flex; gap: 12px; align-items: stretch; flex-wrap: wrap;">
+                                <div style="flex: 2; min-width: 150px;">
+                                    <input type="number" id="new-cost-amount" placeholder="Amount (SAR)..."
+                                        style="font-size: 1.25rem; font-weight: 700; padding: 14px; color: var(--danger); height: 100%;">
+                                </div>
+                                <div style="flex: 1; min-width: 120px;">
+                                    <select id="new-cost-category-select"
+                                        style="height: 100%; font-size: 1rem; font-weight: 600; padding: 14px;"></select>
+                                </div>
+                            </div>
+                            <button onclick="logCostTransaction()" class="btn-danger"
+                                style="font-size: 1.1rem; padding: 14px; font-weight: 800; width:100%; margin-top: 12px;">✅
+                                Log Cost</button>
+                        </div>
+                        <div class="admin-only" style="margin-top: 30px;">
+                            <h3 style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 10px;">Admin: Manage
+                                Cost Categories</h3>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="text" id="new-cost-category" placeholder="Add new category..."
+                                    style="flex:1; padding: 10px; font-size: 0.9rem;">
+                                <button onclick="addCostCategory()" class="btn-outline">Add Category</button>
+                            </div>
+                            <div id="admin-cost-categories-list"
+                                style="display:flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex-between"
+                            style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                            <h3 style="font-size: 1.1rem; margin:0;">Costs Feed</h3>
+                            <span style="font-size:0.8rem; color:var(--text-muted);">Filtered by Timeframe</span>
+                        </div>
+                        <div id="costs-transaction-log"
+                            style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; padding-right: 5px;">
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -2696,7 +2792,6 @@
         function logout() { auth.signOut(); }
 
         // --- ROLE BASED ACCESS CONTROL (RBAC) ---
-        // FEATURE 2: applyUserRoles now detects driver role and adds .is-driver to body
         function applyUserRoles() {
             if (!currentUser) return;
             const email = currentUser.email.toLowerCase();
@@ -2705,7 +2800,12 @@
             let isKinan = email === 'kinan.rahal@hotmail.com';
             let isAdmin = isKinan || admins.map(e => e.toLowerCase()).includes(email);
 
-            let wPerms = { warehouse: false, drivers: false, finance: false, sales: false };
+            let wPerms = { warehouse: false, drivers: false, finance: false, sales: false, costs: false };
+
+            // Global Privacy Config
+            const deptPrivacy = appData.burgeroov.deptPrivacy || {
+                warehouse: 'restricted', drivers: 'restricted', finance: 'restricted', sales: 'restricted', costs: 'restricted'
+            };
 
             const worker = appData.burgeroov.workers.find(w => w.email && w.email.toLowerCase() === email);
             let isDriver = false;
@@ -2727,10 +2827,11 @@
                 document.body.classList.add('role-admin');
             } else {
                 document.body.classList.add('role-worker');
-                if (wPerms.warehouse) document.body.classList.add('perm-warehouse');
-                if (wPerms.drivers) document.body.classList.add('perm-drivers');
-                if (wPerms.finance) document.body.classList.add('perm-finance');
-                if (wPerms.sales) document.body.classList.add('perm-sales');
+                if (wPerms.warehouse || deptPrivacy.warehouse === 'public') document.body.classList.add('perm-warehouse');
+                if (wPerms.drivers || deptPrivacy.drivers === 'public') document.body.classList.add('perm-drivers');
+                if (wPerms.finance || deptPrivacy.finance === 'public') document.body.classList.add('perm-finance');
+                if (wPerms.sales || deptPrivacy.sales === 'public') document.body.classList.add('perm-sales');
+                if (wPerms.costs || deptPrivacy.costs === 'public') document.body.classList.add('perm-costs');
                 if (isDriver) document.body.classList.add('is-driver');
             }
 
@@ -2750,14 +2851,17 @@
             if (!data.adverts) data.adverts = [];
             if (!data.whCategories) data.whCategories = [];
 
-            // NEW: Management Data
+            // Privacy & Management Data
+            if (!data.deptPrivacy) data.deptPrivacy = { warehouse: 'restricted', drivers: 'restricted', finance: 'restricted', sales: 'restricted', costs: 'restricted' };
             if (!data.managerNotes) data.managerNotes = [];
-            data.managerNotes.forEach(n => {
-                if (!n.replies) n.replies = [];
-            });
+            data.managerNotes.forEach(n => { if (!n.replies) n.replies = []; });
             if (!data.incomeSources) data.incomeSources = ['Cash', 'Credit Card'];
             if (!data.salesLogs) data.salesLogs = [];
             if (!data.disabledSalesMethods) data.disabledSalesMethods = [];
+
+            // New Costs Data
+            if (!data.costCategories) data.costCategories = ['Electric Bill', 'Meat Supplier', 'Packaging'];
+            if (!data.costLogs) data.costLogs = []; // Daily costs ledger
 
             data.warehouse.forEach(item => {
                 if (!item.logs) item.logs = [];
@@ -3102,6 +3206,20 @@
             alert("Permissions updated!");
         }
 
+        function saveWorkerPerms() {
+            const wId = document.getElementById('perm-worker-select').value;
+            if (!wId) return alert("Select a worker first.");
+            const worker = getCompanyData().workers.find(w => w.id === wId);
+            worker.permissions = {
+                warehouse: document.getElementById('perm-wh').checked,
+                drivers: document.getElementById('perm-drv').checked,
+                finance: document.getElementById('perm-fin').checked,
+                sales: document.getElementById('perm-sales').checked
+            };
+            saveData();
+            alert("Permissions updated!");
+        }
+
         // --- MANAGING DEPARTMENT SYSTEM ---
         function addIncomeSource() {
             const source = document.getElementById('new-income-source').value.trim();
@@ -3138,120 +3256,7 @@
             alert(`Sales successfully saved for ${currentGlobalMonth} 💰`);
         }
 
-        function postManagerNote() {
-            const text = document.getElementById('manage-note-text').value.trim();
-            if (!text) return alert("Write a note first.");
 
-            const privacy = document.querySelector('input[name="note-privacy"]:checked').value;
-            let targets = [];
-
-            if (privacy === 'private') {
-                const checkboxes = document.querySelectorAll('.private-target-cb:checked');
-                checkboxes.forEach(cb => targets.push(cb.value));
-            }
-
-            const newNote = {
-                id: Date.now().toString(),
-                text: text,
-                date: formatTimestamp(),
-                author: currentUser.email,
-                isPrivate: privacy === 'private',
-                targetWorkers: targets
-            };
-
-            if (!getCompanyData().managerNotes) getCompanyData().managerNotes = [];
-            getCompanyData().managerNotes.unshift(newNote);
-            document.getElementById('manage-note-text').value = '';
-
-            // Uncheck targets cleanly
-            document.querySelectorAll('.private-target-cb').forEach(cb => cb.checked = false);
-            saveData();
-        }
-
-        function deleteManagerNote(id) {
-            if (!confirm("Delete this note?")) return;
-            getCompanyData().managerNotes = getCompanyData().managerNotes.filter(n => n.id !== id);
-            saveData();
-        }
-
-        function renderManaging() {
-            if (currentTab !== 'managing') return;
-
-            // 1. Populate Target Checkboxes for Private Notes
-            const cbContainer = document.getElementById('private-worker-checkboxes');
-            if (cbContainer) {
-                cbContainer.innerHTML = '';
-                getCompanyData().workers.forEach(w => {
-                    cbContainer.innerHTML += `
-                        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; text-transform:none; margin:0; font-size:0.9rem;">
-                            <input type="checkbox" class="private-target-cb" value="${w.id}"> ${w.name} (${w.role})
-                        </label>
-                    `;
-                });
-            }
-
-            // 2. Render Notes Feed
-            const feed = document.getElementById('manage-notes-feed');
-            feed.innerHTML = '';
-            const allNotes = getCompanyData().managerNotes || [];
-
-            // Filter notes for the current viewer
-            const visibleNotes = allNotes.filter(n => {
-                if (currentUser.role === 'admin') return true; // Admin sees all
-                if (!n.isPrivate) return true; // Everyone sees public
-                // If private, worker only sees if they are in the target list
-                const myWorkerProfile = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
-                return myWorkerProfile && n.targetWorkers && n.targetWorkers.includes(myWorkerProfile.id);
-            });
-
-            if (visibleNotes.length === 0) {
-                feed.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding: 20px;">No notes available.</p>';
-            }
-
-            visibleNotes.forEach(n => {
-                const div = document.createElement('div');
-                div.className = 'ledger-card';
-                div.style.borderLeft = n.isPrivate ? '4px solid var(--danger)' : '4px solid var(--info)';
-
-                let delBtn = (currentUser.role === 'admin') ? `<button onclick="deleteManagerNote('${n.id}')" class="btn-outline-danger" style="padding:2px 6px; font-size:0.7rem; border:none; text-decoration:underline;">Delete</button>` : '';
-                let lockIcon = n.isPrivate ? `<span class="badge" style="background:var(--danger);">🔒 Private</span>` : `<span class="badge" style="background:var(--info);">📢 Public</span>`;
-
-                div.innerHTML = `
-                    <div class="flex-between" style="margin-bottom:8px;">
-                        <div style="display:flex; gap:8px; align-items:center;">
-                            ${lockIcon} <span style="font-size:0.75rem; color:var(--text-muted);">${n.date}</span>
-                        </div>
-                        ${delBtn}
-                    </div>
-                    <div style="font-size:0.95rem; color:var(--text-main); white-space: pre-wrap; line-height: 1.5;">${n.text}</div>
-                `;
-                feed.appendChild(div);
-            });
-
-            // 3. Render Sales Inputs (Only matters for those who can see it)
-            const salesContainer = document.getElementById('sales-inputs-container');
-            salesContainer.innerHTML = '';
-            const sources = getCompanyData().incomeSources || ['Cash', 'Credit Card'];
-            const monthlyData = (getCompanyData().monthlySales && getCompanyData().monthlySales[currentGlobalMonth]) ? getCompanyData().monthlySales[currentGlobalMonth] : {};
-
-            sources.forEach(s => {
-                const val = monthlyData[s] !== undefined ? monthlyData[s] : '';
-                const inputId = 'sales-input-' + s.replace(/[^a-zA-Z0-9]/g, '');
-
-                salesContainer.innerHTML += `
-                    <div class="flex-between" style="background: var(--input-bg); padding: 18px 24px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);">
-                        <div style="display:flex; align-items:center; gap: 12px; width: 45%;">
-                            <button onclick="deleteIncomeSource('${s}')" class="btn-outline-danger" style="padding: 4px 8px; font-size: 0.9rem; border: none; background: var(--danger-bg);" title="Delete Source">✖</button>
-                            <strong style="color:var(--text-main); font-size:1.25rem; word-break: break-word;">${s}</strong>
-                        </div>
-                        <div style="display:flex; align-items:center; gap:12px; flex:1;">
-                            <span style="color:var(--text-muted); font-weight:700; font-size: 1.1rem;">SAR</span>
-                            <input type="number" id="${inputId}" value="${val}" placeholder="0.00" style="flex:1; padding: 14px 16px; font-weight: 800; font-size: 1.25rem; color: var(--primary); background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border-color);">
-                        </div>
-                    </div>
-                `;
-            });
-        }
 
         // --- COMMUNICATION & NOTES SYSTEM ---
         function postManagerNote() {
@@ -3396,6 +3401,13 @@
                     }
                 }
             });
+
+            // Toggle visibility of the date picker based on timeframe
+            const datePicker = document.getElementById('sales-date-picker');
+            if (datePicker) {
+                datePicker.style.display = tf === 'day' ? 'inline-block' : 'none';
+            }
+
             renderManaging();
         }
 
@@ -3498,8 +3510,23 @@
             let histoData = {}; // Key: Label (e.g., "10 AM", "Mon"), Value: Sum
 
             if (currentSalesTimeframe === 'day') {
-                const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-                filteredLogs = allLogs.filter(l => l.timestamp >= startOfDay);
+                const datePicker = document.getElementById('sales-date-picker');
+                if (!datePicker.value) {
+                    // Set default to today if empty (using local timezone)
+                    const tzOffset = now.getTimezoneOffset() * 60000;
+                    const localISOTime = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 10);
+                    datePicker.value = localISOTime;
+                }
+
+                const selectedDateStr = datePicker.value; // YYYY-MM-DD
+                const parts = selectedDateStr.split('-');
+
+                // Create start and end bounds for the strictly selected date
+                const startOfDay = new Date(parts[0], parts[1] - 1, parts[2]).getTime();
+                const endOfDay = startOfDay + 86400000; // Add 24 hours in milliseconds
+
+                filteredLogs = allLogs.filter(l => l.timestamp >= startOfDay && l.timestamp < endOfDay);
+
                 // Group by hour
                 filteredLogs.forEach(l => {
                     if (disabledMethods.includes(l.method)) return;
@@ -3625,6 +3652,230 @@
                                     <div style="font-weight: 800; font-size: 1.25rem; color: var(--text-main); text-decoration: ${strike};">SAR ${l.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                                     <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px; display:flex; gap:8px; align-items:center;">
                                         <span class="badge" style="background: ${isCounted ? 'var(--primary)' : 'var(--text-muted)'}; color: white; padding:2px 8px;">${l.method}</span> 
+                                        <span>🕒 ${l.date}</span>
+                                        <span style="font-style:italic; opacity:0.7;">by ${l.cashier.split('@')[0]}</span>
+                                    </div>
+                                </div>
+                                <div>${delBtn}</div>
+                            </div>
+                        `;
+                    });
+                }
+            }
+        }
+
+        // --- COSTS DEPARTMENT SYSTEM ---
+        let currentCostsTimeframe = 'day';
+
+        function setCostsTimeframe(tf) {
+            currentCostsTimeframe = tf;
+            ['day', 'week', 'month', 'year'].forEach(id => {
+                const btn = document.getElementById('cost-tf-' + id);
+                if (btn) {
+                    if (id === tf) {
+                        btn.style.background = 'var(--primary)';
+                        btn.style.color = 'white';
+                    } else {
+                        btn.style.background = 'transparent';
+                        btn.style.color = 'var(--text-muted)';
+                    }
+                }
+            });
+
+            const datePicker = document.getElementById('costs-date-picker');
+            if (datePicker) {
+                datePicker.style.display = tf === 'day' ? 'inline-block' : 'none';
+            }
+
+            renderCosts();
+        }
+
+        function addCostCategory() {
+            const nameInput = document.getElementById('new-cost-category');
+            const name = nameInput.value.trim();
+            if (!name) return;
+            if (!getCompanyData().costCategories) getCompanyData().costCategories = [];
+            if (!getCompanyData().costCategories.includes(name)) {
+                getCompanyData().costCategories.push(name);
+                nameInput.value = '';
+                saveData();
+                renderCosts();
+            } else {
+                alert("This cost category already exists.");
+            }
+        }
+
+        function deleteCostCategory(name) {
+            if (!confirm(`Delete cost category '${name}'?\n\n(This hides it from the dropdown but doesn't delete old logs).`)) return;
+            getCompanyData().costCategories = getCompanyData().costCategories.filter(c => c !== name);
+            saveData();
+            renderCosts();
+        }
+
+        function logCostTransaction() {
+            const amountInput = document.getElementById('new-cost-amount');
+            const methodInput = document.getElementById('new-cost-category-select');
+
+            const amount = parseFloat(amountInput.value);
+            const method = methodInput.value;
+
+            if (isNaN(amount) || amount <= 0 || !method) {
+                alert("Please enter a valid amount and select a cost category.");
+                return;
+            }
+
+            const now = new Date();
+            const newLog = {
+                id: Date.now().toString(),
+                amount: amount,
+                method: method,
+                date: formatTimestamp(),
+                timestamp: now.getTime(),
+                month: currentGlobalMonth,
+                cashier: currentUser.email
+            };
+
+            if (!getCompanyData().costLogs) getCompanyData().costLogs = [];
+            getCompanyData().costLogs.unshift(newLog);
+
+            amountInput.value = '';
+            saveData();
+        }
+
+        function deleteCostTransaction(id) {
+            if (!confirm("Delete this cost record?")) return;
+            getCompanyData().costLogs = getCompanyData().costLogs.filter(l => l.id !== id);
+            saveData();
+        }
+
+        function renderCosts() {
+            if (currentTab !== 'costs') return;
+            const isAdmin = currentUser.role === 'admin';
+
+            // Setup categories dropdown
+            const categories = getCompanyData().costCategories || ['Electric Bill', 'Meat Supplier', 'Packaging'];
+            const methodSelect = document.getElementById('new-cost-category-select');
+            if (methodSelect) {
+                const prevVal = methodSelect.value;
+                methodSelect.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+                if (categories.includes(prevVal)) methodSelect.value = prevVal;
+            }
+
+            // Render Admin categories list
+            const adminListDiv = document.getElementById('admin-cost-categories-list');
+            if (adminListDiv) {
+                adminListDiv.innerHTML = categories.map(c => `
+                    <div style="background: var(--bg-color); border: 1px solid var(--border-color); padding: 6px 14px; border-radius: 20px; font-size: 0.95rem; font-weight:600; display: flex; align-items: center; gap: 10px;">
+                        ${c} <button onclick="deleteCostCategory('${c}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; color: var(--danger); cursor: pointer; padding: 0;">✖</button>
+                    </div>
+                `).join('');
+            }
+
+            // Fetch and Filter Both Data Streams
+            const allSales = getCompanyData().salesLogs || [];
+            const allCosts = getCompanyData().costLogs || [];
+            const disabledSalesMethods = getCompanyData().disabledSalesMethods || [];
+
+            const now = new Date();
+            let filteredSales = [];
+            let filteredCosts = [];
+            let labelText = '';
+
+            if (currentCostsTimeframe === 'day') {
+                const datePicker = document.getElementById('costs-date-picker');
+                if (!datePicker.value) {
+                    const tzOffset = now.getTimezoneOffset() * 60000;
+                    const localISOTime = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 10);
+                    datePicker.value = localISOTime;
+                }
+                const parts = datePicker.value.split('-');
+                const startOfDay = new Date(parts[0], parts[1] - 1, parts[2]).getTime();
+                const endOfDay = startOfDay + 86400000;
+
+                filteredSales = allSales.filter(l => l.timestamp >= startOfDay && l.timestamp < endOfDay);
+                filteredCosts = allCosts.filter(l => l.timestamp >= startOfDay && l.timestamp < endOfDay);
+                labelText = datePicker.value;
+            }
+            else if (currentCostsTimeframe === 'week') {
+                const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).getTime();
+                filteredSales = allSales.filter(l => l.timestamp >= startOfWeek);
+                filteredCosts = allCosts.filter(l => l.timestamp >= startOfWeek);
+                labelText = 'Past 7 Days';
+            }
+            else if (currentCostsTimeframe === 'month') {
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+                filteredSales = allSales.filter(l => l.timestamp >= startOfMonth);
+                filteredCosts = allCosts.filter(l => l.timestamp >= startOfMonth);
+                labelText = 'This Month';
+            }
+            else if (currentCostsTimeframe === 'year') {
+                const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
+                filteredSales = allSales.filter(l => l.timestamp >= startOfYear);
+                filteredCosts = allCosts.filter(l => l.timestamp >= startOfYear);
+                labelText = 'This Year';
+            }
+
+            document.getElementById('pl-timeframe-label').textContent = labelText;
+
+            // Calculate Totals
+            let totalSales = 0;
+            filteredSales.forEach(l => {
+                if (!disabledSalesMethods.includes(l.method)) totalSales += l.amount;
+            });
+
+            let totalCosts = 0;
+            filteredCosts.forEach(l => { totalCosts += l.amount; });
+
+            const netProfit = totalSales - totalCosts;
+            const isProfit = netProfit >= 0;
+
+            // Update P&L UI Elements
+            const netProfitDiv = document.getElementById('pl-net-profit');
+            if (netProfitDiv) {
+                netProfitDiv.textContent = 'SAR ' + Math.abs(netProfit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                netProfitDiv.style.color = isProfit ? 'var(--success)' : 'var(--danger)';
+            }
+
+            const statusDiv = document.getElementById('pl-status-message');
+            if (statusDiv) {
+                if (netProfit > 0) {
+                    statusDiv.textContent = '📈 Healthy Profit Margin';
+                    statusDiv.style.color = 'var(--success)';
+                } else if (netProfit < 0) {
+                    statusDiv.textContent = '⚠️ Operating at a Loss';
+                    statusDiv.style.color = 'var(--danger)';
+                } else {
+                    statusDiv.textContent = '➖ Breaking Even';
+                    statusDiv.style.color = 'var(--text-muted)';
+                }
+            }
+
+            // Animate Charts
+            const maxVal = Math.max(totalSales, totalCosts, 100);
+            const salesHeight = Math.min(100, Math.max(5, (totalSales / maxVal) * 100));
+            const costsHeight = Math.min(100, Math.max(5, (totalCosts / maxVal) * 100));
+
+            document.getElementById('pl-sales-bar').style.height = salesHeight + '%';
+            document.getElementById('pl-costs-bar').style.height = costsHeight + '%';
+            document.getElementById('pl-sales-label').textContent = 'SAR ' + totalSales.toLocaleString(undefined, { maximumFractionDigits: 0 });
+            document.getElementById('pl-costs-label').textContent = 'SAR ' + totalCosts.toLocaleString(undefined, { maximumFractionDigits: 0 });
+
+            // Render Recent Costs Log Feed
+            const logDiv = document.getElementById('costs-transaction-log');
+            if (logDiv) {
+                logDiv.innerHTML = '';
+                if (filteredCosts.length === 0) {
+                    logDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.95rem; padding: 20px;">No costs logged for this timeframe.</p>`;
+                } else {
+                    filteredCosts.forEach(l => {
+                        let delBtn = isAdmin ? `<button onclick="deleteCostTransaction('${l.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="Delete">Undo</button>` : '';
+
+                        logDiv.innerHTML += `
+                            <div class="ledger-card" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; margin-bottom: 0;">
+                                <div>
+                                    <div style="font-weight: 800; font-size: 1.25rem; color: var(--danger);">SAR ${l.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px; display:flex; gap:8px; align-items:center;">
+                                        <span class="badge" style="background: var(--danger); color: white; padding:2px 8px;">${l.method}</span> 
                                         <span>🕒 ${l.date}</span>
                                         <span style="font-style:italic; opacity:0.7;">by ${l.cashier.split('@')[0]}</span>
                                     </div>
@@ -4076,7 +4327,7 @@
         // --- UI NAVIGATION & GLOBALS ---
         function switchTab(tab) {
             currentTab = tab;
-            ['ops', 'ranks', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'managing'].forEach(t => {
+            ['ops', 'ranks', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'managing', 'costs'].forEach(t => {
                 const tabBtn = document.getElementById(`tab-${t}`);
                 const viewSec = document.getElementById(`view-${t}`);
                 if (tabBtn) tabBtn.classList.toggle('active-tab', tab === t);
@@ -5578,6 +5829,7 @@
             else if (currentTab === 'adverts') { renderAdverts(); }
             else if (currentTab === 'notes') { renderNotes(); }
             else if (currentTab === 'managing') { renderManaging(); }
+            else if (currentTab === 'costs') { renderCosts(); }
         }
 
         function renderWorkerViolationPanel() {
