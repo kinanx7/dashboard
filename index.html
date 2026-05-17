@@ -546,8 +546,46 @@
 
         #view-summary.active-view,
         #view-ranks.active-view,
-        #view-tasks.active-view {
+        #view-tasks.active-view,
+        #view-notes.active-view,
+        #view-managing.active-view {
             grid-template-columns: 1fr;
+        }
+
+        .histogram-container {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            height: 200px;
+            padding: 20px 10px 0 10px;
+            border-bottom: 2px solid var(--border-color);
+            margin-top: 20px;
+            overflow-x: auto;
+        }
+
+        .histogram-bar-wrapper {
+            flex: 1;
+            min-width: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            height: 100%;
+        }
+
+        .histogram-bar {
+            width: 100%;
+            background: var(--primary);
+            border-radius: 4px 4px 0 0;
+            transition: height 0.5s ease;
+        }
+
+        .histogram-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 8px;
+            font-weight: 600;
+            text-align: center;
         }
 
         #view-drivers.active-view {
@@ -1451,7 +1489,8 @@
             <button id="tab-summary" class="dept-tab" onclick="switchTab('summary')" data-i18n="tab-summary">📊
                 Summary</button>
             <button id="tab-adverts" class="dept-tab" onclick="switchTab('adverts')">📢 Ads</button>
-            <button id="tab-managing" class="dept-tab" onclick="switchTab('managing')">🛠️ Managing</button>
+            <button id="tab-notes" class="dept-tab" onclick="switchTab('notes')">📝 Notes</button>
+            <button id="tab-managing" class="dept-tab" onclick="switchTab('managing')">💰 Sales</button>
         </div>
 
         <!-- ========================================== -->
@@ -2256,112 +2295,149 @@
             </div>
         </div>
 
-        <div id="view-managing" class="view-section">
-            <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 24px; width: 100%; align-items: start;">
+        <div id="view-notes" class="view-section">
+            <div class="card" style="width: 100%;">
+                <h2 class="card-title">📝 Team Communication & Notes</h2>
+                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 20px;">Public notes are visible to
+                    everyone and allow replies. Private notes are secure.</p>
 
-                <div class="card">
-                    <h2 class="card-title">📝 Communication & Notes</h2>
+                <div class="admin-only"
+                    style="background: var(--input-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 30px; box-shadow: var(--shadow-sm);">
+                    <h3 style="font-size: 1.05rem; margin-bottom: 12px;">Post a New Note</h3>
+                    <textarea id="manage-note-text" rows="3"
+                        placeholder="Write your announcement or private note here..."
+                        style="font-size:1rem;"></textarea>
 
-                    <div class="admin-only"
-                        style="background: var(--input-bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 20px;">
-                        <h3 style="font-size: 0.95rem; margin-bottom: 8px;">Post a New Note</h3>
-                        <textarea id="manage-note-text" rows="3"
-                            placeholder="Write your announcement or private note here..."></textarea>
-
-                        <div style="display:flex; align-items:center; gap: 15px; margin-top: 10px;">
-                            <label
-                                style="display:flex; align-items:center; gap:6px; cursor:pointer; text-transform:none; margin:0; color:var(--text-main);">
-                                <input type="radio" name="note-privacy" value="public" checked
-                                    onchange="document.getElementById('private-note-targets').style.display='none'">
-                                📢 Public
-                            </label>
-                            <label
-                                style="display:flex; align-items:center; gap:6px; cursor:pointer; text-transform:none; margin:0; color:var(--danger);">
-                                <input type="radio" name="note-privacy" value="private"
-                                    onchange="document.getElementById('private-note-targets').style.display='block'">
-                                🔒 Private
-                            </label>
-                        </div>
-
-                        <div id="private-note-targets"
-                            style="display:none; margin-top: 10px; background: var(--bg-color); padding: 10px; border-radius: 6px;">
-                            <label style="font-size:0.8rem; margin-bottom:8px;">Select who can read this (Leave empty
-                                for Manager-Only note):</label>
-                            <div id="private-worker-checkboxes"
-                                style="display:flex; flex-direction:column; gap:6px; max-height:150px; overflow-y:auto;">
-                            </div>
-                        </div>
-
-                        <button onclick="postManagerNote()" style="width: 100%; margin-top: 12px;">Post Note</button>
+                    <div style="display:flex; align-items:center; gap: 20px; margin-top: 16px;">
+                        <label
+                            style="display:flex; align-items:center; gap:8px; cursor:pointer; text-transform:none; margin:0; color:var(--text-main); font-weight:700;">
+                            <input type="radio" name="note-privacy" value="public" checked
+                                onchange="document.getElementById('private-note-targets').style.display='none'">
+                            📢 Public (Allows Replies)
+                        </label>
+                        <label
+                            style="display:flex; align-items:center; gap:8px; cursor:pointer; text-transform:none; margin:0; color:var(--danger); font-weight:700;">
+                            <input type="radio" name="note-privacy" value="private"
+                                onchange="document.getElementById('private-note-targets').style.display='block'">
+                            🔒 Private
+                        </label>
                     </div>
 
-                    <div id="manage-notes-feed"
-                        style="display:flex; flex-direction:column; gap:12px; max-height: 500px; overflow-y:auto; padding-right:5px;">
+                    <div id="private-note-targets"
+                        style="display:none; margin-top: 16px; background: var(--bg-color); padding: 16px; border-radius: 8px; border: 1px dashed var(--border-color);">
+                        <label style="font-size:0.85rem; margin-bottom:12px; color:var(--primary);">Select who can read
+                            this (Leave empty for Manager-Only note):</label>
+                        <div id="private-worker-checkboxes"
+                            style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:10px; max-height:200px; overflow-y:auto;">
+                        </div>
+                    </div>
+
+                    <button onclick="postManagerNote()" class="btn-success"
+                        style="width: 100%; margin-top: 16px; font-size: 1.05rem; padding: 14px;">Post Note</button>
+                </div>
+
+                <div id="manage-notes-feed" style="display:flex; flex-direction:column; gap:20px;">
+                </div>
+            </div>
+        </div>
+
+        <div id="view-managing" class="view-section sales-admin">
+            <div class="card" style="width: 100%; border-top: 4px solid var(--primary);">
+                <div class="flex-between" style="margin-bottom: 16px; flex-wrap: wrap;">
+                    <h2 class="card-title" style="margin:0; border:none; padding:0;">💰 Advanced Sales Analytics</h2>
+                    <div
+                        style="display: flex; gap: 8px; background: var(--input-bg); padding: 6px; border-radius: 100px; border: 1px solid var(--border-color);">
+                        <button id="tf-day" onclick="setSalesTimeframe('day')"
+                            style="border-radius:100px; padding: 6px 16px; background:var(--primary); color:white;">Today</button>
+                        <button id="tf-week" onclick="setSalesTimeframe('week')"
+                            style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">Week</button>
+                        <button id="tf-month" onclick="setSalesTimeframe('month')"
+                            style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">Month</button>
+                        <button id="tf-year" onclick="setSalesTimeframe('year')"
+                            style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">Year</button>
                     </div>
                 </div>
 
-                <div class="card sales-admin" style="border-top: 4px solid var(--primary);">
-                    <div class="flex-between" style="margin-bottom: 8px;">
-                        <h2 class="card-title" style="margin:0;">💰 Shift Sales Log</h2>
-                        <span class="badge" style="background:var(--primary);">Secure Tracker</span>
-                    </div>
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px;">Transactions logged
-                        for <strong><span class="display-current-month"></span></strong>. Click a method box below to
-                        uncount it from the total.</p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: stretch;">
 
-                    <div
-                        style="background: var(--input-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; margin-bottom: 24px;">
+                    <div style="display:flex; flex-direction:column; gap:20px;">
                         <div
-                            style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">
-                            Counted Grand Total</div>
-                        <div style="font-size: 3rem; font-weight: 800; color: var(--primary); margin-bottom: 20px;">SAR
-                            <span id="sales-grand-total">0.00</span>
-                        </div>
+                            style="background: var(--input-bg); padding: 30px; border-radius: 16px; border: 1px solid var(--border-color); text-align: center; height:100%;">
+                            <div
+                                style="font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">
+                                Selected Timeframe Total</div>
+                            <div
+                                style="font-size: 3.5rem; font-weight: 800; color: var(--primary); margin-bottom: 30px;">
+                                SAR <span id="sales-grand-total">0.00</span></div>
 
-                        <div id="sales-method-toggles"
-                            style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+                            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Click a payment
+                                method to exclude it from the total above.</p>
+                            <div id="sales-method-toggles"
+                                style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+                            </div>
                         </div>
                     </div>
 
                     <div
-                        style="background: var(--bg-color); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 24px;">
-                        <h3 style="font-size: 1.05rem; margin-bottom: 12px; color: var(--text-main);">Log a New
+                        style="background: var(--input-bg); padding: 20px; border-radius: 16px; border: 1px solid var(--border-color); display:flex; flex-direction:column;">
+                        <h3 style="font-size: 1rem; color: var(--text-main); margin:0;">Sales Trend</h3>
+                        <div id="sales-histogram" class="histogram-container">
+                        </div>
+                    </div>
+
+                </div>
+
+                <div
+                    style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: stretch; margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 30px;">
+
+                    <div>
+                        <h3 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--text-main);">Log a New
                             Transaction</h3>
-                        <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
-                            <div style="flex: 2; min-width: 150px;">
-                                <input type="number" id="new-sale-amount" placeholder="Amount (SAR)..."
-                                    style="font-size: 1.25rem; font-weight: 700; padding: 12px; color: var(--primary); height: 100%;">
-                            </div>
-                            <div style="flex: 1; min-width: 120px;">
-                                <select id="new-sale-method"
-                                    style="height: 100%; font-size: 1rem; font-weight: 600; padding: 12px;">
-                                </select>
+                        <div
+                            style="background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
+                            <div style="display: flex; gap: 12px; align-items: stretch; flex-wrap: wrap;">
+                                <div style="flex: 2; min-width: 150px;">
+                                    <input type="number" id="new-sale-amount" placeholder="Amount (SAR)..."
+                                        style="font-size: 1.25rem; font-weight: 700; padding: 14px; color: var(--primary); height: 100%;">
+                                </div>
+                                <div style="flex: 1; min-width: 120px;">
+                                    <select id="new-sale-method"
+                                        style="height: 100%; font-size: 1rem; font-weight: 600; padding: 14px;">
+                                    </select>
+                                </div>
                             </div>
                             <button onclick="logSaleTransaction()" class="btn-success"
-                                style="font-size: 1.1rem; padding: 0 24px; font-weight: 800;">Log Sale</button>
+                                style="font-size: 1.1rem; padding: 14px; font-weight: 800; width:100%; margin-top: 12px;">✅
+                                Log Sale</button>
+                        </div>
+
+                        <div class="admin-only" style="margin-top: 30px;">
+                            <h3 style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 10px;">Admin: Manage
+                                Income Sources</h3>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="text" id="new-income-source"
+                                    placeholder="Add new source (e.g. UberEats)..."
+                                    style="flex:1; padding: 10px; font-size: 0.9rem;">
+                                <button onclick="addIncomeSource()" class="btn-outline">Add Source</button>
+                            </div>
+                            <div id="admin-income-sources-list"
+                                style="display:flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;"></div>
                         </div>
                     </div>
 
-                    <h3
-                        style="font-size: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 12px;">
-                        Recent Transactions</h3>
-                    <div id="sales-transaction-log"
-                        style="display: flex; flex-direction: column; gap: 8px; max-height: 350px; overflow-y: auto; margin-bottom: 24px; padding-right: 5px;">
-                    </div>
-
-                    <div class="admin-only" style="border-top: 1px dashed var(--border-color); padding-top: 16px;">
-                        <h3 style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px;">Admin: Manage
-                            Income Sources</h3>
-                        <div style="display: flex; gap: 8px;">
-                            <input type="text" id="new-income-source" placeholder="Add new source (e.g. UberEats)..."
-                                style="flex:1; padding: 10px; font-size: 0.9rem;">
-                            <button onclick="addIncomeSource()" class="btn-outline">Add Source</button>
+                    <div>
+                        <div class="flex-between"
+                            style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                            <h3 style="font-size: 1.1rem; margin:0;">Transaction Feed</h3>
+                            <span style="font-size:0.8rem; color:var(--text-muted);">Filtered by Timeframe</span>
                         </div>
-                        <div id="admin-income-sources-list"
-                            style="display:flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;"></div>
+                        <div id="sales-transaction-log"
+                            style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; padding-right: 5px;">
+                        </div>
                     </div>
 
                 </div>
+
             </div>
         </div>
 
@@ -2676,9 +2752,12 @@
 
             // NEW: Management Data
             if (!data.managerNotes) data.managerNotes = [];
+            data.managerNotes.forEach(n => {
+                if (!n.replies) n.replies = [];
+            });
             if (!data.incomeSources) data.incomeSources = ['Cash', 'Credit Card'];
-            if (!data.salesLogs) data.salesLogs = []; // Stores individual cashier transactions
-            if (!data.disabledSalesMethods) data.disabledSalesMethods = []; // Stores which methods are toggled RED
+            if (!data.salesLogs) data.salesLogs = [];
+            if (!data.disabledSalesMethods) data.disabledSalesMethods = [];
 
             data.warehouse.forEach(item => {
                 if (!item.logs) item.logs = [];
@@ -3174,8 +3253,7 @@
             });
         }
 
-        // --- MANAGING DEPARTMENT SYSTEM ---
-
+        // --- COMMUNICATION & NOTES SYSTEM ---
         function postManagerNote() {
             const text = document.getElementById('manage-note-text').value.trim();
             if (!text) return alert("Write a note first.");
@@ -3186,7 +3264,6 @@
             if (privacy === 'private') {
                 const checkboxes = document.querySelectorAll('.private-target-cb:checked');
                 checkboxes.forEach(cb => targets.push(cb.value));
-                // Notice: No alert! If empty, it's just a Manager-only note.
             }
 
             const newNote = {
@@ -3195,25 +3272,133 @@
                 date: formatTimestamp(),
                 author: currentUser.email,
                 isPrivate: privacy === 'private',
-                targetWorkers: targets
+                targetWorkers: targets,
+                replies: []
             };
 
             if (!getCompanyData().managerNotes) getCompanyData().managerNotes = [];
             getCompanyData().managerNotes.unshift(newNote);
             document.getElementById('manage-note-text').value = '';
 
-            // Cleanly uncheck boxes
             document.querySelectorAll('.private-target-cb').forEach(cb => cb.checked = false);
             saveData();
         }
 
         function deleteManagerNote(id) {
-            if (!confirm("Delete this note?")) return;
+            if (!confirm("Delete this note entirely?")) return;
             getCompanyData().managerNotes = getCompanyData().managerNotes.filter(n => n.id !== id);
             saveData();
         }
 
-        // -- Sales Log System --
+        function addNoteReply(noteId) {
+            const input = document.getElementById(`reply-input-${noteId}`);
+            const text = input.value.trim();
+            if (!text) return;
+
+            const note = getCompanyData().managerNotes.find(n => n.id === noteId);
+            if (note) {
+                if (!note.replies) note.replies = [];
+                note.replies.push({
+                    author: currentUser.email,
+                    text: text,
+                    date: formatTimestamp()
+                });
+                saveData();
+            }
+        }
+
+        function renderNotes() {
+            if (currentTab !== 'notes') return;
+
+            const cbContainer = document.getElementById('private-worker-checkboxes');
+            if (cbContainer) {
+                cbContainer.innerHTML = '';
+                getCompanyData().workers.forEach(w => {
+                    cbContainer.innerHTML += `
+                        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; text-transform:none; margin:0; font-size:0.9rem; background:var(--input-bg); padding:8px; border-radius:6px; border:1px solid var(--border-color);">
+                            <input type="checkbox" class="private-target-cb" value="${w.id}"> ${w.name} <span style="font-size:0.75rem; color:var(--text-muted); padding-left:4px;">(${w.role})</span>
+                        </label>
+                    `;
+                });
+            }
+
+            const feed = document.getElementById('manage-notes-feed');
+            feed.innerHTML = '';
+            const allNotes = getCompanyData().managerNotes || [];
+
+            const visibleNotes = allNotes.filter(n => {
+                if (currentUser.role === 'admin') return true;
+                if (!n.isPrivate) return true;
+                const myWorkerProfile = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+                return myWorkerProfile && n.targetWorkers && n.targetWorkers.includes(myWorkerProfile.id);
+            });
+
+            if (visibleNotes.length === 0) {
+                feed.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding: 40px; font-size: 1.1rem;">No notes available.</p>';
+            }
+
+            visibleNotes.forEach(n => {
+                const div = document.createElement('div');
+                div.className = 'card';
+                div.style.cssText = `border-left: ${n.isPrivate ? '6px solid var(--danger)' : '6px solid var(--info)'}; padding: 20px; margin-bottom:15px; border-radius: 12px;`;
+
+                let delBtn = (currentUser.role === 'admin') ? `<button onclick="deleteManagerNote('${n.id}')" class="btn-outline-danger" style="padding:4px 10px; font-size:0.8rem; border:none; text-decoration:underline;">Delete Thread</button>` : '';
+                let lockIcon = n.isPrivate ? `<span class="badge" style="background:var(--danger); font-size:0.85rem;">🔒 Private Note</span>` : `<span class="badge" style="background:var(--info); font-size:0.85rem;">📢 Public Announcement</span>`;
+
+                let repliesHtml = '';
+                if (n.replies && n.replies.length > 0) {
+                    repliesHtml = n.replies.map(r => `
+                        <div style="background: var(--bg-color); padding: 12px 16px; border-radius: 8px; margin-top: 10px; border-left: 3px solid var(--border-color);">
+                            <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--text-muted); margin-bottom:4px;">
+                                <strong>${r.author}</strong> <span>🕒 ${r.date}</span>
+                            </div>
+                            <div style="color:var(--text-main); font-size:0.95rem;">${r.text}</div>
+                        </div>
+                    `).join('');
+                }
+
+                let replyBox = !n.isPrivate ? `
+                    <div style="display:flex; gap:10px; margin-top:16px; border-top:1px dashed var(--border-color); padding-top:16px;">
+                        <input type="text" id="reply-input-${n.id}" placeholder="Write a reply..." style="flex:1; padding: 10px; font-size:0.9rem;">
+                        <button onclick="addNoteReply('${n.id}')" class="btn-info">Reply</button>
+                    </div>
+                ` : '';
+
+                div.innerHTML = `
+                    <div class="flex-between" style="margin-bottom:12px;">
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            ${lockIcon} <span style="font-size:0.85rem; color:var(--text-muted);">🕒 ${n.date}</span>
+                        </div>
+                        ${delBtn}
+                    </div>
+                    <div style="font-size:1.1rem; color:var(--text-main); white-space: pre-wrap; line-height: 1.6; margin-bottom: 16px;">${n.text}</div>
+                    ${repliesHtml}
+                    ${replyBox}
+                `;
+                feed.appendChild(div);
+            });
+        }
+
+        // --- SALES & POS SYSTEM ---
+        let currentSalesTimeframe = 'day'; // Default view is Today
+
+        function setSalesTimeframe(tf) {
+            currentSalesTimeframe = tf;
+            ['day', 'week', 'month', 'year'].forEach(id => {
+                const btn = document.getElementById('tf-' + id);
+                if (btn) {
+                    if (id === tf) {
+                        btn.style.background = 'var(--primary)';
+                        btn.style.color = 'white';
+                    } else {
+                        btn.style.background = 'transparent';
+                        btn.style.color = 'var(--text-muted)';
+                    }
+                }
+            });
+            renderManaging();
+        }
+
         function addIncomeSource() {
             const source = document.getElementById('new-income-source').value.trim();
             if (source) {
@@ -3246,12 +3431,14 @@
                 return;
             }
 
+            const now = new Date();
             const newLog = {
                 id: Date.now().toString(),
                 amount: amount,
                 method: method,
                 date: formatTimestamp(),
-                month: currentGlobalMonth, // Used to filter views by month
+                timestamp: now.getTime(),
+                month: currentGlobalMonth,
                 cashier: currentUser.email
             };
 
@@ -3271,9 +3458,9 @@
         function toggleSalesMethod(methodName) {
             let disabled = getCompanyData().disabledSalesMethods || [];
             if (disabled.includes(methodName)) {
-                disabled = disabled.filter(m => m !== methodName); // Remove (turn green)
+                disabled = disabled.filter(m => m !== methodName);
             } else {
-                disabled.push(methodName); // Add (turn red)
+                disabled.push(methodName);
             }
             getCompanyData().disabledSalesMethods = disabled;
             saveData();
@@ -3282,56 +3469,6 @@
         function renderManaging() {
             if (currentTab !== 'managing') return;
 
-            // 1. Populate Target Checkboxes for Private Notes
-            const cbContainer = document.getElementById('private-worker-checkboxes');
-            if (cbContainer) {
-                cbContainer.innerHTML = '';
-                getCompanyData().workers.forEach(w => {
-                    cbContainer.innerHTML += `
-                        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; text-transform:none; margin:0; font-size:0.9rem;">
-                            <input type="checkbox" class="private-target-cb" value="${w.id}"> ${w.name} (${w.role})
-                        </label>
-                    `;
-                });
-            }
-
-            // 2. Render Notes Feed
-            const feed = document.getElementById('manage-notes-feed');
-            feed.innerHTML = '';
-            const allNotes = getCompanyData().managerNotes || [];
-
-            const visibleNotes = allNotes.filter(n => {
-                if (currentUser.role === 'admin') return true;
-                if (!n.isPrivate) return true;
-                const myWorkerProfile = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
-                return myWorkerProfile && n.targetWorkers && n.targetWorkers.includes(myWorkerProfile.id);
-            });
-
-            if (visibleNotes.length === 0) {
-                feed.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding: 20px;">No notes available.</p>';
-            }
-
-            visibleNotes.forEach(n => {
-                const div = document.createElement('div');
-                div.className = 'ledger-card';
-                div.style.borderLeft = n.isPrivate ? '4px solid var(--danger)' : '4px solid var(--info)';
-
-                let delBtn = (currentUser.role === 'admin') ? `<button onclick="deleteManagerNote('${n.id}')" class="btn-outline-danger" style="padding:2px 6px; font-size:0.7rem; border:none; text-decoration:underline;">Delete</button>` : '';
-                let lockIcon = n.isPrivate ? `<span class="badge" style="background:var(--danger);">🔒 Private</span>` : `<span class="badge" style="background:var(--info);">📢 Public</span>`;
-
-                div.innerHTML = `
-                    <div class="flex-between" style="margin-bottom:8px;">
-                        <div style="display:flex; gap:8px; align-items:center;">
-                            ${lockIcon} <span style="font-size:0.75rem; color:var(--text-muted);">${n.date}</span>
-                        </div>
-                        ${delBtn}
-                    </div>
-                    <div style="font-size:0.95rem; color:var(--text-main); white-space: pre-wrap; line-height: 1.5;">${n.text}</div>
-                `;
-                feed.appendChild(div);
-            });
-
-            // 3. Render Sales Tracker
             const isAdmin = currentUser.role === 'admin';
             const sources = getCompanyData().incomeSources || ['Cash', 'Credit Card'];
             const allLogs = getCompanyData().salesLogs || [];
@@ -3349,28 +3486,75 @@
             const sourcesListDiv = document.getElementById('admin-income-sources-list');
             if (sourcesListDiv) {
                 sourcesListDiv.innerHTML = sources.map(s => `
-                    <div style="background: var(--bg-color); border: 1px solid var(--border-color); padding: 4px 10px; border-radius: 20px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px;">
-                        ${s} <button onclick="deleteIncomeSource('${s}')" style="background: none; border: none; color: var(--danger); cursor: pointer; padding: 0;">✖</button>
+                    <div style="background: var(--bg-color); border: 1px solid var(--border-color); padding: 6px 14px; border-radius: 20px; font-size: 0.95rem; font-weight:600; display: flex; align-items: center; gap: 10px;">
+                        ${s} <button onclick="deleteIncomeSource('${s}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; color: var(--danger); cursor: pointer; padding: 0;">✖</button>
                     </div>
                 `).join('');
             }
 
-            // Calculate Totals for the current viewing month
-            const currentMonthLogs = allLogs.filter(l => l.month === currentGlobalMonth);
+            // --- FILTER LOGS BY TIMEFRAME ---
+            const now = new Date();
+            let filteredLogs = [];
+            let histoData = {}; // Key: Label (e.g., "10 AM", "Mon"), Value: Sum
 
+            if (currentSalesTimeframe === 'day') {
+                const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                filteredLogs = allLogs.filter(l => l.timestamp >= startOfDay);
+                // Group by hour
+                filteredLogs.forEach(l => {
+                    if (disabledMethods.includes(l.method)) return;
+                    const h = new Date(l.timestamp).getHours();
+                    const label = h + ":00";
+                    histoData[label] = (histoData[label] || 0) + l.amount;
+                });
+            }
+            else if (currentSalesTimeframe === 'week') {
+                const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).getTime();
+                filteredLogs = allLogs.filter(l => l.timestamp >= startOfWeek);
+                // Group by day name
+                const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                filteredLogs.forEach(l => {
+                    if (disabledMethods.includes(l.method)) return;
+                    const d = new Date(l.timestamp).getDay();
+                    const label = days[d];
+                    histoData[label] = (histoData[label] || 0) + l.amount;
+                });
+            }
+            else if (currentSalesTimeframe === 'month') {
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+                filteredLogs = allLogs.filter(l => l.timestamp >= startOfMonth);
+                // Group by date number
+                filteredLogs.forEach(l => {
+                    if (disabledMethods.includes(l.method)) return;
+                    const d = new Date(l.timestamp).getDate();
+                    const label = d.toString();
+                    histoData[label] = (histoData[label] || 0) + l.amount;
+                });
+            }
+            else if (currentSalesTimeframe === 'year') {
+                const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
+                filteredLogs = allLogs.filter(l => l.timestamp >= startOfYear);
+                // Group by month
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                filteredLogs.forEach(l => {
+                    if (disabledMethods.includes(l.method)) return;
+                    const m = new Date(l.timestamp).getMonth();
+                    const label = months[m];
+                    histoData[label] = (histoData[label] || 0) + l.amount;
+                });
+            }
+
+            // Calculate Totals for Toggles
             let grandTotal = 0;
             let methodTotals = {};
             sources.forEach(s => methodTotals[s] = 0);
 
-            currentMonthLogs.forEach(l => {
-                // Keep track of how much each method made
+            filteredLogs.forEach(l => {
                 if (methodTotals[l.method] !== undefined) {
                     methodTotals[l.method] += l.amount;
                 } else {
-                    methodTotals[l.method] = l.amount; // Catch edge cases if a source was deleted
+                    methodTotals[l.method] = l.amount;
                 }
-
-                // Add to Grand Total ONLY if the method is NOT disabled (clicked red)
                 if (!disabledMethods.includes(l.method)) {
                     grandTotal += l.amount;
                 }
@@ -3378,7 +3562,7 @@
 
             document.getElementById('sales-grand-total').textContent = grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-            // Draw the clickable Method Toggles
+            // Draw Toggles
             const togglesDiv = document.getElementById('sales-method-toggles');
             if (togglesDiv) {
                 togglesDiv.innerHTML = Object.keys(methodTotals).map(methodName => {
@@ -3391,34 +3575,58 @@
                     const icon = isCounted ? '✅' : '❌';
 
                     return `
-                        <div onclick="toggleSalesMethod('${methodName}')" style="cursor: pointer; background: ${bg}; border: 1px solid ${border}; color: ${color}; padding: 8px 16px; border-radius: 8px; text-align: left; min-width: 130px; transition: transform 0.1s;">
-                            <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">${icon} ${methodName}</div>
-                            <div style="font-size: 1.1rem; font-weight: 800;">SAR ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                        <div onclick="toggleSalesMethod('${methodName}')" style="cursor: pointer; background: ${bg}; border: 2px solid ${border}; color: ${color}; padding: 12px 20px; border-radius: 12px; text-align: left; min-width: 140px; transition: transform 0.1s; box-shadow: var(--shadow-sm);">
+                            <div style="font-size: 0.8rem; font-weight: 800; text-transform: uppercase; margin-bottom: 6px;">${icon} ${methodName}</div>
+                            <div style="font-size: 1.25rem; font-weight: 800;">SAR ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                         </div>
                     `;
                 }).join('');
+            }
+
+            // Draw Histogram
+            const histoDiv = document.getElementById('sales-histogram');
+            if (histoDiv) {
+                histoDiv.innerHTML = '';
+                const labels = Object.keys(histoData);
+                if (labels.length === 0) {
+                    histoDiv.innerHTML = '<div style="width:100%; text-align:center; color:var(--text-muted); margin-top:80px;">No counted data for this timeframe.</div>';
+                } else {
+                    const maxVal = Math.max(...Object.values(histoData));
+                    labels.forEach(label => {
+                        const val = histoData[label];
+                        const pct = maxVal > 0 ? (val / maxVal) * 100 : 0;
+                        histoDiv.innerHTML += `
+                            <div class="histogram-bar-wrapper">
+                                <div style="font-size:0.65rem; color:var(--primary); font-weight:700; margin-bottom:4px;">${val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val}</div>
+                                <div class="histogram-bar" style="height: ${pct}%;"></div>
+                                <div class="histogram-label">${label}</div>
+                            </div>
+                        `;
+                    });
+                }
             }
 
             // Draw Recent Transactions Log
             const logDiv = document.getElementById('sales-transaction-log');
             if (logDiv) {
                 logDiv.innerHTML = '';
-                if (currentMonthLogs.length === 0) {
-                    logDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.9rem; padding: 10px;">No transactions logged for this month.</p>`;
+                if (filteredLogs.length === 0) {
+                    logDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.95rem; padding: 20px;">No transactions logged for this timeframe.</p>`;
                 } else {
-                    currentMonthLogs.forEach(l => {
+                    filteredLogs.forEach(l => {
                         const isCounted = !disabledMethods.includes(l.method);
                         const opacity = isCounted ? '1' : '0.5';
                         const strike = isCounted ? 'none' : 'line-through';
-                        let delBtn = isAdmin ? `<button onclick="deleteSaleTransaction('${l.id}')" style="background: none; border: none; color: var(--danger); font-size: 1rem; cursor: pointer; padding: 0 4px;" title="Delete">✖</button>` : '';
+                        let delBtn = isAdmin ? `<button onclick="deleteSaleTransaction('${l.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="Delete">Undo</button>` : '';
 
                         logDiv.innerHTML += `
-                            <div class="ledger-card" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; opacity: ${opacity}; margin-bottom: 0;">
+                            <div class="ledger-card" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; opacity: ${opacity}; margin-bottom: 0;">
                                 <div>
-                                    <div style="font-weight: 800; font-size: 1.1rem; color: var(--text-main); text-decoration: ${strike};">SAR ${l.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
-                                        <span class="badge" style="background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color);">${l.method}</span> 
-                                        &nbsp;🕒 ${l.date}
+                                    <div style="font-weight: 800; font-size: 1.25rem; color: var(--text-main); text-decoration: ${strike};">SAR ${l.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px; display:flex; gap:8px; align-items:center;">
+                                        <span class="badge" style="background: ${isCounted ? 'var(--primary)' : 'var(--text-muted)'}; color: white; padding:2px 8px;">${l.method}</span> 
+                                        <span>🕒 ${l.date}</span>
+                                        <span style="font-style:italic; opacity:0.7;">by ${l.cashier.split('@')[0]}</span>
                                     </div>
                                 </div>
                                 <div>${delBtn}</div>
@@ -3868,7 +4076,7 @@
         // --- UI NAVIGATION & GLOBALS ---
         function switchTab(tab) {
             currentTab = tab;
-            ['ops', 'ranks', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'managing'].forEach(t => {
+            ['ops', 'ranks', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'managing'].forEach(t => {
                 const tabBtn = document.getElementById(`tab-${t}`);
                 const viewSec = document.getElementById(`view-${t}`);
                 if (tabBtn) tabBtn.classList.toggle('active-tab', tab === t);
@@ -5368,6 +5576,7 @@
             else if (currentTab === 'summary') { renderSummaryTable(); }
             else if (currentTab === 'drivers') { renderDriversList(); renderDriverPanel(); }
             else if (currentTab === 'adverts') { renderAdverts(); }
+            else if (currentTab === 'notes') { renderNotes(); }
             else if (currentTab === 'managing') { renderManaging(); }
         }
 
