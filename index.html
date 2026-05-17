@@ -2515,15 +2515,15 @@
             if (!data.branches) data.branches = [];
             if (!data.workers) data.workers = [];
             if (!data.violationRules) data.violationRules = [];
-            if (!data.jobCatalog) data.jobCatalog = []; // Task Templates
+            if (!data.jobCatalog) data.jobCatalog = [];
             if (!data.warehouse) data.warehouse = [];
             if (!data.adverts) data.adverts = [];
-            if (!data.whCategories) data.whCategories = ['General']; // NEW: Warehouse Folders
+            if (!data.whCategories) data.whCategories = []; // <--- NOW STARTS WITH 0 FOLDERS
 
-            // Ensure old warehouse items have a category assigned to prevent errors
+            // Ensure old warehouse items don't break if their folder is deleted
             data.warehouse.forEach(item => {
                 if (!item.logs) item.logs = [];
-                if (!item.category) item.category = 'General';
+                if (!item.category) item.category = 'Uncategorized';
             });
 
             data.workers.forEach(w => {
@@ -2980,6 +2980,35 @@
             saveData();
         }
 
+        function showMoveSelect(itemId) {
+            document.getElementById(`move-btn-${itemId}`).style.display = 'none';
+            const sel = document.getElementById(`move-select-${itemId}`);
+            sel.style.display = 'inline-block';
+            sel.focus();
+        }
+
+        function cancelMoveSelect(itemId) {
+            const sel = document.getElementById(`move-select-${itemId}`);
+            if (sel) {
+                sel.style.display = 'none';
+                sel.value = '';
+            }
+            const btn = document.getElementById(`move-btn-${itemId}`);
+            if (btn) btn.style.display = 'inline-block';
+        }
+
+        function executeMove(itemId, folderName) {
+            if (!folderName) {
+                cancelMoveSelect(itemId);
+                return;
+            }
+            const item = getCompanyData().warehouse.find(i => i.id === itemId);
+            if (item) {
+                item.category = folderName;
+                saveData(); // Auto-refreshes the UI instantly
+            }
+        }
+
         function checkStockAlerts() {
             const data = getCompanyData();
             const alertBox = document.getElementById('global-stock-alerts');
@@ -3098,10 +3127,18 @@
                                     <input type="number" id="wh-update-${item.id}" placeholder="${t('placeholder-product-name')}" style="flex:1;" min="0">
                                     <button onclick="updateWarehouseStock('${item.id}')" class="btn-success">${t('btn-log-payment') || 'Update'}</button>
                                 </div>
-                                <div style="display:flex; gap:8px;">
-                                    <button onclick="toggleDetails('wh-logs-${item.id}')" class="btn-neutral">History Log</button>
-                                    ${isWHAdmin ? `<button onclick="editMaxStock('${item.id}')" class="btn-outline">✏️ Edit Max</button>` : ''}
-                                    ${isWHAdmin ? `<button onclick="deleteWarehouseItem('${item.id}')" class="btn-outline-danger">${t('btn-remove')}</button>` : ''}
+                                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                    <button onclick="toggleDetails('wh-logs-${item.id}')" class="btn-neutral">History</button>
+                                    ${isWHAdmin ? `
+                                        <button id="move-btn-${item.id}" onclick="showMoveSelect('${item.id}')" class="btn-outline">📂 Move</button>
+                                        <select id="move-select-${item.id}" onchange="executeMove('${item.id}', this.value)" onblur="cancelMoveSelect('${item.id}')" style="display:none; width:auto; padding: 4px 12px; font-size: 0.85rem;">
+                                            <option value="">Choose...</option>
+                                            <option value="Uncategorized">📂 Uncategorized</option>
+                                            ${(data.whCategories || []).map(f => `<option value="${f}">📂 ${f}</option>`).join('')}
+                                        </select>
+                                    ` : ''}
+                                    ${isWHAdmin ? `<button onclick="editMaxStock('${item.id}')" class="btn-outline">✏️ Max</button>` : ''}
+                                    ${isWHAdmin ? `<button onclick="deleteWarehouseItem('${item.id}')" class="btn-outline-danger">✖</button>` : ''}
                                 </div>
                             </div>
 
