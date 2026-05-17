@@ -245,6 +245,10 @@
             display: none !important;
         }
 
+        body:not(.role-admin):not(.perm-sales) .sales-admin {
+            display: none !important;
+        }
+
         /* Header HUD */
         header {
             background-color: #2d1b11;
@@ -1447,6 +1451,7 @@
             <button id="tab-summary" class="dept-tab" onclick="switchTab('summary')" data-i18n="tab-summary">📊
                 Summary</button>
             <button id="tab-adverts" class="dept-tab" onclick="switchTab('adverts')">📢 Ads</button>
+            <button id="tab-managing" class="dept-tab" onclick="switchTab('managing')">🛠️ Managing</button>
         </div>
 
         <!-- ========================================== -->
@@ -1488,13 +1493,12 @@
                         </label>
                         <label
                             style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
-                            <input type="checkbox" id="perm-drv" style="width:auto;"> <span
-                                data-i18n="tab-drivers">Drivers</span>
+                            <input type="checkbox" id="perm-fin" style="width:auto;"> <span
+                                data-i18n="tab-finance">Finance</span>
                         </label>
                         <label
                             style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
-                            <input type="checkbox" id="perm-fin" style="width:auto;"> <span
-                                data-i18n="tab-finance">Finance</span>
+                            <input type="checkbox" id="perm-sales" style="width:auto;"> <span>Sales Tracker</span>
                         </label>
                     </div>
                     <button onclick="saveWorkerPerms()" style="width: 100%;">Save Permissions</button>
@@ -2252,6 +2256,115 @@
             </div>
         </div>
 
+        <div id="view-managing" class="view-section">
+            <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 24px; width: 100%; align-items: start;">
+
+                <div class="card">
+                    <h2 class="card-title">📝 Communication & Notes</h2>
+
+                    <div class="admin-only"
+                        style="background: var(--input-bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 20px;">
+                        <h3 style="font-size: 0.95rem; margin-bottom: 8px;">Post a New Note</h3>
+                        <textarea id="manage-note-text" rows="3"
+                            placeholder="Write your announcement or private note here..."></textarea>
+
+                        <div style="display:flex; align-items:center; gap: 15px; margin-top: 10px;">
+                            <label
+                                style="display:flex; align-items:center; gap:6px; cursor:pointer; text-transform:none; margin:0; color:var(--text-main);">
+                                <input type="radio" name="note-privacy" value="public" checked
+                                    onchange="document.getElementById('private-note-targets').style.display='none'">
+                                📢 Public
+                            </label>
+                            <label
+                                style="display:flex; align-items:center; gap:6px; cursor:pointer; text-transform:none; margin:0; color:var(--danger);">
+                                <input type="radio" name="note-privacy" value="private"
+                                    onchange="document.getElementById('private-note-targets').style.display='block'">
+                                🔒 Private
+                            </label>
+                        </div>
+
+                        <div id="private-note-targets"
+                            style="display:none; margin-top: 10px; background: var(--bg-color); padding: 10px; border-radius: 6px;">
+                            <label style="font-size:0.8rem; margin-bottom:8px;">Select who can read this (Leave empty
+                                for Manager-Only note):</label>
+                            <div id="private-worker-checkboxes"
+                                style="display:flex; flex-direction:column; gap:6px; max-height:150px; overflow-y:auto;">
+                            </div>
+                        </div>
+
+                        <button onclick="postManagerNote()" style="width: 100%; margin-top: 12px;">Post Note</button>
+                    </div>
+
+                    <div id="manage-notes-feed"
+                        style="display:flex; flex-direction:column; gap:12px; max-height: 500px; overflow-y:auto; padding-right:5px;">
+                    </div>
+                </div>
+
+                <div class="card sales-admin" style="border-top: 4px solid var(--primary);">
+                    <div class="flex-between" style="margin-bottom: 8px;">
+                        <h2 class="card-title" style="margin:0;">💰 Shift Sales Log</h2>
+                        <span class="badge" style="background:var(--primary);">Secure Tracker</span>
+                    </div>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px;">Transactions logged
+                        for <strong><span class="display-current-month"></span></strong>. Click a method box below to
+                        uncount it from the total.</p>
+
+                    <div
+                        style="background: var(--input-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; margin-bottom: 24px;">
+                        <div
+                            style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">
+                            Counted Grand Total</div>
+                        <div style="font-size: 3rem; font-weight: 800; color: var(--primary); margin-bottom: 20px;">SAR
+                            <span id="sales-grand-total">0.00</span>
+                        </div>
+
+                        <div id="sales-method-toggles"
+                            style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+                        </div>
+                    </div>
+
+                    <div
+                        style="background: var(--bg-color); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 24px;">
+                        <h3 style="font-size: 1.05rem; margin-bottom: 12px; color: var(--text-main);">Log a New
+                            Transaction</h3>
+                        <div style="display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap;">
+                            <div style="flex: 2; min-width: 150px;">
+                                <input type="number" id="new-sale-amount" placeholder="Amount (SAR)..."
+                                    style="font-size: 1.25rem; font-weight: 700; padding: 12px; color: var(--primary); height: 100%;">
+                            </div>
+                            <div style="flex: 1; min-width: 120px;">
+                                <select id="new-sale-method"
+                                    style="height: 100%; font-size: 1rem; font-weight: 600; padding: 12px;">
+                                </select>
+                            </div>
+                            <button onclick="logSaleTransaction()" class="btn-success"
+                                style="font-size: 1.1rem; padding: 0 24px; font-weight: 800;">Log Sale</button>
+                        </div>
+                    </div>
+
+                    <h3
+                        style="font-size: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 12px;">
+                        Recent Transactions</h3>
+                    <div id="sales-transaction-log"
+                        style="display: flex; flex-direction: column; gap: 8px; max-height: 350px; overflow-y: auto; margin-bottom: 24px; padding-right: 5px;">
+                    </div>
+
+                    <div class="admin-only" style="border-top: 1px dashed var(--border-color); padding-top: 16px;">
+                        <h3 style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px;">Admin: Manage
+                            Income Sources</h3>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="new-income-source" placeholder="Add new source (e.g. UberEats)..."
+                                style="flex:1; padding: 10px; font-size: 0.9rem;">
+                            <button onclick="addIncomeSource()" class="btn-outline">Add Source</button>
+                        </div>
+                        <div id="admin-income-sources-list"
+                            style="display:flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;"></div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
     </div> <!-- End container -->
 
     <!-- Image Modal -->
@@ -2516,14 +2629,12 @@
             let isKinan = email === 'kinan.rahal@hotmail.com';
             let isAdmin = isKinan || admins.map(e => e.toLowerCase()).includes(email);
 
-            let wPerms = { warehouse: false, drivers: false, finance: false };
+            let wPerms = { warehouse: false, drivers: false, finance: false, sales: false };
 
-            // Find worker to apply permissions if any
             const worker = appData.burgeroov.workers.find(w => w.email && w.email.toLowerCase() === email);
             let isDriver = false;
             if (worker) {
                 if (worker.permissions) wPerms = worker.permissions;
-                // FEATURE 2: Check role string for driver keywords
                 const r = (worker.role || "").toLowerCase();
                 if (r.includes('driver') || r.includes('سائق') || r.includes('delivery')) {
                     isDriver = true;
@@ -2533,7 +2644,7 @@
             currentUser.role = isAdmin ? 'admin' : 'worker';
             currentUser.isKinan = isKinan;
 
-            document.body.className = 'theme-burgeroov'; // reset all dynamic classes
+            document.body.className = 'theme-burgeroov';
             if (isDarkMode) document.body.classList.add('dark-mode');
 
             if (isAdmin) {
@@ -2543,7 +2654,7 @@
                 if (wPerms.warehouse) document.body.classList.add('perm-warehouse');
                 if (wPerms.drivers) document.body.classList.add('perm-drivers');
                 if (wPerms.finance) document.body.classList.add('perm-finance');
-                // FEATURE 2: Add is-driver class so CSS shows the Drivers tab for driver-role users
+                if (wPerms.sales) document.body.classList.add('perm-sales');
                 if (isDriver) document.body.classList.add('is-driver');
             }
 
@@ -2561,19 +2672,24 @@
             if (!data.jobCatalog) data.jobCatalog = [];
             if (!data.warehouse) data.warehouse = [];
             if (!data.adverts) data.adverts = [];
-            if (!data.whCategories) data.whCategories = []; // <--- NOW STARTS WITH 0 FOLDERS
+            if (!data.whCategories) data.whCategories = [];
 
-            // Ensure old warehouse items don't break if their folder is deleted
+            // NEW: Management Data
+            if (!data.managerNotes) data.managerNotes = [];
+            if (!data.incomeSources) data.incomeSources = ['Cash', 'Credit Card'];
+            if (!data.salesLogs) data.salesLogs = []; // Stores individual cashier transactions
+            if (!data.disabledSalesMethods) data.disabledSalesMethods = []; // Stores which methods are toggled RED
+
             data.warehouse.forEach(item => {
                 if (!item.logs) item.logs = [];
                 if (!item.category) item.category = 'Uncategorized';
             });
 
             data.workers.forEach(w => {
-                if (!w.jobs) w.jobs = []; // Tasks assigned to worker
+                if (!w.jobs) w.jobs = [];
                 if (!w.logs) w.logs = [];
-                if (!w.email) w.email = ""; // Linked auth email
-                if (!w.permissions) w.permissions = { warehouse: false, drivers: false, finance: false };
+                if (!w.email) w.email = "";
+                if (!w.permissions) w.permissions = { warehouse: false, drivers: false, finance: false, sales: false };
                 if (!w.monthlyStats) w.monthlyStats = {};
                 Object.keys(w.monthlyStats).forEach(month => {
                     let ms = w.monthlyStats[month];
@@ -2882,13 +2998,15 @@
                 document.getElementById('perm-wh').checked = false;
                 document.getElementById('perm-drv').checked = false;
                 document.getElementById('perm-fin').checked = false;
+                document.getElementById('perm-sales').checked = false;
                 return;
             }
             const worker = getCompanyData().workers.find(w => w.id === wId);
-            const p = worker.permissions || { warehouse: false, drivers: false, finance: false };
+            const p = worker.permissions || { warehouse: false, drivers: false, finance: false, sales: false };
             document.getElementById('perm-wh').checked = !!p.warehouse;
             document.getElementById('perm-drv').checked = !!p.drivers;
             document.getElementById('perm-fin').checked = !!p.finance;
+            document.getElementById('perm-sales').checked = !!p.sales;
         }
 
         function saveWorkerPerms() {
@@ -2898,10 +3016,417 @@
             worker.permissions = {
                 warehouse: document.getElementById('perm-wh').checked,
                 drivers: document.getElementById('perm-drv').checked,
-                finance: document.getElementById('perm-fin').checked
+                finance: document.getElementById('perm-fin').checked,
+                sales: document.getElementById('perm-sales').checked
             };
             saveData();
             alert("Permissions updated!");
+        }
+
+        // --- MANAGING DEPARTMENT SYSTEM ---
+        function addIncomeSource() {
+            const source = document.getElementById('new-income-source').value.trim();
+            if (source) {
+                if (!getCompanyData().incomeSources.includes(source)) {
+                    getCompanyData().incomeSources.push(source);
+                    document.getElementById('new-income-source').value = '';
+                    saveData();
+                } else {
+                    alert("This income source already exists.");
+                }
+            }
+        }
+
+        function deleteIncomeSource(sourceName) {
+            if (!confirm(`Are you sure you want to delete the income source '${sourceName}'?\n\n(This hides it from the tracker but doesn't delete old data).`)) return;
+            getCompanyData().incomeSources = getCompanyData().incomeSources.filter(s => s !== sourceName);
+            saveData();
+        }
+
+        function saveMonthlySales() {
+            const sources = getCompanyData().incomeSources || [];
+            let salesForMonth = {};
+            sources.forEach(s => {
+                const inputId = 'sales-input-' + s.replace(/[^a-zA-Z0-9]/g, '');
+                const el = document.getElementById(inputId);
+                if (el) {
+                    salesForMonth[s] = parseFloat(el.value) || 0;
+                }
+            });
+            if (!getCompanyData().monthlySales) getCompanyData().monthlySales = {};
+            getCompanyData().monthlySales[currentGlobalMonth] = salesForMonth;
+            saveData();
+            alert(`Sales successfully saved for ${currentGlobalMonth} 💰`);
+        }
+
+        function postManagerNote() {
+            const text = document.getElementById('manage-note-text').value.trim();
+            if (!text) return alert("Write a note first.");
+
+            const privacy = document.querySelector('input[name="note-privacy"]:checked').value;
+            let targets = [];
+
+            if (privacy === 'private') {
+                const checkboxes = document.querySelectorAll('.private-target-cb:checked');
+                checkboxes.forEach(cb => targets.push(cb.value));
+            }
+
+            const newNote = {
+                id: Date.now().toString(),
+                text: text,
+                date: formatTimestamp(),
+                author: currentUser.email,
+                isPrivate: privacy === 'private',
+                targetWorkers: targets
+            };
+
+            if (!getCompanyData().managerNotes) getCompanyData().managerNotes = [];
+            getCompanyData().managerNotes.unshift(newNote);
+            document.getElementById('manage-note-text').value = '';
+
+            // Uncheck targets cleanly
+            document.querySelectorAll('.private-target-cb').forEach(cb => cb.checked = false);
+            saveData();
+        }
+
+        function deleteManagerNote(id) {
+            if (!confirm("Delete this note?")) return;
+            getCompanyData().managerNotes = getCompanyData().managerNotes.filter(n => n.id !== id);
+            saveData();
+        }
+
+        function renderManaging() {
+            if (currentTab !== 'managing') return;
+
+            // 1. Populate Target Checkboxes for Private Notes
+            const cbContainer = document.getElementById('private-worker-checkboxes');
+            if (cbContainer) {
+                cbContainer.innerHTML = '';
+                getCompanyData().workers.forEach(w => {
+                    cbContainer.innerHTML += `
+                        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; text-transform:none; margin:0; font-size:0.9rem;">
+                            <input type="checkbox" class="private-target-cb" value="${w.id}"> ${w.name} (${w.role})
+                        </label>
+                    `;
+                });
+            }
+
+            // 2. Render Notes Feed
+            const feed = document.getElementById('manage-notes-feed');
+            feed.innerHTML = '';
+            const allNotes = getCompanyData().managerNotes || [];
+
+            // Filter notes for the current viewer
+            const visibleNotes = allNotes.filter(n => {
+                if (currentUser.role === 'admin') return true; // Admin sees all
+                if (!n.isPrivate) return true; // Everyone sees public
+                // If private, worker only sees if they are in the target list
+                const myWorkerProfile = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+                return myWorkerProfile && n.targetWorkers && n.targetWorkers.includes(myWorkerProfile.id);
+            });
+
+            if (visibleNotes.length === 0) {
+                feed.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding: 20px;">No notes available.</p>';
+            }
+
+            visibleNotes.forEach(n => {
+                const div = document.createElement('div');
+                div.className = 'ledger-card';
+                div.style.borderLeft = n.isPrivate ? '4px solid var(--danger)' : '4px solid var(--info)';
+
+                let delBtn = (currentUser.role === 'admin') ? `<button onclick="deleteManagerNote('${n.id}')" class="btn-outline-danger" style="padding:2px 6px; font-size:0.7rem; border:none; text-decoration:underline;">Delete</button>` : '';
+                let lockIcon = n.isPrivate ? `<span class="badge" style="background:var(--danger);">🔒 Private</span>` : `<span class="badge" style="background:var(--info);">📢 Public</span>`;
+
+                div.innerHTML = `
+                    <div class="flex-between" style="margin-bottom:8px;">
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            ${lockIcon} <span style="font-size:0.75rem; color:var(--text-muted);">${n.date}</span>
+                        </div>
+                        ${delBtn}
+                    </div>
+                    <div style="font-size:0.95rem; color:var(--text-main); white-space: pre-wrap; line-height: 1.5;">${n.text}</div>
+                `;
+                feed.appendChild(div);
+            });
+
+            // 3. Render Sales Inputs (Only matters for those who can see it)
+            const salesContainer = document.getElementById('sales-inputs-container');
+            salesContainer.innerHTML = '';
+            const sources = getCompanyData().incomeSources || ['Cash', 'Credit Card'];
+            const monthlyData = (getCompanyData().monthlySales && getCompanyData().monthlySales[currentGlobalMonth]) ? getCompanyData().monthlySales[currentGlobalMonth] : {};
+
+            sources.forEach(s => {
+                const val = monthlyData[s] !== undefined ? monthlyData[s] : '';
+                const inputId = 'sales-input-' + s.replace(/[^a-zA-Z0-9]/g, '');
+
+                salesContainer.innerHTML += `
+                    <div class="flex-between" style="background: var(--input-bg); padding: 18px 24px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);">
+                        <div style="display:flex; align-items:center; gap: 12px; width: 45%;">
+                            <button onclick="deleteIncomeSource('${s}')" class="btn-outline-danger" style="padding: 4px 8px; font-size: 0.9rem; border: none; background: var(--danger-bg);" title="Delete Source">✖</button>
+                            <strong style="color:var(--text-main); font-size:1.25rem; word-break: break-word;">${s}</strong>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:12px; flex:1;">
+                            <span style="color:var(--text-muted); font-weight:700; font-size: 1.1rem;">SAR</span>
+                            <input type="number" id="${inputId}" value="${val}" placeholder="0.00" style="flex:1; padding: 14px 16px; font-weight: 800; font-size: 1.25rem; color: var(--primary); background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border-color);">
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // --- MANAGING DEPARTMENT SYSTEM ---
+
+        function postManagerNote() {
+            const text = document.getElementById('manage-note-text').value.trim();
+            if (!text) return alert("Write a note first.");
+
+            const privacy = document.querySelector('input[name="note-privacy"]:checked').value;
+            let targets = [];
+
+            if (privacy === 'private') {
+                const checkboxes = document.querySelectorAll('.private-target-cb:checked');
+                checkboxes.forEach(cb => targets.push(cb.value));
+                // Notice: No alert! If empty, it's just a Manager-only note.
+            }
+
+            const newNote = {
+                id: Date.now().toString(),
+                text: text,
+                date: formatTimestamp(),
+                author: currentUser.email,
+                isPrivate: privacy === 'private',
+                targetWorkers: targets
+            };
+
+            if (!getCompanyData().managerNotes) getCompanyData().managerNotes = [];
+            getCompanyData().managerNotes.unshift(newNote);
+            document.getElementById('manage-note-text').value = '';
+
+            // Cleanly uncheck boxes
+            document.querySelectorAll('.private-target-cb').forEach(cb => cb.checked = false);
+            saveData();
+        }
+
+        function deleteManagerNote(id) {
+            if (!confirm("Delete this note?")) return;
+            getCompanyData().managerNotes = getCompanyData().managerNotes.filter(n => n.id !== id);
+            saveData();
+        }
+
+        // -- Sales Log System --
+        function addIncomeSource() {
+            const source = document.getElementById('new-income-source').value.trim();
+            if (source) {
+                if (!getCompanyData().incomeSources) getCompanyData().incomeSources = [];
+                if (!getCompanyData().incomeSources.includes(source)) {
+                    getCompanyData().incomeSources.push(source);
+                    document.getElementById('new-income-source').value = '';
+                    saveData();
+                } else {
+                    alert("This income source already exists.");
+                }
+            }
+        }
+
+        function deleteIncomeSource(sourceName) {
+            if (!confirm(`Delete the income source '${sourceName}'?`)) return;
+            getCompanyData().incomeSources = getCompanyData().incomeSources.filter(s => s !== sourceName);
+            saveData();
+        }
+
+        function logSaleTransaction() {
+            const amountInput = document.getElementById('new-sale-amount');
+            const methodInput = document.getElementById('new-sale-method');
+
+            const amount = parseFloat(amountInput.value);
+            const method = methodInput.value;
+
+            if (isNaN(amount) || amount <= 0 || !method) {
+                alert("Please enter a valid amount and select a payment method.");
+                return;
+            }
+
+            const newLog = {
+                id: Date.now().toString(),
+                amount: amount,
+                method: method,
+                date: formatTimestamp(),
+                month: currentGlobalMonth, // Used to filter views by month
+                cashier: currentUser.email
+            };
+
+            if (!getCompanyData().salesLogs) getCompanyData().salesLogs = [];
+            getCompanyData().salesLogs.unshift(newLog);
+
+            amountInput.value = '';
+            saveData();
+        }
+
+        function deleteSaleTransaction(id) {
+            if (!confirm("Delete this transaction record?")) return;
+            getCompanyData().salesLogs = getCompanyData().salesLogs.filter(l => l.id !== id);
+            saveData();
+        }
+
+        function toggleSalesMethod(methodName) {
+            let disabled = getCompanyData().disabledSalesMethods || [];
+            if (disabled.includes(methodName)) {
+                disabled = disabled.filter(m => m !== methodName); // Remove (turn green)
+            } else {
+                disabled.push(methodName); // Add (turn red)
+            }
+            getCompanyData().disabledSalesMethods = disabled;
+            saveData();
+        }
+
+        function renderManaging() {
+            if (currentTab !== 'managing') return;
+
+            // 1. Populate Target Checkboxes for Private Notes
+            const cbContainer = document.getElementById('private-worker-checkboxes');
+            if (cbContainer) {
+                cbContainer.innerHTML = '';
+                getCompanyData().workers.forEach(w => {
+                    cbContainer.innerHTML += `
+                        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; text-transform:none; margin:0; font-size:0.9rem;">
+                            <input type="checkbox" class="private-target-cb" value="${w.id}"> ${w.name} (${w.role})
+                        </label>
+                    `;
+                });
+            }
+
+            // 2. Render Notes Feed
+            const feed = document.getElementById('manage-notes-feed');
+            feed.innerHTML = '';
+            const allNotes = getCompanyData().managerNotes || [];
+
+            const visibleNotes = allNotes.filter(n => {
+                if (currentUser.role === 'admin') return true;
+                if (!n.isPrivate) return true;
+                const myWorkerProfile = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+                return myWorkerProfile && n.targetWorkers && n.targetWorkers.includes(myWorkerProfile.id);
+            });
+
+            if (visibleNotes.length === 0) {
+                feed.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding: 20px;">No notes available.</p>';
+            }
+
+            visibleNotes.forEach(n => {
+                const div = document.createElement('div');
+                div.className = 'ledger-card';
+                div.style.borderLeft = n.isPrivate ? '4px solid var(--danger)' : '4px solid var(--info)';
+
+                let delBtn = (currentUser.role === 'admin') ? `<button onclick="deleteManagerNote('${n.id}')" class="btn-outline-danger" style="padding:2px 6px; font-size:0.7rem; border:none; text-decoration:underline;">Delete</button>` : '';
+                let lockIcon = n.isPrivate ? `<span class="badge" style="background:var(--danger);">🔒 Private</span>` : `<span class="badge" style="background:var(--info);">📢 Public</span>`;
+
+                div.innerHTML = `
+                    <div class="flex-between" style="margin-bottom:8px;">
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            ${lockIcon} <span style="font-size:0.75rem; color:var(--text-muted);">${n.date}</span>
+                        </div>
+                        ${delBtn}
+                    </div>
+                    <div style="font-size:0.95rem; color:var(--text-main); white-space: pre-wrap; line-height: 1.5;">${n.text}</div>
+                `;
+                feed.appendChild(div);
+            });
+
+            // 3. Render Sales Tracker
+            const isAdmin = currentUser.role === 'admin';
+            const sources = getCompanyData().incomeSources || ['Cash', 'Credit Card'];
+            const allLogs = getCompanyData().salesLogs || [];
+            const disabledMethods = getCompanyData().disabledSalesMethods || [];
+
+            // Update Method Dropdown in the form
+            const methodSelect = document.getElementById('new-sale-method');
+            if (methodSelect) {
+                const prevVal = methodSelect.value;
+                methodSelect.innerHTML = sources.map(s => `<option value="${s}">${s}</option>`).join('');
+                if (sources.includes(prevVal)) methodSelect.value = prevVal;
+            }
+
+            // Update Admin Sources List
+            const sourcesListDiv = document.getElementById('admin-income-sources-list');
+            if (sourcesListDiv) {
+                sourcesListDiv.innerHTML = sources.map(s => `
+                    <div style="background: var(--bg-color); border: 1px solid var(--border-color); padding: 4px 10px; border-radius: 20px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px;">
+                        ${s} <button onclick="deleteIncomeSource('${s}')" style="background: none; border: none; color: var(--danger); cursor: pointer; padding: 0;">✖</button>
+                    </div>
+                `).join('');
+            }
+
+            // Calculate Totals for the current viewing month
+            const currentMonthLogs = allLogs.filter(l => l.month === currentGlobalMonth);
+
+            let grandTotal = 0;
+            let methodTotals = {};
+            sources.forEach(s => methodTotals[s] = 0);
+
+            currentMonthLogs.forEach(l => {
+                // Keep track of how much each method made
+                if (methodTotals[l.method] !== undefined) {
+                    methodTotals[l.method] += l.amount;
+                } else {
+                    methodTotals[l.method] = l.amount; // Catch edge cases if a source was deleted
+                }
+
+                // Add to Grand Total ONLY if the method is NOT disabled (clicked red)
+                if (!disabledMethods.includes(l.method)) {
+                    grandTotal += l.amount;
+                }
+            });
+
+            document.getElementById('sales-grand-total').textContent = grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            // Draw the clickable Method Toggles
+            const togglesDiv = document.getElementById('sales-method-toggles');
+            if (togglesDiv) {
+                togglesDiv.innerHTML = Object.keys(methodTotals).map(methodName => {
+                    const total = methodTotals[methodName];
+                    const isCounted = !disabledMethods.includes(methodName);
+
+                    const bg = isCounted ? 'var(--success-bg)' : 'var(--danger-bg)';
+                    const border = isCounted ? 'var(--success-border)' : 'var(--danger-border)';
+                    const color = isCounted ? 'var(--success)' : 'var(--danger)';
+                    const icon = isCounted ? '✅' : '❌';
+
+                    return `
+                        <div onclick="toggleSalesMethod('${methodName}')" style="cursor: pointer; background: ${bg}; border: 1px solid ${border}; color: ${color}; padding: 8px 16px; border-radius: 8px; text-align: left; min-width: 130px; transition: transform 0.1s;">
+                            <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">${icon} ${methodName}</div>
+                            <div style="font-size: 1.1rem; font-weight: 800;">SAR ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // Draw Recent Transactions Log
+            const logDiv = document.getElementById('sales-transaction-log');
+            if (logDiv) {
+                logDiv.innerHTML = '';
+                if (currentMonthLogs.length === 0) {
+                    logDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.9rem; padding: 10px;">No transactions logged for this month.</p>`;
+                } else {
+                    currentMonthLogs.forEach(l => {
+                        const isCounted = !disabledMethods.includes(l.method);
+                        const opacity = isCounted ? '1' : '0.5';
+                        const strike = isCounted ? 'none' : 'line-through';
+                        let delBtn = isAdmin ? `<button onclick="deleteSaleTransaction('${l.id}')" style="background: none; border: none; color: var(--danger); font-size: 1rem; cursor: pointer; padding: 0 4px;" title="Delete">✖</button>` : '';
+
+                        logDiv.innerHTML += `
+                            <div class="ledger-card" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; opacity: ${opacity}; margin-bottom: 0;">
+                                <div>
+                                    <div style="font-weight: 800; font-size: 1.1rem; color: var(--text-main); text-decoration: ${strike};">SAR ${l.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+                                        <span class="badge" style="background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color);">${l.method}</span> 
+                                        &nbsp;🕒 ${l.date}
+                                    </div>
+                                </div>
+                                <div>${delBtn}</div>
+                            </div>
+                        `;
+                    });
+                }
+            }
         }
 
         // --- WAREHOUSE SYSTEM ---
@@ -3343,7 +3868,7 @@
         // --- UI NAVIGATION & GLOBALS ---
         function switchTab(tab) {
             currentTab = tab;
-            ['ops', 'ranks', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts'].forEach(t => {
+            ['ops', 'ranks', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'managing'].forEach(t => {
                 const tabBtn = document.getElementById(`tab-${t}`);
                 const viewSec = document.getElementById(`view-${t}`);
                 if (tabBtn) tabBtn.classList.toggle('active-tab', tab === t);
@@ -4843,6 +5368,7 @@
             else if (currentTab === 'summary') { renderSummaryTable(); }
             else if (currentTab === 'drivers') { renderDriversList(); renderDriverPanel(); }
             else if (currentTab === 'adverts') { renderAdverts(); }
+            else if (currentTab === 'managing') { renderManaging(); }
         }
 
         function renderWorkerViolationPanel() {
