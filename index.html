@@ -1727,12 +1727,25 @@
         <!-- VIEW 4: WAREHOUSE DEPARTMENT               -->
         <!-- ========================================== -->
         <div id="view-warehouse" class="view-section">
-            <!-- Sidebar: Add Product -->
             <div class="warehouse-admin">
+
+                <div class="card">
+                    <h2 class="card-title">📂 Manage Folders</h2>
+                    <div class="form-group flex-between">
+                        <input type="text" id="new-wh-folder" placeholder="e.g. Drinks, Meats...">
+                        <button onclick="addWhFolder()">Add</button>
+                    </div>
+                    <div id="wh-folder-list" style="display:flex; flex-direction:column; gap:8px; margin-top: 10px;">
+                    </div>
+                </div>
+
                 <div class="card">
                     <h2 class="card-title" data-i18n="title-add-product">Add New Product</h2>
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;"
-                        data-i18n="desc-add-product">Register items to track their consumption.</p>
+                    <div class="form-group">
+                        <label>Select Folder</label>
+                        <select id="wh-folder-select">
+                        </select>
+                    </div>
                     <div class="form-group">
                         <label data-i18n="label-product-name">Product Name</label>
                         <input type="text" id="wh-name" data-i18n="placeholder-product-name"
@@ -2173,11 +2186,13 @@
                     <div style="position: relative;">
                         <div id="promo-map" style="height: 600px; width: 100%; z-index: 1;"></div>
                         <!-- Floating Search Bar -->
-                        <div style="position: absolute; top: 15px; right: 15px; z-index: 1000; background: var(--card-bg); padding: 8px; border-radius: 12px; box-shadow: var(--shadow-md); display: flex; gap: 8px; border: 1px solid var(--border-color); min-width: 300px;">
-                            <input type="text" id="map-search-input" placeholder="Search for a location..." 
-                                   style="flex-grow: 1; padding: 10px; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: 8px;"
-                                   onkeyup="if(event.key==='Enter') searchMapLocation()">
-                            <button onclick="searchMapLocation()" class="btn-info" style="padding: 8px 16px; font-size: 0.85rem; border-radius: 8px;">🔍 Search</button>
+                        <div
+                            style="position: absolute; top: 15px; right: 15px; z-index: 1000; background: var(--card-bg); padding: 8px; border-radius: 12px; box-shadow: var(--shadow-md); display: flex; gap: 8px; border: 1px solid var(--border-color); min-width: 300px;">
+                            <input type="text" id="map-search-input" placeholder="Search for a location..."
+                                style="flex-grow: 1; padding: 10px; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: 8px;"
+                                onkeyup="if(event.key==='Enter') searchMapLocation()">
+                            <button onclick="searchMapLocation()" class="btn-info"
+                                style="padding: 8px 16px; font-size: 0.85rem; border-radius: 8px;">🔍 Search</button>
                         </div>
                     </div>
                 </div>
@@ -2502,7 +2517,14 @@
             if (!data.violationRules) data.violationRules = [];
             if (!data.jobCatalog) data.jobCatalog = []; // Task Templates
             if (!data.warehouse) data.warehouse = [];
-            if (!data.adverts) data.adverts = []; // NEW: Map Pins Array
+            if (!data.adverts) data.adverts = [];
+            if (!data.whCategories) data.whCategories = ['General']; // NEW: Warehouse Folders
+
+            // Ensure old warehouse items have a category assigned to prevent errors
+            data.warehouse.forEach(item => {
+                if (!item.logs) item.logs = [];
+                if (!item.category) item.category = 'General';
+            });
 
             data.workers.forEach(w => {
                 if (!w.jobs) w.jobs = []; // Tasks assigned to worker
@@ -2840,15 +2862,71 @@
         }
 
         // --- WAREHOUSE SYSTEM ---
+        function addWhFolder() {
+            const folderName = document.getElementById('new-wh-folder').value.trim();
+            if (!folderName) return;
+            if (!getCompanyData().whCategories.includes(folderName)) {
+                getCompanyData().whCategories.push(folderName);
+                document.getElementById('new-wh-folder').value = '';
+                saveData();
+            } else {
+                alert("Folder already exists.");
+            }
+        }
+
+        function deleteWhFolder(folderName) {
+            if (folderName === 'General') { alert("Cannot delete the General folder."); return; }
+            if (!confirm(`Delete folder '${folderName}'? Products inside will be moved to 'General'.`)) return;
+
+            getCompanyData().whCategories = getCompanyData().whCategories.filter(f => f !== folderName);
+            // Move items in this folder to General
+            getCompanyData().warehouse.forEach(item => {
+                if (item.category === folderName) item.category = 'General';
+            });
+            saveData();
+        }
+
+        function renderWhFolders() {
+            const list = document.getElementById('wh-folder-list');
+            const select = document.getElementById('wh-folder-select');
+            if (!list || !select) return;
+
+            list.innerHTML = '';
+            select.innerHTML = '';
+
+            const folders = getCompanyData().whCategories || ['General'];
+
+            folders.forEach(f => {
+                // Add to list
+                const div = document.createElement('div');
+                div.className = "flex-between list-item";
+                let delBtn = f !== 'General' ? `<button class="btn-outline-danger admin-only" style="padding: 2px 6px; font-size: 0.75rem; border:none;" onclick="deleteWhFolder('${f}')">✖</button>` : '<span></span>';
+                div.innerHTML = `<span style="font-size:0.9rem; font-weight:600;">📂 ${f}</span> ${delBtn}`;
+                list.appendChild(div);
+
+                // Add to dropdown
+                const opt = document.createElement('option');
+                opt.value = f;
+                opt.textContent = `📂 ${f}`;
+                select.appendChild(opt);
+            });
+        }
+
         function addWarehouseItem() {
             const name = document.getElementById('wh-name').value.trim();
             const stock = parseFloat(document.getElementById('wh-stock').value);
             const risk = parseFloat(document.getElementById('wh-risk').value);
+            const category = document.getElementById('wh-folder-select').value || 'General';
 
             if (!name || isNaN(stock) || isNaN(risk) || stock < 0 || risk < 0) { alert("Please fill out all product details correctly."); return; }
 
             const newItem = {
-                id: 'wh-' + Date.now().toString(), name: name, maxStock: stock, currentStock: stock, riskAmount: risk,
+                id: 'wh-' + Date.now().toString(),
+                name: name,
+                category: category,
+                maxStock: stock,
+                currentStock: stock,
+                riskAmount: risk,
                 logs: [{ date: formatTimestamp(), amount: stock, difference: stock, note: 'Initial Stock Setup' }]
             };
 
@@ -2908,6 +2986,8 @@
         }
 
         function renderWarehouse() {
+            renderWhFolders(); // Render the folder manager UI first
+
             const list = document.getElementById('warehouse-list'); list.innerHTML = '';
             const data = getCompanyData();
 
@@ -2919,78 +2999,137 @@
             const searchQuery = document.getElementById('wh-search').value.toLowerCase();
 
             if (!data.warehouse || data.warehouse.length === 0) {
-                list.innerHTML = `<p style="color:var(--text-muted); text-align:center; padding:20px; background:var(--input-bg); border-radius:var(--radius-md);">${t('no-active-tasks')}</p>`;
+                list.innerHTML = `<p style="color:var(--text-muted); text-align:center; padding:20px; background:var(--input-bg); border-radius:var(--radius-md);">Warehouse is empty.</p>`;
                 return;
             }
 
             const filteredItems = data.warehouse.filter(i => i.name.toLowerCase().includes(searchQuery));
 
             if (filteredItems.length === 0) {
-                list.innerHTML = `<p style="color:var(--text-muted); text-align:center;">${t('no-items-match') || 'No items match.'}</p>`;
+                list.innerHTML = `<p style="color:var(--text-muted); text-align:center;">No items match.</p>`;
                 return;
             }
 
-            filteredItems.forEach(item => {
-                const pct = Math.min(100, Math.max(0, (item.currentStock / item.maxStock) * 100));
-                const isLow = item.currentStock <= item.riskAmount;
-                const div = document.createElement('div'); div.className = `wh-item ${isLow ? 'low-stock' : ''}`;
+            const folders = data.whCategories || ['General'];
 
-                let logsHtml = item.logs.map(l => `
-                    <div class="flex-between" style="border-bottom: 1px solid var(--border-color); padding: 6px 0;">
-                        <span>🕒 ${l.date}</span>
-                        <span>Total: <strong>${l.amount}</strong> <span style="color:${l.difference > 0 ? 'var(--success)' : 'var(--danger)'}">(${l.difference > 0 ? '+' : ''}${l.difference})</span></span>
-                    </div>`).join('');
+            folders.forEach(folder => {
+                const itemsInFolder = filteredItems.filter(i => (i.category || 'General') === folder);
 
-                div.innerHTML = `
-                    <div class="flex-between">
-                        <h3 style="margin:0; color:var(--text-main); font-size:1.15rem;">${item.name}</h3>
-                        <div style="text-align:right;"><span style="font-size:1.4rem; font-weight:800; color:${isLow ? 'var(--danger)' : 'var(--primary)'}">${item.currentStock}</span> <span style="color:var(--text-muted); font-weight:600;">/ ${item.maxStock}</span></div>
-                    </div>
-                    ${isLow ? `<div class="text-danger" style="font-size:0.8rem; margin-top:4px; font-weight:600;">⚠️ ${t('label-currently-left')} (${item.riskAmount})</div>` : ''}
-                    <div class="wh-progress"><div class="wh-fill ${isLow ? 'low' : ''}" style="width: ${pct}%"></div></div>
-                    
-                    <div class="flex-between" style="margin-top: 20px; flex-wrap:wrap; gap:10px;">
-                        <div style="display:flex; gap:8px; flex:1; min-width: 200px;">
-                            <input type="number" id="wh-update-${item.id}" placeholder="${t('placeholder-product-name')}" style="flex:1;" min="0">
-                            <button onclick="updateWarehouseStock('${item.id}')" class="btn-success">${t('btn-log-payment') || 'Update'}</button>
+                // Show folder if it has items, OR if we are not searching
+                if (itemsInFolder.length > 0 || !searchQuery) {
+
+                    const folderId = 'folder-content-' + folder.replace(/\s+/g, '-');
+                    const isSearchActive = searchQuery.length > 0; // If searching, keep folders open
+
+                    // Create Interactive Folder Card
+                    const header = document.createElement('div');
+                    header.style.cssText = "display: flex; justify-content: space-between; align-items: center; background: var(--card-bg); color: var(--text-main); padding: 16px 20px; border: 1px solid var(--border-color); border-radius: 12px; cursor: pointer; margin-top: 12px; transition: var(--transition); box-shadow: var(--shadow-sm);";
+
+                    // Hover effects
+                    header.onmouseover = () => header.style.borderColor = 'var(--primary)';
+                    header.onmouseout = () => header.style.borderColor = 'var(--border-color)';
+
+                    header.innerHTML = `
+                        <div style="display:flex; align-items:center; gap:12px; font-weight: 700; font-size: 1.15rem;">
+                            <span style="font-size:1.8rem;" id="icon-${folderId}">${isSearchActive ? '📂' : '📁'}</span> 
+                            ${folder}
                         </div>
-                        <div style="display:flex; gap:8px;">
-                            <button onclick="toggleDetails('wh-logs-${item.id}')" class="btn-neutral">History Log</button>
-                            ${isWHAdmin ? `<button onclick="editMaxStock('${item.id}')" class="btn-outline">✏️ Edit Max</button>` : ''}
-                            ${isWHAdmin ? `<button onclick="deleteWarehouseItem('${item.id}')" class="btn-outline-danger">${t('btn-remove')}</button>` : ''}
-                        </div>
-                    </div>
+                        <span style="font-size: 0.85rem; font-weight:600; color: var(--text-muted); background: var(--input-bg); padding: 4px 10px; border-radius: 20px;">${itemsInFolder.length} Items</span>
+                    `;
 
-                    <div id="wh-logs-${item.id}" class="wh-logs" style="display:none;">${logsHtml || 'No logs yet.'}</div>`;
-                list.appendChild(div);
+                    // Content Container (Hidden by default unless searching)
+                    const contentDiv = document.createElement('div');
+                    contentDiv.id = folderId;
+                    contentDiv.style.cssText = `display: ${isSearchActive ? 'flex' : 'none'}; flex-direction: column; gap: 12px; margin-top: 12px; margin-bottom: 24px; padding-left: 10px; border-left: 3px solid var(--primary); margin-left: 10px;`;
+
+                    // Click to toggle folder open/closed
+                    header.onclick = () => {
+                        const isOpen = contentDiv.style.display === 'flex';
+                        contentDiv.style.display = isOpen ? 'none' : 'flex';
+                        document.getElementById(`icon-${folderId}`).textContent = isOpen ? '📁' : '📂';
+                    };
+
+                    list.appendChild(header);
+                    list.appendChild(contentDiv);
+
+                    if (itemsInFolder.length === 0) {
+                        contentDiv.innerHTML = `<div style="color:var(--text-muted); font-size:0.9rem; padding:10px;">Empty folder.</div>`;
+                        return;
+                    }
+
+                    // Create items inside this folder
+                    itemsInFolder.forEach(item => {
+                        const pct = Math.min(100, Math.max(0, (item.currentStock / item.maxStock) * 100));
+                        const isLow = item.currentStock <= item.riskAmount;
+                        const div = document.createElement('div'); div.className = `wh-item ${isLow ? 'low-stock' : ''}`;
+
+                        let logsHtml = item.logs.map(l => `
+                            <div class="flex-between" style="border-bottom: 1px solid var(--border-color); padding: 6px 0;">
+                                <span>🕒 ${l.date}</span>
+                                <span>Total: <strong>${l.amount}</strong> <span style="color:${l.difference > 0 ? 'var(--success)' : 'var(--danger)'}">(${l.difference > 0 ? '+' : ''}${l.difference})</span></span>
+                            </div>`).join('');
+
+                        div.innerHTML = `
+                            <div class="flex-between">
+                                <h3 style="margin:0; color:var(--text-main); font-size:1.15rem;">${item.name}</h3>
+                                <div style="text-align:right;"><span style="font-size:1.4rem; font-weight:800; color:${isLow ? 'var(--danger)' : 'var(--primary)'}">${item.currentStock}</span> <span style="color:var(--text-muted); font-weight:600;">/ ${item.maxStock}</span></div>
+                            </div>
+                            ${isLow ? `<div class="text-danger" style="font-size:0.8rem; margin-top:4px; font-weight:600;">⚠️ ${t('label-currently-left')} (${item.riskAmount})</div>` : ''}
+                            <div class="wh-progress"><div class="wh-fill ${isLow ? 'low' : ''}" style="width: ${pct}%"></div></div>
+                            
+                            <div class="flex-between" style="margin-top: 20px; flex-wrap:wrap; gap:10px;">
+                                <div style="display:flex; gap:8px; flex:1; min-width: 200px;">
+                                    <input type="number" id="wh-update-${item.id}" placeholder="${t('placeholder-product-name')}" style="flex:1;" min="0">
+                                    <button onclick="updateWarehouseStock('${item.id}')" class="btn-success">${t('btn-log-payment') || 'Update'}</button>
+                                </div>
+                                <div style="display:flex; gap:8px;">
+                                    <button onclick="toggleDetails('wh-logs-${item.id}')" class="btn-neutral">History Log</button>
+                                    ${isWHAdmin ? `<button onclick="editMaxStock('${item.id}')" class="btn-outline">✏️ Edit Max</button>` : ''}
+                                    ${isWHAdmin ? `<button onclick="deleteWarehouseItem('${item.id}')" class="btn-outline-danger">${t('btn-remove')}</button>` : ''}
+                                </div>
+                            </div>
+
+                            <div id="wh-logs-${item.id}" class="wh-logs" style="display:none;">${logsHtml || 'No logs yet.'}</div>`;
+                        contentDiv.appendChild(div);
+                    });
+                }
             });
         }
 
         function exportWarehousePDF() {
             const data = getCompanyData().warehouse;
+            const folders = getCompanyData().whCategories || ['General'];
             if (!data || data.length === 0) return alert("Warehouse is empty.");
 
             let rowsHtml = '';
             let criticalList = [];
 
-            data.forEach(i => {
-                const isLow = i.currentStock <= i.riskAmount;
-                const toOrder = Math.max(0, i.maxStock - i.currentStock);
+            // Group by folders for PDF too
+            folders.forEach(folder => {
+                const itemsInFolder = data.filter(i => (i.category || 'General') === folder);
+                if (itemsInFolder.length > 0) {
+                    rowsHtml += `<tr style="background-color: #f1f5f9;"><td colspan="3" style="padding:10px; font-weight:bold; color:#334155;">📂 ${folder}</td></tr>`;
 
-                if (isLow) {
-                    criticalList.push(`<li style="margin-bottom:6px;"><strong>${i.name}</strong>: Need to order <strong>${toOrder}</strong></li>`);
+                    itemsInFolder.forEach(i => {
+                        const isLow = i.currentStock <= i.riskAmount;
+                        const toOrder = Math.max(0, i.maxStock - i.currentStock);
+
+                        if (isLow) {
+                            criticalList.push(`<li style="margin-bottom:6px;"><strong>${i.name}</strong> (${folder}): Need to order <strong>${toOrder}</strong></li>`);
+                        }
+
+                        const rowBg = isLow ? 'background-color:#fef2f2; color:#dc2626; font-weight:bold;' : '';
+                        const nameDisplay = isLow ? `&#x1F6A8; ${i.name}` : i.name;
+
+                        rowsHtml += `
+                            <tr style="${rowBg}">
+                                <td style="padding:8px 8px 8px 24px; border:1px solid #e2e8f0;">${nameDisplay}</td>
+                                <td style="padding:8px; border:1px solid #e2e8f0; text-align:center;">${i.currentStock} / ${i.maxStock}</td>
+                                <td style="padding:8px; border:1px solid #e2e8f0; text-align:center;">${toOrder}</td>
+                            </tr>
+                        `;
+                    });
                 }
-
-                const rowBg = isLow ? 'background-color:#fef2f2; color:#dc2626; font-weight:bold;' : '';
-                const nameDisplay = isLow ? `&#x1F6A8; ${i.name}` : i.name;
-
-                rowsHtml += `
-                    <tr style="${rowBg}">
-                        <td style="padding:8px; border:1px solid #ccc;">${nameDisplay}</td>
-                        <td style="padding:8px; border:1px solid #ccc; text-align:center;">${i.currentStock} / ${i.maxStock}</td>
-                        <td style="padding:8px; border:1px solid #ccc; text-align:center;">${toOrder}</td>
-                    </tr>
-                `;
             });
 
             let criticalHtml = '';
@@ -3009,21 +3148,11 @@
                 <title>Burgeroov Restock Report</title>
                 <style>
                     @page { size: portrait; margin: 0mm !important; }
-                    @page :left { margin: 0mm !important; }
-                    @page :right { margin: 0mm !important; }
-                    @page :first { margin: 0mm !important; }
-                    @page :blank { margin: 0mm !important; }
-                    @media print {
-                        html, body { margin: 0 !important; padding: 0 !important; }
-                    }
-                    html { margin: 0; padding: 0; }
                     body { font-family: Arial, sans-serif; color: #1e293b; padding: 15mm; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                     h2 { color: #452b1b; border-bottom: 2px solid #452b1b; padding-bottom: 10px; }
                     table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
-                    th { background-color: #452b1b; color: #fff; padding: 10px; border: 1px solid #ccc; text-align: left; }
-                    td { padding: 8px 10px; border: 1px solid #ccc; }
-                    tr:nth-child(even) td { background-color: #f8fafc; }
-                    .footer { margin-top: 30px; font-size: 10px; color: #64748b; text-align: right; }
+                    th { background-color: #452b1b; color: #fff; padding: 10px; border: 1px solid #cbd5e1; text-align: left; }
+                    td { border: 1px solid #e2e8f0; }
                 </style></head><body>
                 <h2>Burgeroov Restock Report</h2>
                 <p style="color:#64748b; font-size:13px;">Generated: ${new Date().toLocaleString()}</p>
@@ -3038,7 +3167,6 @@
                     <tbody>${rowsHtml}</tbody>
                 </table>
                 ${criticalHtml}
-
                 </body></html>`;
 
             const blob = new Blob([printHTML], { type: 'text/html' });
@@ -4499,7 +4627,7 @@
 
 
 
-                async function searchMapLocation() {
+        async function searchMapLocation() {
             const input = document.getElementById('map-search-input');
             const query = input.value.trim();
             if (!query) return;
@@ -5507,4 +5635,3 @@
 </body>
 
 </html>
-
