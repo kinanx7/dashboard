@@ -2875,13 +2875,13 @@
         }
 
         function deleteWhFolder(folderName) {
-            if (folderName === 'General') { alert("Cannot delete the General folder."); return; }
-            if (!confirm(`Delete folder '${folderName}'? Products inside will be moved to 'General'.`)) return;
+            if (!confirm(`Delete folder '${folderName}'? Products inside will be moved to 'Uncategorized'.`)) return;
 
             getCompanyData().whCategories = getCompanyData().whCategories.filter(f => f !== folderName);
-            // Move items in this folder to General
+
+            // Move items in this folder to Uncategorized
             getCompanyData().warehouse.forEach(item => {
-                if (item.category === folderName) item.category = 'General';
+                if (item.category === folderName || !item.category) item.category = 'Uncategorized';
             });
             saveData();
         }
@@ -2894,13 +2894,14 @@
             list.innerHTML = '';
             select.innerHTML = '';
 
-            const folders = getCompanyData().whCategories || ['General'];
+            const folders = getCompanyData().whCategories || [];
 
             folders.forEach(f => {
                 // Add to list
                 const div = document.createElement('div');
                 div.className = "flex-between list-item";
-                let delBtn = f !== 'General' ? `<button class="btn-outline-danger admin-only" style="padding: 2px 6px; font-size: 0.75rem; border:none;" onclick="deleteWhFolder('${f}')">✖</button>` : '<span></span>';
+                // Now EVERY folder has a delete button!
+                let delBtn = `<button class="btn-outline-danger admin-only" style="padding: 2px 6px; font-size: 0.75rem; border:none;" onclick="deleteWhFolder('${f}')">✖</button>`;
                 div.innerHTML = `<span style="font-size:0.9rem; font-weight:600;">📂 ${f}</span> ${delBtn}`;
                 list.appendChild(div);
 
@@ -2910,13 +2911,21 @@
                 opt.textContent = `📂 ${f}`;
                 select.appendChild(opt);
             });
+
+            // Add a fallback option if you deleted all folders
+            if (folders.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = 'Uncategorized';
+                opt.textContent = `📂 Uncategorized`;
+                select.appendChild(opt);
+            }
         }
 
         function addWarehouseItem() {
             const name = document.getElementById('wh-name').value.trim();
             const stock = parseFloat(document.getElementById('wh-stock').value);
             const risk = parseFloat(document.getElementById('wh-risk').value);
-            const category = document.getElementById('wh-folder-select').value || 'General';
+            const category = document.getElementById('wh-folder-select').value || 'Uncategorized';
 
             if (!name || isNaN(stock) || isNaN(risk) || stock < 0 || risk < 0) { alert("Please fill out all product details correctly."); return; }
 
@@ -3010,10 +3019,17 @@
                 return;
             }
 
-            const folders = data.whCategories || ['General'];
+            // Gather official folders AND any rogue/uncategorized item categories dynamically
+            let folders = [...(data.whCategories || [])];
+            filteredItems.forEach(i => {
+                const cat = i.category || 'Uncategorized';
+                if (!folders.includes(cat)) {
+                    folders.push(cat);
+                }
+            });
 
             folders.forEach(folder => {
-                const itemsInFolder = filteredItems.filter(i => (i.category || 'General') === folder);
+                const itemsInFolder = filteredItems.filter(i => (i.category || 'Uncategorized') === folder);
 
                 // Show folder if it has items, OR if we are not searching
                 if (itemsInFolder.length > 0 || !searchQuery) {
@@ -3098,15 +3114,21 @@
 
         function exportWarehousePDF() {
             const data = getCompanyData().warehouse;
-            const folders = getCompanyData().whCategories || ['General'];
             if (!data || data.length === 0) return alert("Warehouse is empty.");
+
+            // Gather all folders dynamically
+            let folders = [...(getCompanyData().whCategories || [])];
+            data.forEach(i => {
+                const cat = i.category || 'Uncategorized';
+                if (!folders.includes(cat)) folders.push(cat);
+            });
 
             let rowsHtml = '';
             let criticalList = [];
 
             // Group by folders for PDF too
             folders.forEach(folder => {
-                const itemsInFolder = data.filter(i => (i.category || 'General') === folder);
+                const itemsInFolder = data.filter(i => (i.category || 'Uncategorized') === folder);
                 if (itemsInFolder.length > 0) {
                     rowsHtml += `<tr style="background-color: #f1f5f9;"><td colspan="3" style="padding:10px; font-weight:bold; color:#334155;">📂 ${folder}</td></tr>`;
 
