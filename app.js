@@ -1,4 +1,4 @@
-﻿// =============================================
+// =============================================
         // FEATURE 1: IN-APP NOTIFICATION SYSTEM
         // =============================================
 
@@ -2051,16 +2051,23 @@
             ['ops', 'ranks', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'managing', 'costs'].forEach(t => {
                 const tabBtn = document.getElementById(`tab-${t}`);
                 const viewSec = document.getElementById(`view-${t}`);
-                if (tabBtn) tabBtn.classList.toggle('active-tab', tab === t);
+                const mobBtn  = document.getElementById(`mob-tab-${t}`);
+                if (tabBtn)  tabBtn.classList.toggle('active-tab',  tab === t);
+                if (mobBtn)  mobBtn.classList.toggle('active-tab',  tab === t);
                 if (viewSec) viewSec.classList.toggle('active-view', tab === t);
             });
             renderAll();
+
+            // Scroll the active mobile nav button into view
+            const activeMobBtn = document.getElementById(`mob-tab-${tab}`);
+            if (activeMobBtn) activeMobBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 
             // Fixes Leaflet map rendering bug when switching tabs
             if (tab === 'adverts' && promoMap) {
                 setTimeout(() => { promoMap.invalidateSize(); }, 500);
             }
         }
+
 
         function getMonthlyStats(worker, monthStr) {
             if (!worker.monthlyStats) worker.monthlyStats = {};

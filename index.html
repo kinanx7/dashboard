@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -1265,7 +1265,45 @@
             style="max-width: 90%; max-height: 90%; border-radius: 8px; border: 2px solid var(--border-color); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
     </div>
 
+    <!-- Mobile Bottom Navigation Bar (visible on phones only via CSS) -->
+    <nav id="mobile-bottom-nav" role="navigation" aria-label="Mobile navigation">
+        <button class="mob-nav-btn active-tab" id="mob-tab-ops"       onclick="switchTab('ops')">
+            <span class="mob-icon">⚙️</span><span>Ops</span>
+        </button>
+        <button class="mob-nav-btn" id="mob-tab-ranks"     onclick="switchTab('ranks')">
+            <span class="mob-icon">🏆</span><span>Ranks</span>
+        </button>
+        <button class="mob-nav-btn" id="mob-tab-tasks"     onclick="switchTab('tasks')">
+            <span class="mob-icon">📋</span><span>Tasks</span>
+        </button>
+        <button class="mob-nav-btn" id="mob-tab-warehouse" onclick="switchTab('warehouse')">
+            <span class="mob-icon">📦</span><span>Stock</span>
+        </button>
+        <button class="mob-nav-btn" id="mob-tab-drivers"   onclick="switchTab('drivers')">
+            <span class="mob-icon">🚚</span><span>Drivers</span>
+        </button>
+        <button class="mob-nav-btn" id="mob-tab-finance"   onclick="switchTab('finance')">
+            <span class="mob-icon">💰</span><span>Finance</span>
+        </button>
+        <button class="mob-nav-btn" id="mob-tab-summary"   onclick="switchTab('summary')">
+            <span class="mob-icon">📊</span><span>Summary</span>
+        </button>
+        <button class="mob-nav-btn" id="mob-tab-managing"  onclick="switchTab('managing')">
+            <span class="mob-icon">💵</span><span>Sales</span>
+        </button>
+        <button class="mob-nav-btn" id="mob-tab-costs"     onclick="switchTab('costs')">
+            <span class="mob-icon">📉</span><span>Costs</span>
+        </button>
+        <button class="mob-nav-btn" id="mob-tab-adverts"   onclick="switchTab('adverts')">
+            <span class="mob-icon">📢</span><span>Ads</span>
+        </button>
+        <button class="mob-nav-btn" id="mob-tab-notes"     onclick="switchTab('notes')">
+            <span class="mob-icon">📝</span><span>Notes</span>
+        </button>
+    </nav>
+
     <script defer src="app.js"></script>
 </body>
+
 
 </html>

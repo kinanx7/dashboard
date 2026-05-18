@@ -1,4 +1,4 @@
-﻿:root {
+:root {
             /* BURGEROOV LIGHT THEME */
             --primary: #452b1b;
             --primary-hover: #352014;
@@ -1254,62 +1254,313 @@
             border: 1px solid var(--border-color);
         }
 
-        /* Mobile Adjustments */
+
+        /* Mobile Adjustments — tablet */
         @media (max-width: 1024px) {
             .view-section.active-view {
                 grid-template-columns: 1fr !important;
             }
-
             .department-tabs {
                 border-radius: var(--radius-md);
                 flex-wrap: wrap;
+                padding: 0 16px;
             }
-
             .dept-tab {
                 flex: unset;
-                width: calc(50% - 4px);
-            }
-        }
-
-        @media (max-width: 600px) {
-            .month-bar {
-                flex-direction: column;
-                gap: 12px;
-                align-items: stretch;
-            }
-
-            .stat-box .flex-between {
-                flex-direction: column;
-                align-items: stretch;
-                gap: 10px;
-            }
-
-            .grid-2-col {
-                grid-template-columns: 1fr;
-            }
-
-            header {
-                flex-direction: column;
-                gap: 15px;
-                text-align: center;
-            }
-
-            .user-profile {
-                width: 100%;
-                justify-content: center;
-                flex-wrap: wrap;
-            }
-
-            .dept-tab {
-                width: 100%;
-            }
-
-            #in-app-notification {
-                min-width: calc(100vw - 32px);
-                max-width: calc(100vw - 32px);
+                width: calc(50% - 6px);
             }
         }
 
         #view-adverts.active-view {
             grid-template-columns: 1fr;
         }
+
+        /* =============================================
+           MOBILE BOTTOM NAV — hidden on desktop
+           ============================================= */
+        #mobile-bottom-nav {
+            display: none;
+        }
+
+        /* =============================================
+           FULL MOBILE RESPONSIVE SYSTEM (≤ 768px)
+           ============================================= */
+        @media (max-width: 768px) {
+
+            /* Body: extra bottom padding for the nav bar */
+            body {
+                padding-bottom: 80px;
+            }
+
+            /* --- Header: compact --- */
+            header {
+                padding: 10px 14px;
+                gap: 10px;
+                flex-direction: row;
+                flex-wrap: nowrap;
+            }
+            header h1 {
+                font-size: 0.95rem;
+                letter-spacing: 0;
+            }
+            header img {
+                max-height: 28px;
+            }
+            /* Shrink header buttons to icon-only */
+            #lang-toggle-btn,
+            #dark-mode-btn,
+            header .btn-outline[onclick="logout()"] {
+                padding: 6px 8px;
+                font-size: 0.75rem;
+                margin-right: 4px !important;
+            }
+            .user-profile {
+                gap: 6px;
+            }
+
+            /* --- Hide desktop tab pills on mobile --- */
+            .department-tabs {
+                display: none;
+            }
+
+            /* --- Show bottom nav on mobile --- */
+            #mobile-bottom-nav {
+                display: flex;
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                z-index: 500;
+                background: var(--card-bg);
+                border-top: 1px solid var(--border-color);
+                box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+                padding-bottom: env(safe-area-inset-bottom, 0px);
+            }
+            #mobile-bottom-nav::-webkit-scrollbar { display: none; }
+
+            .mob-nav-btn {
+                flex: 0 0 auto;
+                min-width: 60px;
+                padding: 7px 4px 5px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 2px;
+                border: none;
+                background: transparent;
+                color: var(--text-muted);
+                font-size: 0.58rem;
+                font-weight: 700;
+                cursor: pointer;
+                transition: color 0.2s ease, transform 0.15s ease;
+                border-radius: 0;
+                box-shadow: none;
+                white-space: nowrap;
+                letter-spacing: 0.2px;
+            }
+            .mob-nav-btn:hover {
+                background: transparent;
+                box-shadow: none;
+                transform: none;
+            }
+            .mob-nav-btn .mob-icon {
+                font-size: 1.35rem;
+                line-height: 1;
+                transition: transform 0.2s ease;
+            }
+            .mob-nav-btn.active-tab {
+                color: var(--primary);
+                background: transparent;
+                box-shadow: none;
+                transform: none;
+            }
+            .mob-nav-btn.active-tab .mob-icon {
+                transform: translateY(-2px);
+            }
+            /* Active indicator dot above active tab */
+            .mob-nav-btn.active-tab::before {
+                content: '';
+                display: block;
+                width: 4px;
+                height: 4px;
+                background: var(--primary);
+                border-radius: 50%;
+                margin: 0 auto -3px;
+            }
+
+            /* --- Month bar --- */
+            .month-bar {
+                flex-direction: column;
+                gap: 10px;
+                padding: 12px 14px;
+                margin-top: 12px;
+                width: calc(100% - 24px);
+            }
+            .month-bar h2 { font-size: 0.9rem; }
+
+            /* --- View sections --- */
+            .view-section.active-view,
+            #view-summary.active-view,
+            #view-ranks.active-view,
+            #view-tasks.active-view,
+            #view-notes.active-view,
+            #view-managing.active-view,
+            #view-costs.active-view,
+            #view-drivers.active-view,
+            #view-adverts.active-view {
+                grid-template-columns: 1fr !important;
+                padding: 0 12px;
+                gap: 0;
+            }
+
+            /* --- Cards --- */
+            .card {
+                padding: 16px 14px;
+                border-radius: 12px;
+                margin-bottom: 14px;
+            }
+
+            /* --- Inputs / Selects / Textareas --- */
+            /* 16px prevents iOS auto-zoom on focus */
+            input, select, textarea {
+                font-size: 16px !important;
+                padding: 12px 14px;
+                border-radius: 10px;
+            }
+
+            /* --- Buttons --- */
+            button {
+                min-height: 44px; /* Apple HIG touch target */
+                font-size: 0.9rem;
+            }
+
+            /* --- Grids collapse --- */
+            .grid-2-col,
+            .task-grid {
+                grid-template-columns: 1fr;
+            }
+
+            /* --- Tables --- */
+            .table-container {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            th, td {
+                padding: 10px 12px;
+                font-size: 0.82rem;
+            }
+
+            /* --- Stat boxes --- */
+            .stat-box { padding: 14px 12px; }
+            .stat-box .flex-between {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+
+            /* --- Flex-between: let items wrap on mobile --- */
+            .flex-between { flex-wrap: wrap; }
+
+            /* --- Histograms: scroll horizontally --- */
+            .histogram-container,
+            #pl-comparative-histogram,
+            #pl-histogram-labels,
+            #sales-histogram {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            /* --- Costs/Sales HUD 4-col → 2×2 --- */
+            #view-costs .card > div[style*="grid-template-columns:1fr 1fr 1fr 1fr"],
+            #view-costs .card > div[style*="grid-template-columns: 1fr 1fr 1fr 1fr"] {
+                grid-template-columns: 1fr 1fr !important;
+                gap: 10px !important;
+            }
+
+            /* --- Sales/Costs inner 2-col grids → 1-col --- */
+            #view-managing .card > div[style*="grid-template-columns: 1fr 1fr"],
+            #view-costs .card > div[style*="grid-template-columns: 1fr 1fr"] {
+                grid-template-columns: 1fr !important;
+                gap: 16px !important;
+            }
+
+            /* --- Ads map: full height reduced on mobile --- */
+            #view-adverts > div {
+                grid-template-columns: 1fr !important;
+            }
+            #promo-map { height: 320px !important; }
+
+            /* --- Driver/task timer banners --- */
+            #worker-task-timer-banner,
+            #driver-order-timer-banner {
+                margin: 8px 12px;
+                width: calc(100% - 24px);
+                padding: 12px 14px;
+            }
+
+            /* --- In-app notification full width --- */
+            #in-app-notification {
+                min-width: calc(100vw - 24px);
+                max-width: calc(100vw - 24px);
+                left: 12px;
+                transform: none;
+                border-radius: 10px;
+            }
+            #in-app-notification.notif-visible { top: 12px; }
+
+            /* --- Auth card smaller --- */
+            .auth-card {
+                padding: 24px 18px;
+                margin: 12px;
+                border-radius: 14px;
+            }
+
+            /* --- Card header flex: allow wrap --- */
+            .card-header-flex {
+                gap: 10px;
+            }
+
+            /* --- User dropdown for touch --- */
+            .user-dropdown {
+                right: -10px;
+                min-width: 180px;
+            }
+
+            /* --- Map search bar layout --- */
+            #view-adverts [style*="position: absolute; top: 80px"] {
+                top: 60px !important;
+                right: 8px !important;
+            }
+
+            /* --- Advert pins log: max height --- */
+            #adverts-log-list {
+                max-height: 300px;
+            }
+
+            /* --- Global stock alerts --- */
+            #global-stock-alerts {
+                width: calc(100% - 24px);
+                margin: 0 12px 14px;
+            }
+
+            /* --- Timer text smaller on phone --- */
+            .timer-text { font-size: 1.4rem; }
+
+            /* --- Mission items wrap --- */
+            .mission-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+        }
+
+        /* Very small phones (≤ 400px) */
+        @media (max-width: 400px) {
+            header h1 { display: none; } /* Show only logo on tiny screens */
+            .mob-nav-btn { min-width: 52px; font-size: 0.52rem; }
+            .mob-nav-btn .mob-icon { font-size: 1.2rem; }
+        }
+
