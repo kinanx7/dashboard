@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -1039,19 +1039,29 @@
             <div class="card" style="width: 100%; border-top: 4px solid var(--primary);">
                 <div class="flex-between" style="margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
                     <h2 class="card-title" style="margin:0; border:none; padding:0;">💰 Advanced Sales Analytics</h2>
-                    <div style="display: flex; gap: 8px; background: var(--input-bg); padding: 6px; border-radius: 100px; border: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
+                    <div
+                        style="display: flex; gap: 8px; background: var(--input-bg); padding: 6px; border-radius: 100px; border: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
                         <div style="display: flex; gap: 4px; align-items: center;">
-                            <button id="tf-day" onclick="setSalesTimeframe('day')" style="border-radius:100px; padding: 6px 16px; background:var(--primary); color:white;">Daily</button>
-                            <input type="date" id="sales-date-picker" onchange="renderManaging()" style="padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-color); font-size: 0.85rem; height: 32px; background: var(--card-bg); color: var(--text-main);">
+                            <button id="tf-day" onclick="setSalesTimeframe('day')"
+                                style="border-radius:100px; padding: 6px 16px; background:var(--primary); color:white;">Daily</button>
+                            <input type="date" id="sales-date-picker" onchange="renderManaging()"
+                                style="padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-color); font-size: 0.85rem; height: 32px; background: var(--card-bg); color: var(--text-main);">
                         </div>
-                        <button id="tf-week" onclick="setSalesTimeframe('week')" style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">Week</button>
-                        <button id="tf-month" onclick="setSalesTimeframe('month')" style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">Month</button>
-                        <button id="tf-year" onclick="setSalesTimeframe('year')" style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">Year</button>
-                        <button id="tf-custom" onclick="setSalesTimeframe('custom')" style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">📅 Range</button>
+                        <button id="tf-week" onclick="setSalesTimeframe('week')"
+                            style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">Week</button>
+                        <button id="tf-month" onclick="setSalesTimeframe('month')"
+                            style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">Month</button>
+                        <button id="tf-year" onclick="setSalesTimeframe('year')"
+                            style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">Year</button>
+                        <button id="tf-custom" onclick="setSalesTimeframe('custom')"
+                            style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">📅
+                            Range</button>
                         <div id="sales-custom-range" style="display:none; gap:6px; align-items:center; flex-wrap:wrap;">
-                            <input type="date" id="sales-from-date" onchange="renderManaging()" style="padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-color); font-size: 0.85rem; height: 32px; background: var(--card-bg); color: var(--text-main);">
+                            <input type="date" id="sales-from-date" onchange="renderManaging()"
+                                style="padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-color); font-size: 0.85rem; height: 32px; background: var(--card-bg); color: var(--text-main);">
                             <span style="color:var(--text-muted); font-size:0.8rem;">to</span>
-                            <input type="date" id="sales-to-date" onchange="renderManaging()" style="padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-color); font-size: 0.85rem; height: 32px; background: var(--card-bg); color: var(--text-main);">
+                            <input type="date" id="sales-to-date" onchange="renderManaging()"
+                                style="padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-color); font-size: 0.85rem; height: 32px; background: var(--card-bg); color: var(--text-main);">
                         </div>
                     </div>
                 </div>
@@ -1130,51 +1140,84 @@
             <div class="card" style="width: 100%; border-top: 4px solid var(--danger);">
                 <div class="flex-between" style="margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
                     <h2 class="card-title" style="margin:0; border:none; padding:0;">📉 Costs & P&L Dashboard</h2>
-                    <div style="display: flex; gap: 8px; background: var(--input-bg); padding: 6px; border-radius: 100px; border: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
+                    <div
+                        style="display: flex; gap: 8px; background: var(--input-bg); padding: 6px; border-radius: 100px; border: 1px solid var(--border-color); align-items: center; flex-wrap: wrap;">
                         <div style="display: flex; gap: 4px; align-items: center;">
-                            <button id="cost-tf-day" onclick="setCostsTimeframe('day')" style="border-radius:100px; padding: 6px 16px; background:var(--primary); color:white;">Daily</button>
-                            <input type="date" id="costs-date-picker" onchange="renderCosts()" style="padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-color); font-size: 0.85rem; height: 32px; background: var(--card-bg); color: var(--text-main);">
+                            <button id="cost-tf-day" onclick="setCostsTimeframe('day')"
+                                style="border-radius:100px; padding: 6px 16px; background:var(--primary); color:white;">Daily</button>
+                            <input type="date" id="costs-date-picker" onchange="renderCosts()"
+                                style="padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-color); font-size: 0.85rem; height: 32px; background: var(--card-bg); color: var(--text-main);">
                         </div>
-                        <button id="cost-tf-week" onclick="setCostsTimeframe('week')" style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">Week</button>
-                        <button id="cost-tf-month" onclick="setCostsTimeframe('month')" style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">Month</button>
-                        <button id="cost-tf-year" onclick="setCostsTimeframe('year')" style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">Year</button>
-                        <button id="cost-tf-custom" onclick="setCostsTimeframe('custom')" style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">📅 Range</button>
+                        <button id="cost-tf-week" onclick="setCostsTimeframe('week')"
+                            style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">Week</button>
+                        <button id="cost-tf-month" onclick="setCostsTimeframe('month')"
+                            style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">Month</button>
+                        <button id="cost-tf-year" onclick="setCostsTimeframe('year')"
+                            style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">Year</button>
+                        <button id="cost-tf-custom" onclick="setCostsTimeframe('custom')"
+                            style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);">📅
+                            Range</button>
                         <div id="costs-custom-range" style="display:none; gap:6px; align-items:center; flex-wrap:wrap;">
-                            <input type="date" id="costs-from-date" onchange="renderCosts()" style="padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-color); font-size: 0.85rem; height: 32px; background: var(--card-bg); color: var(--text-main);">
+                            <input type="date" id="costs-from-date" onchange="renderCosts()"
+                                style="padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-color); font-size: 0.85rem; height: 32px; background: var(--card-bg); color: var(--text-main);">
                             <span style="color:var(--text-muted); font-size:0.8rem;">to</span>
-                            <input type="date" id="costs-to-date" onchange="renderCosts()" style="padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-color); font-size: 0.85rem; height: 32px; background: var(--card-bg); color: var(--text-main);">
+                            <input type="date" id="costs-to-date" onchange="renderCosts()"
+                                style="padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-color); font-size: 0.85rem; height: 32px; background: var(--card-bg); color: var(--text-main);">
                         </div>
                     </div>
                 </div>
 
                 <!-- HUD: 4 stat cards side by side -->
                 <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px; margin-bottom:24px;">
-                    <div style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:14px; padding:20px; text-align:center;">
-                        <div style="font-size:0.65rem; font-weight:800; text-transform:uppercase; color:var(--text-muted); letter-spacing:1px;">Net Profit (<span id="pl-timeframe-label">Today</span>)</div>
-                        <div id="pl-net-profit" style="font-size:2rem; font-weight:900; margin:8px 0 4px; letter-spacing:-0.5px;">SAR 0.00</div>
+                    <div
+                        style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:14px; padding:20px; text-align:center;">
+                        <div
+                            style="font-size:0.65rem; font-weight:800; text-transform:uppercase; color:var(--text-muted); letter-spacing:1px;">
+                            Net Profit (<span id="pl-timeframe-label">Today</span>)</div>
+                        <div id="pl-net-profit"
+                            style="font-size:2rem; font-weight:900; margin:8px 0 4px; letter-spacing:-0.5px;">SAR 0.00
+                        </div>
                         <div id="pl-status-message" style="font-size:0.8rem; font-weight:700;"></div>
                     </div>
-                    <div style="background:var(--success-bg); border:1px solid var(--success-border); border-radius:14px; padding:20px; text-align:center;">
-                        <div style="font-size:0.65rem; font-weight:800; text-transform:uppercase; color:var(--success); letter-spacing:1px;">Gross Sales</div>
-                        <div id="pl-gross-sales" style="font-size:1.6rem; font-weight:900; color:var(--success); margin-top:8px;">SAR 0</div>
+                    <div
+                        style="background:var(--success-bg); border:1px solid var(--success-border); border-radius:14px; padding:20px; text-align:center;">
+                        <div
+                            style="font-size:0.65rem; font-weight:800; text-transform:uppercase; color:var(--success); letter-spacing:1px;">
+                            Gross Sales</div>
+                        <div id="pl-gross-sales"
+                            style="font-size:1.6rem; font-weight:900; color:var(--success); margin-top:8px;">SAR 0</div>
                     </div>
-                    <div style="background:var(--danger-bg); border:1px solid var(--danger-border); border-radius:14px; padding:20px; text-align:center;">
-                        <div style="font-size:0.65rem; font-weight:800; text-transform:uppercase; color:var(--danger); letter-spacing:1px;">Gross Costs</div>
-                        <div id="pl-gross-costs" style="font-size:1.6rem; font-weight:900; color:var(--danger); margin-top:8px;">SAR 0</div>
+                    <div
+                        style="background:var(--danger-bg); border:1px solid var(--danger-border); border-radius:14px; padding:20px; text-align:center;">
+                        <div
+                            style="font-size:0.65rem; font-weight:800; text-transform:uppercase; color:var(--danger); letter-spacing:1px;">
+                            Gross Costs</div>
+                        <div id="pl-gross-costs"
+                            style="font-size:1.6rem; font-weight:900; color:var(--danger); margin-top:8px;">SAR 0</div>
                     </div>
-                    <div style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:14px; padding:20px; text-align:center;">
-                        <div style="font-size:0.65rem; font-weight:800; text-transform:uppercase; color:var(--text-muted); letter-spacing:1px;">Transactions</div>
-                        <div id="pl-tx-count" style="font-size:1.6rem; font-weight:900; color:var(--primary); margin-top:8px;">0</div>
+                    <div
+                        style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:14px; padding:20px; text-align:center;">
+                        <div
+                            style="font-size:0.65rem; font-weight:800; text-transform:uppercase; color:var(--text-muted); letter-spacing:1px;">
+                            Transactions</div>
+                        <div id="pl-tx-count"
+                            style="font-size:1.6rem; font-weight:900; color:var(--primary); margin-top:8px;">0</div>
                     </div>
                 </div>
 
                 <!-- Full-width histogram: Sales vs Costs over time -->
-                <div style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:16px; padding:24px;">
+                <div
+                    style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:16px; padding:24px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                        <h3 style="font-size:1rem; color:var(--text-main); margin:0;">📊 Sales vs Costs — Trend Chart</h3>
+                        <h3 style="font-size:1rem; color:var(--text-main); margin:0;">📊 Sales vs Costs — Trend Chart
+                        </h3>
                         <div style="display:flex; gap:16px;">
-                            <span style="font-size:0.75rem; color:var(--success); font-weight:700; display:flex; align-items:center; gap:5px;"><span style="width:12px; height:12px; background:var(--success); border-radius:3px; display:inline-block;"></span>Sales</span>
-                            <span style="font-size:0.75rem; color:var(--danger); font-weight:700; display:flex; align-items:center; gap:5px;"><span style="width:12px; height:12px; background:var(--danger); border-radius:3px; display:inline-block;"></span>Costs</span>
+                            <span
+                                style="font-size:0.75rem; color:var(--success); font-weight:700; display:flex; align-items:center; gap:5px;"><span
+                                    style="width:12px; height:12px; background:var(--success); border-radius:3px; display:inline-block;"></span>Sales</span>
+                            <span
+                                style="font-size:0.75rem; color:var(--danger); font-weight:700; display:flex; align-items:center; gap:5px;"><span
+                                    style="width:12px; height:12px; background:var(--danger); border-radius:3px; display:inline-block;"></span>Costs</span>
                         </div>
                     </div>
                     <div id="pl-comparative-histogram" style="
@@ -1186,47 +1229,67 @@
                         overflow-x:auto;
                         padding-bottom:0;
                     "></div>
-                    <div id="pl-histogram-labels" style="display:flex; gap:6px; padding-top:6px; overflow-x:auto;"></div>
+                    <div id="pl-histogram-labels" style="display:flex; gap:6px; padding-top:6px; overflow-x:auto;">
+                    </div>
                 </div>
 
                 <div
                     style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: stretch; margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 30px;">
                     <div>
-                        <h3 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--text-main);">Log a New Cost/Expense</h3>
-                        <div style="background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
+                        <h3 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--text-main);">Log a New
+                            Cost/Expense</h3>
+                        <div
+                            style="background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
                             <div style="display: flex; gap: 12px; align-items: stretch; flex-wrap: wrap;">
                                 <div style="flex: 2; min-width: 150px;">
-                                    <input type="number" id="new-cost-amount" placeholder="Amount (SAR)..." style="font-size: 1.25rem; font-weight: 700; padding: 14px; color: var(--danger); height: 100%;">
+                                    <input type="number" id="new-cost-amount" placeholder="Amount (SAR)..."
+                                        style="font-size: 1.25rem; font-weight: 700; padding: 14px; color: var(--danger); height: 100%;">
                                 </div>
                                 <div style="flex: 1; min-width: 120px;">
-                                    <select id="new-cost-category-select" style="height: 100%; font-size: 1rem; font-weight: 600; padding: 14px;"></select>
+                                    <select id="new-cost-category-select"
+                                        style="height: 100%; font-size: 1rem; font-weight: 600; padding: 14px;"></select>
                                 </div>
                             </div>
-                            <button onclick="logCostTransaction()" class="btn-danger" style="font-size: 1.1rem; padding: 14px; font-weight: 800; width:100%; margin-top: 12px;">✅ Log Cost (Now)</button>
+                            <button onclick="logCostTransaction()" class="btn-danger"
+                                style="font-size: 1.1rem; padding: 14px; font-weight: 800; width:100%; margin-top: 12px;">✅
+                                Log Cost (Now)</button>
                         </div>
 
                         <!-- Past Day Cost Entry (password protected) -->
-                        <div class="admin-only" style="margin-top: 20px; background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px dashed var(--warning-border, #f59e0b);">
+                        <div class="admin-only"
+                            style="margin-top: 20px; background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px dashed var(--warning-border, #f59e0b);">
                             <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
                                 <span style="font-size:1.1rem;">🔒</span>
-                                <h4 style="font-size:0.95rem; font-weight:700; color:var(--warning, #f59e0b); margin:0;">Log Cost for a Past Day</h4>
+                                <h4
+                                    style="font-size:0.95rem; font-weight:700; color:var(--warning, #f59e0b); margin:0;">
+                                    Log Cost for a Past Day</h4>
                             </div>
-                            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; margin-bottom:10px;">
-                                <input type="number" id="past-cost-amount" placeholder="Amount (SAR)" style="flex:2; min-width:110px; font-size:1rem; font-weight:700; padding:12px; color:var(--danger);">
-                                <select id="past-cost-category" style="flex:1; min-width:110px; font-size:0.95rem; font-weight:600; padding:12px;"></select>
-                                <input type="date" id="past-cost-date" style="flex:1; min-width:130px; padding:12px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.9rem;">
+                            <div
+                                style="display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; margin-bottom:10px;">
+                                <input type="number" id="past-cost-amount" placeholder="Amount (SAR)"
+                                    style="flex:2; min-width:110px; font-size:1rem; font-weight:700; padding:12px; color:var(--danger);">
+                                <select id="past-cost-category"
+                                    style="flex:1; min-width:110px; font-size:0.95rem; font-weight:600; padding:12px;"></select>
+                                <input type="date" id="past-cost-date"
+                                    style="flex:1; min-width:130px; padding:12px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.9rem;">
                             </div>
-                            <input type="password" id="past-cost-password" placeholder="🔑 Manager Password" style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.95rem;">
-                            <button onclick="logPastCostTransaction()" style="width:100%; padding:12px; background:linear-gradient(135deg,#f59e0b,#d97706); color:white; border:none; border-radius:8px; font-size:1rem; font-weight:800; cursor:pointer;">🔒 Submit Past Day Cost</button>
+                            <input type="password" id="past-cost-password" placeholder="🔑 Manager Password"
+                                style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.95rem;">
+                            <button onclick="logPastCostTransaction()"
+                                style="width:100%; padding:12px; background:linear-gradient(135deg,#f59e0b,#d97706); color:white; border:none; border-radius:8px; font-size:1rem; font-weight:800; cursor:pointer;">🔒
+                                Submit Past Day Cost</button>
                         </div>
 
                         <div class="admin-only" style="margin-top: 20px;">
-                            <h3 style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 10px;">Admin: Manage Cost Categories</h3>
+                            <h3 style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 10px;">Admin: Manage
+                                Cost Categories</h3>
                             <div style="display: flex; gap: 8px;">
-                                <input type="text" id="new-cost-category" placeholder="Add new category..." style="flex:1; padding: 10px; font-size: 0.9rem;">
+                                <input type="text" id="new-cost-category" placeholder="Add new category..."
+                                    style="flex:1; padding: 10px; font-size: 0.9rem;">
                                 <button onclick="addCostCategory()" class="btn-outline">Add Category</button>
                             </div>
-                            <div id="admin-cost-categories-list" style="display:flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;"></div>
+                            <div id="admin-cost-categories-list"
+                                style="display:flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;"></div>
                         </div>
                     </div>
 
@@ -1244,25 +1307,31 @@
             </div>
 
             <!-- PDF Export Bar -->
-            <div style="margin-top: 20px; padding: 16px 20px; background: var(--input-bg); border-radius: 12px; border: 1px solid var(--border-color); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+            <div
+                style="margin-top: 20px; padding: 16px 20px; background: var(--input-bg); border-radius: 12px; border: 1px solid var(--border-color); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
                 <div>
-                    <div style="font-weight:700; color:var(--text-main); font-size:0.95rem;">📄 Export Cost Summary Report</div>
-                    <div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">Download a full PDF of the current timeframe — HUD stats, source breakdown & all transactions.</div>
+                    <div style="font-weight:700; color:var(--text-main); font-size:0.95rem;">📄 Export Cost Summary
+                        Report</div>
+                    <div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">Download a full PDF of the
+                        current timeframe — HUD stats, source breakdown & all transactions.</div>
                 </div>
-                <button onclick="exportCostsPDF()" style="background:var(--danger); color:#fff; padding:12px 24px; border:none; border-radius:10px; font-size:0.95rem; font-weight:800; cursor:pointer; white-space:nowrap;">🖨️ Print / Save PDF</button>
+                <button onclick="exportCostsPDF()"
+                    style="background:var(--danger); color:#fff; padding:12px 24px; border:none; border-radius:10px; font-size:0.95rem; font-weight:800; cursor:pointer; white-space:nowrap;">🖨️
+                    Print / Save PDF</button>
             </div>
         </div>
-        </div>
+    </div>
 
 
     </div> <!-- End container -->
 
-        <!-- Locked Department Overlay (shown when a worker taps a restricted tab) -->
-        <div id="view-locked" class="view-section">
-            <div style="text-align:center; max-width:480px; margin:0 auto; padding:20px;">
-                <div style="font-size:4rem; margin-bottom:16px; animation: notif-bell 1.2s ease both;">⛓️</div>
-                <h2 style="font-size:1.5rem; font-weight:800; color:var(--text-main); margin-bottom:10px;">Department Locked</h2>
-                <div id="locked-dept-label" style="
+    <!-- Locked Department Overlay (shown when a worker taps a restricted tab) -->
+    <div id="view-locked" class="view-section">
+        <div style="text-align:center; max-width:480px; margin:0 auto; padding:20px;">
+            <div style="font-size:4rem; margin-bottom:16px; animation: notif-bell 1.2s ease both;">⛓️</div>
+            <h2 style="font-size:1.5rem; font-weight:800; color:var(--text-main); margin-bottom:10px;">Department Locked
+            </h2>
+            <div id="locked-dept-label" style="
                     display:inline-block;
                     background:var(--input-bg);
                     border:1px solid var(--border-color);
@@ -1273,11 +1342,11 @@
                     color:var(--primary);
                     margin-bottom:20px;
                 "></div>
-                <p style="color:var(--text-muted); font-size:0.95rem; line-height:1.7; margin-bottom:28px;">
-                    You don't have permission to access this department.<br>
-                    Ask your manager to grant you access.
-                </p>
-                <div style="
+            <p style="color:var(--text-muted); font-size:0.95rem; line-height:1.7; margin-bottom:28px;">
+                You don't have permission to access this department.<br>
+                Ask your manager to grant you access.
+            </p>
+            <div style="
                     background:var(--warning-bg);
                     border:1px solid var(--warning-border);
                     border-left:4px solid var(--warning);
@@ -1290,11 +1359,11 @@
                     align-items:center;
                     gap:10px;
                 ">
-                    <span style="font-size:1.3rem;">🔑</span>
-                    <span>Your manager can unlock this from the Operations tab → Department Access Control.</span>
-                </div>
+                <span style="font-size:1.3rem;">🔑</span>
+                <span>Your manager can unlock this from the Operations tab → Department Access Control.</span>
             </div>
         </div>
+    </div>
 
 
 
@@ -1308,37 +1377,37 @@
 
     <!-- Mobile Bottom Navigation Bar (visible on phones only via CSS) -->
     <nav id="mobile-bottom-nav" role="navigation" aria-label="Mobile navigation">
-        <button class="mob-nav-btn active-tab" id="mob-tab-ops"       onclick="switchTab('ops')">
+        <button class="mob-nav-btn active-tab" id="mob-tab-ops" onclick="switchTab('ops')">
             <span class="mob-icon">⚙️</span><span>Ops</span>
         </button>
-        <button class="mob-nav-btn" id="mob-tab-ranks"     onclick="switchTab('ranks')">
+        <button class="mob-nav-btn" id="mob-tab-ranks" onclick="switchTab('ranks')">
             <span class="mob-icon">🏆</span><span>Ranks</span>
         </button>
-        <button class="mob-nav-btn" id="mob-tab-tasks"     onclick="switchTab('tasks')">
+        <button class="mob-nav-btn" id="mob-tab-tasks" onclick="switchTab('tasks')">
             <span class="mob-icon">📋</span><span>Tasks</span>
         </button>
         <button class="mob-nav-btn" id="mob-tab-warehouse" onclick="switchTab('warehouse')">
             <span class="mob-icon">📦</span><span>Stock</span>
         </button>
-        <button class="mob-nav-btn" id="mob-tab-drivers"   onclick="switchTab('drivers')">
+        <button class="mob-nav-btn" id="mob-tab-drivers" onclick="switchTab('drivers')">
             <span class="mob-icon">🚚</span><span>Drivers</span>
         </button>
-        <button class="mob-nav-btn" id="mob-tab-finance"   onclick="switchTab('finance')">
+        <button class="mob-nav-btn" id="mob-tab-finance" onclick="switchTab('finance')">
             <span class="mob-icon">💰</span><span>Finance</span>
         </button>
-        <button class="mob-nav-btn" id="mob-tab-summary"   onclick="switchTab('summary')">
+        <button class="mob-nav-btn" id="mob-tab-summary" onclick="switchTab('summary')">
             <span class="mob-icon">📊</span><span>Summary</span>
         </button>
-        <button class="mob-nav-btn" id="mob-tab-managing"  onclick="switchTab('managing')">
+        <button class="mob-nav-btn" id="mob-tab-managing" onclick="switchTab('managing')">
             <span class="mob-icon">💵</span><span>Sales</span>
         </button>
-        <button class="mob-nav-btn" id="mob-tab-costs"     onclick="switchTab('costs')">
+        <button class="mob-nav-btn" id="mob-tab-costs" onclick="switchTab('costs')">
             <span class="mob-icon">📉</span><span>Costs</span>
         </button>
-        <button class="mob-nav-btn" id="mob-tab-adverts"   onclick="switchTab('adverts')">
+        <button class="mob-nav-btn" id="mob-tab-adverts" onclick="switchTab('adverts')">
             <span class="mob-icon">📢</span><span>Ads</span>
         </button>
-        <button class="mob-nav-btn" id="mob-tab-notes"     onclick="switchTab('notes')">
+        <button class="mob-nav-btn" id="mob-tab-notes" onclick="switchTab('notes')">
             <span class="mob-icon">📝</span><span>Notes</span>
         </button>
     </nav>
