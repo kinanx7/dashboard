@@ -287,6 +287,33 @@
             const roleBadge = document.getElementById('display-user-role');
             roleBadge.textContent = isAdmin ? 'Manager' : 'Worker';
             roleBadge.style.backgroundColor = isAdmin ? 'var(--secondary)' : 'rgba(255,255,255,0.15)';
+
+            // Always run after body classes are set
+            markLockedTabs();
+        }
+
+        /**
+         * Marks tabs as visually locked (⛓️) for workers who lack access.
+         * Called every time applyUserRoles() runs (i.e. on every Firebase sync).
+         */
+        function markLockedTabs() {
+            const isAdmin = document.body.classList.contains('role-admin');
+
+            // Map: tabId → does current user have access?
+            const access = {
+                warehouse : isAdmin || document.body.classList.contains('perm-warehouse'),
+                drivers   : isAdmin || document.body.classList.contains('perm-drivers') || document.body.classList.contains('is-driver'),
+                finance   : isAdmin || document.body.classList.contains('perm-finance'),
+                managing  : isAdmin || document.body.classList.contains('perm-sales'),
+                costs     : isAdmin || document.body.classList.contains('perm-costs'),
+            };
+
+            Object.entries(access).forEach(([tabId, hasAccess]) => {
+                const btn    = document.getElementById(`tab-${tabId}`);
+                const mobBtn = document.getElementById(`mob-tab-${tabId}`);
+                if (btn)    btn.classList.toggle('tab-locked', !hasAccess);
+                if (mobBtn) mobBtn.classList.toggle('tab-locked', !hasAccess);
+            });
         }
 
         // --- REAL-TIME DATABASE SYNC ---
@@ -2048,24 +2075,48 @@
         // --- UI NAVIGATION & GLOBALS ---
         function switchTab(tab) {
             currentTab = tab;
-            ['ops', 'ranks', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'managing', 'costs'].forEach(t => {
-                const tabBtn = document.getElementById(`tab-${t}`);
-                const viewSec = document.getElementById(`view-${t}`);
-                const mobBtn  = document.getElementById(`mob-tab-${t}`);
-                if (tabBtn)  tabBtn.classList.toggle('active-tab',  tab === t);
-                if (mobBtn)  mobBtn.classList.toggle('active-tab',  tab === t);
-                if (viewSec) viewSec.classList.toggle('active-view', tab === t);
-            });
-            renderAll();
 
-            // Scroll the active mobile nav button into view
+            // --- Check if this tab is locked for the current user ---
+            const tabBtn  = document.getElementById(`tab-${tab}`);
+            const isLocked = tabBtn ? tabBtn.classList.contains('tab-locked') : false;
+
+            // Update the locked view label with the department name
+            if (isLocked) {
+                const label = document.getElementById('locked-dept-label');
+                if (label && tabBtn) {
+                    // Strip the ⛓️ emoji appended by CSS ::after (it's not in textContent)
+                    label.textContent = tabBtn.textContent.trim();
+                }
+            }
+
+            const allTabs = ['ops', 'ranks', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'managing', 'costs'];
+
+            allTabs.forEach(t => {
+                const btn    = document.getElementById(`tab-${t}`);
+                const view   = document.getElementById(`view-${t}`);
+                const mobBtn = document.getElementById(`mob-tab-${t}`);
+                const isActive = tab === t;
+                if (btn)    btn.classList.toggle('active-tab',  isActive);
+                if (mobBtn) mobBtn.classList.toggle('active-tab', isActive);
+                // Only show the real view if NOT locked
+                if (view)   view.classList.toggle('active-view', isActive && !isLocked);
+            });
+
+            // Show or hide the locked overlay
+            const lockedView = document.getElementById('view-locked');
+            if (lockedView) lockedView.classList.toggle('active-view', isLocked);
+
+            if (!isLocked) {
+                renderAll();
+                // Fixes Leaflet map rendering bug when switching tabs
+                if (tab === 'adverts' && promoMap) {
+                    setTimeout(() => { promoMap.invalidateSize(); }, 500);
+                }
+            }
+
+            // Scroll active mobile nav button into view
             const activeMobBtn = document.getElementById(`mob-tab-${tab}`);
             if (activeMobBtn) activeMobBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-
-            // Fixes Leaflet map rendering bug when switching tabs
-            if (tab === 'adverts' && promoMap) {
-                setTimeout(() => { promoMap.invalidateSize(); }, 500);
-            }
         }
 
 

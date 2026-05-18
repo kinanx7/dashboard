@@ -205,14 +205,7 @@
             display: none !important;
         }
 
-        body:not(.role-admin):not(.perm-warehouse) #tab-warehouse {
-            display: none !important;
-        }
-
-        /* FEATURE 2: Drivers tab visible to drivers and perm-drivers, but drivers-admin controls hidden from plain drivers */
-        body:not(.role-admin):not(.perm-drivers):not(.is-driver) #tab-drivers {
-            display: none !important;
-        }
+        /* FEATURE 2: Drivers admin controls hidden from plain drivers */
 
         body:not(.role-admin):not(.perm-drivers) .drivers-admin {
             display: none !important;
@@ -228,6 +221,60 @@
 
         body:not(.role-admin):not(.perm-costs) .costs-admin {
             display: none !important;
+        }
+
+        /* =============================================
+           LOCKED DEPARTMENT TAB SYSTEM
+           ============================================= */
+
+        /* Locked tab: chain icon appended, muted & not-allowed cursor */
+        .tab-locked {
+            opacity: 0.55;
+            cursor: not-allowed !important;
+            position: relative;
+        }
+        .tab-locked::after {
+            content: ' ⛓️';
+            font-size: 0.8em;
+        }
+        .tab-locked:hover {
+            transform: none !important;
+            box-shadow: none !important;
+            border-color: var(--border-color) !important;
+            color: var(--text-muted) !important;
+            background: var(--card-bg) !important;
+        }
+        .tab-locked.active-tab {
+            background: var(--input-bg) !important;
+            border-color: var(--border-color) !important;
+            color: var(--text-muted) !important;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        /* Mobile nav locked buttons */
+        .mob-nav-btn.tab-locked {
+            opacity: 0.45;
+            cursor: not-allowed !important;
+        }
+        .mob-nav-btn.tab-locked:hover {
+            background: transparent !important;
+            box-shadow: none !important;
+            transform: none !important;
+        }
+        .mob-nav-btn.tab-locked.active-tab::before { display: none; }
+
+        /* Locked view overlay */
+        #view-locked {
+            display: none;
+        }
+        #view-locked.active-view {
+            display: flex !important;
+            grid-template-columns: 1fr !important;
+            align-items: center;
+            justify-content: center;
+            min-height: 420px;
+            padding: 40px 20px;
         }
 
         /* Header HUD */
