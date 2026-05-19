@@ -184,6 +184,13 @@
 
                 listenToCloudData();
                 startGlobalTick();
+
+                // Register Firebase Messaging service worker (needed for background push + getToken)
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.register('/firebase-messaging-sw.js')
+                        .then(reg => console.log('[SW] Messaging service worker registered:', reg.scope))
+                        .catch(err => console.warn('[SW] Service worker registration failed:', err));
+                }
             } else {
                 currentUser = null;
                 document.getElementById('auth-loader').style.display = 'none';
@@ -380,6 +387,7 @@
                 if (isInitialLoad) {
                     migrateMonthlyData();
                     runAutoLogger();
+                    initFCMToken(); // ← Capture & save device token on first load
 
                     if (currentUser && currentUser.role === 'worker') {
                         const myWorker = appData.burgeroov.workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
@@ -429,6 +437,116 @@
                     alert("Failed to save. You may not have Admin permissions.");
                 });
         }
+
+
+        // =====================================================================
+        // FCM TOKEN INTEGRATION
+        // Works in two environments:
+        //   1. Android WebView  → AndroidInterface.getFCMToken() bridge
+        //   2. Browser          → Firebase Web Messaging SDK (if VAPID key set)
+        // The token is saved directly to the worker's node in RTDB so the
+        // admin can target the device for push notifications.
+        // =====================================================================
+
+        /**
+         * Entry point — called once on first data load after authentication.
+         * Tries the Android bridge first; falls back to Firebase Web Messaging.
+         */
+        function initFCMToken() {
+            if (!currentUser) return;
+
+            // --- Path 1: Android WebView bridge ---
+            if (typeof AndroidInterface !== 'undefined') {
+                try {
+                    const token = AndroidInterface.getFCMToken();
+                    if (token) {
+                        console.log('[FCM] Token received from AndroidInterface.');
+                        saveWorkerFCMToken(token);
+                        return;   // Done — no need to try Web Messaging
+                    }
+                } catch (e) {
+                    console.warn('[FCM] AndroidInterface.getFCMToken() threw:', e);
+                }
+            }
+
+            // --- Path 2: Firebase Web Messaging (browser, PWA) ---
+            // Requires firebase-messaging-sw.js and a VAPID key.
+            // Leave BURGEROOV_VAPID_KEY as empty string to disable.
+            const BURGEROOV_VAPID_KEY = 'BPqKnYM2FvZmwp6BbqAMcPck2dy52-s5CKTF2A089iyyIHpTfU0yNUjML-NFpofjZAIpTpC9rD98NVNk3SKLwRo';
+
+            if (BURGEROOV_VAPID_KEY && typeof firebase !== 'undefined' && firebase.messaging) {
+                try {
+                    const messaging = firebase.messaging();
+
+                    // Get or refresh token
+                    messaging.getToken({ vapidKey: BURGEROOV_VAPID_KEY })
+                        .then(token => {
+                            if (token) {
+                                console.log('[FCM] Token received from Firebase Web Messaging.');
+                                saveWorkerFCMToken(token);
+                            } else {
+                                console.info('[FCM] No registration token — permission may be denied.');
+                            }
+                        })
+                        .catch(err => console.warn('[FCM] getToken() failed:', err));
+
+                    // Refresh token whenever Firebase rotates it
+                    messaging.onTokenRefresh(() => {
+                        messaging.getToken({ vapidKey: BURGEROOV_VAPID_KEY })
+                            .then(token => { if (token) saveWorkerFCMToken(token); })
+                            .catch(err => console.warn('[FCM] Token refresh failed:', err));
+                    });
+
+                } catch (e) {
+                    console.warn('[FCM] Firebase Web Messaging not available:', e);
+                }
+            }
+        }
+
+        /**
+         * Writes the FCM token directly into the worker's node in Firebase RTDB.
+         * Uses db.ref().update() targeting a specific worker — avoids overwriting
+         * the entire dataset (unlike saveData()).
+         *
+         * @param {string} token  - The FCM registration token
+         */
+        function saveWorkerFCMToken(token) {
+            if (!currentUser || !token) return;
+
+            const email = currentUser.email.toLowerCase();
+            const workers = appData.burgeroov.workers || [];
+            const workerIndex = workers.findIndex(
+                w => w.email && w.email.toLowerCase() === email
+            );
+
+            if (workerIndex === -1) {
+                // Admin or un-matched email: store token in a separate lookup node
+                db.ref('companies/burgeroov/adminTokens/' + btoa(email).replace(/=/g, ''))
+                    .set({ email, fcmToken: token, updatedAt: Date.now() })
+                    .then(() => console.log('[FCM] Admin token stored.'))
+                    .catch(err => console.error('[FCM] Failed to store admin token:', err));
+                return;
+            }
+
+            const workerRef = db.ref(`companies/burgeroov/workers/${workerIndex}`);
+
+            // Only write if the token actually changed (avoids noisy RTDB writes)
+            const currentToken = workers[workerIndex].fcmToken;
+            if (currentToken === token) {
+                console.log('[FCM] Token unchanged — no write needed.');
+                return;
+            }
+
+            workerRef.update({ fcmToken: token, fcmUpdatedAt: Date.now() })
+                .then(() => {
+                    console.log('[FCM] Token saved for worker:', workers[workerIndex].name);
+                    // Mirror into local appData so the next save() includes it
+                    workers[workerIndex].fcmToken = token;
+                    workers[workerIndex].fcmUpdatedAt = Date.now();
+                })
+                .catch(err => console.error('[FCM] Failed to save token:', err));
+        }
+
 
         function migrateMonthlyData() {
             let migrated = false;
