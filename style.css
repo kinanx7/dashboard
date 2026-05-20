@@ -1357,6 +1357,7 @@
         /* =============================================
            DEPARTMENT BOTTOM SHEET â€” hidden by default
            ============================================= */
+        #mobile-bottom-nav,
         #mob-dept-backdrop,
         #mob-dept-sheet {
             display: none;
