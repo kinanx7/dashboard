@@ -313,6 +313,7 @@
                 finance   : isAdmin || document.body.classList.contains('perm-finance'),
                 managing  : isAdmin || document.body.classList.contains('perm-sales'),
                 costs     : isAdmin || document.body.classList.contains('perm-costs'),
+                adverts   : isAdmin,
             };
 
             Object.entries(access).forEach(([tabId, hasAccess]) => {
