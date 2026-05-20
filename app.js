@@ -503,24 +503,28 @@
                 try {
                     const messaging = firebase.messaging();
 
-                    // Get or refresh token
-                    messaging.getToken({ vapidKey: BURGEROOV_VAPID_KEY })
-                        .then(token => {
-                            if (token) {
-                                console.log('[FCM] Token received from Firebase Web Messaging.');
-                                saveWorkerFCMToken(token);
-                            } else {
-                                console.info('[FCM] No registration token — permission may be denied.');
-                            }
-                        })
-                        .catch(err => console.warn('[FCM] getToken() failed:', err));
+                    if ('serviceWorker' in navigator) {
+                        navigator.serviceWorker.ready.then((registration) => {
+                            // Get or refresh token
+                            messaging.getToken({ vapidKey: BURGEROOV_VAPID_KEY, serviceWorkerRegistration: registration })
+                                .then(token => {
+                                    if (token) {
+                                        console.log('[FCM] Token received from Firebase Web Messaging.');
+                                        saveWorkerFCMToken(token);
+                                    } else {
+                                        console.info('[FCM] No registration token — permission may be denied.');
+                                    }
+                                })
+                                .catch(err => console.warn('[FCM] getToken() failed:', err));
 
-                    // Refresh token whenever Firebase rotates it
-                    messaging.onTokenRefresh(() => {
-                        messaging.getToken({ vapidKey: BURGEROOV_VAPID_KEY })
-                            .then(token => { if (token) saveWorkerFCMToken(token); })
-                            .catch(err => console.warn('[FCM] Token refresh failed:', err));
-                    });
+                            // Refresh token whenever Firebase rotates it
+                            messaging.onTokenRefresh(() => {
+                                messaging.getToken({ vapidKey: BURGEROOV_VAPID_KEY, serviceWorkerRegistration: registration })
+                                    .then(token => { if (token) saveWorkerFCMToken(token); })
+                                    .catch(err => console.warn('[FCM] Token refresh failed:', err));
+                            });
+                        });
+                    }
 
                 } catch (e) {
                     console.warn('[FCM] Firebase Web Messaging not available:', e);
