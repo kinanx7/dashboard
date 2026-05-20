@@ -132,7 +132,7 @@
             let lightText = '☀️ Light Mode';
             let darkText = '🌙 Dark Mode';
             
-            if (typeof t === 'function') {
+            if (typeof t === 'function' && typeof uiTranslations !== 'undefined') {
                 lightText = t('btn-light-mode');
                 darkText = t('btn-dark-mode');
             } else {
@@ -4801,6 +4801,10 @@
                     }
                 }
             });
+
+            if (typeof applyDarkMode === "function") {
+                applyDarkMode();
+            }
         }
 
         function toggleLanguage(event) {
