@@ -374,6 +374,16 @@
             transform: translateY(0);
         }
 
+        .user-dropdown.show-dropdown {
+            opacity: 1 !important;
+            visibility: visible !important;
+            transform: translateY(0) !important;
+        }
+
+        .dropdown-mob-actions {
+            display: none !important;
+        }
+
         #display-user-email {
             color: var(--text-main);
             font-weight: 600;
@@ -1394,16 +1404,23 @@
             }
             header img { max-height: 26px; }
 
-            /* Shrink header buttons */
+            /* Hide inline lang/dark buttons in header on mobile */
             #lang-toggle-btn,
-            #dark-mode-btn,
-            header .btn-outline[onclick="logout()"] {
-                padding: 5px 7px;
-                font-size: 0.7rem;
-                margin-right: 2px !important;
-                min-height: 34px;
+            #dark-mode-btn {
+                display: none !important;
             }
-            .user-profile { gap: 4px; }
+
+            /* Style mobile header logout button */
+            header .btn-outline[onclick="logout()"] {
+                padding: 5px 10px;
+                font-size: 0.75rem;
+                margin-right: 4px !important;
+                min-height: 32px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .user-profile { gap: 8px; }
 
             /* --- Hide desktop tab pills on mobile --- */
             .department-tabs { display: none; }
@@ -1801,6 +1818,35 @@
             .user-dropdown {
                 right: -10px;
                 min-width: 180px;
+            }
+            .dropdown-mob-actions {
+                display: flex !important;
+                flex-direction: column;
+                gap: 6px;
+                margin-top: 10px;
+                padding-top: 8px;
+                border-top: 1px solid var(--border-color);
+                width: 100%;
+            }
+            .dropdown-mob-btn {
+                width: 100%;
+                min-height: 36px !important;
+                padding: 6px 12px;
+                font-size: 0.75rem;
+                border: 1px solid var(--border-color);
+                background: var(--input-bg);
+                color: var(--text-main);
+                border-radius: var(--radius-md);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 6px;
+                transition: var(--transition);
+            }
+            .dropdown-mob-btn:active {
+                background: rgba(197, 131, 43, 0.1);
+                border-color: var(--secondary);
             }
 
             /* --- Map search bar layout --- */

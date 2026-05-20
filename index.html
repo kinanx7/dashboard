@@ -106,16 +106,24 @@
                 </button>
 
                 <div class="user-menu-container">
-                    <div class="user-avatar">
+                    <div class="user-avatar" onclick="toggleUserDropdown(event)">
                         <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2"
                             fill="none" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                             <circle cx="12" cy="7" r="4"></circle>
                         </svg>
                     </div>
-                    <div class="user-dropdown">
+                    <div class="user-dropdown" id="user-dropdown-menu">
                         <div id="display-user-email"></div>
                         <div id="display-user-role" class="user-role-badge"></div>
+                        <div class="dropdown-mob-actions">
+                            <button class="btn-outline dropdown-mob-btn" onclick="toggleLanguage(event)" id="lang-toggle-btn-mob" translate="no">
+                                🌐 عربي
+                            </button>
+                            <button class="btn-outline dropdown-mob-btn" onclick="toggleDarkMode(event)" id="dark-mode-btn-mob" data-i18n="btn-dark-mode">
+                                🌙 Dark Mode
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

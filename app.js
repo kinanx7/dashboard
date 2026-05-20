@@ -127,15 +127,34 @@
         let isDarkMode = localStorage.getItem('darkMode') === 'true';
         function applyDarkMode() {
             const btn = document.getElementById('dark-mode-btn');
+            const btnMob = document.getElementById('dark-mode-btn-mob');
+            
+            let lightText = '☀️ Light Mode';
+            let darkText = '🌙 Dark Mode';
+            
+            if (typeof t === 'function') {
+                lightText = t('btn-light-mode');
+                darkText = t('btn-dark-mode');
+            } else {
+                const currentLang = localStorage.getItem("burgeroov_lang") || "en";
+                if (currentLang === 'ar') {
+                    lightText = '☀️ الوضع النهاري';
+                    darkText = '🌙 الوضع الليلي';
+                }
+            }
+
             if (isDarkMode) {
                 document.body.classList.add('dark-mode');
-                if (btn) btn.textContent = '☀️ Light Mode';
+                if (btn) btn.textContent = lightText;
+                if (btnMob) btnMob.textContent = lightText;
             } else {
                 document.body.classList.remove('dark-mode');
-                if (btn) btn.textContent = '🌙 Dark Mode';
+                if (btn) btn.textContent = darkText;
+                if (btnMob) btnMob.textContent = darkText;
             }
         }
-        function toggleDarkMode() {
+        function toggleDarkMode(event) {
+            if (event) event.stopPropagation();
             isDarkMode = !isDarkMode;
             localStorage.setItem('darkMode', isDarkMode);
             applyDarkMode();
@@ -4765,30 +4784,51 @@
             if (langBtn) {
                 langBtn.innerText = currentAppLang === "ar" ? "🌐 English" : "🌐 عربي";
             }
+            const langBtnMob = document.getElementById("lang-toggle-btn-mob");
+            if (langBtnMob) {
+                langBtnMob.innerText = currentAppLang === "ar" ? "🌐 English" : "🌐 عربي";
+            }
 
             document.querySelectorAll("[data-i18n]").forEach(el => {
                 const key = el.getAttribute("data-i18n");
                 const translation = uiTranslations[currentAppLang][key];
 
                 if (translation) {
-                    // معالجة حقول الإدخال (Placeholder)
                     if (el.tagName === "INPUT" && el.hasAttribute("placeholder")) {
                         el.placeholder = translation;
                     } else {
-                        // معالجة النصوص العادية
                         el.innerHTML = translation;
                     }
                 }
             });
         }
 
-        function toggleLanguage() {
+        function toggleLanguage(event) {
+            if (event) event.stopPropagation();
             currentAppLang = currentAppLang === "en" ? "ar" : "en";
             localStorage.setItem("burgeroov_lang", currentAppLang);
 
             if (typeof renderAll === "function") renderAll();
             applyTranslations();
+            if (typeof applyDarkMode === "function") applyDarkMode();
         }
 
-        // تنفيذ الترجمة عند تحميل الصفحة
+        // --- MOBILE USER DROPDOWN TRIGGER ---
+        window.toggleUserDropdown = function(event) {
+            if (event) event.stopPropagation();
+            const dropdown = document.getElementById('user-dropdown-menu');
+            if (dropdown) {
+                dropdown.classList.toggle('show-dropdown');
+            }
+        };
+
+        document.addEventListener('click', function(e) {
+            const container = document.querySelector('.user-menu-container');
+            const dropdown = document.getElementById('user-dropdown-menu');
+            if (container && dropdown && !container.contains(e.target)) {
+                dropdown.classList.remove('show-dropdown');
+            }
+        });
+
+        // Initial run
         applyTranslations();
