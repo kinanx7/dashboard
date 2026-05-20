@@ -202,7 +202,7 @@
 
                 // Register Firebase Messaging service worker (needed for background push + getToken)
                 if ('serviceWorker' in navigator) {
-                    navigator.serviceWorker.register('/firebase-messaging-sw.js')
+                    navigator.serviceWorker.register('./firebase-messaging-sw.js')
                         .then(reg => console.log('[SW] Messaging service worker registered:', reg.scope))
                         .catch(err => console.warn('[SW] Service worker registration failed:', err));
                 }
