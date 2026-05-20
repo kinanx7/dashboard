@@ -4778,6 +4778,9 @@
         }
 
         function applyTranslations() {
+            if (currentAppLang !== "en" && currentAppLang !== "ar") {
+                currentAppLang = "en";
+            }
             document.documentElement.dir = currentAppLang === "ar" ? "rtl" : "ltr";
 
             const langBtn = document.getElementById("lang-toggle-btn");
@@ -4789,9 +4792,11 @@
                 langBtnMob.innerText = currentAppLang === "ar" ? "🌐 English" : "🌐 عربي";
             }
 
+            const langDict = uiTranslations[currentAppLang] || uiTranslations["en"] || {};
+
             document.querySelectorAll("[data-i18n]").forEach(el => {
                 const key = el.getAttribute("data-i18n");
-                const translation = uiTranslations[currentAppLang][key];
+                const translation = langDict[key];
 
                 if (translation) {
                     if (el.tagName === "INPUT" && el.hasAttribute("placeholder")) {

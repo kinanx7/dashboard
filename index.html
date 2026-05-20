@@ -5,6 +5,60 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Burgeroov Management Portal</title>
+    <!-- Global Error Diagnostic Banner -->
+    <script>
+        (function() {
+            function showBanner(title, msg) {
+                const div = document.createElement('div');
+                div.style.position = 'fixed';
+                div.style.top = '10px';
+                div.style.left = '10px';
+                div.style.right = '10px';
+                div.style.background = 'rgba(220, 38, 38, 0.95)';
+                div.style.color = '#fff';
+                div.style.padding = '18px';
+                div.style.borderRadius = '8px';
+                div.style.boxShadow = '0 10px 25px rgba(0,0,0,0.3)';
+                div.style.zIndex = '999999';
+                div.style.fontSize = '0.9rem';
+                div.style.fontFamily = 'monospace';
+                div.style.whiteSpace = 'pre-wrap';
+                div.style.border = '1px solid rgba(255,255,255,0.2)';
+                div.innerHTML = `<strong style="font-size:1rem; display:block; margin-bottom:8px;">🚨 ${title}</strong>${msg}`;
+                
+                // Allow dismissing
+                const closeBtn = document.createElement('button');
+                closeBtn.innerText = '✕';
+                closeBtn.style.position = 'absolute';
+                closeBtn.style.top = '10px';
+                closeBtn.style.right = '10px';
+                closeBtn.style.background = 'none';
+                closeBtn.style.border = 'none';
+                closeBtn.style.color = '#fff';
+                closeBtn.style.fontSize = '1.2rem';
+                closeBtn.style.cursor = 'pointer';
+                closeBtn.onclick = function() { div.remove(); };
+                div.appendChild(closeBtn);
+
+                if (document.body) {
+                    document.body.appendChild(div);
+                } else {
+                    window.addEventListener('DOMContentLoaded', () => document.body.appendChild(div));
+                }
+            }
+
+            window.onerror = function(message, source, lineno, colno, error) {
+                const cleanSource = source ? source.split('/').pop() : 'unknown';
+                showBanner('Runtime Error Detected', `Message: ${message}\nFile: ${cleanSource}\nLine: ${lineno}:${colno}\nStack: ${error ? error.stack : 'N/A'}`);
+                return false;
+            };
+
+            window.addEventListener('unhandledrejection', function(event) {
+                showBanner('Promise Rejection Detected', `Reason: ${event.reason ? (event.reason.stack || event.reason.message || event.reason) : 'Unknown reason'}`);
+            });
+        })();
+    </script>
+
     <!-- Professional Corporate Font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
