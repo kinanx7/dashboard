@@ -256,12 +256,14 @@
             let isKinan = email === 'kinan.rahal@hotmail.com';
             let isAdmin = isKinan || admins.map(e => e.toLowerCase()).includes(email);
 
-            let wPerms = { warehouse: false, drivers: false, finance: false, sales: false, costs: false };
+            let wPerms = { warehouse: false, drivers: false, finance: false, sales: false, costs: false, adverts: false };
 
             // Global Privacy Config
             const deptPrivacy = appData.burgeroov.deptPrivacy || {
-                warehouse: 'restricted', drivers: 'restricted', finance: 'restricted', sales: 'restricted', costs: 'restricted'
+                warehouse: 'restricted', drivers: 'restricted', finance: 'restricted', sales: 'restricted', costs: 'restricted', adverts: 'restricted'
             };
+            if (!deptPrivacy.adverts) deptPrivacy.adverts = 'restricted';
+            if (!deptPrivacy.costs) deptPrivacy.costs = 'restricted';
 
             const worker = appData.burgeroov.workers.find(w => w.email && w.email.toLowerCase() === email);
             let isDriver = false;
@@ -288,6 +290,7 @@
                 if (wPerms.finance || deptPrivacy.finance === 'public') document.body.classList.add('perm-finance');
                 if (wPerms.sales || deptPrivacy.sales === 'public') document.body.classList.add('perm-sales');
                 if (wPerms.costs || deptPrivacy.costs === 'public') document.body.classList.add('perm-costs');
+                if (wPerms.adverts || deptPrivacy.adverts === 'public') document.body.classList.add('perm-adverts');
                 if (isDriver) document.body.classList.add('is-driver');
             }
 
@@ -313,7 +316,7 @@
                 finance   : isAdmin || document.body.classList.contains('perm-finance'),
                 managing  : isAdmin || document.body.classList.contains('perm-sales'),
                 costs     : isAdmin || document.body.classList.contains('perm-costs'),
-                adverts   : isAdmin,
+                adverts   : isAdmin || document.body.classList.contains('perm-adverts'),
             };
 
             Object.entries(access).forEach(([tabId, hasAccess]) => {
@@ -336,7 +339,9 @@
             if (!data.whCategories) data.whCategories = [];
 
             // Privacy & Management Data
-            if (!data.deptPrivacy) data.deptPrivacy = { warehouse: 'restricted', drivers: 'restricted', finance: 'restricted', sales: 'restricted', costs: 'restricted' };
+            if (!data.deptPrivacy) data.deptPrivacy = { warehouse: 'restricted', drivers: 'restricted', finance: 'restricted', sales: 'restricted', costs: 'restricted', adverts: 'restricted' };
+            if (!data.deptPrivacy.adverts) data.deptPrivacy.adverts = 'restricted';
+            if (!data.deptPrivacy.costs) data.deptPrivacy.costs = 'restricted';
             if (!data.managerNotes) data.managerNotes = [];
             data.managerNotes.forEach(n => { if (!n.replies) n.replies = []; });
             if (!data.incomeSources) data.incomeSources = ['Cash', 'Credit Card'];
@@ -777,14 +782,18 @@
                 document.getElementById('perm-drv').checked = false;
                 document.getElementById('perm-fin').checked = false;
                 document.getElementById('perm-sales').checked = false;
+                document.getElementById('perm-costs').checked = false;
+                document.getElementById('perm-adverts').checked = false;
                 return;
             }
             const worker = getCompanyData().workers.find(w => w.id === wId);
-            const p = worker.permissions || { warehouse: false, drivers: false, finance: false, sales: false };
+            const p = worker.permissions || { warehouse: false, drivers: false, finance: false, sales: false, costs: false, adverts: false };
             document.getElementById('perm-wh').checked = !!p.warehouse;
             document.getElementById('perm-drv').checked = !!p.drivers;
             document.getElementById('perm-fin').checked = !!p.finance;
             document.getElementById('perm-sales').checked = !!p.sales;
+            document.getElementById('perm-costs').checked = !!p.costs;
+            document.getElementById('perm-adverts').checked = !!p.adverts;
         }
 
         function saveWorkerPerms() {
@@ -795,21 +804,9 @@
                 warehouse: document.getElementById('perm-wh').checked,
                 drivers: document.getElementById('perm-drv').checked,
                 finance: document.getElementById('perm-fin').checked,
-                sales: document.getElementById('perm-sales').checked
-            };
-            saveData();
-            alert("Permissions updated!");
-        }
-
-        function saveWorkerPerms() {
-            const wId = document.getElementById('perm-worker-select').value;
-            if (!wId) return alert("Select a worker first.");
-            const worker = getCompanyData().workers.find(w => w.id === wId);
-            worker.permissions = {
-                warehouse: document.getElementById('perm-wh').checked,
-                drivers: document.getElementById('perm-drv').checked,
-                finance: document.getElementById('perm-fin').checked,
-                sales: document.getElementById('perm-sales').checked
+                sales: document.getElementById('perm-sales').checked,
+                costs: document.getElementById('perm-costs').checked,
+                adverts: document.getElementById('perm-adverts').checked
             };
             saveData();
             alert("Permissions updated!");
@@ -3709,8 +3706,55 @@
             }
         }
 
+        function renderGlobalPrivacyToggles() {
+            const container = document.getElementById('global-privacy-toggles');
+            if (!container) return;
+
+            const deptPrivacy = appData.burgeroov.deptPrivacy || {
+                warehouse: 'restricted', drivers: 'restricted', finance: 'restricted', sales: 'restricted', costs: 'restricted', adverts: 'restricted'
+            };
+            if (!deptPrivacy.adverts) deptPrivacy.adverts = 'restricted';
+            if (!deptPrivacy.costs) deptPrivacy.costs = 'restricted';
+
+            const depts = [
+                { id: 'warehouse', label: 'Warehouse / Stock' },
+                { id: 'drivers', label: 'Drivers Department' },
+                { id: 'finance', label: 'Financial Department' },
+                { id: 'sales', label: 'Sales Tracker' },
+                { id: 'costs', label: 'Costs Tracker' },
+                { id: 'adverts', label: 'Advertise / Ads' }
+            ];
+
+            container.innerHTML = '';
+            depts.forEach(dept => {
+                const currentVal = deptPrivacy[dept.id] || 'restricted';
+                
+                const row = document.createElement('div');
+                row.className = 'flex-between';
+                row.style.cssText = 'align-items: center; gap: 10px; margin-bottom: 8px;';
+                row.innerHTML = `
+                    <span style="font-weight: 600; font-size: 0.9rem; color: var(--text-main);">${dept.label}</span>
+                    <select onchange="updateDeptPrivacy('${dept.id}', this.value)" style="padding: 6px 12px; font-size: 0.85rem; width: auto; min-height: unset; margin: 0; border-radius: 6px;">
+                        <option value="restricted" ${currentVal === 'restricted' ? 'selected' : ''}>Restricted 🔐</option>
+                        <option value="public" ${currentVal === 'public' ? 'selected' : ''}>Public 🔓</option>
+                    </select>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        window.updateDeptPrivacy = function(deptId, value) {
+            if (!appData.burgeroov.deptPrivacy) {
+                appData.burgeroov.deptPrivacy = { warehouse: 'restricted', drivers: 'restricted', finance: 'restricted', sales: 'restricted', costs: 'restricted', adverts: 'restricted' };
+            }
+            appData.burgeroov.deptPrivacy[deptId] = value;
+            saveData();
+            applyUserRoles();
+        };
+
         // --- RENDERING ---
         function renderAll() {
+            renderGlobalPrivacyToggles();
             renderBranches();
             renderViolationRules();
             populateWorkerDropdowns();
@@ -4206,7 +4250,6 @@
 
                 const card = document.createElement('div');
                 card.className = 'summary-worker-card';
-                card.style.cssText = 'background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:24px; box-shadow:var(--shadow-sm); animation: fadeIn 0.3s ease;';
                 card.innerHTML = `
                     <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:20px; border-bottom:1px solid var(--border-color); padding-bottom:15px;">
                         <div>
@@ -4221,7 +4264,7 @@
                         </div>
                     </div>
 
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap:12px; margin-bottom:20px;">
+                    <div class="stats-grid" style="margin-bottom:20px;">
                         <div style="background:var(--input-bg); padding:16px 12px; border-radius:8px; text-align:center; border:1px solid var(--border-color);">
                             <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">${t('label-good-notes')}</div>
                             <div style="font-size:1.4rem; font-weight:700; color:var(--success); line-height:1;">${goodCount}</div>
