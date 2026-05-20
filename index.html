@@ -47,11 +47,14 @@
                 }
             }
 
-            window.onerror = function(message, source, lineno, colno, error) {
-                const cleanSource = source ? source.split('/').pop() : 'unknown';
-                showBanner('Runtime Error Detected', `Message: ${message}\nFile: ${cleanSource}\nLine: ${lineno}:${colno}\nStack: ${error ? error.stack : 'N/A'}`);
-                return false;
-            };
+            window.addEventListener('error', function (event) {
+                // Ignore generic cross-origin Script errors which are harmless but trigger the banner
+                if (event.message === 'Script error.' && (!event.filename || event.filename === '' || event.filename === 'unknown') && event.lineno === 0) {
+                    return false;
+                }
+                const cleanSource = event.filename ? event.filename.split('/').pop() : 'unknown';
+                showBanner('Runtime Error Detected', `Message: ${event.message}\nFile: ${cleanSource}\nLine: ${event.lineno}:${event.colno}\nStack: ${event.error ? event.error.stack : 'N/A'}`);
+            });
 
             window.addEventListener('unhandledrejection', function(event) {
                 showBanner('Promise Rejection Detected', `Reason: ${event.reason ? (event.reason.stack || event.reason.message || event.reason) : 'Unknown reason'}`);
