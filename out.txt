@@ -1,0 +1,64 @@
+// Autoplay may be blocked before user interaction; fail silently.
+errorMsg.style.display = 'block';
+errorMsg.style.display = 'block';
+errorMsg.style.display = 'block';
+appWrapper.style.display = 'block';
+document.getElementById('auth-btn').style.display = 'block';
+document.getElementById('auth-btn').style.display = 'block';
+errorMsg.style.display = 'block'; return;
+loader.style.display = 'block';
+btn.style.display = 'block';
+errorMsg.style.display = 'block';
+btn.style.display = 'block';
+errorMsg.style.display = 'block';
+warehouse: 'restricted', drivers: 'restricted', finance: 'restricted', sales: 'restricted', costs: 'restricted', adverts: 'restricted'
+if (!deptPrivacy.adverts) deptPrivacy.adverts = 'restricted';
+if (!deptPrivacy.costs) deptPrivacy.costs = 'restricted';
+markLockedTabs();
+* Marks tabs as visually locked (⛓️) for workers who lack access.
+function markLockedTabs() {
+if (btn)    btn.classList.toggle('tab-locked', !hasAccess);
+if (mobBtn) mobBtn.classList.toggle('tab-locked', !hasAccess);
+// Also lock dept sheet items (use data-tab)
+el.classList.toggle('tab-locked', !hasAccess);
+if (!data.deptPrivacy) data.deptPrivacy = { warehouse: 'restricted', drivers: 'restricted', finance: 'restricted', sales: 'restricted', costs: 'restricted', adverts: 'restricted' };
+if (!data.deptPrivacy.adverts) data.deptPrivacy.adverts = 'restricted';
+if (!data.deptPrivacy.costs) data.deptPrivacy.costs = 'restricted';
+banner.style.display = 'block';
+let lockIcon = n.isPrivate ? `<span class="badge" style="background:var(--danger); font-size:0.85rem;">🔒 Private Note</span>` : `<span class="badge" style="background:var(--info); font-size:0.85rem;">📢 Public Announcement</span>`;
+${lockIcon} <span style="font-size:0.85rem; color:var(--text-muted);">🕒 ${n.date}</span>
+if (datePicker) datePicker.style.display = tf === 'day' ? 'inline-block' : 'none';
+if (datePicker) datePicker.style.display = tf === 'day' ? 'inline-block' : 'none';
+sel.style.display = 'inline-block';
+if (btn) btn.style.display = 'inline-block';
+alertBox.style.display = 'block';
+if (el.style.display === 'none' || el.style.display === '') { el.style.display = 'block'; }
+// --- Check if this tab is locked for the current user ---
+const isLocked = tabBtn ? tabBtn.classList.contains('tab-locked') : false;
+// Update the locked view label with the department name
+if (isLocked) {
+const label = document.getElementById('locked-dept-label');
+// Only show the real view if NOT locked
+if (view) view.classList.toggle('active-view', isActive && !isLocked);
+// Show or hide the locked overlay
+const lockedView = document.getElementById('view-locked');
+if (lockedView) lockedView.classList.toggle('active-view', isLocked);
+if (!isLocked) {
+document.getElementById('vacation-days-group').style.display = type === 'vacation' ? 'block' : 'none';
+<strong style="display:block; border-bottom:1px solid var(--border-color); margin-bottom:8px; padding-bottom:4px; color:var(--text-main);">Last 90 Days Log</strong>
+document.getElementById('driver-prep-time-group').style.display = (status === 'preparing') ? 'block' : 'none';
+driverBanner.style.display = 'block';
+mngArea.style.display = 'block';
+activeArea.style.display = 'block';
+else { formArea.style.display = 'block'; activeArea.style.display = 'none'; }
+document.getElementById('tool-finish').style.display = 'inline-block';
+warehouse: 'restricted', drivers: 'restricted', finance: 'restricted', sales: 'restricted', costs: 'restricted', adverts: 'restricted'
+if (!deptPrivacy.adverts) deptPrivacy.adverts = 'restricted';
+if (!deptPrivacy.costs) deptPrivacy.costs = 'restricted';
+const currentVal = deptPrivacy[dept.id] || 'restricted';
+<option value="restricted" ${currentVal === 'restricted' ? 'selected' : ''}>Restricted 🔐</option>
+appData.burgeroov.deptPrivacy = { warehouse: 'restricted', drivers: 'restricted', finance: 'restricted', sales: 'restricted', costs: 'restricted', adverts: 'restricted' };
+panel.style.display = 'block';
+if (area) area.style.display = 'block';
+if (area) area.style.display = 'block';
+let imgHtml = v.image ? `<img src="${v.image}" onclick="showImage('${v.image}')" class="proof-img" style="max-height: 80px; display: block; margin-top: 10px;">` : '';
