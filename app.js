@@ -132,15 +132,11 @@
             let lightText = '☀️ Light Mode';
             let darkText = '🌙 Dark Mode';
             
-            if (typeof t === 'function' && typeof uiTranslations !== 'undefined') {
-                lightText = t('btn-light-mode');
-                darkText = t('btn-dark-mode');
-            } else {
-                const currentLang = localStorage.getItem("burgeroov_lang") || "en";
-                if (currentLang === 'ar') {
-                    lightText = '☀️ الوضع النهاري';
-                    darkText = '🌙 الوضع الليلي';
-                }
+            // Read directly from localStorage to avoid TDZ ReferenceErrors on late-declared variables
+            const currentLang = localStorage.getItem("burgeroov_lang") || "en";
+            if (currentLang === 'ar') {
+                lightText = '☀️ الوضع النهاري';
+                darkText = '🌙 الوضع الليلي';
             }
 
             if (isDarkMode) {
