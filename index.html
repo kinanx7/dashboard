@@ -7,7 +7,7 @@
     <title>Burgeroov Management Portal</title>
     <!-- Global Error Diagnostic Banner -->
     <script>
-        (function() {
+        (function () {
             function showBanner(title, msg) {
                 const div = document.createElement('div');
                 div.style.position = 'fixed';
@@ -25,7 +25,7 @@
                 div.style.whiteSpace = 'pre-wrap';
                 div.style.border = '1px solid rgba(255,255,255,0.2)';
                 div.innerHTML = `<strong style="font-size:1rem; display:block; margin-bottom:8px;">🚨 ${title}</strong>${msg}`;
-                
+
                 // Allow dismissing
                 const closeBtn = document.createElement('button');
                 closeBtn.innerText = '✕';
@@ -37,7 +37,7 @@
                 closeBtn.style.color = '#fff';
                 closeBtn.style.fontSize = '1.2rem';
                 closeBtn.style.cursor = 'pointer';
-                closeBtn.onclick = function() { div.remove(); };
+                closeBtn.onclick = function () { div.remove(); };
                 div.appendChild(closeBtn);
 
                 if (document.body) {
@@ -56,7 +56,7 @@
                 showBanner('Runtime Error Detected', `Message: ${event.message}\nFile: ${cleanSource}\nLine: ${event.lineno}:${event.colno}\nStack: ${event.error ? event.error.stack : 'N/A'}`);
             });
 
-            window.addEventListener('unhandledrejection', function(event) {
+            window.addEventListener('unhandledrejection', function (event) {
                 showBanner('Promise Rejection Detected', `Reason: ${event.reason ? (event.reason.stack || event.reason.message || event.reason) : 'Unknown reason'}`);
             });
         })();
@@ -78,7 +78,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=3">
 </head>
 
 <body class="theme-burgeroov">
@@ -174,10 +174,12 @@
                         <div id="display-user-email"></div>
                         <div id="display-user-role" class="user-role-badge"></div>
                         <div class="dropdown-mob-actions">
-                            <button class="btn-outline dropdown-mob-btn" onclick="toggleLanguage(event)" id="lang-toggle-btn-mob" translate="no">
+                            <button class="btn-outline dropdown-mob-btn" onclick="toggleLanguage(event)"
+                                id="lang-toggle-btn-mob" translate="no">
                                 🌐 عربي
                             </button>
-                            <button class="btn-outline dropdown-mob-btn" onclick="toggleDarkMode(event)" id="dark-mode-btn-mob" data-i18n="btn-dark-mode">
+                            <button class="btn-outline dropdown-mob-btn" onclick="toggleDarkMode(event)"
+                                id="dark-mode-btn-mob" data-i18n="btn-dark-mode">
                                 🌙 Dark Mode
                             </button>
                         </div>
@@ -1454,8 +1456,10 @@
         </div>
         <!-- Center: quick access to 3 most used tabs -->
         <div id="mob-quick-tabs">
-            <button class="mob-quick-btn active-tab" id="mob-tab-ops" onclick="switchTab('ops')" title="Operations">⚙️</button>
-            <button class="mob-quick-btn" id="mob-tab-summary" onclick="switchTab('summary')" title="Summary">📊</button>
+            <button class="mob-quick-btn active-tab" id="mob-tab-ops" onclick="switchTab('ops')"
+                title="Operations">⚙️</button>
+            <button class="mob-quick-btn" id="mob-tab-summary" onclick="switchTab('summary')"
+                title="Summary">📊</button>
             <button class="mob-quick-btn" id="mob-tab-tasks" onclick="switchTab('tasks')" title="Tasks">📋</button>
         </div>
         <!-- Right: open department picker -->
@@ -1474,34 +1478,44 @@
             <button class="mob-dept-item mob-sheet-tab" data-tab="ops" onclick="switchTab('ops'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">⚙️</span><span>Operations</span>
             </button>
-            <button class="mob-dept-item mob-sheet-tab" data-tab="ranks" onclick="switchTab('ranks'); closeMobDeptMenu()">
+            <button class="mob-dept-item mob-sheet-tab" data-tab="ranks"
+                onclick="switchTab('ranks'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">🏆</span><span>Ranks</span>
             </button>
-            <button class="mob-dept-item mob-sheet-tab" data-tab="tasks" onclick="switchTab('tasks'); closeMobDeptMenu()">
+            <button class="mob-dept-item mob-sheet-tab" data-tab="tasks"
+                onclick="switchTab('tasks'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">📋</span><span>Tasks</span>
             </button>
-            <button class="mob-dept-item mob-sheet-tab" data-tab="warehouse" onclick="switchTab('warehouse'); closeMobDeptMenu()">
+            <button class="mob-dept-item mob-sheet-tab" data-tab="warehouse"
+                onclick="switchTab('warehouse'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">📦</span><span>Warehouse</span>
             </button>
-            <button class="mob-dept-item mob-sheet-tab" data-tab="drivers" onclick="switchTab('drivers'); closeMobDeptMenu()">
+            <button class="mob-dept-item mob-sheet-tab" data-tab="drivers"
+                onclick="switchTab('drivers'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">🚚</span><span>Drivers</span>
             </button>
-            <button class="mob-dept-item mob-sheet-tab" data-tab="finance" onclick="switchTab('finance'); closeMobDeptMenu()">
+            <button class="mob-dept-item mob-sheet-tab" data-tab="finance"
+                onclick="switchTab('finance'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">💰</span><span>Finance</span>
             </button>
-            <button class="mob-dept-item mob-sheet-tab" data-tab="summary" onclick="switchTab('summary'); closeMobDeptMenu()">
+            <button class="mob-dept-item mob-sheet-tab" data-tab="summary"
+                onclick="switchTab('summary'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">📊</span><span>Summary</span>
             </button>
-            <button class="mob-dept-item mob-sheet-tab" data-tab="managing" onclick="switchTab('managing'); closeMobDeptMenu()">
+            <button class="mob-dept-item mob-sheet-tab" data-tab="managing"
+                onclick="switchTab('managing'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">💵</span><span>Sales</span>
             </button>
-            <button class="mob-dept-item mob-sheet-tab" data-tab="costs" onclick="switchTab('costs'); closeMobDeptMenu()">
+            <button class="mob-dept-item mob-sheet-tab" data-tab="costs"
+                onclick="switchTab('costs'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">📉</span><span>Costs</span>
             </button>
-            <button class="mob-dept-item mob-sheet-tab" data-tab="adverts" onclick="switchTab('adverts'); closeMobDeptMenu()">
+            <button class="mob-dept-item mob-sheet-tab" data-tab="adverts"
+                onclick="switchTab('adverts'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">📢</span><span>Ads</span>
             </button>
-            <button class="mob-dept-item mob-sheet-tab" data-tab="notes" onclick="switchTab('notes'); closeMobDeptMenu()">
+            <button class="mob-dept-item mob-sheet-tab" data-tab="notes"
+                onclick="switchTab('notes'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">📝</span><span>Notes</span>
             </button>
         </div>

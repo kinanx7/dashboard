@@ -234,7 +234,7 @@
             position: relative;
         }
         .tab-locked::after {
-            content: ' â›“ï¸';
+            content: ' 🔒';
             font-size: 0.8em;
         }
         .tab-locked:hover {
@@ -1657,7 +1657,7 @@
                 pointer-events: none;
             }
             .mob-dept-item.tab-locked::after {
-                content: 'ðŸ”’';
+                content: '🔒';
                 font-size: 0.7rem;
                 display: block;
             }
