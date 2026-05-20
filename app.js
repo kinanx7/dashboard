@@ -324,6 +324,10 @@
                 const mobBtn = document.getElementById(`mob-tab-${tabId}`);
                 if (btn)    btn.classList.toggle('tab-locked', !hasAccess);
                 if (mobBtn) mobBtn.classList.toggle('tab-locked', !hasAccess);
+                // Also lock dept sheet items (use data-tab)
+                document.querySelectorAll(`.mob-sheet-tab[data-tab="${tabId}"]`).forEach(el => {
+                    el.classList.toggle('tab-locked', !hasAccess);
+                });
             });
         }
 
@@ -2210,13 +2214,40 @@
             allTabs.forEach(t => {
                 const btn    = document.getElementById(`tab-${t}`);
                 const view   = document.getElementById(`view-${t}`);
-                const mobBtn = document.getElementById(`mob-tab-${t}`);
                 const isActive = tab === t;
-                if (btn)    btn.classList.toggle('active-tab',  isActive);
-                if (mobBtn) mobBtn.classList.toggle('active-tab', isActive);
+                if (btn) btn.classList.toggle('active-tab', isActive);
                 // Only show the real view if NOT locked
-                if (view)   view.classList.toggle('active-view', isActive && !isLocked);
+                if (view) view.classList.toggle('active-view', isActive && !isLocked);
+
+                // Sync quick-bar buttons (by id)
+                const qBtn = document.getElementById(`mob-tab-${t}`);
+                if (qBtn) qBtn.classList.toggle('active-tab', isActive);
+
+                // Sync dept-sheet buttons (by data-tab attribute)
+                document.querySelectorAll(`.mob-sheet-tab[data-tab="${t}"]`).forEach(el => {
+                    el.classList.toggle('active-tab', isActive);
+                });
             });
+
+            // Update the compact bar's active tab label and icon
+            const tabMeta = {
+                ops:       { icon: '⚙️', label: 'Operations' },
+                ranks:     { icon: '🏆', label: 'Ranks' },
+                tasks:     { icon: '📋', label: 'Tasks' },
+                warehouse: { icon: '📦', label: 'Warehouse' },
+                drivers:   { icon: '🚚', label: 'Drivers' },
+                finance:   { icon: '💰', label: 'Finance' },
+                summary:   { icon: '📊', label: 'Summary' },
+                managing:  { icon: '💵', label: 'Sales' },
+                costs:     { icon: '📉', label: 'Costs' },
+                adverts:   { icon: '📢', label: 'Ads' },
+                notes:     { icon: '📝', label: 'Notes' },
+            };
+            const meta = tabMeta[tab] || { icon: '⚙️', label: tab };
+            const iconEl  = document.getElementById('mob-active-icon');
+            const labelEl = document.getElementById('mob-active-label');
+            if (iconEl)  iconEl.textContent  = meta.icon;
+            if (labelEl) labelEl.textContent = meta.label;
 
             // Show or hide the locked overlay
             const lockedView = document.getElementById('view-locked');
@@ -2229,11 +2260,31 @@
                     setTimeout(() => { promoMap.invalidateSize(); }, 500);
                 }
             }
-
-            // Scroll active mobile nav button into view
-            const activeMobBtn = document.getElementById(`mob-tab-${tab}`);
-            if (activeMobBtn) activeMobBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
         }
+
+        // --- MOBILE DEPARTMENT MENU ---
+        window.openMobDeptMenu = function() {
+            const backdrop = document.getElementById('mob-dept-backdrop');
+            const sheet    = document.getElementById('mob-dept-sheet');
+            if (backdrop) backdrop.classList.add('open');
+            if (sheet)    sheet.classList.add('open');
+            document.body.style.overflow = 'hidden';
+        };
+
+        window.closeMobDeptMenu = function() {
+            const backdrop = document.getElementById('mob-dept-backdrop');
+            const sheet    = document.getElementById('mob-dept-sheet');
+            if (backdrop) backdrop.classList.remove('open');
+            if (sheet) {
+                sheet.classList.remove('open');
+            }
+            document.body.style.overflow = '';
+        };
+
+        // Close menu on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeMobDeptMenu();
+        });
 
 
         function getMonthlyStats(worker, monthStr) {
