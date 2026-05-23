@@ -1737,10 +1737,21 @@
                 -webkit-overflow-scrolling: touch;
                 max-width: 100%;
             }
-            table { min-width: 0; }
+            table {
+                min-width: 420px;  /* force horizontal scroll rather than collapsing columns */
+                width: 100%;
+                table-layout: auto;
+            }
             th, td {
                 padding: 9px 10px;
                 font-size: 0.8rem;
+                white-space: nowrap;      /* never break inside a word on mobile */
+                overflow: hidden;
+                text-overflow: ellipsis;
+                max-width: 140px;
+            }
+            /* Allow long text like notes/addresses to wrap, just not break mid-word */
+            td.wrap-cell, th.wrap-cell {
                 white-space: normal;
                 word-break: break-word;
             }
