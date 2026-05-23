@@ -200,10 +200,14 @@
                 listenToCloudData();
                 startGlobalTick();
 
-                // Register Firebase Messaging service worker (needed for background push + getToken)
+                // Register Firebase Messaging service worker
+                // This is stored globally so initFCMToken() can reuse the registration
                 if ('serviceWorker' in navigator) {
                     navigator.serviceWorker.register('./firebase-messaging-sw.js')
-                        .then(reg => console.log('[SW] Messaging service worker registered:', reg.scope))
+                        .then(reg => {
+                            console.log('[SW] Service worker registered:', reg.scope);
+                            window.__swRegistration = reg;
+                        })
                         .catch(err => console.warn('[SW] Service worker registration failed:', err));
                 }
             } else {
@@ -503,21 +507,28 @@
                 try {
                     const messaging = firebase.messaging();
 
-                    if ('serviceWorker' in navigator) {
-                        navigator.serviceWorker.ready.then((registration) => {
-                            // Get or refresh token
-                            messaging.getToken({ vapidKey: BURGEROOV_VAPID_KEY, serviceWorkerRegistration: registration })
-                                .then(token => {
-                                    if (token) {
-                                        console.log('[FCM] Token received from Firebase Web Messaging.');
-                                        saveWorkerFCMToken(token);
-                                    } else {
-                                        console.info('[FCM] No registration token — permission may be denied.');
-                                    }
-                                })
-                                .catch(err => console.warn('[FCM] getToken() failed:', err));
-                        });
+                    // Build the getToken options — include SW registration if available
+                    const getTokenOpts = { vapidKey: BURGEROOV_VAPID_KEY };
+                    if (window.__swRegistration) {
+                        getTokenOpts.serviceWorkerRegistration = window.__swRegistration;
                     }
+
+                    messaging.getToken(getTokenOpts)
+                        .then(token => {
+                            if (token) {
+                                console.log('[FCM] Token received from Firebase Web Messaging.');
+                                saveWorkerFCMToken(token);
+                            } else {
+                                console.info('[FCM] No registration token — permission may be denied.');
+                            }
+                        })
+                        .catch(err => {
+                            // If passing the SW registration failed, try without it
+                            console.warn('[FCM] getToken() with SW failed, retrying without SW:', err.message);
+                            messaging.getToken({ vapidKey: BURGEROOV_VAPID_KEY })
+                                .then(token => { if (token) saveWorkerFCMToken(token); })
+                                .catch(err2 => console.warn('[FCM] getToken() fallback failed:', err2));
+                        });
 
                 } catch (e) {
                     console.warn('[FCM] Firebase Web Messaging not available:', e);
