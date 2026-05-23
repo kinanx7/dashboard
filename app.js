@@ -870,11 +870,15 @@
         let noteRecordingDuration = 0;
         let noteRecorderShouldSave = false;
 
-        function triggerNoteImageUpload() {
+        function triggerNoteImageUpload(source) {
             if (noteMediaRecorder && noteMediaRecorder.state === 'recording') {
                 stopVoiceRecording(false);
             }
-            document.getElementById('note-image-input').click();
+            if (source === 'camera') {
+                document.getElementById('note-camera-input').click();
+            } else {
+                document.getElementById('note-image-input').click();
+            }
         }
 
         function handleNoteImageSelected(event) {
@@ -1041,17 +1045,21 @@
         let replyRecordingDurations = {}; // noteId -> int
         let replyRecordersShouldSave = {}; // noteId -> bool
 
-        function triggerReplyImageUpload(noteId) {
+        function triggerReplyImageUpload(noteId, source) {
             if (replyMediaRecorders[noteId] && replyMediaRecorders[noteId].state === 'recording') {
                 stopReplyVoiceRecording(noteId, false);
             }
             
-            let fileInput = document.getElementById('reply-image-input-global');
+            let inputId = source === 'camera' ? 'reply-camera-input-global' : 'reply-image-input-global';
+            let fileInput = document.getElementById(inputId);
             if (!fileInput) {
                 fileInput = document.createElement('input');
                 fileInput.type = 'file';
-                fileInput.id = 'reply-image-input-global';
+                fileInput.id = inputId;
                 fileInput.accept = 'image/*';
+                if (source === 'camera') {
+                    fileInput.setAttribute('capture', 'environment');
+                }
                 fileInput.style.display = 'none';
                 document.body.appendChild(fileInput);
             }
@@ -1361,8 +1369,11 @@
                             <input type="text" id="reply-input-${n.id}" placeholder="Write a reply..." style="flex:1; min-width: 150px; padding: 10px; font-size:0.9rem; margin: 0;">
                             
                             <div style="display:flex; gap:6px;">
-                                <button type="button" class="btn-outline" style="padding: 8px 10px; min-height:36px; height:36px; font-size: 0.8rem; border-radius: 6px; display:flex; align-items:center; gap:4px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); cursor:pointer;" onclick="triggerReplyImageUpload('${n.id}')" title="Attach Image">
-                                    📷 Image
+                                <button type="button" class="btn-outline" style="padding: 8px 10px; min-height:36px; height:36px; font-size: 0.8rem; border-radius: 6px; display:flex; align-items:center; gap:4px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); cursor:pointer;" onclick="triggerReplyImageUpload('${n.id}', 'camera')" title="Take Photo">
+                                    📷 Camera
+                                </button>
+                                <button type="button" class="btn-outline" style="padding: 8px 10px; min-height:36px; height:36px; font-size: 0.8rem; border-radius: 6px; display:flex; align-items:center; gap:4px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); cursor:pointer;" onclick="triggerReplyImageUpload('${n.id}', 'gallery')" title="Choose Photo">
+                                    🖼️ Gallery
                                 </button>
                                 <button type="button" id="reply-btn-voice-${n.id}" class="btn-outline" style="padding: 8px 10px; min-height:36px; height:36px; font-size: 0.8rem; border-radius: 6px; display:flex; align-items:center; gap:4px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); cursor:pointer;" onclick="toggleReplyVoiceRecording('${n.id}')" title="Record Voice">
                                     🎤 Voice

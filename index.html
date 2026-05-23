@@ -1105,16 +1105,20 @@
                     <div class="note-attachment-section" style="margin-top: 18px; border-top: 1px solid var(--border-color); padding-top: 18px;">
                         <label style="color:var(--text-main); font-weight:700; font-size:0.9rem; display:block; margin-bottom:8px;">Add Attachment (Optional):</label>
                         <div class="attachment-buttons" style="display:flex; gap:12px; flex-wrap:wrap;">
-                            <button type="button" id="note-btn-attach-image" class="btn-outline" style="display:flex; align-items:center; gap:8px; padding: 8px 14px; font-size: 0.9rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); cursor:pointer;" onclick="triggerNoteImageUpload()">
-                                📷 Add Image
+                            <button type="button" id="note-btn-attach-camera" class="btn-outline" style="display:flex; align-items:center; gap:8px; padding: 8px 14px; font-size: 0.9rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); cursor:pointer;" onclick="triggerNoteImageUpload('camera')">
+                                📷 Camera
+                            </button>
+                            <button type="button" id="note-btn-attach-image" class="btn-outline" style="display:flex; align-items:center; gap:8px; padding: 8px 14px; font-size: 0.9rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); cursor:pointer;" onclick="triggerNoteImageUpload('gallery')">
+                                🖼️ Gallery
                             </button>
                             <button type="button" id="note-btn-record-voice" class="btn-outline" style="display:flex; align-items:center; gap:8px; padding: 8px 14px; font-size: 0.9rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); cursor:pointer;" onclick="toggleVoiceRecording()">
                                 🎤 Record Voice Note
                             </button>
                         </div>
                         
-                        <!-- Hidden File Input -->
+                        <!-- Hidden File Inputs -->
                         <input type="file" id="note-image-input" accept="image/*" style="display:none;" onchange="handleNoteImageSelected(event)">
+                        <input type="file" id="note-camera-input" accept="image/*" capture="environment" style="display:none;" onchange="handleNoteImageSelected(event)">
                         
                         <!-- Voice Recording Interface (collapsible) -->
                         <div id="note-voice-recording-ui" style="display:none; align-items:center; gap:12px; margin-top:12px; background:var(--input-bg); padding:10px 14px; border-radius:8px; border:1px solid var(--border-color);">
