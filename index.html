@@ -1487,6 +1487,31 @@
             style="max-width: 90%; max-height: 90%; border-radius: 8px; border: 2px solid var(--border-color); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
     </div>
 
+    <!-- APK Permission Helper Modal -->
+    <div id="apk-permission-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 11000; align-items: center; justify-content: center; padding: 20px;">
+        <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 16px; padding: 24px; max-width: 420px; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.3); box-sizing: border-box; text-align: center;">
+            <span style="font-size: 3rem; display: block; margin-bottom: 12px;">🎙️</span>
+            <h3 style="color: var(--text-main); font-size: 1.2rem; font-weight: 700; margin-bottom: 12px; margin-top: 0;">Microphone Permission Required</h3>
+            
+            <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.5; margin-bottom: 20px;">
+                To record voice notes inside the Burgeroov App, you need to manually allow microphone access in your phone settings.
+            </p>
+            
+            <div style="text-align: left; background: var(--input-bg); padding: 16px; border-radius: 10px; border: 1px solid var(--border-color); margin-bottom: 24px; font-size: 0.9rem; line-height: 1.6; color: var(--text-main);">
+                <strong style="color: var(--primary); display:block; margin-bottom:6px;">How to enable:</strong>
+                <ol style="margin: 0; padding-left: 20px;">
+                    <li>Open your phone's <strong>Settings</strong> app.</li>
+                    <li>Go to <strong>Apps</strong> (or <strong>App Management</strong>).</li>
+                    <li>Select the <strong>Burgeroov</strong> App.</li>
+                    <li>Tap <strong>Permissions</strong> and turn on the <strong>Microphone</strong> switch.</li>
+                    <li>Reopen the Burgeroov App!</li>
+                </ol>
+            </div>
+            
+            <button onclick="document.getElementById('apk-permission-modal').style.display='none'" class="btn-success" style="width: 100%; padding: 12px; font-size: 1rem; border-radius: 8px; cursor: pointer;">Got it, thanks!</button>
+        </div>
+    </div>
+
     <!-- Mobile Compact Bottom Bar (visible on phones only via CSS) -->
     <nav id="mobile-bottom-nav" role="navigation" aria-label="Mobile navigation">
         <!-- Left: Current active tab indicator -->

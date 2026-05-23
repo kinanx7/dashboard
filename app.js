@@ -968,7 +968,11 @@
                 })
                 .catch(err => {
                     console.error("Microphone access error:", err);
-                    alert("Unable to access microphone. Please make sure that your phone's browser or the Burgeroov App has Microphone permissions enabled in your phone's Settings 🎤");
+                    if (typeof AndroidInterface !== 'undefined') {
+                        document.getElementById('apk-permission-modal').style.display = 'flex';
+                    } else {
+                        alert("Unable to access microphone. Please make sure that your phone's browser or the Burgeroov App has Microphone permissions enabled in your phone's Settings 🎤");
+                    }
                 });
         }
 
@@ -1145,7 +1149,11 @@
                 })
                 .catch(err => {
                     console.error("Microphone access error:", err);
-                    alert("Unable to access microphone. Please make sure that your phone's browser or the Burgeroov App has Microphone permissions enabled in your phone's Settings 🎤");
+                    if (typeof AndroidInterface !== 'undefined') {
+                        document.getElementById('apk-permission-modal').style.display = 'flex';
+                    } else {
+                        alert("Unable to access microphone. Please make sure that your phone's browser or the Burgeroov App has Microphone permissions enabled in your phone's Settings 🎤");
+                    }
                 });
         }
 
