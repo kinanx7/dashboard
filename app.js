@@ -3776,55 +3776,9 @@
             }
         }
 
-        function renderGlobalPrivacyToggles() {
-            const container = document.getElementById('global-privacy-toggles');
-            if (!container) return;
-
-            const deptPrivacy = appData.burgeroov.deptPrivacy || {
-                warehouse: 'restricted', drivers: 'restricted', finance: 'restricted', sales: 'restricted', costs: 'restricted', adverts: 'restricted'
-            };
-            if (!deptPrivacy.adverts) deptPrivacy.adverts = 'restricted';
-            if (!deptPrivacy.costs) deptPrivacy.costs = 'restricted';
-
-            const depts = [
-                { id: 'warehouse', label: 'Warehouse / Stock' },
-                { id: 'drivers', label: 'Drivers Department' },
-                { id: 'finance', label: 'Financial Department' },
-                { id: 'sales', label: 'Sales Tracker' },
-                { id: 'costs', label: 'Costs Tracker' },
-                { id: 'adverts', label: 'Advertise / Ads' }
-            ];
-
-            container.innerHTML = '';
-            depts.forEach(dept => {
-                const currentVal = deptPrivacy[dept.id] || 'restricted';
-                
-                const row = document.createElement('div');
-                row.className = 'flex-between';
-                row.style.cssText = 'align-items: center; gap: 10px; margin-bottom: 8px;';
-                row.innerHTML = `
-                    <span style="font-weight: 600; font-size: 0.9rem; color: var(--text-main);">${dept.label}</span>
-                    <select onchange="updateDeptPrivacy('${dept.id}', this.value)" style="padding: 6px 12px; font-size: 0.85rem; width: auto; min-height: unset; margin: 0; border-radius: 6px;">
-                        <option value="restricted" ${currentVal === 'restricted' ? 'selected' : ''}>Restricted 🔐</option>
-                        <option value="public" ${currentVal === 'public' ? 'selected' : ''}>Public 🔓</option>
-                    </select>
-                `;
-                container.appendChild(row);
-            });
-        }
-
-        window.updateDeptPrivacy = function(deptId, value) {
-            if (!appData.burgeroov.deptPrivacy) {
-                appData.burgeroov.deptPrivacy = { warehouse: 'restricted', drivers: 'restricted', finance: 'restricted', sales: 'restricted', costs: 'restricted', adverts: 'restricted' };
-            }
-            appData.burgeroov.deptPrivacy[deptId] = value;
-            saveData();
-            applyUserRoles();
-        };
 
         // --- RENDERING ---
         function renderAll() {
-            renderGlobalPrivacyToggles();
             renderBranches();
             renderViolationRules();
             populateWorkerDropdowns();
