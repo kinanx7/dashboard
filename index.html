@@ -1093,6 +1093,36 @@
                         </div>
                     </div>
 
+                    <!-- Media Attachment Section -->
+                    <div class="note-attachment-section" style="margin-top: 18px; border-top: 1px solid var(--border-color); padding-top: 18px;">
+                        <label style="color:var(--text-main); font-weight:700; font-size:0.9rem; display:block; margin-bottom:8px;">Add Attachment (Optional):</label>
+                        <div class="attachment-buttons" style="display:flex; gap:12px; flex-wrap:wrap;">
+                            <button type="button" id="note-btn-attach-image" class="btn-outline" style="display:flex; align-items:center; gap:8px; padding: 8px 14px; font-size: 0.9rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); cursor:pointer;" onclick="triggerNoteImageUpload()">
+                                📷 Add Image
+                            </button>
+                            <button type="button" id="note-btn-record-voice" class="btn-outline" style="display:flex; align-items:center; gap:8px; padding: 8px 14px; font-size: 0.9rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); cursor:pointer;" onclick="toggleVoiceRecording()">
+                                🎤 Record Voice Note
+                            </button>
+                        </div>
+                        
+                        <!-- Hidden File Input -->
+                        <input type="file" id="note-image-input" accept="image/*" style="display:none;" onchange="handleNoteImageSelected(event)">
+                        
+                        <!-- Voice Recording Interface (collapsible) -->
+                        <div id="note-voice-recording-ui" style="display:none; align-items:center; gap:12px; margin-top:12px; background:var(--input-bg); padding:10px 14px; border-radius:8px; border:1px solid var(--border-color);">
+                            <span class="recording-pulse" style="display:inline-block; width:10px; height:10px; background-color:#dc2626; border-radius:50%;"></span>
+                            <span id="recording-timer" style="font-family:monospace; font-size:0.95rem; color:var(--text-main); font-weight:600;">0:00</span>
+                            <button type="button" class="btn-success" style="padding:6px 12px; font-size:0.85rem; min-height:32px; height:32px; line-height:1; cursor:pointer;" onclick="stopVoiceRecording(true)">Done</button>
+                            <button type="button" class="btn-outline-danger" style="padding:6px 12px; font-size:0.85rem; min-height:32px; height:32px; line-height:1; border: 1px solid var(--danger); background: transparent; color: var(--danger); border-radius: 6px; cursor: pointer;" onclick="stopVoiceRecording(false)">Cancel</button>
+                        </div>
+                        
+                        <!-- Preview Box for Attached Media -->
+                        <div id="note-attachment-preview" style="display:none; margin-top:12px; padding:12px; background:var(--input-bg); border-radius:8px; border:1px solid var(--border-color); position:relative; max-width: 100%; box-sizing: border-box;">
+                            <div id="note-preview-content" style="display:flex; align-items:center; gap:10px; width: 100%;"></div>
+                            <button type="button" onclick="clearNoteAttachment()" style="position:absolute; top:8px; right:8px; background:var(--danger); color:white; border:none; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-weight:bold; font-size:0.8rem; line-height: 1;" title="Remove Attachment">✕</button>
+                        </div>
+                    </div>
+
                     <button onclick="postManagerNote()" class="btn-success"
                         style="width: 100%; margin-top: 16px; font-size: 1.05rem; padding: 14px;">Post Note</button>
                 </div>

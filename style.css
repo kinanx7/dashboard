@@ -1896,7 +1896,7 @@
             .mob-nav-btn { display: none !important; }
         }
 
-        /* Very small phones (â‰¤ 400px) */
+        /* Very small phones (≤ 400px) */
         @media (max-width: 400px) {
             header h1 { display: none; }
             header img { max-height: 24px; }
@@ -1905,4 +1905,14 @@
             .mob-dept-icon { font-size: 1.4rem; }
             #mob-active-label { display: none; }
         }
+
+        /* Note Attachment & Recording Styling */
+        @keyframes notePulse {
+            0%, 100% { opacity: 0.4; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+        .recording-pulse {
+            animation: notePulse 1.2s infinite ease-in-out;
+        }
+
 

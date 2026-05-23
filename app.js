@@ -859,9 +859,179 @@
 
 
         // --- COMMUNICATION & NOTES SYSTEM ---
+        let noteAttachmentType = null; // 'image' or 'voice'
+        let noteAttachmentData = null; // base64 Data URL
+        let noteMediaRecorder = null;
+        let noteAudioChunks = [];
+        let noteRecordingTimer = null;
+        let noteRecordingDuration = 0;
+        let noteRecorderShouldSave = false;
+
+        function triggerNoteImageUpload() {
+            if (noteMediaRecorder && noteMediaRecorder.state === 'recording') {
+                stopVoiceRecording(false);
+            }
+            document.getElementById('note-image-input').click();
+        }
+
+        function handleNoteImageSelected(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            compressImage(file, (base64Img) => {
+                noteAttachmentType = 'image';
+                noteAttachmentData = base64Img;
+                updateNoteAttachmentPreview();
+            });
+        }
+
+        function toggleVoiceRecording() {
+            if (noteMediaRecorder && noteMediaRecorder.state === 'recording') {
+                stopVoiceRecording(true);
+                return;
+            }
+
+            clearNoteAttachment();
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert("Microphone recording is not supported in this browser or environment.");
+                return;
+            }
+
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    noteAudioChunks = [];
+                    let options = { mimeType: 'audio/webm' };
+                    if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                        options = { mimeType: 'audio/ogg' };
+                    }
+                    if (!MediaRecorder.isTypeSupported('audio/ogg')) {
+                        options = {};
+                    }
+
+                    try {
+                        noteMediaRecorder = new MediaRecorder(stream, options);
+                    } catch (e) {
+                        noteMediaRecorder = new MediaRecorder(stream);
+                    }
+
+                    noteMediaRecorder.ondataavailable = e => {
+                        if (e.data && e.data.size > 0) {
+                            noteAudioChunks.push(e.data);
+                        }
+                    };
+
+                    noteMediaRecorder.onstop = () => {
+                        stream.getTracks().forEach(track => track.stop());
+
+                        if (noteRecorderShouldSave && noteAudioChunks.length > 0) {
+                            const audioBlob = new Blob(noteAudioChunks, { type: noteMediaRecorder.mimeType || 'audio/octet-stream' });
+                            const reader = new FileReader();
+                            reader.readAsDataURL(audioBlob);
+                            reader.onloadend = () => {
+                                noteAttachmentType = 'voice';
+                                noteAttachmentData = reader.result;
+                                updateNoteAttachmentPreview();
+                            };
+                        }
+                    };
+
+                    noteRecorderShouldSave = false;
+                    noteMediaRecorder.start();
+
+                    document.getElementById('note-voice-recording-ui').style.display = 'flex';
+                    const recordBtn = document.getElementById('note-btn-record-voice');
+                    recordBtn.innerHTML = '🛑 Stop Recording';
+                    recordBtn.style.borderColor = 'var(--danger)';
+                    recordBtn.style.color = 'var(--danger)';
+
+                    noteRecordingDuration = 0;
+                    document.getElementById('recording-timer').innerText = '0:00';
+                    clearInterval(noteRecordingTimer);
+                    noteRecordingTimer = setInterval(() => {
+                        noteRecordingDuration++;
+                        const mins = Math.floor(noteRecordingDuration / 60);
+                        const secs = noteRecordingDuration % 60;
+                        document.getElementById('recording-timer').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+                        
+                        if (noteRecordingDuration >= 120) {
+                            stopVoiceRecording(true);
+                        }
+                    }, 1000);
+                })
+                .catch(err => {
+                    console.error("Microphone access error:", err);
+                    alert("Could not access microphone. Please verify site permissions in your browser/settings.");
+                });
+        }
+
+        function stopVoiceRecording(save) {
+            if (!noteMediaRecorder || noteMediaRecorder.state !== 'recording') return;
+
+            noteRecorderShouldSave = save;
+            noteMediaRecorder.stop();
+
+            clearInterval(noteRecordingTimer);
+            noteRecordingTimer = null;
+
+            document.getElementById('note-voice-recording-ui').style.display = 'none';
+            const recordBtn = document.getElementById('note-btn-record-voice');
+            recordBtn.innerHTML = '🎤 Record Voice Note';
+            recordBtn.style.borderColor = 'var(--border-color)';
+            recordBtn.style.color = 'var(--text-main)';
+        }
+
+        function updateNoteAttachmentPreview() {
+            const previewEl = document.getElementById('note-attachment-preview');
+            const contentEl = document.getElementById('note-preview-content');
+            if (!previewEl || !contentEl) return;
+
+            previewEl.style.display = 'block';
+            contentEl.innerHTML = '';
+
+            if (noteAttachmentType === 'image') {
+                contentEl.innerHTML = `
+                    <div style="position:relative; display:inline-block; max-width: 100%;">
+                        <img src="${noteAttachmentData}" style="max-height:100px; max-width:100%; border-radius:6px; border:1px solid var(--border-color);" alt="Attachment preview">
+                        <span style="display:block; font-size:0.75rem; color:var(--text-muted); margin-top:4px;">📷 Image Selected</span>
+                    </div>
+                `;
+            } else if (noteAttachmentType === 'voice') {
+                contentEl.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:8px; width: 100%; max-width: calc(100% - 30px); flex-wrap: wrap;">
+                        <span style="font-size:1.25rem;">🎤</span>
+                        <audio src="${noteAttachmentData}" controls style="height:36px; max-width:100%;"></audio>
+                        <span style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap;">Voice note attached</span>
+                    </div>
+                `;
+            }
+        }
+
+        function clearNoteAttachment() {
+            noteAttachmentType = null;
+            noteAttachmentData = null;
+            document.getElementById('note-attachment-preview').style.display = 'none';
+            document.getElementById('note-preview-content').innerHTML = '';
+            document.getElementById('note-image-input').value = '';
+            
+            const recordBtn = document.getElementById('note-btn-record-voice');
+            if (recordBtn) {
+                recordBtn.innerHTML = '🎤 Record Voice Note';
+                recordBtn.style.borderColor = 'var(--border-color)';
+                recordBtn.style.color = 'var(--text-main)';
+            }
+            const recordUI = document.getElementById('note-voice-recording-ui');
+            if (recordUI) recordUI.style.display = 'none';
+            
+            if (noteRecordingTimer) {
+                clearInterval(noteRecordingTimer);
+                noteRecordingTimer = null;
+            }
+        }
+
         function postManagerNote() {
             const text = document.getElementById('manage-note-text').value.trim();
-            if (!text) return alert("Write a note first.");
+            if (!text && !noteAttachmentData) return alert("Write a note or add a media attachment first.");
 
             const privacy = document.querySelector('input[name="note-privacy"]:checked').value;
             let targets = [];
@@ -878,7 +1048,9 @@
                 author: currentUser.email,
                 isPrivate: privacy === 'private',
                 targetWorkers: targets,
-                replies: []
+                replies: [],
+                attachmentType: noteAttachmentType || null,
+                attachmentData: noteAttachmentData || null
             };
 
             if (!getCompanyData().managerNotes) getCompanyData().managerNotes = [];
@@ -886,6 +1058,7 @@
             document.getElementById('manage-note-text').value = '';
 
             document.querySelectorAll('.private-target-cb').forEach(cb => cb.checked = false);
+            clearNoteAttachment();
             saveData();
         }
 
@@ -969,6 +1142,23 @@
                     </div>
                 ` : '';
 
+                let textHtml = n.text ? `<div style="font-size:1.1rem; color:var(--text-main); white-space: pre-wrap; line-height: 1.6; margin-bottom: 16px;">${n.text}</div>` : '';
+                let attachmentHtml = '';
+                if (n.attachmentType === 'image' && n.attachmentData) {
+                    attachmentHtml = `
+                        <div style="margin-bottom: 16px; max-width: 320px; cursor: pointer; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);" onclick="showImage('${n.attachmentData.replace(/'/g, "\\'")}')">
+                            <img src="${n.attachmentData}" alt="Attachment" style="width: 100%; display: block; height: auto; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                        </div>
+                    `;
+                } else if (n.attachmentType === 'voice' && n.attachmentData) {
+                    attachmentHtml = `
+                        <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 12px; background: var(--input-bg); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border-color); max-width: 360px; box-sizing: border-box;">
+                            <span style="font-size: 1.4rem; line-height: 1;">🎤</span>
+                            <audio src="${n.attachmentData}" controls style="flex: 1; height: 36px; max-width: calc(100% - 30px);"></audio>
+                        </div>
+                    `;
+                }
+
                 div.innerHTML = `
                     <div class="flex-between" style="margin-bottom:12px;">
                         <div style="display:flex; gap:10px; align-items:center;">
@@ -976,7 +1166,8 @@
                         </div>
                         ${delBtn}
                     </div>
-                    <div style="font-size:1.1rem; color:var(--text-main); white-space: pre-wrap; line-height: 1.6; margin-bottom: 16px;">${n.text}</div>
+                    ${textHtml}
+                    ${attachmentHtml}
                     ${repliesHtml}
                     ${replyBox}
                 `;
