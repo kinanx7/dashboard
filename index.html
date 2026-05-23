@@ -84,8 +84,10 @@
 <body class="theme-burgeroov">
 
     <!-- Launch Loader Overlay -->
-    <div id="launch-loader-overlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #2d1b11; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;">
-        <img src="burgeroov.png" alt="Burgeroov Logo" style="max-width: 160px; height: auto; animation: notePulse 2s infinite ease-in-out;" onerror="this.style.display = 'none'">
+    <div id="launch-loader-overlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #2d1b11; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;">
+        <div style="background: #ffffff; padding: 14px 20px; border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(0,0,0,0.25);">
+            <img src="burgeroov.png" alt="Burgeroov Logo" style="max-width: 130px; height: auto; display: block; animation: notePulse 2.0s infinite ease-in-out;" onerror="this.parentNode.style.display = 'none'">
+        </div>
         <div class="loader" style="width: 42px; height: 42px; border: 4px solid rgba(255,255,255,0.15); border-top-color: #c5832b; border-radius: 50%; animation: spin 1s linear infinite;"></div>
     </div>
 
