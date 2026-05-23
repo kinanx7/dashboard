@@ -968,7 +968,7 @@
                 })
                 .catch(err => {
                     console.error("Microphone access error:", err);
-                    alert("Could not access microphone. Please verify site permissions in your browser/settings.");
+                    alert("Unable to access microphone. Please make sure that your phone's browser or the Burgeroov App has Microphone permissions enabled in your phone's Settings 🎤");
                 });
         }
 
@@ -1050,19 +1050,9 @@
                 stopReplyVoiceRecording(noteId, false);
             }
             
-            let inputId = source === 'camera' ? 'reply-camera-input-global' : 'reply-image-input-global';
-            let fileInput = document.getElementById(inputId);
-            if (!fileInput) {
-                fileInput = document.createElement('input');
-                fileInput.type = 'file';
-                fileInput.id = inputId;
-                fileInput.accept = 'image/*';
-                if (source === 'camera') {
-                    fileInput.setAttribute('capture', 'environment');
-                }
-                fileInput.style.display = 'none';
-                document.body.appendChild(fileInput);
-            }
+            const inputId = source === 'camera' ? 'reply-camera-input-global' : 'reply-image-input-global';
+            const fileInput = document.getElementById(inputId);
+            if (!fileInput) return;
             
             fileInput.onchange = (event) => {
                 const file = event.target.files[0];
@@ -1155,7 +1145,7 @@
                 })
                 .catch(err => {
                     console.error("Microphone access error:", err);
-                    alert("Could not access microphone. Please verify site permissions in your browser/settings.");
+                    alert("Unable to access microphone. Please make sure that your phone's browser or the Burgeroov App has Microphone permissions enabled in your phone's Settings 🎤");
                 });
         }
 

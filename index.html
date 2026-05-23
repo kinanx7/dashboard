@@ -1120,6 +1120,10 @@
                         <input type="file" id="note-image-input" accept="image/*" style="display:none;" onchange="handleNoteImageSelected(event)">
                         <input type="file" id="note-camera-input" accept="image/*" capture="environment" style="display:none;" onchange="handleNoteImageSelected(event)">
                         
+                        <!-- Global Hidden Inputs for Replies -->
+                        <input type="file" id="reply-image-input-global" accept="image/*" style="display:none;">
+                        <input type="file" id="reply-camera-input-global" accept="image/*" capture="environment" style="display:none;">
+                        
                         <!-- Voice Recording Interface (collapsible) -->
                         <div id="note-voice-recording-ui" style="display:none; align-items:center; gap:12px; margin-top:12px; background:var(--input-bg); padding:10px 14px; border-radius:8px; border:1px solid var(--border-color);">
                             <span class="recording-pulse" style="display:inline-block; width:10px; height:10px; background-color:#dc2626; border-radius:50%;"></span>
