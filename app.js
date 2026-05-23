@@ -516,13 +516,6 @@
                                     }
                                 })
                                 .catch(err => console.warn('[FCM] getToken() failed:', err));
-
-                            // Refresh token whenever Firebase rotates it
-                            messaging.onTokenRefresh(() => {
-                                messaging.getToken({ vapidKey: BURGEROOV_VAPID_KEY, serviceWorkerRegistration: registration })
-                                    .then(token => { if (token) saveWorkerFCMToken(token); })
-                                    .catch(err => console.warn('[FCM] Token refresh failed:', err));
-                            });
                         });
                     }
 
