@@ -183,6 +183,9 @@
         auth.onAuthStateChanged((user) => {
             const overlay = document.getElementById('auth-overlay');
             const appWrapper = document.getElementById('app-wrapper');
+            const launchLoader = document.getElementById('launch-loader-overlay');
+
+            if (launchLoader) launchLoader.style.display = 'none';
 
             if (user) {
                 currentUser = { email: user.email, uid: user.uid };
@@ -1029,6 +1032,195 @@
             }
         }
 
+        // Reply Attachments state
+        let replyAttachmentTypes = {}; // noteId -> 'image' | 'voice'
+        let replyAttachmentDatas = {}; // noteId -> base64
+        let replyMediaRecorders = {}; // noteId -> MediaRecorder
+        let replyAudioChunks = {}; // noteId -> array
+        let replyRecordingTimers = {}; // noteId -> intervalId
+        let replyRecordingDurations = {}; // noteId -> int
+        let replyRecordersShouldSave = {}; // noteId -> bool
+
+        function triggerReplyImageUpload(noteId) {
+            if (replyMediaRecorders[noteId] && replyMediaRecorders[noteId].state === 'recording') {
+                stopReplyVoiceRecording(noteId, false);
+            }
+            
+            let fileInput = document.getElementById('reply-image-input-global');
+            if (!fileInput) {
+                fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.id = 'reply-image-input-global';
+                fileInput.accept = 'image/*';
+                fileInput.style.display = 'none';
+                document.body.appendChild(fileInput);
+            }
+            
+            fileInput.onchange = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                compressImage(file, (base64Img) => {
+                    replyAttachmentTypes[noteId] = 'image';
+                    replyAttachmentDatas[noteId] = base64Img;
+                    updateReplyAttachmentPreview(noteId);
+                });
+            };
+            
+            fileInput.click();
+        }
+
+        function toggleReplyVoiceRecording(noteId) {
+            if (replyMediaRecorders[noteId] && replyMediaRecorders[noteId].state === 'recording') {
+                stopReplyVoiceRecording(noteId, true);
+                return;
+            }
+
+            clearReplyAttachment(noteId);
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert("Microphone recording is not supported in this browser or environment.");
+                return;
+            }
+
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    replyAudioChunks[noteId] = [];
+                    let options = { mimeType: 'audio/webm' };
+                    if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                        options = { mimeType: 'audio/ogg' };
+                    }
+                    if (!MediaRecorder.isTypeSupported('audio/ogg')) {
+                        options = {};
+                    }
+
+                    try {
+                        replyMediaRecorders[noteId] = new MediaRecorder(stream, options);
+                    } catch (e) {
+                        replyMediaRecorders[noteId] = new MediaRecorder(stream);
+                    }
+
+                    replyMediaRecorders[noteId].ondataavailable = e => {
+                        if (e.data && e.data.size > 0) {
+                            replyAudioChunks[noteId].push(e.data);
+                        }
+                    };
+
+                    replyMediaRecorders[noteId].onstop = () => {
+                        stream.getTracks().forEach(track => track.stop());
+
+                        if (replyRecordersShouldSave[noteId] && replyAudioChunks[noteId].length > 0) {
+                            const audioBlob = new Blob(replyAudioChunks[noteId], { type: replyMediaRecorders[noteId].mimeType || 'audio/octet-stream' });
+                            const reader = new FileReader();
+                            reader.readAsDataURL(audioBlob);
+                            reader.onloadend = () => {
+                                replyAttachmentTypes[noteId] = 'voice';
+                                replyAttachmentDatas[noteId] = reader.result;
+                                updateReplyAttachmentPreview(noteId);
+                            };
+                        }
+                    };
+
+                    replyRecordersShouldSave[noteId] = false;
+                    replyMediaRecorders[noteId].start();
+
+                    document.getElementById(`reply-voice-ui-${noteId}`).style.display = 'flex';
+                    const recordBtn = document.getElementById(`reply-btn-voice-${noteId}`);
+                    if (recordBtn) {
+                        recordBtn.innerHTML = '🛑 Stop';
+                        recordBtn.style.borderColor = 'var(--danger)';
+                        recordBtn.style.color = 'var(--danger)';
+                    }
+
+                    replyRecordingDurations[noteId] = 0;
+                    document.getElementById(`reply-timer-${noteId}`).innerText = '0:00';
+                    clearInterval(replyRecordingTimers[noteId]);
+                    replyRecordingTimers[noteId] = setInterval(() => {
+                        replyRecordingDurations[noteId]++;
+                        const mins = Math.floor(replyRecordingDurations[noteId] / 60);
+                        const secs = replyRecordingDurations[noteId] % 60;
+                        document.getElementById(`reply-timer-${noteId}`).innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+                        
+                        if (replyRecordingDurations[noteId] >= 120) {
+                            stopReplyVoiceRecording(noteId, true);
+                        }
+                    }, 1000);
+                })
+                .catch(err => {
+                    console.error("Microphone access error:", err);
+                    alert("Could not access microphone. Please verify site permissions in your browser/settings.");
+                });
+        }
+
+        function stopReplyVoiceRecording(noteId, save) {
+            if (!replyMediaRecorders[noteId] || replyMediaRecorders[noteId].state !== 'recording') return;
+
+            replyRecordersShouldSave[noteId] = save;
+            replyMediaRecorders[noteId].stop();
+
+            clearInterval(replyRecordingTimers[noteId]);
+            replyRecordingTimers[noteId] = null;
+
+            document.getElementById(`reply-voice-ui-${noteId}`).style.display = 'none';
+            const recordBtn = document.getElementById(`reply-btn-voice-${noteId}`);
+            if (recordBtn) {
+                recordBtn.innerHTML = '🎤 Voice';
+                recordBtn.style.borderColor = 'var(--border-color)';
+                recordBtn.style.color = 'var(--text-main)';
+            }
+        }
+
+        function updateReplyAttachmentPreview(noteId) {
+            const previewEl = document.getElementById(`reply-preview-${noteId}`);
+            const contentEl = document.getElementById(`reply-preview-content-${noteId}`);
+            if (!previewEl || !contentEl) return;
+
+            previewEl.style.display = 'block';
+            contentEl.innerHTML = '';
+
+            const type = replyAttachmentTypes[noteId];
+            const data = replyAttachmentDatas[noteId];
+
+            if (type === 'image') {
+                contentEl.innerHTML = `
+                    <div style="position:relative; display:inline-block; max-width: 100%;">
+                        <img src="${data}" style="max-height:80px; max-width:100%; border-radius:6px; border:1px solid var(--border-color);" alt="Reply preview">
+                        <span style="display:block; font-size:0.7rem; color:var(--text-muted); margin-top:2px;">📷 Image Selected</span>
+                    </div>
+                `;
+            } else if (type === 'voice') {
+                contentEl.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:6px; width: 100%; max-width: calc(100% - 24px); flex-wrap: wrap;">
+                        <span style="font-size:1.1rem;">🎤</span>
+                        <audio src="${data}" controls style="height:32px; max-width:100%;"></audio>
+                    </div>
+                `;
+            }
+        }
+
+        function clearReplyAttachment(noteId) {
+            delete replyAttachmentTypes[noteId];
+            delete replyAttachmentDatas[noteId];
+            
+            const previewEl = document.getElementById(`reply-preview-${noteId}`);
+            if (previewEl) previewEl.style.display = 'none';
+            const contentEl = document.getElementById(`reply-preview-content-${noteId}`);
+            if (contentEl) contentEl.innerHTML = '';
+
+            const recordBtn = document.getElementById(`reply-btn-voice-${noteId}`);
+            if (recordBtn) {
+                recordBtn.innerHTML = '🎤 Voice';
+                recordBtn.style.borderColor = 'var(--border-color)';
+                recordBtn.style.color = 'var(--text-main)';
+            }
+            const recordUI = document.getElementById(`reply-voice-ui-${noteId}`);
+            if (recordUI) recordUI.style.display = 'none';
+
+            if (replyRecordingTimers[noteId]) {
+                clearInterval(replyRecordingTimers[noteId]);
+                delete replyRecordingTimers[noteId];
+            }
+        }
+
         function postManagerNote() {
             const text = document.getElementById('manage-note-text').value.trim();
             if (!text && !noteAttachmentData) return alert("Write a note or add a media attachment first.");
@@ -1071,7 +1263,10 @@
         function addNoteReply(noteId) {
             const input = document.getElementById(`reply-input-${noteId}`);
             const text = input.value.trim();
-            if (!text) return;
+            const type = replyAttachmentTypes[noteId] || null;
+            const data = replyAttachmentDatas[noteId] || null;
+
+            if (!text && !data) return;
 
             const note = getCompanyData().managerNotes.find(n => n.id === noteId);
             if (note) {
@@ -1079,8 +1274,13 @@
                 note.replies.push({
                     author: currentUser.email,
                     text: text,
-                    date: formatTimestamp()
+                    date: formatTimestamp(),
+                    attachmentType: type,
+                    attachmentData: data
                 });
+                
+                input.value = '';
+                clearReplyAttachment(noteId);
                 saveData();
             }
         }
@@ -1125,20 +1325,66 @@
 
                 let repliesHtml = '';
                 if (n.replies && n.replies.length > 0) {
-                    repliesHtml = n.replies.map(r => `
-                        <div style="background: var(--bg-color); padding: 12px 16px; border-radius: 8px; margin-top: 10px; border-left: 3px solid var(--border-color);">
-                            <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--text-muted); margin-bottom:4px;">
-                                <strong>${r.author}</strong> <span>🕒 ${r.date}</span>
+                    repliesHtml = n.replies.map(r => {
+                        let replyTextHtml = r.text ? `<div style="color:var(--text-main); font-size:0.95rem;">${r.text}</div>` : '';
+                        let replyAttachmentHtml = '';
+                        if (r.attachmentType === 'image' && r.attachmentData) {
+                            replyAttachmentHtml = `
+                                <div style="margin-top: 8px; max-width: 150px; cursor: pointer; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color);" onclick="showImage('${r.attachmentData.replace(/'/g, "\\'")}')">
+                                    <img src="${r.attachmentData}" alt="Reply attachment" style="width: 100%; display: block; height: auto;">
+                                </div>
+                            `;
+                        } else if (r.attachmentType === 'voice' && r.attachmentData) {
+                            replyAttachmentHtml = `
+                                <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px; background: var(--input-bg); padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-color); max-width: 250px;">
+                                    <span style="font-size: 1.1rem; line-height: 1;">🎤</span>
+                                    <audio src="${r.attachmentData}" controls style="flex: 1; height: 28px; max-width: calc(100% - 20px);"></audio>
+                                </div>
+                            `;
+                        }
+
+                        return `
+                            <div style="background: var(--bg-color); padding: 12px 16px; border-radius: 8px; margin-top: 10px; border-left: 3px solid var(--border-color);">
+                                <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--text-muted); margin-bottom:6px;">
+                                    <strong>${r.author}</strong> <span>🕒 ${r.date}</span>
+                                </div>
+                                ${replyTextHtml}
+                                ${replyAttachmentHtml}
                             </div>
-                            <div style="color:var(--text-main); font-size:0.95rem;">${r.text}</div>
-                        </div>
-                    `).join('');
+                        `;
+                    }).join('');
                 }
 
                 let replyBox = !n.isPrivate ? `
-                    <div style="display:flex; gap:10px; margin-top:16px; border-top:1px dashed var(--border-color); padding-top:16px;">
-                        <input type="text" id="reply-input-${n.id}" placeholder="Write a reply..." style="flex:1; padding: 10px; font-size:0.9rem;">
-                        <button onclick="addNoteReply('${n.id}')" class="btn-info">Reply</button>
+                    <div style="margin-top:16px; border-top:1px dashed var(--border-color); padding-top:16px;">
+                        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                            <input type="text" id="reply-input-${n.id}" placeholder="Write a reply..." style="flex:1; min-width: 150px; padding: 10px; font-size:0.9rem; margin: 0;">
+                            
+                            <div style="display:flex; gap:6px;">
+                                <button type="button" class="btn-outline" style="padding: 8px 10px; min-height:36px; height:36px; font-size: 0.8rem; border-radius: 6px; display:flex; align-items:center; gap:4px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); cursor:pointer;" onclick="triggerReplyImageUpload('${n.id}')" title="Attach Image">
+                                    📷 Image
+                                </button>
+                                <button type="button" id="reply-btn-voice-${n.id}" class="btn-outline" style="padding: 8px 10px; min-height:36px; height:36px; font-size: 0.8rem; border-radius: 6px; display:flex; align-items:center; gap:4px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); cursor:pointer;" onclick="toggleReplyVoiceRecording('${n.id}')" title="Record Voice">
+                                    🎤 Voice
+                                </button>
+                            </div>
+                            
+                            <button onclick="addNoteReply('${n.id}')" class="btn-info" style="padding: 8px 14px; min-height:36px; height:36px; font-size: 0.85rem; border-radius: 6px;">Reply</button>
+                        </div>
+                        
+                        <!-- Voice Recording UI (collapsible) -->
+                        <div id="reply-voice-ui-${n.id}" style="display:none; align-items:center; gap:8px; margin-top:8px; background:var(--input-bg); padding:6px 10px; border-radius:6px; border:1px solid var(--border-color); font-size:0.85rem;">
+                            <span class="recording-pulse" style="display:inline-block; width:8px; height:8px; background-color:#dc2626; border-radius:50%;"></span>
+                            <span id="reply-timer-${n.id}" style="font-family:monospace; font-weight:600;">0:00</span>
+                            <button type="button" class="btn-success" style="padding:3px 8px; font-size:0.75rem; min-height:24px; height:24px; line-height:1; cursor:pointer;" onclick="stopReplyVoiceRecording('${n.id}', true)">Done</button>
+                            <button type="button" class="btn-outline-danger" style="padding:3px 8px; font-size:0.75rem; min-height:24px; height:24px; line-height:1; border:1px solid var(--danger); background:transparent; color:var(--danger); border-radius:4px; cursor:pointer;" onclick="stopReplyVoiceRecording('${n.id}', false)">Cancel</button>
+                        </div>
+                        
+                        <!-- Attachment Preview -->
+                        <div id="reply-preview-${n.id}" style="display:none; margin-top:8px; padding:8px; background:var(--input-bg); border-radius:6px; border:1px solid var(--border-color); position:relative;">
+                            <div id="reply-preview-content-${n.id}"></div>
+                            <button type="button" onclick="clearReplyAttachment('${n.id}')" style="position:absolute; top:6px; right:6px; background:var(--danger); color:white; border:none; border-radius:50%; width:18px; height:18px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-weight:bold; font-size:0.75rem; line-height:1;">✕</button>
+                        </div>
                     </div>
                 ` : '';
 
