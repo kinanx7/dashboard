@@ -1432,6 +1432,8 @@
 
         // --- SALES & POS SYSTEM ---
         let currentSalesTimeframe = 'day';
+        let currentSalesChartType = 'bar'; // 'bar' | 'line' | 'doughnut'
+        let _salesChartInstance = null;  // Chart.js instance handle
 
         function setSalesTimeframe(tf) {
             currentSalesTimeframe = tf;
@@ -1449,6 +1451,20 @@
             const customRange = document.getElementById('sales-custom-range');
             if (customRange) customRange.style.display = tf === 'custom' ? 'flex' : 'none';
 
+            renderManaging();
+        }
+
+        function setSalesChartType(type) {
+            currentSalesChartType = type;
+            ['bar', 'line', 'doughnut'].forEach(t => {
+                const btn = document.getElementById('sct-' + t);
+                if (btn) {
+                    const active = t === type;
+                    btn.style.background = active ? 'var(--primary)' : 'transparent';
+                    btn.style.color = active ? '#fff' : 'var(--text-muted)';
+                    btn.style.border = active ? 'none' : '1px solid var(--border-color)';
+                }
+            });
             renderManaging();
         }
 
@@ -1652,29 +1668,211 @@
                 }).join('');
             }
 
-            // Draw Histogram (upgraded quality)
-            const histoDiv = document.getElementById('sales-histogram');
-            if (histoDiv) {
-                histoDiv.innerHTML = '';
-                const labels = Object.keys(histoData);
-                if (labels.length === 0) {
-                    histoDiv.innerHTML = '<div style="width:100%; text-align:center; color:var(--text-muted); margin-top:80px; font-size:0.9rem;">No data for this timeframe.</div>';
-                } else {
-                    const maxVal = Math.max(...Object.values(histoData), 1);
-                    labels.forEach(label => {
-                        const val = histoData[label];
-                        const pct = Math.max(2, (val / maxVal) * 100);
-                        const display = val >= 1000 ? (val/1000).toFixed(1)+'k' : val.toFixed(0);
-                        histoDiv.innerHTML += `
-                            <div class="histogram-bar-wrapper" title="${label}: SAR ${val.toLocaleString(undefined,{minimumFractionDigits:2})}" style="cursor:default;">
-                                <div style="font-size:0.6rem; color:var(--primary); font-weight:800; text-align:center; margin-bottom:3px; white-space:nowrap;">${display}</div>
-                                <div class="histogram-bar" style="height:${pct}%; background: linear-gradient(180deg, var(--primary) 0%, var(--secondary) 100%); border-radius:4px 4px 0 0; box-shadow: 0 -2px 8px rgba(99,102,241,0.3);"></div>
-                                <div class="histogram-label" style="font-size:0.6rem; margin-top:4px;">${label}</div>
-                            </div>
-                        `;
-                    });
+            // === Advanced Chart.js Histogram ===
+            (function drawSalesChart() {
+                const canvas = document.getElementById('sales-main-chart');
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+
+                // Destroy previous instance to avoid canvas reuse errors
+                if (_salesChartInstance) {
+                    _salesChartInstance.destroy();
+                    _salesChartInstance = null;
                 }
-            }
+
+                // Resolve CSS var colours for Chart.js (which can't read CSS vars natively)
+                const rootStyle = getComputedStyle(document.documentElement);
+                const primaryColor = rootStyle.getPropertyValue('--primary').trim() || '#6366f1';
+                const secondaryColor = rootStyle.getPropertyValue('--secondary').trim() || '#f59e0b';
+                const textMuted = rootStyle.getPropertyValue('--text-muted').trim() || '#94a3b8';
+                const borderColor = rootStyle.getPropertyValue('--border-color').trim() || '#e2e8f0';
+                const cardBg = rootStyle.getPropertyValue('--card-bg').trim() || '#ffffff';
+
+                const PALETTE = [
+                    '#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899',
+                    '#8b5cf6','#14b8a6','#f97316','#06b6d4','#84cc16'
+                ];
+
+                const summaryDiv = document.getElementById('sales-chart-summary');
+
+                if (currentSalesChartType === 'doughnut') {
+                    // --- DOUGHNUT: breakdown by payment method ---
+                    const dLabels = Object.keys(methodTotals).filter(m => methodTotals[m] > 0);
+                    const dData   = dLabels.map(m => methodTotals[m]);
+                    const dColors = dLabels.map((_, i) => PALETTE[i % PALETTE.length]);
+
+                    if (dData.length === 0) {
+                        canvas.style.display = 'none';
+                        let overlay = document.getElementById('sales-chart-empty');
+                        if (!overlay) {
+                            overlay = document.createElement('div');
+                            overlay.id = 'sales-chart-empty';
+                            overlay.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.9rem;color:' + textMuted + ';';
+                            canvas.parentElement.appendChild(overlay);
+                        }
+                        overlay.textContent = 'No data for this timeframe.';
+                        overlay.style.display = 'flex';
+                        if (summaryDiv) summaryDiv.innerHTML = '';
+                        return;
+                    }
+                    canvas.style.display = '';
+                    const oldOverlay = document.getElementById('sales-chart-empty');
+                    if (oldOverlay) oldOverlay.style.display = 'none';
+
+                    _salesChartInstance = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: dLabels,
+                            datasets: [{
+                                data: dData,
+                                backgroundColor: dColors,
+                                borderColor: cardBg,
+                                borderWidth: 3,
+                                hoverOffset: 10
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            cutout: '62%',
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    callbacks: {
+                                        label: ctx => ` ${ctx.label}: SAR ${ctx.parsed.toLocaleString(undefined,{minimumFractionDigits:2})}`
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    // Pill legend
+                    if (summaryDiv) {
+                        summaryDiv.innerHTML = dLabels.map((lbl, i) => `
+                            <span style="display:inline-flex;align-items:center;gap:5px;font-size:0.78rem;font-weight:700;color:${dColors[i]};background:${dColors[i]}18;padding:3px 10px;border-radius:20px;">
+                                <span style="width:8px;height:8px;border-radius:50%;background:${dColors[i]};display:inline-block;"></span>
+                                ${lbl}: SAR ${methodTotals[lbl].toLocaleString(undefined,{minimumFractionDigits:2})}
+                            </span>`).join('');
+                    }
+
+                } else {
+                    // --- BAR / LINE: time-series ---
+                    const labels = Object.keys(histoData);
+                    const values = Object.values(histoData);
+
+                    if (labels.length === 0) {
+                        canvas.style.display = 'none';
+                        let overlay = document.getElementById('sales-chart-empty');
+                        if (!overlay) {
+                            overlay = document.createElement('div');
+                            overlay.id = 'sales-chart-empty';
+                            overlay.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.9rem;color:' + textMuted + ';';
+                            canvas.parentElement.appendChild(overlay);
+                        }
+                        overlay.textContent = 'No data for this timeframe.';
+                        overlay.style.display = 'flex';
+                        if (summaryDiv) summaryDiv.innerHTML = '';
+                        return;
+                    }
+                    canvas.style.display = '';
+                    const oldOverlay = document.getElementById('sales-chart-empty');
+                    if (oldOverlay) oldOverlay.style.display = 'none';
+
+                    // Gradient fill for bar/line
+                    const grad = ctx.createLinearGradient(0, 0, 0, 280);
+                    grad.addColorStop(0, primaryColor + 'cc');
+                    grad.addColorStop(1, primaryColor + '18');
+
+                    const isLine = currentSalesChartType === 'line';
+                    _salesChartInstance = new Chart(ctx, {
+                        type: currentSalesChartType,
+                        data: {
+                            labels,
+                            datasets: [{
+                                label: 'Sales (SAR)',
+                                data: values,
+                                backgroundColor: isLine ? grad : values.map((v, i) => {
+                                    const max = Math.max(...values, 1);
+                                    const alpha = Math.round(80 + (v / max) * 130).toString(16).padStart(2,'0');
+                                    return primaryColor + alpha;
+                                }),
+                                borderColor: primaryColor,
+                                borderWidth: isLine ? 3 : 1.5,
+                                borderRadius: isLine ? 0 : 8,
+                                borderSkipped: false,
+                                fill: isLine,
+                                tension: 0.42,
+                                pointRadius: isLine ? 5 : 0,
+                                pointHoverRadius: isLine ? 8 : 0,
+                                pointBackgroundColor: isLine ? primaryColor : undefined,
+                                pointBorderColor: isLine ? cardBg : undefined,
+                                pointBorderWidth: isLine ? 2 : 0,
+                                hoverBackgroundColor: isLine ? primaryColor + 'dd' : secondaryColor + 'cc'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            animation: { duration: 600, easing: 'easeOutQuart' },
+                            interaction: { mode: 'index', intersect: false },
+                            scales: {
+                                x: {
+                                    grid: { display: false },
+                                    ticks: {
+                                        color: textMuted,
+                                        font: { size: 11, weight: '600', family: 'Inter, sans-serif' },
+                                        maxRotation: 45
+                                    },
+                                    border: { color: borderColor }
+                                },
+                                y: {
+                                    beginAtZero: true,
+                                    grid: { color: borderColor + '80', drawBorder: false },
+                                    ticks: {
+                                        color: textMuted,
+                                        font: { size: 11, family: 'Inter, sans-serif' },
+                                        callback: v => v >= 1000 ? (v/1000).toFixed(1)+'k' : v
+                                    },
+                                    border: { display: false }
+                                }
+                            },
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: cardBg,
+                                    titleColor: textMuted,
+                                    bodyColor: primaryColor,
+                                    borderColor: borderColor,
+                                    borderWidth: 1,
+                                    padding: 12,
+                                    cornerRadius: 10,
+                                    callbacks: {
+                                        label: ctx => ` SAR ${ctx.parsed.y.toLocaleString(undefined,{minimumFractionDigits:2})}`
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    // Quick stats pill row
+                    if (summaryDiv && values.length > 0) {
+                        const total = values.reduce((a, b) => a + b, 0);
+                        const avg   = total / values.length;
+                        const peak  = Math.max(...values);
+                        const peakLabel = labels[values.indexOf(peak)];
+                        summaryDiv.innerHTML = [
+                            { icon: '💰', label: 'Total',   val: 'SAR ' + total.toLocaleString(undefined,{minimumFractionDigits:2}) },
+                            { icon: '📈', label: 'Average', val: 'SAR ' + avg.toFixed(2) },
+                            { icon: '🏆', label: 'Peak',    val: `${peakLabel} · SAR ${peak.toLocaleString(undefined,{minimumFractionDigits:2})}` }
+                        ].map(s => `
+                            <div style="flex:1; min-width:100px; text-align:center; background:var(--bg-color); border:1px solid var(--border-color); border-radius:10px; padding:8px 12px;">
+                                <div style="font-size:1.1rem;">${s.icon}</div>
+                                <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.05em;">${s.label}</div>
+                                <div style="font-size:0.82rem; font-weight:800; color:var(--primary); margin-top:2px;">${s.val}</div>
+                            </div>`).join('');
+                    }
+                }
+            })();
 
             // Draw Recent Transactions Log
             const logDiv = document.getElementById('sales-transaction-log');
@@ -1805,7 +2003,7 @@
             }
             if (!category) { alert('Please select a category.'); return; }
             if (!dateStr) { alert('Please select a past date.'); return; }
-            if (password !== 'N1231') {
+            if (password !== 'N123456') {
                 alert('❌ Incorrect password. Access denied.');
                 document.getElementById('past-cost-password').value = '';
                 return;

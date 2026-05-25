@@ -69,6 +69,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
+    <!-- Chart.js for Advanced Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -1193,10 +1196,19 @@
                         </div>
                     </div>
 
-                    <div
-                        style="background: var(--input-bg); padding: 20px; border-radius: 16px; border: 1px solid var(--border-color); display:flex; flex-direction:column;">
-                        <h3 style="font-size: 1rem; color: var(--text-main); margin:0;">Sales Trend</h3>
-                        <div id="sales-histogram" class="histogram-container"></div>
+                    <div style="background: var(--input-bg); padding: 20px; border-radius: 16px; border: 1px solid var(--border-color); display:flex; flex-direction:column; gap:14px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                            <h3 style="font-size: 1rem; color: var(--text-main); margin:0;">📊 Sales Trend</h3>
+                            <div id="sales-chart-type-btns" style="display:flex; gap:6px;">
+                                <button id="sct-bar" onclick="setSalesChartType('bar')" style="padding:4px 14px; border-radius:20px; font-size:0.78rem; font-weight:700; background:var(--primary); color:#fff; border:none; cursor:pointer;">Bar</button>
+                                <button id="sct-line" onclick="setSalesChartType('line')" style="padding:4px 14px; border-radius:20px; font-size:0.78rem; font-weight:700; background:transparent; color:var(--text-muted); border:1px solid var(--border-color); cursor:pointer;">Line</button>
+                                <button id="sct-doughnut" onclick="setSalesChartType('doughnut')" style="padding:4px 14px; border-radius:20px; font-size:0.78rem; font-weight:700; background:transparent; color:var(--text-muted); border:1px solid var(--border-color); cursor:pointer;">Method</button>
+                            </div>
+                        </div>
+                        <div id="sales-chart-wrapper" style="position:relative; flex:1; min-height:220px;">
+                            <canvas id="sales-main-chart"></canvas>
+                        </div>
+                        <div id="sales-chart-summary" style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;"></div>
                     </div>
                 </div>
 
@@ -1586,7 +1598,7 @@
         </div>
     </div>
 
-    <script defer src="app.js?v=5"></script>
+    <script defer src="app.js?v=6"></script>
 </body>
 
 
