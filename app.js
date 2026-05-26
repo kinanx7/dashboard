@@ -3086,206 +3086,58 @@
             `;
             document.head.appendChild(printStyle);
 
-            // Check if we are inside WebView/APK (or explicitly forced for testing)
-            const isWebView = typeof AndroidInterface !== 'undefined';
+            // Create a temporary element for html2pdf to compile
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = printHTML;
+            document.body.appendChild(tempDiv);
+
+            // Style container for high quality PDF generation
+            tempDiv.style.width = '790px';
+            tempDiv.style.background = '#ffffff';
+            tempDiv.style.padding = '0';
+
+            const opt = {
+                margin:       [0.3, 0.3, 0.3, 0.3],
+                filename:     'burgeroov-restock-report.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true, logging: false },
+                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+            };
+
+            // Trigger direct PDF download immediately (works on Web & supporting WebView APKs)
+            html2pdf().from(tempDiv).set(opt).save().then(() => {
+                if (tempDiv.parentNode) document.body.removeChild(tempDiv);
+            }).catch(err => {
+                console.error("PDF generation/download failed:", err);
+                if (tempDiv.parentNode) document.body.removeChild(tempDiv);
+            });
+
+            // Prepare text summary content for the clipboard (bulletproof APK fallback)
+            let summaryText = `🍔 BURGEROOV RESTOCK REPORT 🍔\n`;
+            summaryText += `Generated: ${dateStr} at ${timeStr}\n`;
+            summaryText += `====================================\n`;
+            summaryText += `Total Items: ${totalItems}\n`;
+            summaryText += `Critical Items: ${criticalItems.length}\n`;
+            summaryText += `Stocked OK: ${okItems}\n`;
+            summaryText += `====================================\n\n`;
             
-            // Check if there is an explicit bridge print method
-            if (isWebView && typeof AndroidInterface.print === 'function') {
-                try {
-                    AndroidInterface.print(printHTML);
-                    return;
-                } catch (e) {
-                    console.error("AndroidInterface.print failed, falling back:", e);
-                }
+            if (criticalItems.length > 0) {
+                summaryText += `🚨 CRITICAL RESTOCK ORDERS 🚨\n`;
+                criticalItems.forEach(c => {
+                    summaryText += `- ${c.name} (${c.category}): Stock is ${c.current}/${c.max}. Need to order: ${c.toOrder} units (Risk threshold: ${c.riskAmount})\n`;
+                });
+            } else {
+                summaryText += `✓ All warehouse stocks are OK!\n`;
             }
 
-            if (isWebView) {
-                // Prepare HTML content
-                currentApkReportHtml = printHTML;
+            // Copy to clipboard silently
+            copyToClipboard(summaryText);
 
-                // Prepare text summary content for the clipboard or easy sharing
-                let summaryText = `🍔 BURGEROOV RESTOCK REPORT 🍔\n`;
-                summaryText += `Generated: ${dateStr} at ${timeStr}\n`;
-                summaryText += `====================================\n`;
-                summaryText += `Total Items: ${totalItems}\n`;
-                summaryText += `Critical Items: ${criticalItems.length}\n`;
-                summaryText += `Stocked OK: ${okItems}\n`;
-                summaryText += `====================================\n\n`;
-                
-                if (criticalItems.length > 0) {
-                    summaryText += `🚨 CRITICAL RESTOCK ORDERS 🚨\n`;
-                    criticalItems.forEach(c => {
-                        summaryText += `- ${c.name} (${c.category}): Stock is ${c.current}/${c.max}. Need to order: ${c.toOrder} units (Risk threshold: ${c.riskAmount})\n`;
-                    });
-                } else {
-                    summaryText += `✓ All warehouse stocks are OK!\n`;
-                }
-
-                currentApkReportText = summaryText;
-
-                // Open the modal
-                const modal = document.getElementById('apk-print-modal');
-                if (modal) {
-                    modal.style.display = 'flex';
-                    
-                    // Inject report into iframe
-                    const iframe = document.getElementById('apk-report-iframe');
-                    if (iframe) {
-                        const doc = iframe.contentDocument || iframe.contentWindow.document;
-                        doc.open();
-                        doc.write(printHTML);
-                        doc.close();
-                    }
-                    
-                    // Configure buttons
-                    const sharePdfBtn = document.getElementById('btn-apk-share-pdf');
-                    const downloadPdfBtn = document.getElementById('btn-apk-download-pdf');
-                    const copyBtn = document.getElementById('btn-apk-copy');
-                    
-                    if (sharePdfBtn) {
-                        sharePdfBtn.onclick = function() {
-                            // Update status to show generation started
-                            const statusEl = document.getElementById('apk-report-status');
-                            if (statusEl) {
-                                statusEl.textContent = '⏳ Preparing PDF...';
-                                statusEl.style.color = '#b45309';
-                            }
-                            
-                            // Generate real PDF using html2pdf
-                            const tempDiv = document.createElement('div');
-                            tempDiv.innerHTML = printHTML;
-                            document.body.appendChild(tempDiv);
-                            
-                            // Style container for high quality printing
-                            tempDiv.style.width = '790px';
-                            tempDiv.style.background = '#ffffff';
-                            
-                            const opt = {
-                                margin:       [0.3, 0.3, 0.3, 0.3],
-                                filename:     'burgeroov-restock-report.pdf',
-                                image:        { type: 'jpeg', quality: 0.98 },
-                                html2canvas:  { scale: 2, useCORS: true, logging: false },
-                                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
-                            };
-                            
-                            html2pdf().from(tempDiv).set(opt).output('blob').then(function(pdfBlob) {
-                                if (tempDiv.parentNode) document.body.removeChild(tempDiv);
-                                if (statusEl) {
-                                    statusEl.textContent = '● PDF Ready';
-                                    statusEl.style.color = '#16a34a';
-                                }
-                                
-                                try {
-                                    const file = new File([pdfBlob], `burgeroov-restock-report.pdf`, { type: 'application/pdf' });
-                                    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                                        navigator.share({
-                                            files: [file],
-                                            title: 'Burgeroov Restock Report',
-                                            text: 'Warehouse Restock Order PDF'
-                                        }).then(() => {
-                                            showInAppNotification("PDF shared successfully! 📤");
-                                        }).catch(err => {
-                                            console.warn("Share resolved/canceled:", err);
-                                        });
-                                    } else {
-                                        // Fallback to text sharing if file sharing is not supported by device
-                                        navigator.share({
-                                            title: 'Burgeroov Restock Report',
-                                            text: summaryText
-                                        }).then(() => {
-                                            showInAppNotification("Summary text shared successfully! 📤");
-                                        }).catch(err => {
-                                            console.error("Text share failed:", err);
-                                            copyToClipboard(summaryText);
-                                        });
-                                    }
-                                } catch (e) {
-                                    console.error("File sharing exception:", e);
-                                    copyToClipboard(summaryText);
-                                }
-                            }).catch(function(err) {
-                                console.error("PDF generation failed:", err);
-                                if (tempDiv.parentNode) document.body.removeChild(tempDiv);
-                                if (statusEl) {
-                                    statusEl.textContent = '❌ Generation failed';
-                                    statusEl.style.color = '#dc2626';
-                                }
-                                showInAppNotification("PDF generation failed. Copying summary instead.");
-                                copyToClipboard(summaryText);
-                            });
-                        };
-                    }
-                    
-                    if (downloadPdfBtn) {
-                        downloadPdfBtn.onclick = function() {
-                            // Update status to show generation started
-                            const statusEl = document.getElementById('apk-report-status');
-                            if (statusEl) {
-                                statusEl.textContent = '⏳ Downloading PDF...';
-                                statusEl.style.color = '#b45309';
-                            }
-                            
-                            const tempDiv = document.createElement('div');
-                            tempDiv.innerHTML = printHTML;
-                            document.body.appendChild(tempDiv);
-                            
-                            tempDiv.style.width = '790px';
-                            tempDiv.style.background = '#ffffff';
-                            
-                            const opt = {
-                                margin:       [0.3, 0.3, 0.3, 0.3],
-                                filename:     'burgeroov-restock-report.pdf',
-                                image:        { type: 'jpeg', quality: 0.98 },
-                                html2canvas:  { scale: 2, useCORS: true, logging: false },
-                                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
-                            };
-                            
-                            html2pdf().from(tempDiv).set(opt).save().then(function() {
-                                if (tempDiv.parentNode) document.body.removeChild(tempDiv);
-                                if (statusEl) {
-                                    statusEl.textContent = '● PDF Downloaded';
-                                    statusEl.style.color = '#16a34a';
-                                }
-                                showInAppNotification("PDF download triggered! 💾");
-                            }).catch(function(err) {
-                                console.error("PDF download failed:", err);
-                                if (tempDiv.parentNode) document.body.removeChild(tempDiv);
-                                if (statusEl) {
-                                    statusEl.textContent = '❌ Download failed';
-                                    statusEl.style.color = '#dc2626';
-                                }
-                                alert("PDF Download failed. Please try 'Share PDF' instead!");
-                            });
-                        };
-                    }
-                    
-                    if (copyBtn) {
-                        copyBtn.onclick = function() {
-                            copyToClipboard(summaryText);
-                        };
-                    }
-                }
-                return;
-            }
-
-            // Trigger print then clean up (Web/Desktop mode)
-            setTimeout(() => {
-                window.print();
-                setTimeout(() => {
-                    printLayer.remove();
-                    printStyle.remove();
-                }, 1500);
-            }, 150);
+            // Show a sleek toast notification
+            showInAppNotification("📥 Restock PDF download started & text summary copied to clipboard! 📋");
         }
 
-        // --- APK PRINT HUB HELPERS ---
-        let currentApkReportHtml = '';
-        let currentApkReportText = '';
-
-        function closeApkPrintModal() {
-            const modal = document.getElementById('apk-print-modal');
-            if (modal) modal.style.display = 'none';
-        }
+        // --- APK PRINT HELPERS ---
 
         function copyToClipboard(text) {
             if (navigator.clipboard && navigator.clipboard.writeText) {
