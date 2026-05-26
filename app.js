@@ -2711,20 +2711,22 @@
             });
         }
 
-        async function exportWarehousePDF() {
+        function exportWarehousePDF() {
             const data = getCompanyData().warehouse;
             if (!data || data.length === 0) return alert("Warehouse is empty.");
 
-            // Pre-load logo as base64 so it works inside a blob: URL
+            // Extract logo as base64 from the already-loaded DOM image (works on web & APK)
             let logoDataUrl = '';
             try {
-                const resp = await fetch('burgeroov.png');
-                const ab = await resp.arrayBuffer();
-                const bytes = new Uint8Array(ab);
-                let binary = '';
-                bytes.forEach(b => binary += String.fromCharCode(b));
-                logoDataUrl = 'data:image/png;base64,' + btoa(binary);
-            } catch(e) { /* logo unavailable — header will render without it */ }
+                const logoImg = document.getElementById('header-logo');
+                if (logoImg && logoImg.complete && logoImg.naturalWidth > 0) {
+                    const c = document.createElement('canvas');
+                    c.width = logoImg.naturalWidth;
+                    c.height = logoImg.naturalHeight;
+                    c.getContext('2d').drawImage(logoImg, 0, 0);
+                    logoDataUrl = c.toDataURL('image/png');
+                }
+            } catch(e) { /* canvas tainted — logo skipped */ }
 
             // Gather all folders dynamically
             let folders = [...(getCompanyData().whCategories || [])];
@@ -3038,12 +3040,39 @@
 
             const blob = new Blob([printHTML], { type: 'text/html' });
             const blobUrl = URL.createObjectURL(blob);
-            const iframe = document.createElement('iframe');
-            iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
-            document.body.appendChild(iframe);
-            iframe.onload = function () { setTimeout(function () { iframe.contentWindow.print(); }, 400); };
-            iframe.src = blobUrl;
-            setTimeout(() => { URL.revokeObjectURL(blobUrl); document.body.removeChild(iframe); }, 12000);
+
+            // Detect Android WebView / APK environment
+            const isAndroidWebView = /wv/.test(navigator.userAgent) || (navigator.userAgent.includes('Android') && !navigator.userAgent.includes('Chrome/'));
+            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+            if (isAndroidWebView || isMobile) {
+                // On APK/mobile: trigger download of the HTML file so user can open & print from browser
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = 'Burgeroov_Restock_Report_' + new Date().toISOString().slice(0,10) + '.html';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+            } else {
+                // On desktop web: open in new tab and auto-trigger print dialog
+                const win = window.open(blobUrl, '_blank');
+                if (win) {
+                    win.onload = function() {
+                        setTimeout(() => { win.print(); }, 500);
+                    };
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 15000);
+                } else {
+                    // Popup blocked — fallback to download
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = 'Burgeroov_Restock_Report_' + new Date().toISOString().slice(0,10) + '.html';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+                }
+            }
         }
 
         // --- UTILITIES ---
