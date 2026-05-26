@@ -2711,9 +2711,20 @@
             });
         }
 
-        function exportWarehousePDF() {
+        async function exportWarehousePDF() {
             const data = getCompanyData().warehouse;
             if (!data || data.length === 0) return alert("Warehouse is empty.");
+
+            // Pre-load logo as base64 so it works inside a blob: URL
+            let logoDataUrl = '';
+            try {
+                const resp = await fetch('burgeroov.png');
+                const ab = await resp.arrayBuffer();
+                const bytes = new Uint8Array(ab);
+                let binary = '';
+                bytes.forEach(b => binary += String.fromCharCode(b));
+                logoDataUrl = 'data:image/png;base64,' + btoa(binary);
+            } catch(e) { /* logo unavailable — header will render without it */ }
 
             // Gather all folders dynamically
             let folders = [...(getCompanyData().whCategories || [])];
@@ -2854,10 +2865,10 @@
     }
     .header-left { display: flex; align-items: center; gap: 18px; }
     .logo-wrap {
-        background: rgba(255,255,255,0.12);
+        background: #ffffff;
         border-radius: 14px;
         padding: 8px;
-        backdrop-filter: blur(4px);
+        box-shadow: 0 2px 12px rgba(0,0,0,0.18);
     }
     .logo-wrap img { width: 54px; height: 54px; object-fit: contain; border-radius: 8px; }
     .brand-name { font-size: 26px; font-weight: 900; letter-spacing: -0.02em; }
@@ -2954,7 +2965,7 @@
     <div class="header">
         <div class="header-left">
             <div class="logo-wrap">
-                <img src="burgeroov.png" alt="Burgeroov Logo" />
+                ${logoDataUrl ? `<img src="${logoDataUrl}" alt="Burgeroov Logo" />` : '<span style="font-size:28px;">🍔</span>'}
             </div>
             <div>
                 <div class="brand-name">Burgeroov</div>
