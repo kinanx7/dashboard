@@ -87,17 +87,11 @@
 <body class="theme-burgeroov">
 
     <!-- Launch Loader Overlay -->
-    <div id="launch-loader-overlay"
-        style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #2d1b11; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;">
-        <div
-            style="background: #ffffff; padding: 14px 20px; border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(0,0,0,0.25);">
-            <img src="burgeroov.png" alt="Burgeroov Logo"
-                style="max-width: 130px; height: auto; display: block; animation: notePulse 2.0s infinite ease-in-out;"
-                onerror="this.parentNode.style.display = 'none'">
+    <div id="launch-loader-overlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #2d1b11; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;">
+        <div style="background: #ffffff; padding: 14px 20px; border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(0,0,0,0.25);">
+            <img src="burgeroov.png" alt="Burgeroov Logo" style="max-width: 130px; height: auto; display: block; animation: notePulse 2.0s infinite ease-in-out;" onerror="this.parentNode.style.display = 'none'">
         </div>
-        <div class="loader"
-            style="width: 42px; height: 42px; border: 4px solid rgba(255,255,255,0.15); border-top-color: #c5832b; border-radius: 50%; animation: spin 1s linear infinite;">
-        </div>
+        <div class="loader" style="width: 42px; height: 42px; border: 4px solid rgba(255,255,255,0.15); border-top-color: #c5832b; border-radius: 50%; animation: spin 1s linear infinite;"></div>
     </div>
 
     <!-- Authentication Overlay -->
@@ -1111,63 +1105,40 @@
                     </div>
 
                     <!-- Media Attachment Section -->
-                    <div class="note-attachment-section"
-                        style="margin-top: 18px; border-top: 1px solid var(--border-color); padding-top: 18px;">
-                        <label
-                            style="color:var(--text-main); font-weight:700; font-size:0.9rem; display:block; margin-bottom:8px;">Add
-                            Attachment (Optional):</label>
+                    <div class="note-attachment-section" style="margin-top: 18px; border-top: 1px solid var(--border-color); padding-top: 18px;">
+                        <label style="color:var(--text-main); font-weight:700; font-size:0.9rem; display:block; margin-bottom:8px;">Add Attachment (Optional):</label>
                         <div class="attachment-buttons" style="display:flex; gap:12px; flex-wrap:wrap;">
-                            <button type="button" id="note-btn-attach-camera" class="btn-outline"
-                                style="display:flex; align-items:center; gap:8px; padding: 8px 14px; font-size: 0.9rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); cursor:pointer;"
-                                onclick="triggerNoteImageUpload('camera')">
+                            <button type="button" id="note-btn-attach-camera" class="btn-outline" style="display:flex; align-items:center; gap:8px; padding: 8px 14px; font-size: 0.9rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); cursor:pointer;" onclick="triggerNoteImageUpload('camera')">
                                 📷 Camera
                             </button>
-                            <button type="button" id="note-btn-attach-image" class="btn-outline"
-                                style="display:flex; align-items:center; gap:8px; padding: 8px 14px; font-size: 0.9rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); cursor:pointer;"
-                                onclick="triggerNoteImageUpload('gallery')">
+                            <button type="button" id="note-btn-attach-image" class="btn-outline" style="display:flex; align-items:center; gap:8px; padding: 8px 14px; font-size: 0.9rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); cursor:pointer;" onclick="triggerNoteImageUpload('gallery')">
                                 🖼️ Gallery
                             </button>
-                            <button type="button" id="note-btn-record-voice" class="btn-outline"
-                                style="display:flex; align-items:center; gap:8px; padding: 8px 14px; font-size: 0.9rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); cursor:pointer;"
-                                onclick="toggleVoiceRecording()">
+                            <button type="button" id="note-btn-record-voice" class="btn-outline" style="display:flex; align-items:center; gap:8px; padding: 8px 14px; font-size: 0.9rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); cursor:pointer;" onclick="toggleVoiceRecording()">
                                 🎤 Record Voice Note
                             </button>
                         </div>
-
+                        
                         <!-- Hidden File Inputs -->
-                        <input type="file" id="note-image-input" accept="image/*" style="display:none;"
-                            onchange="handleNoteImageSelected(event)">
-                        <input type="file" id="note-camera-input" accept="image/*" capture="environment"
-                            style="display:none;" onchange="handleNoteImageSelected(event)">
-
+                        <input type="file" id="note-image-input" accept="image/*" style="display:none;" onchange="handleNoteImageSelected(event)">
+                        <input type="file" id="note-camera-input" accept="image/*" capture="environment" style="display:none;" onchange="handleNoteImageSelected(event)">
+                        
                         <!-- Global Hidden Inputs for Replies -->
                         <input type="file" id="reply-image-input-global" accept="image/*" style="display:none;">
-                        <input type="file" id="reply-camera-input-global" accept="image/*" capture="environment"
-                            style="display:none;">
-
+                        <input type="file" id="reply-camera-input-global" accept="image/*" capture="environment" style="display:none;">
+                        
                         <!-- Voice Recording Interface (collapsible) -->
-                        <div id="note-voice-recording-ui"
-                            style="display:none; align-items:center; gap:12px; margin-top:12px; background:var(--input-bg); padding:10px 14px; border-radius:8px; border:1px solid var(--border-color);">
-                            <span class="recording-pulse"
-                                style="display:inline-block; width:10px; height:10px; background-color:#dc2626; border-radius:50%;"></span>
-                            <span id="recording-timer"
-                                style="font-family:monospace; font-size:0.95rem; color:var(--text-main); font-weight:600;">0:00</span>
-                            <button type="button" class="btn-success"
-                                style="padding:6px 12px; font-size:0.85rem; min-height:32px; height:32px; line-height:1; cursor:pointer;"
-                                onclick="stopVoiceRecording(true)">Done</button>
-                            <button type="button" class="btn-outline-danger"
-                                style="padding:6px 12px; font-size:0.85rem; min-height:32px; height:32px; line-height:1; border: 1px solid var(--danger); background: transparent; color: var(--danger); border-radius: 6px; cursor: pointer;"
-                                onclick="stopVoiceRecording(false)">Cancel</button>
+                        <div id="note-voice-recording-ui" style="display:none; align-items:center; gap:12px; margin-top:12px; background:var(--input-bg); padding:10px 14px; border-radius:8px; border:1px solid var(--border-color);">
+                            <span class="recording-pulse" style="display:inline-block; width:10px; height:10px; background-color:#dc2626; border-radius:50%;"></span>
+                            <span id="recording-timer" style="font-family:monospace; font-size:0.95rem; color:var(--text-main); font-weight:600;">0:00</span>
+                            <button type="button" class="btn-success" style="padding:6px 12px; font-size:0.85rem; min-height:32px; height:32px; line-height:1; cursor:pointer;" onclick="stopVoiceRecording(true)">Done</button>
+                            <button type="button" class="btn-outline-danger" style="padding:6px 12px; font-size:0.85rem; min-height:32px; height:32px; line-height:1; border: 1px solid var(--danger); background: transparent; color: var(--danger); border-radius: 6px; cursor: pointer;" onclick="stopVoiceRecording(false)">Cancel</button>
                         </div>
-
+                        
                         <!-- Preview Box for Attached Media -->
-                        <div id="note-attachment-preview"
-                            style="display:none; margin-top:12px; padding:12px; background:var(--input-bg); border-radius:8px; border:1px solid var(--border-color); position:relative; max-width: 100%; box-sizing: border-box;">
-                            <div id="note-preview-content"
-                                style="display:flex; align-items:center; gap:10px; width: 100%;"></div>
-                            <button type="button" onclick="clearNoteAttachment()"
-                                style="position:absolute; top:8px; right:8px; background:var(--danger); color:white; border:none; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-weight:bold; font-size:0.8rem; line-height: 1;"
-                                title="Remove Attachment">✕</button>
+                        <div id="note-attachment-preview" style="display:none; margin-top:12px; padding:12px; background:var(--input-bg); border-radius:8px; border:1px solid var(--border-color); position:relative; max-width: 100%; box-sizing: border-box;">
+                            <div id="note-preview-content" style="display:flex; align-items:center; gap:10px; width: 100%;"></div>
+                            <button type="button" onclick="clearNoteAttachment()" style="position:absolute; top:8px; right:8px; background:var(--danger); color:white; border:none; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-weight:bold; font-size:0.8rem; line-height: 1;" title="Remove Attachment">✕</button>
                         </div>
                     </div>
 
@@ -1225,25 +1196,19 @@
                         </div>
                     </div>
 
-                    <div
-                        style="background: var(--input-bg); padding: 20px; border-radius: 16px; border: 1px solid var(--border-color); display:flex; flex-direction:column; gap:14px;">
-                        <div
-                            style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <div style="background: var(--input-bg); padding: 20px; border-radius: 16px; border: 1px solid var(--border-color); display:flex; flex-direction:column; gap:14px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                             <h3 style="font-size: 1rem; color: var(--text-main); margin:0;">📊 Sales Trend</h3>
                             <div id="sales-chart-type-btns" style="display:flex; gap:6px;">
-                                <button id="sct-bar" onclick="setSalesChartType('bar')"
-                                    style="padding:4px 14px; border-radius:20px; font-size:0.78rem; font-weight:700; background:var(--primary); color:#fff; border:none; cursor:pointer;">Bar</button>
-                                <button id="sct-line" onclick="setSalesChartType('line')"
-                                    style="padding:4px 14px; border-radius:20px; font-size:0.78rem; font-weight:700; background:transparent; color:var(--text-muted); border:1px solid var(--border-color); cursor:pointer;">Line</button>
-                                <button id="sct-doughnut" onclick="setSalesChartType('doughnut')"
-                                    style="padding:4px 14px; border-radius:20px; font-size:0.78rem; font-weight:700; background:transparent; color:var(--text-muted); border:1px solid var(--border-color); cursor:pointer;">Method</button>
+                                <button id="sct-bar" onclick="setSalesChartType('bar')" style="padding:4px 14px; border-radius:20px; font-size:0.78rem; font-weight:700; background:var(--primary); color:#fff; border:none; cursor:pointer;">Bar</button>
+                                <button id="sct-line" onclick="setSalesChartType('line')" style="padding:4px 14px; border-radius:20px; font-size:0.78rem; font-weight:700; background:transparent; color:var(--text-muted); border:1px solid var(--border-color); cursor:pointer;">Line</button>
+                                <button id="sct-doughnut" onclick="setSalesChartType('doughnut')" style="padding:4px 14px; border-radius:20px; font-size:0.78rem; font-weight:700; background:transparent; color:var(--text-muted); border:1px solid var(--border-color); cursor:pointer;">Method</button>
                             </div>
                         </div>
                         <div id="sales-chart-wrapper" style="position:relative; flex:1; min-height:220px;">
                             <canvas id="sales-main-chart"></canvas>
                         </div>
-                        <div id="sales-chart-summary"
-                            style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;"></div>
+                        <div id="sales-chart-summary" style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;"></div>
                     </div>
                 </div>
 
@@ -1535,22 +1500,16 @@
     </div>
 
     <!-- APK Permission Helper Modal -->
-    <div id="apk-permission-modal"
-        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 11000; align-items: center; justify-content: center; padding: 20px;">
-        <div
-            style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 16px; padding: 24px; max-width: 420px; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.3); box-sizing: border-box; text-align: center;">
+    <div id="apk-permission-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 11000; align-items: center; justify-content: center; padding: 20px;">
+        <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 16px; padding: 24px; max-width: 420px; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.3); box-sizing: border-box; text-align: center;">
             <span style="font-size: 3rem; display: block; margin-bottom: 12px;">🎙️</span>
-            <h3
-                style="color: var(--text-main); font-size: 1.2rem; font-weight: 700; margin-bottom: 12px; margin-top: 0;">
-                Microphone Permission Required</h3>
-
+            <h3 style="color: var(--text-main); font-size: 1.2rem; font-weight: 700; margin-bottom: 12px; margin-top: 0;">Microphone Permission Required</h3>
+            
             <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.5; margin-bottom: 20px;">
-                To record voice notes inside the Burgeroov App, you need to manually allow microphone access in your
-                phone settings.
+                To record voice notes inside the Burgeroov App, you need to manually allow microphone access in your phone settings.
             </p>
-
-            <div
-                style="text-align: left; background: var(--input-bg); padding: 16px; border-radius: 10px; border: 1px solid var(--border-color); margin-bottom: 24px; font-size: 0.9rem; line-height: 1.6; color: var(--text-main);">
+            
+            <div style="text-align: left; background: var(--input-bg); padding: 16px; border-radius: 10px; border: 1px solid var(--border-color); margin-bottom: 24px; font-size: 0.9rem; line-height: 1.6; color: var(--text-main);">
                 <strong style="color: var(--primary); display:block; margin-bottom:6px;">How to enable:</strong>
                 <ol style="margin: 0; padding-left: 20px;">
                     <li>Open your phone's <strong>Settings</strong> app.</li>
@@ -1560,54 +1519,8 @@
                     <li>Reopen the Burgeroov App!</li>
                 </ol>
             </div>
-
-            <button onclick="document.getElementById('apk-permission-modal').style.display='none'" class="btn-success"
-                style="width: 100%; padding: 12px; font-size: 1rem; border-radius: 8px; cursor: pointer;">Got it,
-                thanks!</button>
-        </div>
-    </div>
-
-
-    <!-- Burgeroov PDF Print Viewer Modal -->
-    <div id="apk-print-modal"
-        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #0f172a; z-index: 12000; flex-direction: column; box-sizing: border-box; overflow: hidden;">
-        <!-- Top Header Control Bar -->
-        <div id="apk-print-header-bar"
-            style="background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(10px); border-bottom: 1px solid #1e293b; color: #fff; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; z-index: 10;">
-            <div style="display: flex; align-items: center; gap: 12px; text-align: left;">
-                <span style="font-size: 1.5rem;">📄</span>
-                <div>
-                    <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: #fff; letter-spacing: -0.01em;">
-                        Burgeroov PDF Viewer</h3>
-                    <p style="margin: 2px 0 0 0; font-size: 0.75rem; color: #94a3b8;">Warehouse Restock Report</p>
-                </div>
-            </div>
-            <div style="display: flex; align-items: center; gap: 12px;">
-                <button id="btn-apk-direct-print" class="btn-success"
-                    style="padding: 10px 22px; font-size: 0.9rem; font-weight: 700; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; border: none; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.2); transition: transform 0.1s;"
-                    onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='none'">
-                    🖨️ Print PDF
-                </button>
-                <button id="btn-apk-direct-save"
-                    style="padding: 10px 22px; font-size: 0.9rem; font-weight: 700; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; border: none; background: #6366f1; color: #fff; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2); transition: transform 0.1s;"
-                    onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='none'">
-                    💾 Save PDF
-                </button>
-                <button onclick="closeApkPrintModal()"
-                    style="padding: 10px 16px; font-size: 0.9rem; font-weight: 700; border-radius: 8px; cursor: pointer; background: #334155; color: #e2e8f0; border: none; transition: background 0.2s;"
-                    onmouseover="this.style.background='#475569'" onmouseout="this.style.background='#334155'">
-                    ✕ Close
-                </button>
-            </div>
-        </div>
-
-        <!-- Scrollable Paper Container -->
-        <div
-            style="flex: 1; overflow-y: auto; padding: 20px 16px; display: flex; justify-content: center; background: #0f172a;">
-            <div id="apk-pdf-paper"
-                style="width: 100%; max-width: 800px; background: #ffffff; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-radius: 6px; overflow: hidden; height: fit-content; min-height: 297mm; box-sizing: border-box; color: #1e293b;">
-                <!-- Dynamically populated PDF Content will render here -->
-            </div>
+            
+            <button onclick="document.getElementById('apk-permission-modal').style.display='none'" class="btn-success" style="width: 100%; padding: 12px; font-size: 1rem; border-radius: 8px; cursor: pointer;">Got it, thanks!</button>
         </div>
     </div>
 
@@ -1685,7 +1598,7 @@
         </div>
     </div>
 
-    <script defer src="app.js?v=11"></script>
+    <script defer src="app.js?v=6"></script>
 </body>
 
 
