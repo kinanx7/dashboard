@@ -2715,19 +2715,6 @@
             const data = getCompanyData().warehouse;
             if (!data || data.length === 0) return alert("Warehouse is empty.");
 
-            // Extract logo as base64 from the already-loaded DOM image (works on web & APK)
-            let logoDataUrl = '';
-            try {
-                const logoImg = document.getElementById('header-logo');
-                if (logoImg && logoImg.complete && logoImg.naturalWidth > 0) {
-                    const c = document.createElement('canvas');
-                    c.width = logoImg.naturalWidth;
-                    c.height = logoImg.naturalHeight;
-                    c.getContext('2d').drawImage(logoImg, 0, 0);
-                    logoDataUrl = c.toDataURL('image/png');
-                }
-            } catch(e) { /* canvas tainted — logo skipped */ }
-
             // Gather all folders dynamically
             let folders = [...(getCompanyData().whCategories || [])];
             data.forEach(i => {
@@ -2735,416 +2722,82 @@
                 if (!folders.includes(cat)) folders.push(cat);
             });
 
-            // Build stats
-            let totalItems = data.length;
-            let criticalItems = [];
-            let okItems = 0;
+            let rowsHtml = '';
+            let criticalList = [];
 
-            // Build table body grouped by category
-            let categorySectionsHtml = '';
-
+            // Group by folders for PDF too
             folders.forEach(folder => {
                 const itemsInFolder = data.filter(i => (i.category || 'Uncategorized') === folder);
-                if (itemsInFolder.length === 0) return;
+                if (itemsInFolder.length > 0) {
+                    rowsHtml += `<tr style="background-color: #f1f5f9;"><td colspan="3" style="padding:10px; font-weight:bold; color:#334155;">📂 ${folder}</td></tr>`;
 
-                let rowsHtml = '';
-                itemsInFolder.forEach((item, idx) => {
-                    const isLow = item.currentStock <= item.riskAmount;
-                    const toOrder = Math.max(0, item.maxStock - item.currentStock);
-                    const stockPct = item.maxStock > 0 ? Math.round((item.currentStock / item.maxStock) * 100) : 0;
+                    itemsInFolder.forEach(i => {
+                        const isLow = i.currentStock <= i.riskAmount;
+                        const toOrder = Math.max(0, i.maxStock - i.currentStock);
 
-                    if (isLow) {
-                        criticalItems.push({ name: item.name, category: folder, current: item.currentStock, max: item.maxStock, toOrder, riskAmount: item.riskAmount });
-                    } else {
-                        okItems++;
-                    }
+                        if (isLow) {
+                            criticalList.push(`<li style="margin-bottom:6px;"><strong>${i.name}</strong> (${folder}): Need to order <strong>${toOrder}</strong></li>`);
+                        }
 
-                    const statusBadge = isLow
-                        ? `<span style="display:inline-block;background:#dc2626;color:#fff;font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px;letter-spacing:0.05em;text-transform:uppercase;">⚠ Low Stock</span>`
-                        : `<span style="display:inline-block;background:#16a34a;color:#fff;font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px;letter-spacing:0.05em;text-transform:uppercase;">✓ OK</span>`;
+                        const rowBg = isLow ? 'background-color:#fef2f2; color:#dc2626; font-weight:bold;' : '';
+                        const nameDisplay = isLow ? `&#x1F6A8; ${i.name}` : i.name;
 
-                    const rowBg = isLow
-                        ? (idx % 2 === 0 ? '#fff5f5' : '#fff0f0')
-                        : (idx % 2 === 0 ? '#ffffff' : '#f8fafc');
-
-                    const stockBarColor = isLow ? '#dc2626' : '#16a34a';
-                    const barWidth = Math.min(stockPct, 100);
-
-                    rowsHtml += `
-                        <tr style="background:${rowBg};">
-                            <td style="padding:10px 14px; border-bottom:1px solid #e2e8f0; font-size:12px; font-weight:${isLow ? '700' : '500'}; color:${isLow ? '#dc2626' : '#1e293b'};">
-                                ${isLow ? '⚠ ' : ''}${item.name}
-                            </td>
-                            <td style="padding:10px 14px; border-bottom:1px solid #e2e8f0; text-align:center; font-size:12px;">
-                                <div style="font-weight:700; color:${isLow ? '#dc2626' : '#1e293b'};">${item.currentStock}</div>
-                                <div style="font-size:10px; color:#94a3b8;">of ${item.maxStock}</div>
-                            </td>
-                            <td style="padding:10px 14px; border-bottom:1px solid #e2e8f0; text-align:center; font-size:11px; color:#64748b;">
-                                <div style="background:#f1f5f9; border-radius:4px; height:6px; width:80px; margin:0 auto 4px auto; overflow:hidden;">
-                                    <div style="background:${stockBarColor}; height:100%; width:${barWidth}%; border-radius:4px;"></div>
-                                </div>
-                                ${stockPct}%
-                            </td>
-                            <td style="padding:10px 14px; border-bottom:1px solid #e2e8f0; text-align:center; font-size:12px; font-weight:${toOrder > 0 ? '800' : '500'}; color:${toOrder > 0 ? '#b45309' : '#94a3b8'};">
-                                ${toOrder > 0 ? toOrder : '—'}
-                            </td>
-                            <td style="padding:10px 14px; border-bottom:1px solid #e2e8f0; text-align:center;">${statusBadge}</td>
-                        </tr>`;
-                });
-
-                categorySectionsHtml += `
-                    <tr>
-                        <td colspan="5" style="padding:12px 14px 6px 14px; background:#f1f5f9; border-top:2px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">
-                            <span style="font-size:11px; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.08em;">📂 ${folder}</span>
-                            <span style="margin-left:8px; font-size:10px; color:#94a3b8;">${itemsInFolder.length} item${itemsInFolder.length !== 1 ? 's' : ''}</span>
-                        </td>
-                    </tr>
-                    ${rowsHtml}`;
+                        rowsHtml += `
+                            <tr style="${rowBg}">
+                                <td style="padding:8px 8px 8px 24px; border:1px solid #e2e8f0;">${nameDisplay}</td>
+                                <td style="padding:8px; border:1px solid #e2e8f0; text-align:center;">${i.currentStock} / ${i.maxStock}</td>
+                                <td style="padding:8px; border:1px solid #e2e8f0; text-align:center;">${toOrder}</td>
+                            </tr>
+                        `;
+                    });
+                }
             });
 
-            // Critical items cards
-            let criticalCardsHtml = '';
-            if (criticalItems.length > 0) {
-                const cards = criticalItems.map(c => `
-                    <div style="background:#fff;border:1.5px solid #fca5a5;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;box-shadow:0 1px 4px rgba(220,38,38,0.08);">
-                        <div>
-                            <div style="font-size:13px;font-weight:800;color:#dc2626;">⚠ ${c.name}</div>
-                            <div style="font-size:10px;color:#94a3b8;margin-top:2px;">Category: ${c.category} &nbsp;|&nbsp; Risk threshold: ${c.riskAmount}</div>
-                        </div>
-                        <div style="text-align:right;">
-                            <div style="font-size:11px;color:#64748b;">Current / Max</div>
-                            <div style="font-size:13px;font-weight:700;color:#1e293b;">${c.current} / ${c.max}</div>
-                        </div>
-                        <div style="background:#dc2626;color:#fff;border-radius:8px;padding:10px 18px;text-align:center;min-width:80px;">
-                            <div style="font-size:10px;font-weight:600;opacity:0.85;">ORDER</div>
-                            <div style="font-size:22px;font-weight:900;line-height:1.1;">${c.toOrder}</div>
-                            <div style="font-size:10px;opacity:0.85;">units</div>
-                        </div>
-                    </div>`).join('');
-
-                criticalCardsHtml = `
-                    <div style="margin-top:40px; page-break-inside:avoid;">
-                        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-                            <div style="flex:1;height:2px;background:#fca5a5;"></div>
-                            <div style="background:#dc2626;color:#fff;font-size:11px;font-weight:800;padding:4px 16px;border-radius:20px;letter-spacing:0.06em;text-transform:uppercase;">🚨 Critical Restock Orders — ${criticalItems.length} item${criticalItems.length !== 1 ? 's' : ''}</div>
-                            <div style="flex:1;height:2px;background:#fca5a5;"></div>
-                        </div>
-                        ${cards}
-                    </div>`;
+            let criticalHtml = '';
+            if (criticalList.length > 0) {
+                criticalHtml = `
+                    <div style="margin-top:30px; border:2px solid #dc2626; padding:15px; border-radius:8px; background-color:#fef2f2;">
+                        <h3 style="color:#dc2626; margin-top:0; font-size:16px;">&#x1F6A8; CRITICAL RESTOCK ORDERS</h3>
+                        <ul style="color:#dc2626; margin-bottom:0; font-size:14px; list-style-type:square;">
+                            ${criticalList.join('')}
+                        </ul>
+                    </div>
+                `;
             }
 
-            // Summary stats
-            const now = new Date();
-            const dateStr = now.toLocaleDateString('en-GB', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-            const timeStr = now.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+            const printHTML = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+                <title>Burgeroov Restock Report</title>
+                <style>
+                    @page { size: portrait; margin: 0mm !important; }
+                    body { font-family: Arial, sans-serif; color: #1e293b; padding: 15mm; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    h2 { color: #452b1b; border-bottom: 2px solid #452b1b; padding-bottom: 10px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+                    th { background-color: #452b1b; color: #fff; padding: 10px; border: 1px solid #cbd5e1; text-align: left; }
+                    td { border: 1px solid #e2e8f0; }
+                </style></head><body>
+                <h2>Burgeroov Restock Report</h2>
+                <p style="color:#64748b; font-size:13px;">Generated: ${new Date().toLocaleString()}</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Product Name</th>
+                            <th style="text-align:center;">Currently Left</th>
+                            <th style="text-align:center;">Amount to Order</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+                ${criticalHtml}
+                </body></html>`;
 
-            const printHTML = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Burgeroov Restock Report</title>
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-    @page { size: A4 portrait; margin: 0; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-        font-family: 'Inter', Arial, sans-serif;
-        color: #1e293b;
-        background: #ffffff;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-    }
-    .page { padding: 0; }
-
-    /* HEADER */
-    .header {
-        background: linear-gradient(135deg, #3b1a0a 0%, #6b3316 60%, #92400e 100%);
-        color: #fff;
-        padding: 32px 40px 24px 40px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .header-left { display: flex; align-items: center; gap: 18px; }
-    .logo-wrap {
-        background: #ffffff;
-        border-radius: 14px;
-        padding: 8px;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.18);
-    }
-    .logo-wrap img { width: 54px; height: 54px; object-fit: contain; border-radius: 8px; }
-    .brand-name { font-size: 26px; font-weight: 900; letter-spacing: -0.02em; }
-    .brand-sub { font-size: 12px; font-weight: 500; opacity: 0.7; margin-top: 2px; letter-spacing: 0.12em; text-transform: uppercase; }
-    .header-right { text-align: right; font-size: 12px; opacity: 0.8; line-height: 1.7; }
-    .header-right strong { font-size: 14px; opacity: 1; font-weight: 700; }
-
-    /* ACCENT STRIPE */
-    .accent-stripe {
-        height: 5px;
-        background: linear-gradient(90deg, #f59e0b, #ef4444, #6366f1);
-    }
-
-    /* STATS BAR */
-    .stats-bar {
-        display: flex;
-        gap: 0;
-        background: #f8fafc;
-        border-bottom: 1.5px solid #e2e8f0;
-    }
-    .stat-box {
-        flex: 1;
-        padding: 16px 24px;
-        text-align: center;
-        border-right: 1px solid #e2e8f0;
-    }
-    .stat-box:last-child { border-right: none; }
-    .stat-num { font-size: 28px; font-weight: 900; line-height: 1; }
-    .stat-label { font-size: 10px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
-    .stat-critical .stat-num { color: #dc2626; }
-    .stat-ok .stat-num { color: #16a34a; }
-    .stat-total .stat-num { color: #3b1a0a; }
-    .stat-cat .stat-num { color: #6366f1; }
-
-    /* BODY CONTENT */
-    .content { padding: 30px 40px; }
-
-    /* SECTION TITLE */
-    .section-title {
-        font-size: 13px;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
-        color: #475569;
-        margin-bottom: 14px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    .section-title::after {
-        content: '';
-        flex: 1;
-        height: 1.5px;
-        background: #e2e8f0;
-    }
-
-    /* TABLE */
-    table { width: 100%; border-collapse: collapse; }
-    thead th {
-        background: #1e293b;
-        color: #fff;
-        font-size: 10px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        padding: 10px 14px;
-        text-align: left;
-    }
-    thead th:not(:first-child) { text-align: center; }
-
-    /* FOOTER */
-    .footer {
-        margin: 40px 40px 0 40px;
-        padding: 16px 0;
-        border-top: 1.5px solid #e2e8f0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 10px;
-        color: #94a3b8;
-    }
-    .footer strong { color: #475569; }
-
-    @media print {
-        body { margin: 0; }
-        .no-break { page-break-inside: avoid; }
-    }
-</style>
-</head>
-<body>
-<div class="page">
-
-    <!-- HEADER -->
-    <div class="header">
-        <div class="header-left">
-            <div class="logo-wrap">
-                ${logoDataUrl ? `<img src="${logoDataUrl}" alt="Burgeroov Logo" />` : '<span style="font-size:28px;">🍔</span>'}
-            </div>
-            <div>
-                <div class="brand-name">Burgeroov</div>
-                <div class="brand-sub">Restock &amp; Inventory Report</div>
-            </div>
-        </div>
-        <div class="header-right">
-            <strong>📅 ${dateStr}</strong><br>
-            Time: ${timeStr}<br>
-            Document: Warehouse Restock Order
-        </div>
-    </div>
-
-    <!-- ACCENT STRIPE -->
-    <div class="accent-stripe"></div>
-
-    <!-- STATS BAR -->
-    <div class="stats-bar">
-        <div class="stat-box stat-total">
-            <div class="stat-num">${totalItems}</div>
-            <div class="stat-label">Total Items</div>
-        </div>
-        <div class="stat-box stat-critical">
-            <div class="stat-num">${criticalItems.length}</div>
-            <div class="stat-label">Need Restock</div>
-        </div>
-        <div class="stat-box stat-ok">
-            <div class="stat-num">${okItems}</div>
-            <div class="stat-label">Stocked OK</div>
-        </div>
-        <div class="stat-box stat-cat">
-            <div class="stat-num">${folders.filter(f => data.some(i => (i.category || 'Uncategorized') === f)).length}</div>
-            <div class="stat-label">Categories</div>
-        </div>
-    </div>
-
-    <!-- MAIN CONTENT -->
-    <div class="content">
-
-        <div class="section-title">📋 Full Inventory Status</div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th style="width:35%;">Product Name</th>
-                    <th style="width:15%;">Stock (Current / Max)</th>
-                    <th style="width:15%;">Level</th>
-                    <th style="width:15%;">To Order</th>
-                    <th style="width:20%;">Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${categorySectionsHtml}
-            </tbody>
-        </table>
-
-        ${criticalCardsHtml}
-
-    </div>
-
-    <!-- FOOTER -->
-    <div class="footer">
-        <div>Burgeroov &nbsp;|&nbsp; Confidential — Internal Use Only</div>
-        <div>Generated on <strong>${dateStr}</strong> at <strong>${timeStr}</strong></div>
-    </div>
-
-</div>
-</body>
-</html>`;
-
-            // Populate the paper container with the report body
-            const bodyMatch = printHTML.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-            const bodyContent = bodyMatch ? bodyMatch[1] : printHTML;
-
-            const paper = document.getElementById('apk-pdf-paper');
-            if (paper) {
-                paper.innerHTML = bodyContent;
-            }
-
-            // Extract styles to compile them dynamically for page rendering
-            let extractedCss = '';
-            const cssMatches = printHTML.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi);
-            for (const m of cssMatches) {
-                extractedCss += m[1] + '\n';
-            }
-
-            // Clean up any previous print styles
-            const oldStyle = document.getElementById('wh-print-style');
-            if (oldStyle) oldStyle.remove();
-
-            // Inject printing rules
-            const printStyle = document.createElement('style');
-            printStyle.id = 'wh-print-style';
-            printStyle.textContent = `
-                ${extractedCss}
-                @media print {
-                    body > *:not(#apk-print-modal) { display: none !important; visibility: hidden !important; }
-                    #apk-print-modal {
-                        display: flex !important;
-                        visibility: visible !important;
-                        position: absolute !important;
-                        left: 0 !important;
-                        top: 0 !important;
-                        width: 100% !important;
-                        height: auto !important;
-                        background: #fff !important;
-                        overflow: visible !important;
-                    }
-                    #apk-print-header-bar { display: none !important; }
-                    #apk-pdf-paper {
-                        box-shadow: none !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        width: 100% !important;
-                        border: none !important;
-                        background: #fff !important;
-                    }
-                }
-            `;
-            document.head.appendChild(printStyle);
-
-            // Display the gorgeous PDF Viewer
-            const modal = document.getElementById('apk-print-modal');
-            if (modal) {
-                modal.style.display = 'flex';
-                
-                // Configure print button (direct user-initiated action)
-                const printBtn = document.getElementById('btn-apk-direct-print');
-                if (printBtn) {
-                    printBtn.onclick = function() {
-                        window.print();
-                    };
-                }
-            }
-        }
-
-        // --- APK PRINT HUB HELPERS ---
-        let currentApkReportHtml = '';
-        let currentApkReportText = '';
-
-        function closeApkPrintModal() {
-            const modal = document.getElementById('apk-print-modal');
-            if (modal) modal.style.display = 'none';
-        }
-
-        function copyToClipboard(text) {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text).then(() => {
-                    showInAppNotification("Report summary copied to clipboard! 📋");
-                }).catch(err => {
-                    console.error("Clipboard API failed, trying fallback:", err);
-                    fallbackCopyText(text);
-                });
-            } else {
-                fallbackCopyText(text);
-            }
-        }
-
-        function fallbackCopyText(text) {
-            try {
-                const textArea = document.createElement("textarea");
-                textArea.value = text;
-                textArea.style.position = "fixed";  // Avoid scrolling to bottom
-                document.body.appendChild(textArea);
-                textArea.focus();
-                textArea.select();
-                const successful = document.execCommand('copy');
-                document.body.removeChild(textArea);
-                if (successful) {
-                    showInAppNotification("Report summary copied to clipboard! 📋");
-                } else {
-                    alert("Failed to copy text. Please try selecting the text manually.");
-                }
-            } catch (err) {
-                console.error("Fallback copy failed:", err);
-                alert("Failed to copy text: " + err);
-            }
+            const blob = new Blob([printHTML], { type: 'text/html' });
+            const blobUrl = URL.createObjectURL(blob);
+            const iframe = document.createElement('iframe');
+            iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+            document.body.appendChild(iframe);
+            iframe.onload = function () { setTimeout(function () { iframe.contentWindow.print(); }, 300); };
+            iframe.src = blobUrl;
+            setTimeout(() => { URL.revokeObjectURL(blobUrl); document.body.removeChild(iframe); }, 10000);
         }
 
         // --- UTILITIES ---
