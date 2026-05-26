@@ -3138,39 +3138,124 @@
                     }
                     
                     // Configure buttons
-                    const shareBtn = document.getElementById('btn-apk-share');
+                    const sharePdfBtn = document.getElementById('btn-apk-share-pdf');
+                    const downloadPdfBtn = document.getElementById('btn-apk-download-pdf');
                     const copyBtn = document.getElementById('btn-apk-copy');
                     
-                    if (shareBtn) {
-                        shareBtn.onclick = function() {
-                            try {
-                                const file = new File([printHTML], `burgeroov-restock-report.html`, { type: 'text/html' });
-                                if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                                    navigator.share({
-                                        files: [file],
-                                        title: 'Burgeroov Restock Report',
-                                        text: 'Warehouse Restock Order Report'
-                                    }).then(() => {
-                                        showInAppNotification("Report shared successfully! 📤");
-                                    }).catch(err => {
-                                        console.warn("Share resolved/canceled:", err);
-                                    });
-                                } else {
-                                    // Fallback to text sharing if file sharing is not supported by device
-                                    navigator.share({
-                                        title: 'Burgeroov Restock Report',
-                                        text: summaryText
-                                    }).then(() => {
-                                        showInAppNotification("Summary text shared successfully! 📤");
-                                    }).catch(err => {
-                                        console.error("Text share failed:", err);
-                                        copyToClipboard(summaryText);
-                                    });
-                                }
-                            } catch (e) {
-                                console.error("File sharing exception:", e);
-                                copyToClipboard(summaryText);
+                    if (sharePdfBtn) {
+                        sharePdfBtn.onclick = function() {
+                            // Update status to show generation started
+                            const statusEl = document.getElementById('apk-report-status');
+                            if (statusEl) {
+                                statusEl.textContent = '⏳ Preparing PDF...';
+                                statusEl.style.color = '#b45309';
                             }
+                            
+                            // Generate real PDF using html2pdf
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = printHTML;
+                            document.body.appendChild(tempDiv);
+                            
+                            // Style container for high quality printing
+                            tempDiv.style.width = '790px';
+                            tempDiv.style.background = '#ffffff';
+                            
+                            const opt = {
+                                margin:       [0.3, 0.3, 0.3, 0.3],
+                                filename:     'burgeroov-restock-report.pdf',
+                                image:        { type: 'jpeg', quality: 0.98 },
+                                html2canvas:  { scale: 2, useCORS: true, logging: false },
+                                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+                            };
+                            
+                            html2pdf().from(tempDiv).set(opt).output('blob').then(function(pdfBlob) {
+                                if (tempDiv.parentNode) document.body.removeChild(tempDiv);
+                                if (statusEl) {
+                                    statusEl.textContent = '● PDF Ready';
+                                    statusEl.style.color = '#16a34a';
+                                }
+                                
+                                try {
+                                    const file = new File([pdfBlob], `burgeroov-restock-report.pdf`, { type: 'application/pdf' });
+                                    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                                        navigator.share({
+                                            files: [file],
+                                            title: 'Burgeroov Restock Report',
+                                            text: 'Warehouse Restock Order PDF'
+                                        }).then(() => {
+                                            showInAppNotification("PDF shared successfully! 📤");
+                                        }).catch(err => {
+                                            console.warn("Share resolved/canceled:", err);
+                                        });
+                                    } else {
+                                        // Fallback to text sharing if file sharing is not supported by device
+                                        navigator.share({
+                                            title: 'Burgeroov Restock Report',
+                                            text: summaryText
+                                        }).then(() => {
+                                            showInAppNotification("Summary text shared successfully! 📤");
+                                        }).catch(err => {
+                                            console.error("Text share failed:", err);
+                                            copyToClipboard(summaryText);
+                                        });
+                                    }
+                                } catch (e) {
+                                    console.error("File sharing exception:", e);
+                                    copyToClipboard(summaryText);
+                                }
+                            }).catch(function(err) {
+                                console.error("PDF generation failed:", err);
+                                if (tempDiv.parentNode) document.body.removeChild(tempDiv);
+                                if (statusEl) {
+                                    statusEl.textContent = '❌ Generation failed';
+                                    statusEl.style.color = '#dc2626';
+                                }
+                                showInAppNotification("PDF generation failed. Copying summary instead.");
+                                copyToClipboard(summaryText);
+                            });
+                        };
+                    }
+                    
+                    if (downloadPdfBtn) {
+                        downloadPdfBtn.onclick = function() {
+                            // Update status to show generation started
+                            const statusEl = document.getElementById('apk-report-status');
+                            if (statusEl) {
+                                statusEl.textContent = '⏳ Downloading PDF...';
+                                statusEl.style.color = '#b45309';
+                            }
+                            
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = printHTML;
+                            document.body.appendChild(tempDiv);
+                            
+                            tempDiv.style.width = '790px';
+                            tempDiv.style.background = '#ffffff';
+                            
+                            const opt = {
+                                margin:       [0.3, 0.3, 0.3, 0.3],
+                                filename:     'burgeroov-restock-report.pdf',
+                                image:        { type: 'jpeg', quality: 0.98 },
+                                html2canvas:  { scale: 2, useCORS: true, logging: false },
+                                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+                            };
+                            
+                            html2pdf().from(tempDiv).set(opt).save().then(function() {
+                                if (tempDiv.parentNode) document.body.removeChild(tempDiv);
+                                if (statusEl) {
+                                    statusEl.textContent = '● PDF Downloaded';
+                                    statusEl.style.color = '#16a34a';
+                                }
+                                showInAppNotification("PDF download triggered! 💾");
+                            }).catch(function(err) {
+                                console.error("PDF download failed:", err);
+                                if (tempDiv.parentNode) document.body.removeChild(tempDiv);
+                                if (statusEl) {
+                                    statusEl.textContent = '❌ Download failed';
+                                    statusEl.style.color = '#dc2626';
+                                }
+                                alert("PDF Download failed. Please try 'Share PDF' instead!");
+                            });
                         };
                     }
                     

@@ -1543,19 +1543,22 @@
             <div style="background: #fffbeb; border-bottom: 1px solid #fef3c7; color: #b45309; padding: 12px 24px; font-size: 0.85rem; line-height: 1.5; display: flex; align-items: flex-start; gap: 10px; text-align: left;">
                 <span style="font-size: 1.1rem; margin-top: 1px;">💡</span>
                 <div>
-                    <strong>Android APK Print Guide:</strong> Android apps cannot print directly. You can <strong>Share Report</strong> to send a beautiful HTML report via WhatsApp/Email to print from any device, or <strong>Copy Summary</strong> for a quick text list!
+                    <strong>Android APK Print Guide:</strong> Android apps cannot print directly. Tap <strong>Share PDF</strong> to print/save natively, or tap <strong>Download PDF</strong> to generate the PDF copy directly on your device!
                 </div>
             </div>
 
             <!-- Action buttons -->
-            <div style="padding: 16px 24px; background: var(--input-bg); border-bottom: 1px solid var(--border-color); display: flex; gap: 12px; flex-wrap: wrap;">
-                <button id="btn-apk-share" class="btn-success" style="flex: 1; min-width: 140px; padding: 12px; font-size: 0.95rem; font-weight: 700; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; border: none; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.15); transition: transform 0.1s, filter 0.2s;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='none'">
-                    <span>📤</span> Share Report (HTML)
+            <div style="padding: 16px 24px; background: var(--input-bg); border-bottom: 1px solid var(--border-color); display: flex; gap: 10px; flex-wrap: wrap;">
+                <button id="btn-apk-share-pdf" class="btn-success" style="flex: 1.2; min-width: 150px; padding: 12px; font-size: 0.95rem; font-weight: 700; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; border: none; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.15); transition: transform 0.1s, filter 0.2s;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='none'">
+                    <span>📤</span> Share PDF (Print/Send)
                 </button>
-                <button id="btn-apk-copy" class="btn-primary" style="flex: 1; min-width: 140px; padding: 12px; font-size: 0.95rem; font-weight: 700; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; border: none; transition: transform 0.1s, filter 0.2s;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='none'">
+                <button id="btn-apk-download-pdf" class="btn-primary" style="flex: 1; min-width: 140px; padding: 12px; font-size: 0.95rem; font-weight: 700; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; border: none; transition: transform 0.1s, filter 0.2s;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='none'">
+                    <span>💾</span> Download PDF
+                </button>
+                <button id="btn-apk-copy" style="flex: 1; min-width: 130px; padding: 12px; font-size: 0.95rem; font-weight: 700; border-radius: 10px; cursor: pointer; background: #6366f1; color: #fff; display: flex; align-items: center; justify-content: center; gap: 8px; border: none; transition: transform 0.1s, filter 0.2s;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='none'">
                     <span>📋</span> Copy Text Summary
                 </button>
-                <button onclick="closeApkPrintModal()" style="flex: 0.5; min-width: 90px; padding: 12px; font-size: 0.95rem; font-weight: 700; border-radius: 10px; cursor: pointer; background: #94a3b8; color: #fff; border: none; transition: transform 0.1s;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='none'">
+                <button onclick="closeApkPrintModal()" style="flex: 0.5; min-width: 80px; padding: 12px; font-size: 0.95rem; font-weight: 700; border-radius: 10px; cursor: pointer; background: #94a3b8; color: #fff; border: none; transition: transform 0.1s;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='none'">
                     Close
                 </button>
             </div>
