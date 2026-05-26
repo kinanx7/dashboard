@@ -3086,7 +3086,104 @@
             `;
             document.head.appendChild(printStyle);
 
-            // Trigger print then clean up
+            // Check if we are inside WebView/APK (or explicitly forced for testing)
+            const isWebView = typeof AndroidInterface !== 'undefined';
+            
+            // Check if there is an explicit bridge print method
+            if (isWebView && typeof AndroidInterface.print === 'function') {
+                try {
+                    AndroidInterface.print(printHTML);
+                    return;
+                } catch (e) {
+                    console.error("AndroidInterface.print failed, falling back:", e);
+                }
+            }
+
+            if (isWebView) {
+                // Prepare HTML content
+                currentApkReportHtml = printHTML;
+
+                // Prepare text summary content for the clipboard or easy sharing
+                let summaryText = `🍔 BURGEROOV RESTOCK REPORT 🍔\n`;
+                summaryText += `Generated: ${dateStr} at ${timeStr}\n`;
+                summaryText += `====================================\n`;
+                summaryText += `Total Items: ${totalItems}\n`;
+                summaryText += `Critical Items: ${criticalItems.length}\n`;
+                summaryText += `Stocked OK: ${okItems}\n`;
+                summaryText += `====================================\n\n`;
+                
+                if (criticalItems.length > 0) {
+                    summaryText += `🚨 CRITICAL RESTOCK ORDERS 🚨\n`;
+                    criticalItems.forEach(c => {
+                        summaryText += `- ${c.name} (${c.category}): Stock is ${c.current}/${c.max}. Need to order: ${c.toOrder} units (Risk threshold: ${c.riskAmount})\n`;
+                    });
+                } else {
+                    summaryText += `✓ All warehouse stocks are OK!\n`;
+                }
+
+                currentApkReportText = summaryText;
+
+                // Open the modal
+                const modal = document.getElementById('apk-print-modal');
+                if (modal) {
+                    modal.style.display = 'flex';
+                    
+                    // Inject report into iframe
+                    const iframe = document.getElementById('apk-report-iframe');
+                    if (iframe) {
+                        const doc = iframe.contentDocument || iframe.contentWindow.document;
+                        doc.open();
+                        doc.write(printHTML);
+                        doc.close();
+                    }
+                    
+                    // Configure buttons
+                    const shareBtn = document.getElementById('btn-apk-share');
+                    const copyBtn = document.getElementById('btn-apk-copy');
+                    
+                    if (shareBtn) {
+                        shareBtn.onclick = function() {
+                            try {
+                                const file = new File([printHTML], `burgeroov-restock-report.html`, { type: 'text/html' });
+                                if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                                    navigator.share({
+                                        files: [file],
+                                        title: 'Burgeroov Restock Report',
+                                        text: 'Warehouse Restock Order Report'
+                                    }).then(() => {
+                                        showInAppNotification("Report shared successfully! 📤");
+                                    }).catch(err => {
+                                        console.warn("Share resolved/canceled:", err);
+                                    });
+                                } else {
+                                    // Fallback to text sharing if file sharing is not supported by device
+                                    navigator.share({
+                                        title: 'Burgeroov Restock Report',
+                                        text: summaryText
+                                    }).then(() => {
+                                        showInAppNotification("Summary text shared successfully! 📤");
+                                    }).catch(err => {
+                                        console.error("Text share failed:", err);
+                                        copyToClipboard(summaryText);
+                                    });
+                                }
+                            } catch (e) {
+                                console.error("File sharing exception:", e);
+                                copyToClipboard(summaryText);
+                            }
+                        };
+                    }
+                    
+                    if (copyBtn) {
+                        copyBtn.onclick = function() {
+                            copyToClipboard(summaryText);
+                        };
+                    }
+                }
+                return;
+            }
+
+            // Trigger print then clean up (Web/Desktop mode)
             setTimeout(() => {
                 window.print();
                 setTimeout(() => {
@@ -3094,6 +3191,49 @@
                     printStyle.remove();
                 }, 1500);
             }, 150);
+        }
+
+        // --- APK PRINT HUB HELPERS ---
+        let currentApkReportHtml = '';
+        let currentApkReportText = '';
+
+        function closeApkPrintModal() {
+            const modal = document.getElementById('apk-print-modal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function copyToClipboard(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showInAppNotification("Report summary copied to clipboard! 📋");
+                }).catch(err => {
+                    console.error("Clipboard API failed, trying fallback:", err);
+                    fallbackCopyText(text);
+                });
+            } else {
+                fallbackCopyText(text);
+            }
+        }
+
+        function fallbackCopyText(text) {
+            try {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";  // Avoid scrolling to bottom
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                if (successful) {
+                    showInAppNotification("Report summary copied to clipboard! 📋");
+                } else {
+                    alert("Failed to copy text. Please try selecting the text manually.");
+                }
+            } catch (err) {
+                console.error("Fallback copy failed:", err);
+                alert("Failed to copy text: " + err);
+            }
         }
 
         // --- UTILITIES ---
