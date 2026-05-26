@@ -3064,26 +3064,45 @@
             printStyle.textContent = `
                 ${extractedCss}
                 @media print {
+                    /* Hide core app components */
                     body > *:not(#apk-print-modal) { display: none !important; visibility: hidden !important; }
+                    
+                    /* Reset print viewport */
                     #apk-print-modal {
-                        display: flex !important;
+                        display: block !important;
                         visibility: visible !important;
-                        position: absolute !important;
-                        left: 0 !important;
-                        top: 0 !important;
+                        position: relative !important;
+                        background: #fff !important;
                         width: 100% !important;
                         height: auto !important;
-                        background: #fff !important;
                         overflow: visible !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
                     }
                     #apk-print-header-bar { display: none !important; }
+                    
+                    /* Reset scrollable container */
+                    #apk-print-modal > div {
+                        display: block !important;
+                        overflow: visible !important;
+                        background: #fff !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        width: 100% !important;
+                        height: auto !important;
+                    }
+                    
+                    /* Reset paper container */
                     #apk-pdf-paper {
                         box-shadow: none !important;
                         margin: 0 !important;
                         padding: 0 !important;
                         width: 100% !important;
+                        max-width: 100% !important;
                         border: none !important;
                         background: #fff !important;
+                        height: auto !important;
+                        overflow: visible !important;
                     }
                 }
             `;
@@ -3094,36 +3113,43 @@
             if (modal) {
                 modal.style.display = 'flex';
                 
-                // Configure print button (direct user-initiated action)
+                // Configure print button (direct window-initiated action)
                 const printBtn = document.getElementById('btn-apk-direct-print');
                 if (printBtn) {
                     printBtn.onclick = function() {
+                        window.print();
+                    };
+                }
+
+                // Configure save button (Save PDF copy dynamically)
+                const saveBtn = document.getElementById('btn-apk-direct-save');
+                if (saveBtn) {
+                    saveBtn.onclick = function() {
                         const isAPK = typeof AndroidInterface !== 'undefined';
-                        
+                        const saveBtnText = saveBtn.innerHTML;
+                        saveBtn.innerHTML = '⏳ Saving...';
+                        saveBtn.disabled = true;
+
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = printHTML;
+                        document.body.appendChild(tempDiv);
+                        tempDiv.style.width = '790px';
+                        tempDiv.style.background = '#ffffff';
+
+                        const opt = {
+                            margin:       [0.3, 0.3, 0.3, 0.3],
+                            filename:     'burgeroov-restock-report.pdf',
+                            image:        { type: 'jpeg', quality: 0.98 },
+                            html2canvas:  { scale: 2, useCORS: true, logging: false },
+                            jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+                        };
+
                         if (isAPK) {
-                            // APK Mode: Compile PDF file and open native Android Share sheet
-                            const printBtnText = printBtn.innerHTML;
-                            printBtn.innerHTML = '⏳ Generating PDF...';
-                            printBtn.disabled = true;
-
-                            const tempDiv = document.createElement('div');
-                            tempDiv.innerHTML = printHTML;
-                            document.body.appendChild(tempDiv);
-                            tempDiv.style.width = '790px';
-                            tempDiv.style.background = '#ffffff';
-
-                            const opt = {
-                                margin:       [0.3, 0.3, 0.3, 0.3],
-                                filename:     'burgeroov-restock-report.pdf',
-                                image:        { type: 'jpeg', quality: 0.98 },
-                                html2canvas:  { scale: 2, useCORS: true, logging: false },
-                                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
-                            };
-
+                            // APK Mode: Generate PDF and open native share sheet for sending/saving
                             html2pdf().from(tempDiv).set(opt).output('blob').then(function(pdfBlob) {
                                 if (tempDiv.parentNode) document.body.removeChild(tempDiv);
-                                printBtn.innerHTML = printBtnText;
-                                printBtn.disabled = false;
+                                saveBtn.innerHTML = saveBtnText;
+                                saveBtn.disabled = false;
 
                                 try {
                                     const file = new File([pdfBlob], `burgeroov-restock-report.pdf`, { type: 'application/pdf' });
@@ -3132,11 +3158,13 @@
                                             files: [file],
                                             title: 'Burgeroov Restock Report',
                                             text: 'Warehouse Restock Order PDF'
+                                        }).then(() => {
+                                            showInAppNotification("PDF shared successfully! 📤");
                                         }).catch(err => {
                                             console.warn("Share resolved/canceled:", err);
                                         });
                                     } else {
-                                        // Fallback to direct download
+                                        // Fallback direct download
                                         html2pdf().from(paper).set(opt).save();
                                     }
                                 } catch (e) {
@@ -3146,10 +3174,9 @@
                             }).catch(function(err) {
                                 console.error("PDF generation failed:", err);
                                 if (tempDiv.parentNode) document.body.removeChild(tempDiv);
-                                printBtn.innerHTML = printBtnText;
-                                printBtn.disabled = false;
-                                alert("PDF generation failed. Calling fallback print.");
-                                window.print();
+                                saveBtn.innerHTML = saveBtnText;
+                                saveBtn.disabled = false;
+                                alert("PDF saving failed: " + err);
                             });
                         } else {
                             // Web Mode: Standard main-window print preview
