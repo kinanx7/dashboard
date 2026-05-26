@@ -3038,106 +3038,80 @@
 </body>
 </html>`;
 
-            // === Universal print: inject into current page DOM (works on web + Android WebView APK) ===
-            // Remove any previous print layer
-            const oldLayer = document.getElementById('wh-print-layer');
-            const oldStyle = document.getElementById('wh-print-style');
-            if (oldLayer) oldLayer.remove();
-            if (oldStyle) oldStyle.remove();
-
-            // Extract just the <body> content from printHTML
+            // Populate the paper container with the report body
             const bodyMatch = printHTML.match(/<body[^>]*>([\s\S]*)<\/body>/i);
             const bodyContent = bodyMatch ? bodyMatch[1] : printHTML;
 
-            // Extract CSS from printHTML <style> blocks and scope for the print layer
+            const paper = document.getElementById('apk-pdf-paper');
+            if (paper) {
+                paper.innerHTML = bodyContent;
+            }
+
+            // Extract styles to compile them dynamically for page rendering
             let extractedCss = '';
             const cssMatches = printHTML.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi);
             for (const m of cssMatches) {
-                // Strip @import lines (Google Fonts won't load in WebView anyway)
-                extractedCss += m[1].replace(/@import[^;]+;/g, '') + '\n';
+                extractedCss += m[1] + '\n';
             }
 
-            // Inject a hidden print layer into the current page
-            const printLayer = document.createElement('div');
-            printLayer.id = 'wh-print-layer';
-            printLayer.innerHTML = bodyContent;
-            document.body.appendChild(printLayer);
+            // Clean up any previous print styles
+            const oldStyle = document.getElementById('wh-print-style');
+            if (oldStyle) oldStyle.remove();
 
-            // Inject CSS: the report styles + @media print to show only the layer
+            // Inject printing rules
             const printStyle = document.createElement('style');
             printStyle.id = 'wh-print-style';
             printStyle.textContent = `
-                #wh-print-layer { display: none; }
                 ${extractedCss}
                 @media print {
-                    body > *:not(#wh-print-layer) { display: none !important; visibility: hidden !important; }
-                    #wh-print-layer {
-                        display: block !important;
+                    body > *:not(#apk-print-modal) { display: none !important; visibility: hidden !important; }
+                    #apk-print-modal {
+                        display: flex !important;
                         visibility: visible !important;
-                        position: fixed !important;
-                        inset: 0 !important;
-                        z-index: 999999 !important;
+                        position: absolute !important;
+                        left: 0 !important;
+                        top: 0 !important;
+                        width: 100% !important;
+                        height: auto !important;
                         background: #fff !important;
                         overflow: visible !important;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
+                    }
+                    #apk-print-header-bar { display: none !important; }
+                    #apk-pdf-paper {
+                        box-shadow: none !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        width: 100% !important;
+                        border: none !important;
+                        background: #fff !important;
                     }
                 }
             `;
             document.head.appendChild(printStyle);
 
-            // Create a temporary element for html2pdf to compile
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = printHTML;
-            document.body.appendChild(tempDiv);
-
-            // Style container for high quality PDF generation
-            tempDiv.style.width = '790px';
-            tempDiv.style.background = '#ffffff';
-            tempDiv.style.padding = '0';
-
-            const opt = {
-                margin:       [0.3, 0.3, 0.3, 0.3],
-                filename:     'burgeroov-restock-report.pdf',
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true, logging: false },
-                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
-            };
-
-            // Trigger direct PDF download immediately (works on Web & supporting WebView APKs)
-            html2pdf().from(tempDiv).set(opt).save().then(() => {
-                if (tempDiv.parentNode) document.body.removeChild(tempDiv);
-            }).catch(err => {
-                console.error("PDF generation/download failed:", err);
-                if (tempDiv.parentNode) document.body.removeChild(tempDiv);
-            });
-
-            // Prepare text summary content for the clipboard (bulletproof APK fallback)
-            let summaryText = `🍔 BURGEROOV RESTOCK REPORT 🍔\n`;
-            summaryText += `Generated: ${dateStr} at ${timeStr}\n`;
-            summaryText += `====================================\n`;
-            summaryText += `Total Items: ${totalItems}\n`;
-            summaryText += `Critical Items: ${criticalItems.length}\n`;
-            summaryText += `Stocked OK: ${okItems}\n`;
-            summaryText += `====================================\n\n`;
-            
-            if (criticalItems.length > 0) {
-                summaryText += `🚨 CRITICAL RESTOCK ORDERS 🚨\n`;
-                criticalItems.forEach(c => {
-                    summaryText += `- ${c.name} (${c.category}): Stock is ${c.current}/${c.max}. Need to order: ${c.toOrder} units (Risk threshold: ${c.riskAmount})\n`;
-                });
-            } else {
-                summaryText += `✓ All warehouse stocks are OK!\n`;
+            // Display the gorgeous PDF Viewer
+            const modal = document.getElementById('apk-print-modal');
+            if (modal) {
+                modal.style.display = 'flex';
+                
+                // Configure print button (direct user-initiated action)
+                const printBtn = document.getElementById('btn-apk-direct-print');
+                if (printBtn) {
+                    printBtn.onclick = function() {
+                        window.print();
+                    };
+                }
             }
-
-            // Copy to clipboard silently
-            copyToClipboard(summaryText);
-
-            // Show a sleek toast notification
-            showInAppNotification("📥 Restock PDF download started & text summary copied to clipboard! 📋");
         }
 
-        // --- APK PRINT HELPERS ---
+        // --- APK PRINT HUB HELPERS ---
+        let currentApkReportHtml = '';
+        let currentApkReportText = '';
+
+        function closeApkPrintModal() {
+            const modal = document.getElementById('apk-print-modal');
+            if (modal) modal.style.display = 'none';
+        }
 
         function copyToClipboard(text) {
             if (navigator.clipboard && navigator.clipboard.writeText) {
