@@ -3038,41 +3038,62 @@
 </body>
 </html>`;
 
-            const blob = new Blob([printHTML], { type: 'text/html' });
-            const blobUrl = URL.createObjectURL(blob);
+            // === Universal print: inject into current page DOM (works on web + Android WebView APK) ===
+            // Remove any previous print layer
+            const oldLayer = document.getElementById('wh-print-layer');
+            const oldStyle = document.getElementById('wh-print-style');
+            if (oldLayer) oldLayer.remove();
+            if (oldStyle) oldStyle.remove();
 
-            // Detect Android WebView / APK environment
-            const isAndroidWebView = /wv/.test(navigator.userAgent) || (navigator.userAgent.includes('Android') && !navigator.userAgent.includes('Chrome/'));
-            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            // Extract just the <body> content from printHTML
+            const bodyMatch = printHTML.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+            const bodyContent = bodyMatch ? bodyMatch[1] : printHTML;
 
-            if (isAndroidWebView || isMobile) {
-                // On APK/mobile: trigger download of the HTML file so user can open & print from browser
-                const a = document.createElement('a');
-                a.href = blobUrl;
-                a.download = 'Burgeroov_Restock_Report_' + new Date().toISOString().slice(0,10) + '.html';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-            } else {
-                // On desktop web: open in new tab and auto-trigger print dialog
-                const win = window.open(blobUrl, '_blank');
-                if (win) {
-                    win.onload = function() {
-                        setTimeout(() => { win.print(); }, 500);
-                    };
-                    setTimeout(() => URL.revokeObjectURL(blobUrl), 15000);
-                } else {
-                    // Popup blocked — fallback to download
-                    const a = document.createElement('a');
-                    a.href = blobUrl;
-                    a.download = 'Burgeroov_Restock_Report_' + new Date().toISOString().slice(0,10) + '.html';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-                }
+            // Extract CSS from printHTML <style> blocks and scope for the print layer
+            let extractedCss = '';
+            const cssMatches = printHTML.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi);
+            for (const m of cssMatches) {
+                // Strip @import lines (Google Fonts won't load in WebView anyway)
+                extractedCss += m[1].replace(/@import[^;]+;/g, '') + '\n';
             }
+
+            // Inject a hidden print layer into the current page
+            const printLayer = document.createElement('div');
+            printLayer.id = 'wh-print-layer';
+            printLayer.innerHTML = bodyContent;
+            document.body.appendChild(printLayer);
+
+            // Inject CSS: the report styles + @media print to show only the layer
+            const printStyle = document.createElement('style');
+            printStyle.id = 'wh-print-style';
+            printStyle.textContent = `
+                #wh-print-layer { display: none; }
+                ${extractedCss}
+                @media print {
+                    body > *:not(#wh-print-layer) { display: none !important; visibility: hidden !important; }
+                    #wh-print-layer {
+                        display: block !important;
+                        visibility: visible !important;
+                        position: fixed !important;
+                        inset: 0 !important;
+                        z-index: 999999 !important;
+                        background: #fff !important;
+                        overflow: visible !important;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                }
+            `;
+            document.head.appendChild(printStyle);
+
+            // Trigger print then clean up
+            setTimeout(() => {
+                window.print();
+                setTimeout(() => {
+                    printLayer.remove();
+                    printStyle.remove();
+                }, 1500);
+            }, 150);
         }
 
         // --- UTILITIES ---
