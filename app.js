@@ -3098,7 +3098,63 @@
                 const printBtn = document.getElementById('btn-apk-direct-print');
                 if (printBtn) {
                     printBtn.onclick = function() {
-                        window.print();
+                        const isAPK = typeof AndroidInterface !== 'undefined';
+                        
+                        if (isAPK) {
+                            // APK Mode: Compile PDF file and open native Android Share sheet
+                            const printBtnText = printBtn.innerHTML;
+                            printBtn.innerHTML = '⏳ Generating PDF...';
+                            printBtn.disabled = true;
+
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = printHTML;
+                            document.body.appendChild(tempDiv);
+                            tempDiv.style.width = '790px';
+                            tempDiv.style.background = '#ffffff';
+
+                            const opt = {
+                                margin:       [0.3, 0.3, 0.3, 0.3],
+                                filename:     'burgeroov-restock-report.pdf',
+                                image:        { type: 'jpeg', quality: 0.98 },
+                                html2canvas:  { scale: 2, useCORS: true, logging: false },
+                                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+                            };
+
+                            html2pdf().from(tempDiv).set(opt).output('blob').then(function(pdfBlob) {
+                                if (tempDiv.parentNode) document.body.removeChild(tempDiv);
+                                printBtn.innerHTML = printBtnText;
+                                printBtn.disabled = false;
+
+                                try {
+                                    const file = new File([pdfBlob], `burgeroov-restock-report.pdf`, { type: 'application/pdf' });
+                                    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                                        navigator.share({
+                                            files: [file],
+                                            title: 'Burgeroov Restock Report',
+                                            text: 'Warehouse Restock Order PDF'
+                                        }).catch(err => {
+                                            console.warn("Share resolved/canceled:", err);
+                                        });
+                                    } else {
+                                        // Fallback to direct download
+                                        html2pdf().from(paper).set(opt).save();
+                                    }
+                                } catch (e) {
+                                    console.error("File sharing exception:", e);
+                                    html2pdf().from(paper).set(opt).save();
+                                }
+                            }).catch(function(err) {
+                                console.error("PDF generation failed:", err);
+                                if (tempDiv.parentNode) document.body.removeChild(tempDiv);
+                                printBtn.innerHTML = printBtnText;
+                                printBtn.disabled = false;
+                                alert("PDF generation failed. Calling fallback print.");
+                                window.print();
+                            });
+                        } else {
+                            // Web Mode: Standard main-window print preview
+                            window.print();
+                        }
                     };
                 }
             }
