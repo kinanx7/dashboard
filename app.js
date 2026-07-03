@@ -158,7 +158,11 @@
         applyDarkMode();
 
         // --- CORE STATE & DATA ---
-        let appData = { burgeroov: { branches: ['Main Branch'], workers: [], violationRules: [], jobCatalog: [], warehouse: [], admins: ['kinan.rahal@hotmail.com'] } };
+        let currentCompany = 'burgeroov';
+        let appData = { 
+            burgeroov: { branches: ['Main Branch'], workers: [], violationRules: [], jobCatalog: [], warehouse: [], admins: ['kinan.rahal@hotmail.com'] },
+            mvc: { branches: ['Main Branch'], workers: [], violationRules: [], jobCatalog: [], warehouse: [], admins: ['kinan.rahal@hotmail.com'] }
+        };
         const today = new Date();
         let currentGlobalMonth = today.toISOString().slice(0, 7);
         let currentTab = 'ops';
@@ -172,10 +176,56 @@
 
         const translations = {
             en: { empName: "Employee Name", role: "Role", branch: "Branch", shift: "Shift Schedule", baseIncome: "Base Salary (SAR)", rewards: "Rewards (+)", violations: "Violations (-)", netPay: "Net Payable (SAR)", paid: "Paid This Month (SAR)", remaining: "Remaining To Pay (SAR)", costs: "Company Costs", custody: "Custody (SAR)", avgPerf: "Avg Perf (%)", goodNotes: "Good Notes", badNotes: "Bad Notes", deliveries: "Deliveries", initialBalance: "Initial Debt Carryover", unassigned: "Unassigned", na: "N/A", generatedOn: "Generated on:", reportTitle: "Financial & Payroll Report" },
-            ar: { empName: "اسم الموظف", role: "المسمى الوظيفي", branch: "الفرع", shift: "أوقات العمل", baseIncome: "الراتب الأساسي (ريال)", rewards: "المكافآت (+)", violations: "الخصومات (-)", netPay: "صافي الراتب المستحق (ريال)", paid: "المدفوع هذا الشهر (ريال)", remaining: "المتبقي للدفع (ريال)", costs: "تكاليف الشركة", custody: "رصيد العهدة (ريال)", avgPerf: "متوسط الأداء (%)", goodNotes: "ملاحظات جيدة", badNotes: "ملاحظات سيئة", deliveries: "التوصيلات", initialBalance: "رصيد متبقي سابق", unassigned: "غير محدد", na: "غير متوفر", generatedOn: "تاريخ إنشاء التقرير:", reportTitle: "تقرير مسير الرواتب والمالية" }
+            ar: { empName: "اسم الموظف", role: "المسمى الوظيفي", branch: "الفرع", shift: "أوقات العمل", baseIncome: "الراتب الأساسي (ريال)", rewards: "المكافآت (+)", violations: "الخصومات (-)", netPay: "صافي الراتب المستحق (ريال)", paid: "المدفوع هذا الشهر (ريال)", remaining: "المتبقي للدفع (ريال)", custody: "رصيد العهدة (ريال)", avgPerf: "متوسط الأداء (%)", goodNotes: "ملاحظات جيدة", badNotes: "ملاحظات سيئة", deliveries: "التوصيلات", initialBalance: "رصيد متبقي سابق", unassigned: "غير محدد", na: "غير متوفر", generatedOn: "تاريخ إنشاء التقرير:", reportTitle: "تقرير مسير الرواتب والمالية" }
         };
 
-        function getCompanyData() { return appData.burgeroov; }
+        function getCompanyData() { 
+            if (!appData[currentCompany]) {
+                appData[currentCompany] = { admins: ['kinan.rahal@hotmail.com'], branches: ['Main Branch'], workers: [], violationRules: [], jobCatalog: [], warehouse: [] };
+            }
+            return appData[currentCompany]; 
+        }
+
+        function showCompanySelectionHUD() {
+            document.getElementById('company-selection-overlay').style.display = 'flex';
+            document.getElementById('app-wrapper').style.display = 'none';
+        }
+
+        function selectCompany(companyId) {
+            currentCompany = companyId;
+            localStorage.setItem('selected_company', companyId);
+
+            document.getElementById('company-selection-overlay').style.display = 'none';
+
+            document.body.classList.remove('theme-burgeroov', 'theme-mvc');
+            document.body.classList.add('theme-' + companyId);
+
+            const logoSrc = (companyId === 'mvc' ? 'mvc.png' : 'burgeroov.png');
+            const headerLogo = document.getElementById('header-logo');
+            if (headerLogo) headerLogo.src = logoSrc;
+            const authLogo = document.getElementById('auth-logo');
+            if (authLogo) authLogo.src = logoSrc;
+            const loaderLogo = document.getElementById('launch-loader-logo');
+            if (loaderLogo) loaderLogo.src = logoSrc;
+
+            applyTranslations();
+
+            document.getElementById('app-wrapper').style.display = 'block';
+
+            isInitialLoad = true;
+
+            setTodayDisplay();
+            document.getElementById('global-month').value = currentGlobalMonth;
+            setDatePickerLimits();
+            
+            listenToCloudData();
+            startGlobalTick();
+
+            initFCMToken();
+        }
+
+        window.selectCompany = selectCompany;
+        window.showCompanySelectionHUD = showCompanySelectionHUD;
 
         // --- AUTHENTICATION SYSTEM ---
         let authMode = 'login';
@@ -190,28 +240,56 @@
             if (user) {
                 currentUser = { email: user.email, uid: user.uid };
                 document.getElementById('display-user-email').textContent = currentUser.email;
-                overlay.style.display = 'none';
-                appWrapper.style.display = 'block';
 
-                setTodayDisplay();
-                document.getElementById('global-month').value = currentGlobalMonth;
-                setDatePickerLimits();
+                document.getElementById('auth-loader').style.display = 'block';
+                document.getElementById('auth-btn').style.display = 'none';
 
-                document.getElementById('auth-loader').style.display = 'none';
-                document.getElementById('auth-btn').style.display = 'block';
+                const email = user.email.toLowerCase();
 
-                listenToCloudData();
-                startGlobalTick();
+                if (email === 'kinan.rahal@hotmail.com') {
+                    document.getElementById('auth-loader').style.display = 'none';
+                    document.getElementById('auth-btn').style.display = 'block';
+                    overlay.style.display = 'none';
+                    showCompanySelectionHUD();
+                } else {
+                    // Check databases for worker membership
+                    Promise.all([
+                        db.ref('companies/burgeroov/admins').once('value'),
+                        db.ref('companies/burgeroov/workers').once('value'),
+                        db.ref('companies/mvc/admins').once('value'),
+                        db.ref('companies/mvc/workers').once('value')
+                    ]).then(([bgAdmins, bgWorkers, mvcAdmins, mvcWorkers]) => {
+                        document.getElementById('auth-loader').style.display = 'none';
+                        document.getElementById('auth-btn').style.display = 'block';
 
-                // Register Firebase Messaging service worker
-                // This is stored globally so initFCMToken() can reuse the registration
-                if ('serviceWorker' in navigator) {
-                    navigator.serviceWorker.register('./firebase-messaging-sw.js')
-                        .then(reg => {
-                            console.log('[SW] Service worker registered:', reg.scope);
-                            window.__swRegistration = reg;
-                        })
-                        .catch(err => console.warn('[SW] Service worker registration failed:', err));
+                        const burgeroovAdmins = bgAdmins.val() || [];
+                        const burgeroovWorkers = bgWorkers.val() || [];
+                        const mvcAdminsList = mvcAdmins.val() || [];
+                        const mvcWorkersList = mvcWorkers.val() || [];
+
+                        const inBurgeroov = burgeroovAdmins.map(e => e.toLowerCase()).includes(email) || 
+                                            burgeroovWorkers.some(w => w.email && w.email.toLowerCase() === email);
+                                            
+                        const inMvc = mvcAdminsList.map(e => e.toLowerCase()).includes(email) || 
+                                      mvcWorkersList.some(w => w.email && w.email.toLowerCase() === email);
+
+                        overlay.style.display = 'none';
+
+                        if (inBurgeroov && inMvc) {
+                            showCompanySelectionHUD();
+                        } else if (inMvc) {
+                            selectCompany('mvc');
+                        } else {
+                            selectCompany('burgeroov');
+                        }
+                    }).catch((error) => {
+                        console.error("Error checking company access:", error);
+                        document.getElementById('auth-loader').style.display = 'none';
+                        document.getElementById('auth-btn').style.display = 'block';
+                        
+                        overlay.style.display = 'none';
+                        showCompanySelectionHUD();
+                    });
                 }
             } else {
                 currentUser = null;
@@ -219,6 +297,12 @@
                 document.getElementById('auth-btn').style.display = 'block';
                 overlay.style.display = 'flex';
                 appWrapper.style.display = 'none';
+                document.getElementById('company-selection-overlay').style.display = 'none';
+                
+                if (window.companyListenerRef) {
+                    window.companyListenerRef.off();
+                    window.companyListenerRef = null;
+                }
             }
         });
 
@@ -273,7 +357,7 @@
         function applyUserRoles() {
             if (!currentUser) return;
             const email = currentUser.email.toLowerCase();
-            const admins = appData.burgeroov.admins || ['kinan.rahal@hotmail.com'];
+            const admins = getCompanyData().admins || ['kinan.rahal@hotmail.com'];
 
             let isKinan = email === 'kinan.rahal@hotmail.com';
             let isAdmin = isKinan || admins.map(e => e.toLowerCase()).includes(email);
@@ -281,13 +365,13 @@
             let wPerms = { warehouse: false, drivers: false, finance: false, sales: false, costs: false, adverts: false };
 
             // Global Privacy Config
-            const deptPrivacy = appData.burgeroov.deptPrivacy || {
+            const deptPrivacy = getCompanyData().deptPrivacy || {
                 warehouse: 'restricted', drivers: 'restricted', finance: 'restricted', sales: 'restricted', costs: 'restricted', adverts: 'restricted'
             };
             if (!deptPrivacy.adverts) deptPrivacy.adverts = 'restricted';
             if (!deptPrivacy.costs) deptPrivacy.costs = 'restricted';
 
-            const worker = appData.burgeroov.workers.find(w => w.email && w.email.toLowerCase() === email);
+            const worker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === email);
             let isDriver = false;
             if (worker) {
                 if (worker.permissions) wPerms = worker.permissions;
@@ -300,7 +384,7 @@
             currentUser.role = isAdmin ? 'admin' : 'worker';
             currentUser.isKinan = isKinan;
 
-            document.body.className = 'theme-burgeroov';
+            document.body.className = 'theme-' + currentCompany;
             if (isDarkMode) document.body.classList.add('dark-mode');
 
             if (isAdmin) {
@@ -405,12 +489,17 @@
         }
 
         function listenToCloudData() {
-            db.ref('companies/burgeroov').on('value', (snapshot) => {
+            if (window.companyListenerRef) {
+                window.companyListenerRef.off();
+            }
+
+            window.companyListenerRef = db.ref('companies/' + currentCompany);
+            window.companyListenerRef.on('value', (snapshot) => {
                 if (snapshot.exists()) {
-                    appData.burgeroov = snapshot.val();
-                    ensureArraysExist(appData.burgeroov);
+                    appData[currentCompany] = snapshot.val();
+                    ensureArraysExist(appData[currentCompany]);
                 } else {
-                    appData.burgeroov = { admins: ['kinan.rahal@hotmail.com'], branches: ['Main Branch'], workers: [], violationRules: [], jobCatalog: [], warehouse: [] };
+                    appData[currentCompany] = { admins: ['kinan.rahal@hotmail.com'], branches: ['Main Branch'], workers: [], violationRules: [], jobCatalog: [], warehouse: [] };
                     saveData();
                 }
 
@@ -422,7 +511,7 @@
                     initFCMToken(); // ← Capture & save device token on first load
 
                     if (currentUser && currentUser.role === 'worker') {
-                        const myWorker = appData.burgeroov.workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+                        const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
                         if (myWorker) {
                             if (myWorker.jobs) previousTaskIds = myWorker.jobs.map(j => j.id);
                             // Track initial active order time to avoid false notification on login
@@ -432,7 +521,7 @@
                     isInitialLoad = false;
                 } else {
                     if (currentUser && currentUser.role === 'worker') {
-                        const myWorker = appData.burgeroov.workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+                        const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
                         if (myWorker) {
                             // 1. Task Check
                             if (myWorker.jobs) {
@@ -463,7 +552,7 @@
         }
 
         function saveData() {
-            db.ref('companies/burgeroov').set(appData.burgeroov)
+            db.ref('companies/' + currentCompany).set(appData[currentCompany])
                 .catch(error => {
                     console.error("Error saving data:", error);
                     alert("Failed to save. You may not have Admin permissions.");
@@ -550,21 +639,21 @@
             if (!currentUser || !token) return;
 
             const email = currentUser.email.toLowerCase();
-            const workers = appData.burgeroov.workers || [];
+            const workers = getCompanyData().workers || [];
             const workerIndex = workers.findIndex(
                 w => w.email && w.email.toLowerCase() === email
             );
 
             if (workerIndex === -1) {
                 // Admin or un-matched email: store token in a separate lookup node
-                db.ref('companies/burgeroov/adminTokens/' + btoa(email).replace(/=/g, ''))
+                db.ref('companies/' + currentCompany + '/adminTokens/' + btoa(email).replace(/=/g, ''))
                     .set({ email, fcmToken: token, updatedAt: Date.now() })
                     .then(() => console.log('[FCM] Admin token stored.'))
                     .catch(err => console.error('[FCM] Failed to store admin token:', err));
                 return;
             }
 
-            const workerRef = db.ref(`companies/burgeroov/workers/${workerIndex}`);
+            const workerRef = db.ref(`companies/${currentCompany}/workers/${workerIndex}`);
 
             // Only write if the token actually changed (avoids noisy RTDB writes)
             const currentToken = workers[workerIndex].fcmToken;
@@ -586,7 +675,7 @@
 
         function migrateMonthlyData() {
             let migrated = false;
-            let company = appData.burgeroov;
+            let company = getCompanyData();
 
             company.workers.forEach(w => {
                 if (!w.email) { w.email = ""; migrated = true; }
@@ -756,13 +845,21 @@
             if (updated) saveData();
         }
 
-        // --- PERMISSION FILTERING ---
         function getVisibleWorkers() {
             const workers = getCompanyData().workers;
-            if (currentUser && currentUser.role === 'admin') {
+            if (!currentUser) return [];
+            
+            const email = currentUser.email.toLowerCase();
+            const admins = getCompanyData().admins || ['kinan.rahal@hotmail.com'];
+            const isAdmin = email === 'kinan.rahal@hotmail.com' || admins.map(e => e.toLowerCase()).includes(email);
+            
+            const worker = workers.find(w => w.email && w.email.toLowerCase() === email);
+            const hasFinancePerm = worker && worker.permissions && worker.permissions.finance;
+            
+            if (isAdmin || hasFinancePerm) {
                 return workers;
             } else {
-                return workers.filter(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+                return workers.filter(w => w.email && w.email.toLowerCase() === email);
             }
         }
 
@@ -788,8 +885,8 @@
         function addManager() {
             const email = document.getElementById('new-manager-email').value.trim().toLowerCase();
             if (!email) return;
-            if (!appData.burgeroov.admins.includes(email)) {
-                appData.burgeroov.admins.push(email);
+            if (!getCompanyData().admins.includes(email)) {
+                getCompanyData().admins.push(email);
                 document.getElementById('new-manager-email').value = '';
                 saveData();
             }
@@ -799,7 +896,7 @@
             if (!currentUser.isKinan) return alert("Only the ultimate admin can demote managers.");
             if (email === 'kinan.rahal@hotmail.com') return alert("Cannot demote master admin.");
             if (confirm(`${t('btn-remove')} ${email}?`)) {
-                appData.burgeroov.admins = appData.burgeroov.admins.filter(e => e !== email);
+                getCompanyData().admins = getCompanyData().admins.filter(e => e !== email);
                 saveData();
                 renderManagersList();
             }
@@ -5394,7 +5491,18 @@
                 langBtnMob.innerText = currentAppLang === "ar" ? "🌐 English" : "🌐 عربي";
             }
 
-            const langDict = uiTranslations[currentAppLang] || uiTranslations["en"] || {};
+            const langDict = {...(uiTranslations[currentAppLang] || uiTranslations["en"] || {})};
+
+            // Dynamic translations based on selected company
+            if (currentCompany === 'mvc') {
+                langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات إم في سي فريش' : 'MVC Fresh Operations Portal';
+                langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة تحكم إم في سي فريش' : 'Login to MVC Fresh Dashboard';
+                document.title = 'MVC Fresh Management Portal';
+            } else {
+                langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات برجروف' : 'Burgeroov Operations Portal';
+                langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة التحكم' : 'Login to Dashboard';
+                document.title = 'Burgeroov Management Portal';
+            }
 
             document.querySelectorAll("[data-i18n]").forEach(el => {
                 const key = el.getAttribute("data-i18n");

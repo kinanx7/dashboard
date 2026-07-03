@@ -91,7 +91,7 @@
         style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #2d1b11; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;">
         <div
             style="background: #ffffff; padding: 14px 20px; border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(0,0,0,0.25);">
-            <img src="burgeroov.png" alt="Burgeroov Logo"
+            <img id="launch-loader-logo" src="burgeroov.png" alt="Burgeroov Logo"
                 style="max-width: 130px; height: auto; display: block; animation: notePulse 2.0s infinite ease-in-out;"
                 onerror="this.parentNode.style.display = 'none'">
         </div>
@@ -132,6 +132,36 @@
             margin-top: 15px;
             display: none;
           "></p>
+        </div>
+    </div>
+
+    <!-- Company Selection HUD Overlay -->
+    <div id="company-selection-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(18, 14, 12, 0.95); z-index: 12000; align-items: center; justify-content: center; backdrop-filter: blur(8px);">
+        <div style="text-align: center; max-width: 600px; width: 90%; padding: 24px; font-family: 'Inter', sans-serif;">
+            <h2 style="color: #ffffff; font-size: 2rem; font-weight: 800; margin-bottom: 8px; text-shadow: 0 4px 12px rgba(0,0,0,0.3);">Burgeroov Portal Network</h2>
+            <p style="color: #a38d82; font-size: 1.1rem; margin-bottom: 40px;">Select the dashboard you want to access</p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; justify-content: center;">
+                
+                <!-- Burgeroov Card -->
+                <div onclick="selectCompany('burgeroov')" style="background: #1c1512; border: 2px solid #362822; border-radius: 20px; padding: 40px 24px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 10px 30px rgba(0,0,0,0.5);" onmouseover="this.style.borderColor='#c5832b'; this.style.transform='translateY(-6px)';" onmouseout="this.style.borderColor='#362822'; this.style.transform='none';">
+                    <div style="background: #ffffff; width: 120px; height: 120px; border-radius: 24px; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.25);">
+                        <img src="burgeroov.png" alt="Burgeroov Logo" style="max-width: 90px; max-height: 90px; object-fit: contain;">
+                    </div>
+                    <h3 style="color: #ffffff; font-size: 1.3rem; font-weight: 800; margin: 0;">Burgeroov</h3>
+                    <span style="display: inline-block; margin-top: 14px; background: rgba(197, 131, 43, 0.15); color: #c5832b; font-size: 0.8rem; font-weight: 700; padding: 6px 16px; border-radius: 100px;">Enter Portal</span>
+                </div>
+                
+                <!-- MVC FRESH Card -->
+                <div onclick="selectCompany('mvc')" style="background: #1c1512; border: 2px solid #362822; border-radius: 20px; padding: 40px 24px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 10px 30px rgba(0,0,0,0.5);" onmouseover="this.style.borderColor='#22c55e'; this.style.transform='translateY(-6px)';" onmouseout="this.style.borderColor='#362822'; this.style.transform='none';">
+                    <div style="background: #ffffff; width: 120px; height: 120px; border-radius: 24px; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.25);">
+                        <img src="mvc.png" alt="MVC Fresh Logo" style="max-width: 90px; max-height: 90px; object-fit: contain;">
+                    </div>
+                    <h3 style="color: #ffffff; font-size: 1.3rem; font-weight: 800; margin: 0;">MVC FRESH</h3>
+                    <span style="display: inline-block; margin-top: 14px; background: rgba(34, 197, 94, 0.15); color: #22c55e; font-size: 0.8rem; font-weight: 700; padding: 6px 16px; border-radius: 100px;">Enter Portal</span>
+                </div>
+                
+            </div>
         </div>
     </div>
 
@@ -1641,7 +1671,7 @@
         </div>
     </div>
 
-    <script defer src="app.js?v=6"></script>
+    <script defer src="app.js?v=7"></script>
 </body>
 
 

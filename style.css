@@ -72,6 +72,55 @@
             --shadow-md: 0 10px 20px -5px rgba(0, 0, 0, 0.5);
         }
 
+        /* MVC FRESH THEME Overrides */
+        body.theme-mvc {
+            --primary: #1b4d3e;
+            --primary-hover: #12352b;
+            --secondary: #f97316;
+            --secondary-hover: #ea580c;
+
+            --bg-color: #f4f7f5;
+            --card-bg: #ffffff;
+            --input-bg: #fafdfb;
+
+            --text-main: #11221c;
+            --text-muted: #526e64;
+            --text-light: #ffffff;
+            --border-color: #d1dfda;
+            
+            --success: #16a34a;
+            --success-bg: #f0fdf4;
+            --success-border: #86efac;
+            
+            --warning: #d97706;
+            --warning-bg: #fffbeb;
+            --warning-border: #fcd34d;
+        }
+
+        body.theme-mvc.dark-mode {
+            --primary: #4ade80;
+            --primary-hover: #22c55e;
+            --secondary: #fb923c;
+            --secondary-hover: #f97316;
+
+            --bg-color: #0c110e;
+            --card-bg: #141b18;
+            --input-bg: #0a0e0c;
+
+            --text-main: #f0fdf4;
+            --text-muted: #7ea293;
+            --text-light: #ffffff;
+            --border-color: #24332c;
+            
+            --success: #22c55e;
+            --success-bg: #0f2e1b;
+            --success-border: #14532d;
+            
+            --warning: #f59e0b;
+            --warning-bg: #3b240a;
+            --warning-border: #78350f;
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
