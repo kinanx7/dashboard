@@ -4506,8 +4506,9 @@ function renderDriversList() {
     const list = document.getElementById('driver-list-sidebar'); list.innerHTML = '';
 
     let workers;
-    if (currentUser && (currentUser.role === 'admin' || document.body.classList.contains('perm-drivers'))) {
-        workers = getCompanyData().workers;
+    const isDriversAdmin = currentUser && (currentUser.role === 'admin' || document.body.classList.contains('perm-drivers'));
+    if (isDriversAdmin) {
+        workers = getCompanyData().workers || [];
     } else {
         workers = getVisibleWorkers();
     }
@@ -4519,25 +4520,86 @@ function renderDriversList() {
 
     if (drivers.length === 0) {
         list.innerHTML = `<p style="color:var(--text-muted); font-size:0.85rem;">No drivers found.</p>`;
-        return;
+    } else {
+        drivers.forEach(d => {
+            const div = document.createElement('div');
+            const isSelected = d.id === activeDriverId;
+            const isBusy = !!d.activeOrder;
+
+            div.className = 'driver-card';
+            div.style.cursor = 'pointer';
+            div.style.borderColor = isSelected ? 'var(--primary)' : 'var(--border-color)';
+            div.style.borderWidth = isSelected ? '2px' : '1px';
+
+            let statusBadge = isBusy ? `<span class="badge" style="background:var(--warning);">In Transit</span>` : `<span class="badge" style="background:var(--success);">Available</span>`;
+            let removeBtn = isDriversAdmin ? `<button onclick="demoteFromDriver(event, '${d.id}')" style="background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger-border); border-radius:6px; padding:2px 8px; font-size:0.75rem; cursor:pointer;" title="Remove Driver Role">Remove</button>` : '';
+
+            div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><strong style="color:var(--text-main);">${d.name}</strong><div style="display:flex; gap:6px; align-items:center;">${statusBadge}${removeBtn}</div></div>`;
+            div.onclick = () => selectDriver(d.id);
+            list.appendChild(div);
+        });
     }
 
-    drivers.forEach(d => {
-        const div = document.createElement('div');
-        const isSelected = d.id === activeDriverId;
-        const isBusy = !!d.activeOrder;
+    // Populate Promote selector
+    const selectEl = document.getElementById('assign-driver-select');
+    if (selectEl) {
+        const prevVal = selectEl.value;
+        selectEl.innerHTML = '<option value="">-- Choose Employee --</option>';
+        
+        const nonDrivers = workers.filter(w => {
+            const r = (w.role || "").toLowerCase();
+            return !(r.includes('driver') || r.includes('سائق') || r.includes('delivery'));
+        });
 
-        div.className = 'driver-card';
-        div.style.cursor = 'pointer';
-        div.style.borderColor = isSelected ? 'var(--primary)' : 'var(--border-color)';
-        div.style.borderWidth = isSelected ? '2px' : '1px';
+        nonDrivers.forEach(w => {
+            const opt = document.createElement('option');
+            opt.value = w.id;
+            opt.textContent = `${w.name} (${w.role})`;
+            selectEl.appendChild(opt);
+        });
+        
+        if (nonDrivers.some(w => w.id === prevVal)) {
+            selectEl.value = prevVal;
+        }
+    }
+}
 
-        let statusBadge = isBusy ? `<span class="badge" style="background:var(--warning);">In Transit</span>` : `<span class="badge" style="background:var(--success);">Available</span>`;
+function promoteToDriver() {
+    const wId = document.getElementById('assign-driver-select').value;
+    if (!wId) return alert("Select an employee first.");
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === wId);
+    if (workerIndex === -1) return;
 
-        div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><strong style="color:var(--text-main);">${d.name}</strong>${statusBadge}</div>`;
-        div.onclick = () => selectDriver(d.id);
-        list.appendChild(div);
-    });
+    const worker = getCompanyData().workers[workerIndex];
+    worker.role = "Driver";
+
+    // Targeted write to update worker role
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/role`).set(worker.role)
+        .then(() => {
+            alert(`${worker.name} is now assigned as a Driver!`);
+            document.getElementById('assign-driver-select').value = "";
+        })
+        .catch(err => console.error("Error promoting to driver:", err));
+}
+
+function demoteFromDriver(event, dId) {
+    if (event) event.stopPropagation();
+    if (!confirm("Remove this employee from Driver role?")) return;
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === dId);
+    if (workerIndex === -1) return;
+
+    const worker = getCompanyData().workers[workerIndex];
+    worker.role = "General Staff";
+
+    // Targeted write to update worker role
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/role`).set(worker.role)
+        .then(() => {
+            alert(`${worker.name} is now assigned as General Staff!`);
+            if (activeDriverId === dId) {
+                activeDriverId = null;
+            }
+        })
+        .catch(err => console.error("Error demoting driver:", err));
 }
 
 function renderDriverPanel() {
