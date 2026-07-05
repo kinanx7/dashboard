@@ -1128,6 +1128,7 @@ function loadWorkerPerms() {
         return;
     }
     const worker = getCompanyData().workers.find(w => w.id === wId);
+    if (!worker) return;
     const p = worker.permissions || { warehouse: false, drivers: false, finance: false, sales: false, costs: false, adverts: false };
     document.getElementById('perm-wh').checked = !!p.warehouse;
     document.getElementById('perm-drv').checked = !!p.drivers;

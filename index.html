@@ -176,7 +176,8 @@
     </div>
 
     <!-- Main Application Wrapper -->
-    <div id="app-wrapper" style="display: none;">
+    <main>
+        <div id="app-wrapper" style="display: none;">
 
         <!-- FEATURE 1: IN-APP SLIDING NOTIFICATION BANNER -->
         <div id="in-app-notification">
@@ -309,7 +310,7 @@
               margin-left: 12px;
             "></span>
             </h2>
-            <input type="month" id="global-month" onchange="handleMonthChange()" />
+            <input type="month" id="global-month" onchange="handleMonthChange()" aria-label="Select month" />
         </div>
 
         <!-- Modern Department Tabs -->
@@ -1573,6 +1574,7 @@
             </div>
         </div>
     </div>
+</main>
 
 
 
@@ -1633,7 +1635,7 @@
             <button class="mob-quick-btn" id="mob-tab-tasks" onclick="switchTab('tasks')" title="Tasks">📋</button>
         </div>
         <!-- Right: open department picker -->
-        <button id="mob-dept-menu-btn" onclick="openMobDeptMenu()" aria-label="Open department menu">
+        <button id="mob-dept-menu-btn" onclick="openMobDeptMenu()" aria-label="Departments menu">
             <span id="mob-menu-icon">☰</span>
             <span>Depts</span>
         </button>
@@ -1691,7 +1693,7 @@
         </div>
     </div>
 
-    <script defer src="app.js?v=8"></script>
+    <script defer src="app.js?v=9"></script>
 </body>
 
 

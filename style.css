@@ -1559,6 +1559,13 @@ body:not(.role-admin) .task-grid {
         max-width: 80px;
     }
 
+    body.theme-burgeroov:not(.dark-mode) #mob-active-label {
+        color: #764d1a;
+    }
+    body.theme-mvc:not(.dark-mode) #mob-active-label {
+        color: #c2410c;
+    }
+
     body.dark-mode #mob-active-label {
         color: var(--primary);
     }
