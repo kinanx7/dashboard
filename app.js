@@ -160,8 +160,8 @@ applyDarkMode();
 // --- CORE STATE & DATA ---
 let currentCompany = 'burgeroov';
 let appData = {
-    burgeroov: { branches: ['Main Branch'], workers: [], violationRules: [], jobCatalog: [], warehouse: [], admins: ['kinan.rahal@hotmail.com'] },
-    mvc: { branches: ['Main Branch'], workers: [], violationRules: [], jobCatalog: [], warehouse: [], admins: ['kinan.rahal@hotmail.com'] }
+    burgeroov: { branches: ['Main Branch'], workers: [], violationRules: [], jobCatalog: [], warehouse: [], admins: { "kinan,rahal@hotmail,com": true } },
+    mvc: { branches: ['Main Branch'], workers: [], violationRules: [], jobCatalog: [], warehouse: [], admins: { "kinan,rahal@hotmail,com": true } }
 };
 const today = new Date();
 let currentGlobalMonth = today.toISOString().slice(0, 7);
@@ -181,7 +181,7 @@ const translations = {
 
 function getCompanyData() {
     if (!appData[currentCompany]) {
-        appData[currentCompany] = { admins: ['kinan.rahal@hotmail.com'], branches: ['Main Branch'], workers: [], violationRules: [], jobCatalog: [], warehouse: [] };
+        appData[currentCompany] = { admins: { "kinan,rahal@hotmail,com": true }, branches: ['Main Branch'], workers: [], violationRules: [], jobCatalog: [], warehouse: [] };
     }
     return appData[currentCompany];
 }
@@ -262,15 +262,16 @@ auth.onAuthStateChanged((user) => {
                 document.getElementById('auth-loader').style.display = 'none';
                 document.getElementById('auth-btn').style.display = 'block';
 
-                const burgeroovAdmins = (bgAdmins && typeof bgAdmins.val === 'function') ? (bgAdmins.val() || []) : [];
+                const burgeroovAdmins = (bgAdmins && typeof bgAdmins.val === 'function') ? (bgAdmins.val() || {}) : {};
                 const burgeroovWorkers = (bgWorkers && typeof bgWorkers.val === 'function') ? (bgWorkers.val() || []) : [];
-                const mvcAdminsList = (mvcAdmins && typeof mvcAdmins.val === 'function') ? (mvcAdmins.val() || []) : [];
+                const mvcAdminsList = (mvcAdmins && typeof mvcAdmins.val === 'function') ? (mvcAdmins.val() || {}) : {};
                 const mvcWorkersList = (mvcWorkers && typeof mvcWorkers.val === 'function') ? (mvcWorkers.val() || []) : [];
 
-                const inBurgeroov = burgeroovAdmins.map(e => e.toLowerCase()).includes(email) ||
+                const sanitizedEmail = email.replace(/\./g, ',');
+                const inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
                     burgeroovWorkers.some(w => w.email && w.email.toLowerCase() === email);
 
-                const inMvc = mvcAdminsList.map(e => e.toLowerCase()).includes(email) ||
+                const inMvc = mvcAdminsList[sanitizedEmail] === true ||
                     mvcWorkersList.some(w => w.email && w.email.toLowerCase() === email);
 
                 overlay.style.display = 'none';
@@ -357,10 +358,10 @@ function logout() { auth.signOut(); }
 function applyUserRoles() {
     if (!currentUser) return;
     const email = currentUser.email.toLowerCase();
-    const admins = getCompanyData().admins || ['kinan.rahal@hotmail.com'];
+    const admins = getCompanyData().admins || { "kinan,rahal@hotmail,com": true };
 
     let isKinan = email === 'kinan.rahal@hotmail.com';
-    let isAdmin = isKinan || admins.map(e => e.toLowerCase()).includes(email);
+    let isAdmin = isKinan || admins[email.replace(/\./g, ',')] === true;
 
     let wPerms = { warehouse: false, drivers: false, finance: false, sales: false, costs: false, adverts: false };
 
@@ -439,7 +440,7 @@ function markLockedTabs() {
 
 // --- REAL-TIME DATABASE SYNC ---
 function ensureArraysExist(data) {
-    if (!data.admins) data.admins = ['kinan.rahal@hotmail.com'];
+    if (!data.admins) data.admins = { "kinan,rahal@hotmail,com": true };
     if (!data.branches) data.branches = [];
     if (!data.workers) data.workers = [];
     if (!data.violationRules) data.violationRules = [];
@@ -924,8 +925,8 @@ function getVisibleWorkers() {
     if (!currentUser) return [];
 
     const email = currentUser.email.toLowerCase();
-    const admins = getCompanyData().admins || ['kinan.rahal@hotmail.com'];
-    const isAdmin = email === 'kinan.rahal@hotmail.com' || admins.map(e => e.toLowerCase()).includes(email);
+    const admins = getCompanyData().admins || { "kinan,rahal@hotmail,com": true };
+    const isAdmin = email === 'kinan.rahal@hotmail.com' || admins[email.replace(/\./g, ',')] === true;
 
     const worker = workers.find(w => w.email && w.email.toLowerCase() === email);
     const hasFinancePerm = worker && worker.permissions && worker.permissions.finance;
@@ -942,7 +943,9 @@ function renderManagersList() {
     const list = document.getElementById('managers-list');
     if (!list) return;
     list.innerHTML = '';
-    getCompanyData().admins.forEach(email => {
+    const admins = getCompanyData().admins || {};
+    Object.keys(admins).forEach(key => {
+        const email = key.replace(/,/g, '.');
         const li = document.createElement('li'); li.className = 'flex-between list-item';
         let delBtn = '';
         if (currentUser && currentUser.isKinan && email !== 'kinan.rahal@hotmail.com') {
@@ -959,12 +962,14 @@ function renderManagersList() {
 function addManager() {
     const email = document.getElementById('new-manager-email').value.trim().toLowerCase();
     if (!email) return;
-    if (!getCompanyData().admins.includes(email)) {
-        getCompanyData().admins.push(email);
+    const key = email.replace(/\./g, ',');
+    if (!getCompanyData().admins) getCompanyData().admins = {};
+    if (!getCompanyData().admins[key]) {
+        getCompanyData().admins[key] = true;
         document.getElementById('new-manager-email').value = '';
         
         // Targeted write to admins list
-        db.ref('companies/' + currentCompany + '/admins').set(getCompanyData().admins)
+        db.ref('companies/' + currentCompany + '/admins/' + key).set(true)
             .catch(err => console.error("Error adding admin manager:", err));
     }
 }
@@ -973,10 +978,13 @@ function deleteManager(email) {
     if (!currentUser.isKinan) return alert("Only the ultimate admin can demote managers.");
     if (email === 'kinan.rahal@hotmail.com') return alert("Cannot demote master admin.");
     if (confirm(`${t('btn-remove')} ${email}?`)) {
-        getCompanyData().admins = getCompanyData().admins.filter(e => e !== email);
+        const key = email.replace(/\./g, ',');
+        if (getCompanyData().admins) {
+            delete getCompanyData().admins[key];
+        }
         
         // Targeted write to admins list
-        db.ref('companies/' + currentCompany + '/admins').set(getCompanyData().admins)
+        db.ref('companies/' + currentCompany + '/admins/' + key).remove()
             .catch(err => console.error("Error deleting admin manager:", err));
         renderManagersList();
     }
@@ -1473,20 +1481,31 @@ function addNoteReply(noteId) {
 
     const note = getCompanyData().managerNotes.find(n => n.id === noteId);
     if (note) {
-        if (!note.replies) note.replies = [];
-        note.replies.push({
+        if (!note.replies || Array.isArray(note.replies)) {
+            const obj = {};
+            if (note.replies && Array.isArray(note.replies)) {
+                note.replies.forEach((r, idx) => {
+                    obj[idx.toString()] = r;
+                });
+            }
+            note.replies = obj;
+        }
+
+        const replyId = Date.now().toString();
+        const newReply = {
             author: currentUser.email,
             text: text,
             date: formatTimestamp(),
             attachmentType: type,
             attachmentData: data
-        });
+        };
+        note.replies[replyId] = newReply;
 
         input.value = '';
         clearReplyAttachment(noteId);
         
-        // Targeted write to replies subnode
-        db.ref('companies/' + currentCompany + '/managerNotes/' + noteId + '/replies').set(note.replies)
+        // Targeted write to replies subnode using the unique key
+        db.ref('companies/' + currentCompany + '/managerNotes/' + noteId + '/replies/' + replyId).set(newReply)
             .catch(error => {
                 console.error("Error saving reply:", error);
                 alert("Failed to save reply.");
@@ -1533,8 +1552,9 @@ function renderNotes() {
         let lockIcon = n.isPrivate ? `<span class="badge" style="background:var(--danger); font-size:0.85rem;">🔒 Private Note</span>` : `<span class="badge" style="background:var(--info); font-size:0.85rem;">📢 Public Announcement</span>`;
 
         let repliesHtml = '';
-        if (n.replies && n.replies.length > 0) {
-            repliesHtml = n.replies.map(r => {
+        const replies = n.replies ? Object.values(n.replies) : [];
+        if (replies.length > 0) {
+            repliesHtml = replies.map(r => {
                 let replyTextHtml = r.text ? `<div style="color:var(--text-main); font-size:0.95rem;">${r.text}</div>` : '';
                 let replyAttachmentHtml = '';
                 if (r.attachmentType === 'image' && r.attachmentData) {
@@ -1709,6 +1729,9 @@ function logSaleTransaction() {
         return;
     }
 
+    const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+    const workerId = myWorker ? myWorker.id : "";
+
     const now = new Date();
     const newLog = {
         id: Date.now().toString(),
@@ -1717,7 +1740,8 @@ function logSaleTransaction() {
         date: formatTimestamp(),
         timestamp: now.getTime(),
         month: currentGlobalMonth,
-        cashier: currentUser.email
+        cashier: currentUser.email,
+        workerId: workerId
     };
 
     if (!getCompanyData().salesLogs) getCompanyData().salesLogs = [];
@@ -2196,6 +2220,9 @@ function logCostTransaction() {
         return;
     }
 
+    const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+    const workerId = myWorker ? myWorker.id : "";
+
     const now = new Date();
     const newLog = {
         id: Date.now().toString(),
@@ -2204,7 +2231,8 @@ function logCostTransaction() {
         date: formatTimestamp(),
         timestamp: now.getTime(),
         month: currentGlobalMonth,
-        cashier: currentUser.email
+        cashier: currentUser.email,
+        workerId: workerId
     };
 
     if (!getCompanyData().costLogs) getCompanyData().costLogs = [];
@@ -2257,6 +2285,9 @@ function logPastCostTransaction() {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     if (d >= today) { alert('Please select a date in the past (not today or future).'); return; }
 
+    const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+    const workerId = myWorker ? myWorker.id : "";
+
     const timestamp = d.getTime() + (12 * 3600000); // noon of that day
     const newLog = {
         id: Date.now().toString(),
@@ -2266,7 +2297,8 @@ function logPastCostTransaction() {
         timestamp: timestamp,
         month: dateStr.slice(0, 7),
         cashier: currentUser.email,
-        isPastEntry: true
+        isPastEntry: true,
+        workerId: workerId
     };
 
     if (!getCompanyData().costLogs) getCompanyData().costLogs = [];
@@ -2748,6 +2780,9 @@ function addWarehouseItem() {
 
     if (!name || isNaN(stock) || isNaN(risk) || stock < 0 || risk < 0) { alert("Please fill out all product details correctly."); return; }
 
+    const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+    const workerId = myWorker ? myWorker.id : "";
+
     const newItem = {
         id: 'wh-' + Date.now().toString(),
         name: name,
@@ -2755,7 +2790,8 @@ function addWarehouseItem() {
         maxStock: stock,
         currentStock: stock,
         riskAmount: risk,
-        logs: [{ date: formatTimestamp(), amount: stock, difference: stock, note: 'Initial Stock Setup' }]
+        workerId: workerId,
+        logs: [{ date: formatTimestamp(), amount: stock, difference: stock, note: 'Initial Stock Setup', workerId: workerId }]
     };
 
     if (!getCompanyData().warehouse) getCompanyData().warehouse = [];
@@ -2782,14 +2818,18 @@ function updateWarehouseStock(itemId) {
     const diff = newStock - item.currentStock;
     if (diff === 0) { inputEl.value = ''; return; }
 
+    const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+    const workerId = myWorker ? myWorker.id : "";
+
     item.currentStock = newStock;
-    item.logs.unshift({ date: formatTimestamp(), amount: newStock, difference: diff, note: diff > 0 ? 'Refill' : 'Consumption' });
+    item.logs.unshift({ date: formatTimestamp(), amount: newStock, difference: diff, note: diff > 0 ? 'Refill' : 'Consumption', workerId: workerId });
     inputEl.value = ''; 
     
     // Targeted update to warehouse item index
     db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex).update({
         currentStock: newStock,
-        logs: item.logs
+        logs: item.logs,
+        workerId: workerId
     }).catch(err => console.error("Error updating warehouse stock:", err));
 }
 
