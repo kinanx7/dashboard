@@ -81,7 +81,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=5">
 </head>
 
 <body class="theme-burgeroov">
@@ -145,15 +145,11 @@
             <p style="color: #a38d82; font-size: 1.1rem; margin-bottom: 40px;">Select the dashboard you want to access
             </p>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; justify-content: center;">
+            <div class="company-selection-grid">
 
                 <!-- Burgeroov Card -->
-                <div onclick="selectCompany('burgeroov')"
-                    style="background: #1c1512; border: 2px solid #362822; border-radius: 20px; padding: 40px 24px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 10px 30px rgba(0,0,0,0.5);"
-                    onmouseover="this.style.borderColor='#c5832b'; this.style.transform='translateY(-6px)';"
-                    onmouseout="this.style.borderColor='#362822'; this.style.transform='none';">
-                    <div
-                        style="background: #ffffff; width: 120px; height: 120px; border-radius: 24px; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.25);">
+                <div onclick="selectCompany('burgeroov')" class="company-card burgeroov-card">
+                    <div class="company-logo-wrap">
                         <img src="burgeroov.png" alt="Burgeroov Logo"
                             style="max-width: 90px; max-height: 90px; object-fit: contain;">
                     </div>
@@ -164,12 +160,8 @@
                 </div>
 
                 <!-- MVC FRESH Card -->
-                <div onclick="selectCompany('mvc')"
-                    style="background: #1c1512; border: 2px solid #362822; border-radius: 20px; padding: 40px 24px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 10px 30px rgba(0,0,0,0.5);"
-                    onmouseover="this.style.borderColor='#22c55e'; this.style.transform='translateY(-6px)';"
-                    onmouseout="this.style.borderColor='#362822'; this.style.transform='none';">
-                    <div
-                        style="background: #ffffff; width: 120px; height: 120px; border-radius: 24px; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.25);">
+                <div onclick="selectCompany('mvc')" class="company-card mvc-card">
+                    <div class="company-logo-wrap">
                         <img src="mvc.png" alt="MVC Fresh Logo"
                             style="max-width: 90px; max-height: 90px; object-fit: contain;">
                     </div>

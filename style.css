@@ -2064,6 +2064,33 @@ body:not(.role-admin) .task-grid {
     .mob-nav-btn {
         display: none !important;
     }
+
+    /* RTL overrides on mobile */
+    [dir="rtl"] .user-dropdown {
+        right: auto !important;
+        left: -10px !important;
+    }
+
+    [dir="rtl"] header .btn-outline[onclick="logout()"] {
+        margin-right: 0 !important;
+        margin-left: 4px !important;
+    }
+
+    /* Company Selection HUD responsive adjustments */
+    .company-selection-grid {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+    }
+
+    .company-card {
+        padding: 24px 16px !important;
+    }
+
+    .company-logo-wrap {
+        width: 100px !important;
+        height: 100px !important;
+        margin-bottom: 16px !important;
+    }
 }
 
 /* Very small phones (≤ 400px) */
@@ -2111,4 +2138,47 @@ body:not(.role-admin) .task-grid {
 
 .recording-pulse {
     animation: notePulse 1.2s infinite ease-in-out;
+}
+
+/* Company Selection HUD Styles */
+.company-selection-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    justify-content: center;
+}
+
+.company-card {
+    background: #1c1512;
+    border: 2px solid #362822;
+    border-radius: 20px;
+    padding: 40px 24px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    text-align: center;
+}
+
+.company-card:hover {
+    transform: translateY(-6px);
+}
+
+.company-card.burgeroov-card:hover {
+    border-color: #c5832b;
+}
+
+.company-card.mvc-card:hover {
+    border-color: #22c55e;
+}
+
+.company-logo-wrap {
+    background: #ffffff;
+    width: 120px;
+    height: 120px;
+    border-radius: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 24px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
 }
