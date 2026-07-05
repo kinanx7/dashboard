@@ -487,37 +487,61 @@ function markLockedTabs() {
 
 // --- REAL-TIME DATABASE SYNC ---
 function ensureArraysExist(data) {
+    if (data.admins && Array.isArray(data.admins)) {
+        const map = {};
+        data.admins.forEach(email => {
+            if (email) {
+                map[email.toLowerCase().replace(/\./g, ',')] = true;
+            }
+        });
+        data.admins = map;
+    }
     if (!data.admins) data.admins = { "kinan,rahal@hotmail,com": true };
     if (!data.branches) data.branches = [];
+    data.branches = data.branches.filter(b => b);
+    
     if (!data.workers) data.workers = [];
+    data.workers = data.workers.filter(w => w);
+    
     if (!data.violationRules) data.violationRules = [];
+    data.violationRules = data.violationRules.filter(r => r);
+    
     if (!data.jobCatalog) data.jobCatalog = [];
+    data.jobCatalog = data.jobCatalog.filter(j => j);
+    
     if (!data.warehouse) data.warehouse = [];
+    data.warehouse = data.warehouse.filter(i => i);
+    
     if (!data.whCategories) data.whCategories = [];
+    data.whCategories = data.whCategories.filter(f => f);
 
     // Convert object structures to arrays if loaded as objects from Firebase
     if (data.salesLogs && !Array.isArray(data.salesLogs)) {
         data.salesLogs = Object.values(data.salesLogs);
     }
     if (!data.salesLogs) data.salesLogs = [];
+    data.salesLogs = data.salesLogs.filter(s => s && s.timestamp);
     data.salesLogs.sort((a, b) => b.timestamp - a.timestamp);
 
     if (data.costLogs && !Array.isArray(data.costLogs)) {
         data.costLogs = Object.values(data.costLogs);
     }
     if (!data.costLogs) data.costLogs = [];
+    data.costLogs = data.costLogs.filter(c => c && c.timestamp);
     data.costLogs.sort((a, b) => b.timestamp - a.timestamp);
 
     if (data.managerNotes && !Array.isArray(data.managerNotes)) {
         data.managerNotes = Object.values(data.managerNotes);
     }
     if (!data.managerNotes) data.managerNotes = [];
+    data.managerNotes = data.managerNotes.filter(n => n && n.id);
     data.managerNotes.sort((a, b) => b.id.localeCompare(a.id));
 
     if (data.adverts && !Array.isArray(data.adverts)) {
         data.adverts = Object.values(data.adverts);
     }
     if (!data.adverts) data.adverts = [];
+    data.adverts = data.adverts.filter(a => a && a.id);
     data.adverts.sort((a, b) => b.id.localeCompare(a.id));
 
     // Privacy & Management Data
@@ -526,8 +550,21 @@ function ensureArraysExist(data) {
     if (!data.deptPrivacy.costs) data.deptPrivacy.costs = 'restricted';
 
     data.managerNotes.forEach(n => { 
-        if (!n.replies) n.replies = []; 
-        else if (!Array.isArray(n.replies)) n.replies = Object.values(n.replies);
+        if (!n.replies) n.replies = {}; 
+        else if (Array.isArray(n.replies)) {
+            const obj = {};
+            n.replies.forEach((r, idx) => {
+                if (r) obj[idx.toString()] = r;
+            });
+            n.replies = obj;
+        }
+        if (typeof n.replies === 'object') {
+            Object.keys(n.replies).forEach(key => {
+                if (!n.replies[key] || !n.replies[key].author) {
+                    delete n.replies[key];
+                }
+            });
+        }
     });
 
     if (!data.incomeSources) data.incomeSources = ['Cash', 'Credit Card'];
@@ -539,33 +576,45 @@ function ensureArraysExist(data) {
     data.warehouse.forEach(item => {
         if (!item.logs) item.logs = [];
         else if (!Array.isArray(item.logs)) item.logs = Object.values(item.logs);
+        item.logs = item.logs.filter(l => l);
         if (!item.category) item.category = 'Uncategorized';
     });
 
     data.workers.forEach(w => {
         if (!w.jobs) w.jobs = [];
         else if (!Array.isArray(w.jobs)) w.jobs = Object.values(w.jobs);
+        w.jobs = w.jobs.filter(j => j);
+
         if (!w.logs) w.logs = [];
         else if (!Array.isArray(w.logs)) w.logs = Object.values(w.logs);
+        w.logs = w.logs.filter(l => l);
+
         if (!w.email) w.email = "";
         if (!w.permissions) w.permissions = { warehouse: false, drivers: false, finance: false, sales: false };
         if (!w.monthlyStats) w.monthlyStats = {};
         Object.keys(w.monthlyStats).forEach(month => {
             let ms = w.monthlyStats[month];
-            if (!ms.custodyList) ms.custodyList = [];
-            else if (!Array.isArray(ms.custodyList)) ms.custodyList = Object.values(ms.custodyList);
-            
-            if (!ms.violationsList) ms.violationsList = [];
-            else if (!Array.isArray(ms.violationsList)) ms.violationsList = Object.values(ms.violationsList);
-            
-            if (!ms.rewardsList) ms.rewardsList = [];
-            else if (!Array.isArray(ms.rewardsList)) ms.rewardsList = Object.values(ms.rewardsList);
-            
-            if (!ms.paymentsList) ms.paymentsList = [];
-            else if (!Array.isArray(ms.paymentsList)) ms.paymentsList = Object.values(ms.paymentsList);
-            
-            if (!ms.deliveriesList) ms.deliveriesList = [];
-            else if (!Array.isArray(ms.deliveriesList)) ms.deliveriesList = Object.values(ms.deliveriesList);
+            if (ms) {
+                if (!ms.custodyList) ms.custodyList = [];
+                else if (!Array.isArray(ms.custodyList)) ms.custodyList = Object.values(ms.custodyList);
+                ms.custodyList = ms.custodyList.filter(x => x);
+                
+                if (!ms.violationsList) ms.violationsList = [];
+                else if (!Array.isArray(ms.violationsList)) ms.violationsList = Object.values(ms.violationsList);
+                ms.violationsList = ms.violationsList.filter(x => x);
+                
+                if (!ms.rewardsList) ms.rewardsList = [];
+                else if (!Array.isArray(ms.rewardsList)) ms.rewardsList = Object.values(ms.rewardsList);
+                ms.rewardsList = ms.rewardsList.filter(x => x);
+                
+                if (!ms.paymentsList) ms.paymentsList = [];
+                else if (!Array.isArray(ms.paymentsList)) ms.paymentsList = Object.values(ms.paymentsList);
+                ms.paymentsList = ms.paymentsList.filter(x => x);
+                
+                if (!ms.deliveriesList) ms.deliveriesList = [];
+                else if (!Array.isArray(ms.deliveriesList)) ms.deliveriesList = Object.values(ms.deliveriesList);
+                ms.deliveriesList = ms.deliveriesList.filter(x => x);
+            }
         });
     });
 }
@@ -2244,7 +2293,8 @@ function renderManaging() {
                 const isCounted = !disabledMethods.includes(l.method);
                 const opacity = isCounted ? '1' : '0.5';
                 const strike = isCounted ? 'none' : 'line-through';
-                let delBtn = isAdmin ? `<button onclick="deleteSaleTransaction('${l.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="Delete">Undo</button>` : '';
+                let isSalesAdmin = isAdmin || document.body.classList.contains('perm-finance') || document.body.classList.contains('perm-sales');
+                let delBtn = isSalesAdmin ? `<button onclick="deleteSaleTransaction('${l.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="Delete">Undo</button>` : '';
 
                 logDiv.innerHTML += `
                             <div class="ledger-card" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; opacity: ${opacity}; margin-bottom: 0;">
@@ -2659,7 +2709,8 @@ function renderCosts() {
 
             // Render individual transaction entries
             filteredCosts.forEach(l => {
-                let delBtn = isAdmin ? `<button onclick="deleteCostTransaction('${l.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="Delete">Undo</button>` : '';
+                let isCostsAdmin = isAdmin || document.body.classList.contains('perm-finance') || document.body.classList.contains('perm-costs');
+                let delBtn = isCostsAdmin ? `<button onclick="deleteCostTransaction('${l.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="Delete">Undo</button>` : '';
 
                 logDiv.innerHTML += `
                             <div class="ledger-card" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; margin-bottom: 0;">
@@ -3093,6 +3144,11 @@ function renderWarehouse() {
             const folderId = 'folder-content-' + folder.replace(/\s+/g, '-');
             const isSearchActive = searchQuery.length > 0; // If searching, keep folders open
 
+            window.expandedWhFolders = window.expandedWhFolders || {};
+            const isFolderExpanded = isSearchActive || window.expandedWhFolders[folderId] === true;
+            const folderDisplay = isFolderExpanded ? 'flex' : 'none';
+            const folderIcon = isFolderExpanded ? '📂' : '📁';
+
             // Create Interactive Folder Card
             const header = document.createElement('div');
             header.style.cssText = "display: flex; justify-content: space-between; align-items: center; background: var(--card-bg); color: var(--text-main); padding: 16px 20px; border: 1px solid var(--border-color); border-radius: 12px; cursor: pointer; margin-top: 12px; transition: var(--transition); box-shadow: var(--shadow-sm);";
@@ -3103,7 +3159,7 @@ function renderWarehouse() {
 
             header.innerHTML = `
                         <div style="display:flex; align-items:center; gap:12px; font-weight: 700; font-size: 1.15rem;">
-                            <span style="font-size:1.8rem;" id="icon-${folderId}">${isSearchActive ? '📂' : '📁'}</span> 
+                            <span style="font-size:1.8rem;" id="icon-${folderId}">${folderIcon}</span> 
                             ${folder}
                         </div>
                         <span style="font-size: 0.85rem; font-weight:600; color: var(--text-muted); background: var(--input-bg); padding: 4px 10px; border-radius: 20px;">${itemsInFolder.length} Items</span>
@@ -3112,13 +3168,20 @@ function renderWarehouse() {
             // Content Container (Hidden by default unless searching)
             const contentDiv = document.createElement('div');
             contentDiv.id = folderId;
-            contentDiv.style.cssText = `display: ${isSearchActive ? 'flex' : 'none'}; flex-direction: column; gap: 12px; margin-top: 12px; margin-bottom: 24px; padding-left: 10px; border-left: 3px solid var(--primary); margin-left: 10px;`;
+            contentDiv.style.cssText = `display: ${folderDisplay}; flex-direction: column; gap: 12px; margin-top: 12px; margin-bottom: 24px; padding-left: 10px; border-left: 3px solid var(--primary); margin-left: 10px;`;
 
             // Click to toggle folder open/closed
             header.onclick = () => {
                 const isOpen = contentDiv.style.display === 'flex';
                 contentDiv.style.display = isOpen ? 'none' : 'flex';
                 document.getElementById(`icon-${folderId}`).textContent = isOpen ? '📁' : '📂';
+                
+                window.expandedWhFolders = window.expandedWhFolders || {};
+                if (isOpen) {
+                    delete window.expandedWhFolders[folderId];
+                } else {
+                    window.expandedWhFolders[folderId] = true;
+                }
             };
 
             list.appendChild(header);
@@ -3141,6 +3204,11 @@ function renderWarehouse() {
                                 <span>Total: <strong>${l.amount}</strong> <span style="color:${l.difference > 0 ? 'var(--success)' : 'var(--danger)'}">(${l.difference > 0 ? '+' : ''}${l.difference})</span></span>
                             </div>`).join('');
 
+                const logId = `wh-logs-${item.id}`;
+                window.expandedWhLogs = window.expandedWhLogs || {};
+                const isLogExpanded = window.expandedWhLogs[logId] === true;
+                const logDisplay = isLogExpanded ? 'block' : 'none';
+
                 div.innerHTML = `
                             <div class="flex-between">
                                 <h3 style="margin:0; color:var(--text-main); font-size:1.15rem;">${item.name}</h3>
@@ -3152,7 +3220,7 @@ function renderWarehouse() {
                             <div class="flex-between" style="margin-top: 20px; flex-wrap:wrap; gap:10px;">
                                 <div style="display:flex; gap:8px; flex:1; min-width: 200px;">
                                     <input type="number" id="wh-update-${item.id}" placeholder="${t('placeholder-product-name')}" style="flex:1;" min="0">
-                                    <button onclick="updateWarehouseStock('${item.id}')" class="btn-success">${t('btn-log-payment') || 'Update'}</button>
+                                    <button onclick="updateWarehouseStock('${item.id}')" class="btn-success">${t('btn-change-stock') || 'Change'}</button>
                                 </div>
                                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
                                     <button onclick="toggleDetails('wh-logs-${item.id}')" class="btn-neutral">History</button>
@@ -3169,7 +3237,7 @@ function renderWarehouse() {
                                 </div>
                             </div>
 
-                            <div id="wh-logs-${item.id}" class="wh-logs" style="display:none;">${logsHtml || 'No logs yet.'}</div>`;
+                            <div id="${logId}" class="wh-logs" style="display:${logDisplay};">${logsHtml || 'No logs yet.'}</div>`;
                 contentDiv.appendChild(div);
             });
         }
@@ -3297,8 +3365,20 @@ function showImage(src) { document.getElementById('image-modal-content').src = s
 
 function toggleDetails(id) {
     const el = document.getElementById(id);
-    if (el.style.display === 'none' || el.style.display === '') { el.style.display = 'block'; }
-    else { el.style.display = 'none'; }
+    if (!el) return;
+    if (el.style.display === 'none' || el.style.display === '') {
+        el.style.display = 'block';
+        if (id.startsWith('wh-logs-')) {
+            window.expandedWhLogs = window.expandedWhLogs || {};
+            window.expandedWhLogs[id] = true;
+        }
+    } else {
+        el.style.display = 'none';
+        if (id.startsWith('wh-logs-')) {
+            window.expandedWhLogs = window.expandedWhLogs || {};
+            delete window.expandedWhLogs[id];
+        }
+    }
 }
 
 function downloadBackup() {
@@ -5763,6 +5843,7 @@ const uiTranslations = {
         "desc-advances": "Log cash or transfers handed to the worker this month (deducts from current Net Payable).",
         "placeholder-amount": "Amount (SAR)",
         "btn-log-payment": "Log Payment",
+        "btn-change-stock": "Change",
         "desc-rewards": "Increases their net payable for this month.",
         "btn-add-reward": "Add Reward",
         "opt-select-rule": "-- Select Rule --",
@@ -5949,6 +6030,7 @@ const uiTranslations = {
         "desc-advances": "سجل المبالغ النقدية أو الحوالات المدفوعة للموظف هذا الشهر.",
         "placeholder-amount": "المبلغ (ريال)",
         "btn-log-payment": "تسجيل الدفعة",
+        "btn-change-stock": "تعديل",
         "desc-rewards": "تزيد من صافي الراتب المستحق لهذا الشهر.",
         "btn-add-reward": "إضافة مكافأة",
         "opt-select-rule": "-- اختر المخالفة --",
