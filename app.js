@@ -445,46 +445,80 @@ function ensureArraysExist(data) {
     if (!data.violationRules) data.violationRules = [];
     if (!data.jobCatalog) data.jobCatalog = [];
     if (!data.warehouse) data.warehouse = [];
-    if (!data.adverts) data.adverts = [];
     if (!data.whCategories) data.whCategories = [];
+
+    // Convert object structures to arrays if loaded as objects from Firebase
+    if (data.salesLogs && !Array.isArray(data.salesLogs)) {
+        data.salesLogs = Object.values(data.salesLogs);
+    }
+    if (!data.salesLogs) data.salesLogs = [];
+    data.salesLogs.sort((a, b) => b.timestamp - a.timestamp);
+
+    if (data.costLogs && !Array.isArray(data.costLogs)) {
+        data.costLogs = Object.values(data.costLogs);
+    }
+    if (!data.costLogs) data.costLogs = [];
+    data.costLogs.sort((a, b) => b.timestamp - a.timestamp);
+
+    if (data.managerNotes && !Array.isArray(data.managerNotes)) {
+        data.managerNotes = Object.values(data.managerNotes);
+    }
+    if (!data.managerNotes) data.managerNotes = [];
+    data.managerNotes.sort((a, b) => b.id.localeCompare(a.id));
+
+    if (data.adverts && !Array.isArray(data.adverts)) {
+        data.adverts = Object.values(data.adverts);
+    }
+    if (!data.adverts) data.adverts = [];
+    data.adverts.sort((a, b) => b.id.localeCompare(a.id));
 
     // Privacy & Management Data
     if (!data.deptPrivacy) data.deptPrivacy = { warehouse: 'restricted', drivers: 'restricted', finance: 'restricted', sales: 'restricted', costs: 'restricted', adverts: 'restricted' };
     if (!data.deptPrivacy.adverts) data.deptPrivacy.adverts = 'restricted';
     if (!data.deptPrivacy.costs) data.deptPrivacy.costs = 'restricted';
-    if (!data.managerNotes) data.managerNotes = [];
-    data.managerNotes.forEach(n => { if (!n.replies) n.replies = []; });
+
+    data.managerNotes.forEach(n => { 
+        if (!n.replies) n.replies = []; 
+        else if (!Array.isArray(n.replies)) n.replies = Object.values(n.replies);
+    });
+
     if (!data.incomeSources) data.incomeSources = ['Cash', 'Credit Card'];
-    if (!data.salesLogs) data.salesLogs = [];
     if (!data.disabledSalesMethods) data.disabledSalesMethods = [];
 
     // New Costs Data
     if (!data.costCategories) data.costCategories = ['Electric Bill', 'Meat Supplier', 'Packaging'];
-    if (!data.costLogs) data.costLogs = []; // Daily costs ledger
 
     data.warehouse.forEach(item => {
         if (!item.logs) item.logs = [];
+        else if (!Array.isArray(item.logs)) item.logs = Object.values(item.logs);
         if (!item.category) item.category = 'Uncategorized';
     });
 
     data.workers.forEach(w => {
         if (!w.jobs) w.jobs = [];
+        else if (!Array.isArray(w.jobs)) w.jobs = Object.values(w.jobs);
         if (!w.logs) w.logs = [];
+        else if (!Array.isArray(w.logs)) w.logs = Object.values(w.logs);
         if (!w.email) w.email = "";
         if (!w.permissions) w.permissions = { warehouse: false, drivers: false, finance: false, sales: false };
         if (!w.monthlyStats) w.monthlyStats = {};
         Object.keys(w.monthlyStats).forEach(month => {
             let ms = w.monthlyStats[month];
             if (!ms.custodyList) ms.custodyList = [];
+            else if (!Array.isArray(ms.custodyList)) ms.custodyList = Object.values(ms.custodyList);
+            
             if (!ms.violationsList) ms.violationsList = [];
+            else if (!Array.isArray(ms.violationsList)) ms.violationsList = Object.values(ms.violationsList);
+            
             if (!ms.rewardsList) ms.rewardsList = [];
+            else if (!Array.isArray(ms.rewardsList)) ms.rewardsList = Object.values(ms.rewardsList);
+            
             if (!ms.paymentsList) ms.paymentsList = [];
+            else if (!Array.isArray(ms.paymentsList)) ms.paymentsList = Object.values(ms.paymentsList);
+            
             if (!ms.deliveriesList) ms.deliveriesList = [];
+            else if (!Array.isArray(ms.deliveriesList)) ms.deliveriesList = Object.values(ms.deliveriesList);
         });
-    });
-
-    data.warehouse.forEach(item => {
-        if (!item.logs) item.logs = [];
     });
 }
 
@@ -825,11 +859,20 @@ function runAutoLogger() {
     const monthStrPad = selMonthNum.toString().padStart(2, '0');
     const todayStr = `${todayYear}-${todayMonthNum.toString().padStart(2, '0')}-${todayDay.toString().padStart(2, '0')}`;
 
-    getCompanyData().workers.forEach(w => {
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    const email = currentUser ? currentUser.email.toLowerCase() : "";
+
+    getCompanyData().workers.forEach((w, workerIndex) => {
+        // If not admin, the worker can ONLY auto-log their own records
+        if (!isAdmin && (!w.email || w.email.toLowerCase() !== email)) {
+            return;
+        }
+
+        let workerUpdated = false;
         if (!isFuture) {
             const originalCount = w.logs.length;
             w.logs = w.logs.filter(l => l.date <= todayStr || l.note !== 'Auto-logged ✅');
-            if (w.logs.length !== originalCount) updated = true;
+            if (w.logs.length !== originalCount) workerUpdated = true;
         }
 
         for (let i = 1; i <= targetDayLimit; i++) {
@@ -837,12 +880,24 @@ function runAutoLogger() {
             let existing = w.logs.find(l => l.date === dStr);
             if (!existing) {
                 w.logs.push({ date: dStr, score: 100, note: 'Auto-logged ✅', noteType: 'good' });
-                updated = true;
+                workerUpdated = true;
             }
         }
         w.logs.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        if (workerUpdated) {
+            updated = true;
+            if (!isAdmin) {
+                // Workers write specifically to their own logs path to satisfy security rules
+                db.ref(`companies/${currentCompany}/workers/${workerIndex}/logs`).set(w.logs)
+                    .catch(err => console.error("Error auto-logging for worker:", err));
+            }
+        }
     });
-    if (updated) saveData();
+
+    if (updated && isAdmin) {
+        saveData();
+    }
 }
 
 function getVisibleWorkers() {
@@ -888,7 +943,10 @@ function addManager() {
     if (!getCompanyData().admins.includes(email)) {
         getCompanyData().admins.push(email);
         document.getElementById('new-manager-email').value = '';
-        saveData();
+        
+        // Targeted write to admins list
+        db.ref('companies/' + currentCompany + '/admins').set(getCompanyData().admins)
+            .catch(err => console.error("Error adding admin manager:", err));
     }
 }
 
@@ -897,7 +955,10 @@ function deleteManager(email) {
     if (email === 'kinan.rahal@hotmail.com') return alert("Cannot demote master admin.");
     if (confirm(`${t('btn-remove')} ${email}?`)) {
         getCompanyData().admins = getCompanyData().admins.filter(e => e !== email);
-        saveData();
+        
+        // Targeted write to admins list
+        db.ref('companies/' + currentCompany + '/admins').set(getCompanyData().admins)
+            .catch(err => console.error("Error deleting admin manager:", err));
         renderManagersList();
     }
 }
@@ -926,7 +987,9 @@ function loadWorkerPerms() {
 function saveWorkerPerms() {
     const wId = document.getElementById('perm-worker-select').value;
     if (!wId) return alert("Select a worker first.");
-    const worker = getCompanyData().workers.find(w => w.id === wId);
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === wId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
     worker.permissions = {
         warehouse: document.getElementById('perm-wh').checked,
         drivers: document.getElementById('perm-drv').checked,
@@ -935,7 +998,10 @@ function saveWorkerPerms() {
         costs: document.getElementById('perm-costs').checked,
         adverts: document.getElementById('perm-adverts').checked
     };
-    saveData();
+    
+    // Targeted write to worker permissions path
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/permissions`).set(worker.permissions)
+        .catch(err => console.error("Error saving worker perms:", err));
     alert("Permissions updated!");
 }
 
@@ -952,7 +1018,10 @@ function saveMonthlySales() {
     });
     if (!getCompanyData().monthlySales) getCompanyData().monthlySales = {};
     getCompanyData().monthlySales[currentGlobalMonth] = salesForMonth;
-    saveData();
+    
+    // Targeted write to monthlySales for current month
+    db.ref(`companies/${currentCompany}/monthlySales/${currentGlobalMonth}`).set(salesForMonth)
+        .catch(err => console.error("Error saving monthly sales:", err));
     alert(`Sales successfully saved for ${currentGlobalMonth} 💰`);
 }
 
@@ -1354,13 +1423,25 @@ function postManagerNote() {
 
     document.querySelectorAll('.private-target-cb').forEach(cb => cb.checked = false);
     clearNoteAttachment();
-    saveData();
+    
+    // Targeted write to managerNotes
+    db.ref('companies/' + currentCompany + '/managerNotes/' + newNote.id).set(newNote)
+        .catch(error => {
+            console.error("Error saving note:", error);
+            alert("Failed to save note.");
+        });
 }
 
 function deleteManagerNote(id) {
     if (!confirm("Delete this note entirely?")) return;
     getCompanyData().managerNotes = getCompanyData().managerNotes.filter(n => n.id !== id);
-    saveData();
+    
+    // Targeted delete from managerNotes
+    db.ref('companies/' + currentCompany + '/managerNotes/' + id).remove()
+        .catch(error => {
+            console.error("Error deleting note:", error);
+            alert("Failed to delete note.");
+        });
 }
 
 function addNoteReply(noteId) {
@@ -1384,7 +1465,13 @@ function addNoteReply(noteId) {
 
         input.value = '';
         clearReplyAttachment(noteId);
-        saveData();
+        
+        // Targeted write to replies subnode
+        db.ref('companies/' + currentCompany + '/managerNotes/' + noteId + '/replies').set(note.replies)
+            .catch(error => {
+                console.error("Error saving reply:", error);
+                alert("Failed to save reply.");
+            });
     }
 }
 
@@ -1572,7 +1659,10 @@ function addIncomeSource() {
         if (!getCompanyData().incomeSources.includes(source)) {
             getCompanyData().incomeSources.push(source);
             document.getElementById('new-income-source').value = '';
-            saveData();
+            
+            // Targeted write to incomeSources
+            db.ref('companies/' + currentCompany + '/incomeSources').set(getCompanyData().incomeSources)
+                .catch(err => console.error("Error adding income source:", err));
         } else {
             alert("This income source already exists.");
         }
@@ -1582,7 +1672,10 @@ function addIncomeSource() {
 function deleteIncomeSource(sourceName) {
     if (!confirm(`Delete the income source '${sourceName}'?`)) return;
     getCompanyData().incomeSources = getCompanyData().incomeSources.filter(s => s !== sourceName);
-    saveData();
+    
+    // Targeted write to incomeSources
+    db.ref('companies/' + currentCompany + '/incomeSources').set(getCompanyData().incomeSources)
+        .catch(err => console.error("Error deleting income source:", err));
 }
 
 function logSaleTransaction() {
@@ -1612,13 +1705,25 @@ function logSaleTransaction() {
     getCompanyData().salesLogs.unshift(newLog);
 
     amountInput.value = '';
-    saveData();
+    
+    // Targeted write for sales transactions
+    db.ref('companies/' + currentCompany + '/salesLogs/' + newLog.id).set(newLog)
+        .catch(error => {
+            console.error("Error saving sale:", error);
+            alert("Failed to save transaction.");
+        });
 }
 
 function deleteSaleTransaction(id) {
     if (!confirm("Delete this transaction record?")) return;
     getCompanyData().salesLogs = getCompanyData().salesLogs.filter(l => l.id !== id);
-    saveData();
+    
+    // Targeted removal for sales transactions
+    db.ref('companies/' + currentCompany + '/salesLogs/' + id).remove()
+        .catch(error => {
+            console.error("Error deleting sale:", error);
+            alert("Failed to delete transaction.");
+        });
 }
 
 function toggleSalesMethod(methodName) {
@@ -1629,7 +1734,10 @@ function toggleSalesMethod(methodName) {
         disabled.push(methodName);
     }
     getCompanyData().disabledSalesMethods = disabled;
-    saveData();
+    
+    // Targeted write to disabledSalesMethods
+    db.ref('companies/' + currentCompany + '/disabledSalesMethods').set(disabled)
+        .catch(err => console.error("Error toggling sales method:", err));
 }
 
 function renderManaging() {
@@ -2037,7 +2145,10 @@ function addCostCategory() {
     if (!getCompanyData().costCategories.includes(name)) {
         getCompanyData().costCategories.push(name);
         nameInput.value = '';
-        saveData();
+        
+        // Targeted write to costCategories
+        db.ref('companies/' + currentCompany + '/costCategories').set(getCompanyData().costCategories)
+            .catch(err => console.error("Error adding cost category:", err));
         renderCosts();
     } else {
         alert("This cost category already exists.");
@@ -2047,7 +2158,10 @@ function addCostCategory() {
 function deleteCostCategory(name) {
     if (!confirm(`Delete cost category '${name}'?\n\n(This hides it from the dropdown but doesn't delete old logs).`)) return;
     getCompanyData().costCategories = getCompanyData().costCategories.filter(c => c !== name);
-    saveData();
+    
+    // Targeted write to costCategories
+    db.ref('companies/' + currentCompany + '/costCategories').set(getCompanyData().costCategories)
+        .catch(err => console.error("Error deleting cost category:", err));
     renderCosts();
 }
 
@@ -2078,17 +2192,30 @@ function logCostTransaction() {
     getCompanyData().costLogs.unshift(newLog);
 
     amountInput.value = '';
-    saveData();
+    
+    // Targeted write to costLogs
+    db.ref('companies/' + currentCompany + '/costLogs/' + newLog.id).set(newLog)
+        .catch(error => {
+            console.error("Error saving cost:", error);
+            alert("Failed to save cost transaction.");
+        });
     renderCosts();
 }
 
 function deleteCostTransaction(id) {
     if (!confirm("Delete this cost record?")) return;
     getCompanyData().costLogs = getCompanyData().costLogs.filter(l => l.id !== id);
-    saveData();
+    
+    // Targeted removal from costLogs
+    db.ref('companies/' + currentCompany + '/costLogs/' + id).remove()
+        .catch(error => {
+            console.error("Error deleting cost:", error);
+            alert("Failed to delete cost transaction.");
+        });
     renderCosts();
 }
 
+// Log past costs
 function logPastCostTransaction() {
     const amount = parseFloat(document.getElementById('past-cost-amount').value);
     const category = document.getElementById('past-cost-category').value;
@@ -2129,7 +2256,13 @@ function logPastCostTransaction() {
     document.getElementById('past-cost-amount').value = '';
     document.getElementById('past-cost-password').value = '';
     document.getElementById('past-cost-date').value = '';
-    saveData();
+    
+    // Targeted write to costLogs
+    db.ref('companies/' + currentCompany + '/costLogs/' + newLog.id).set(newLog)
+        .catch(error => {
+            console.error("Error saving past cost:", error);
+            alert("Failed to save past cost transaction.");
+        });
     renderCosts();
     alert(`✅ Past cost of SAR ${amount} for '${category}' on ${dateStr} has been logged!`);
 }
@@ -2527,7 +2660,10 @@ function addWhFolder() {
     if (!getCompanyData().whCategories.includes(folderName)) {
         getCompanyData().whCategories.push(folderName);
         document.getElementById('new-wh-folder').value = '';
-        saveData();
+        
+        // Targeted write to categories list
+        db.ref('companies/' + currentCompany + '/whCategories').set(getCompanyData().whCategories)
+            .catch(err => console.error("Error adding warehouse category:", err));
     } else {
         alert("Folder already exists.");
     }
@@ -2542,7 +2678,12 @@ function deleteWhFolder(folderName) {
     getCompanyData().warehouse.forEach(item => {
         if (item.category === folderName || !item.category) item.category = 'Uncategorized';
     });
-    saveData();
+    
+    // Targeted write to categories and warehouse list
+    db.ref('companies/' + currentCompany + '/whCategories').set(getCompanyData().whCategories)
+        .catch(err => console.error("Error deleting category list:", err));
+    db.ref('companies/' + currentCompany + '/warehouse').set(getCompanyData().warehouse)
+        .catch(err => console.error("Error updating warehouse products categories:", err));
 }
 
 function renderWhFolders() {
@@ -2598,9 +2739,15 @@ function addWarehouseItem() {
         logs: [{ date: formatTimestamp(), amount: stock, difference: stock, note: 'Initial Stock Setup' }]
     };
 
+    if (!getCompanyData().warehouse) getCompanyData().warehouse = [];
     getCompanyData().warehouse.push(newItem);
+    const itemIndex = getCompanyData().warehouse.length - 1;
+    
     document.getElementById('wh-name').value = ''; document.getElementById('wh-stock').value = ''; document.getElementById('wh-risk').value = '';
-    saveData();
+    
+    // Targeted write to item index in warehouse
+    db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex).set(newItem)
+        .catch(err => console.error("Error adding warehouse item:", err));
 }
 
 function updateWarehouseStock(itemId) {
@@ -2609,34 +2756,47 @@ function updateWarehouseStock(itemId) {
 
     if (isNaN(newStock) || newStock < 0) return;
 
-    const item = getCompanyData().warehouse.find(i => i.id === itemId);
-    if (!item) return;
-
+    const itemIndex = getCompanyData().warehouse.findIndex(i => i.id === itemId);
+    if (itemIndex === -1) return;
+    
+    const item = getCompanyData().warehouse[itemIndex];
     const diff = newStock - item.currentStock;
     if (diff === 0) { inputEl.value = ''; return; }
 
     item.currentStock = newStock;
-    // Max stock cap stays strictly original. It no longer auto-increases!
-
     item.logs.unshift({ date: formatTimestamp(), amount: newStock, difference: diff, note: diff > 0 ? 'Refill' : 'Consumption' });
-    inputEl.value = ''; saveData();
+    inputEl.value = ''; 
+    
+    // Targeted update to warehouse item index
+    db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex).update({
+        currentStock: newStock,
+        logs: item.logs
+    }).catch(err => console.error("Error updating warehouse stock:", err));
 }
 
 function editMaxStock(itemId) {
-    const item = getCompanyData().warehouse.find(i => i.id === itemId);
-    if (!item) return;
+    const itemIndex = getCompanyData().warehouse.findIndex(i => i.id === itemId);
+    if (itemIndex === -1) return;
+    
+    const item = getCompanyData().warehouse[itemIndex];
     const newMax = prompt(t('desc-edit-max') || `Enter new Max / Full Stock for ${item.name}:`, item.maxStock);
     const parsed = parseFloat(newMax);
     if (!isNaN(parsed) && parsed > 0) {
         item.maxStock = parsed;
-        saveData();
+        
+        // Targeted write to maxStock attribute
+        db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex + '/maxStock').set(parsed)
+            .catch(err => console.error("Error editing max stock:", err));
     }
 }
 
 function deleteWarehouseItem(itemId) {
     if (!confirm(t('confirm-delete-product'))) return;
     getCompanyData().warehouse = getCompanyData().warehouse.filter(i => i.id !== itemId);
-    saveData();
+    
+    // Targeted write of modified list (admin action)
+    db.ref('companies/' + currentCompany + '/warehouse').set(getCompanyData().warehouse)
+        .catch(err => console.error("Error deleting warehouse item:", err));
 }
 
 function showMoveSelect(itemId) {
@@ -2661,10 +2821,13 @@ function executeMove(itemId, folderName) {
         cancelMoveSelect(itemId);
         return;
     }
-    const item = getCompanyData().warehouse.find(i => i.id === itemId);
-    if (item) {
-        item.category = folderName;
-        saveData(); // Auto-refreshes the UI instantly
+    const itemIndex = getCompanyData().warehouse.findIndex(i => i.id === itemId);
+    if (itemIndex !== -1) {
+        getCompanyData().warehouse[itemIndex].category = folderName;
+        
+        // Targeted write to item category attribute
+        db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex + '/category').set(folderName)
+            .catch(err => console.error("Error moving warehouse item:", err));
     }
 }
 
@@ -3375,10 +3538,19 @@ function addViolationRule() {
     if (!name || isNaN(amount) || amount <= 0) { alert("Please provide a valid name and amount."); return; }
     getCompanyData().violationRules.push({ id: Date.now().toString(), name, amount });
     document.getElementById('new-vrule-name').value = ''; document.getElementById('new-vrule-amount').value = '';
-    saveData();
+    
+    // Targeted write to global violationRules list
+    db.ref('companies/' + currentCompany + '/violationRules').set(getCompanyData().violationRules)
+        .catch(err => console.error("Error adding violation rule:", err));
 }
 
-function deleteViolationRule(id) { getCompanyData().violationRules = getCompanyData().violationRules.filter(r => r.id !== id); saveData(); }
+function deleteViolationRule(id) { 
+    getCompanyData().violationRules = getCompanyData().violationRules.filter(r => r.id !== id); 
+    
+    // Targeted write to global violationRules list
+    db.ref('companies/' + currentCompany + '/violationRules').set(getCompanyData().violationRules)
+        .catch(err => console.error("Error deleting violation rule:", err));
+}
 
 function renderViolationRules() {
     const list = document.getElementById('vrule-list'); list.innerHTML = '';
@@ -3424,33 +3596,53 @@ function applyDetailedViolation() {
     };
 
     if (fileInput.files && fileInput.files[0]) {
-        compressImage(fileInput.files[0], (base64Img) => { newViolation.image = base64Img; saveViolationRecord(stats, newViolation); });
-    } else { saveViolationRecord(stats, newViolation); }
+        compressImage(fileInput.files[0], (base64Img) => { 
+            newViolation.image = base64Img; 
+            saveViolationRecord(workerId, stats, newViolation); 
+        });
+    } else { 
+        saveViolationRecord(workerId, stats, newViolation); 
+    }
 }
 
-function saveViolationRecord(stats, record) {
+function saveViolationRecord(workerId, stats, record) {
     stats.violationsList.unshift(record);
     document.getElementById('v-amount').value = ''; document.getElementById('v-reason').value = '';
     document.getElementById('v-rule-select').value = ''; document.getElementById('v-image').value = '';
-    saveData();
+    
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex !== -1) {
+        db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/violationsList`).set(stats.violationsList)
+            .catch(err => console.error("Error saving violation record:", err));
+    }
 }
 
 function deleteDetailedViolation(workerId, violationId) {
     if (!confirm("Are you sure you want to remove this violation?")) return;
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
-    const stats = getMonthlyStats(worker, currentGlobalMonth);
-    stats.violationsList = stats.violationsList.filter(v => v.id !== violationId);
-    saveData();
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex !== -1) {
+        const worker = getCompanyData().workers[workerIndex];
+        const stats = getMonthlyStats(worker, currentGlobalMonth);
+        stats.violationsList = stats.violationsList.filter(v => v.id !== violationId);
+        
+        db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/violationsList`).set(stats.violationsList)
+            .catch(err => console.error("Error deleting violation record:", err));
+    }
 }
 
 function resolveViolation(workerId, violationId, action) {
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
-    const stats = getMonthlyStats(worker, currentGlobalMonth);
-    const v = stats.violationsList.find(v => v.id === violationId);
-    if (v) {
-        if (action === 'waive') v.status = 'waived';
-        if (action === 'apply') v.status = 'active';
-        saveData();
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex !== -1) {
+        const worker = getCompanyData().workers[workerIndex];
+        const stats = getMonthlyStats(worker, currentGlobalMonth);
+        const v = stats.violationsList.find(v => v.id === violationId);
+        if (v) {
+            if (action === 'waive') v.status = 'waived';
+            if (action === 'apply') v.status = 'active';
+            
+            db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/violationsList`).set(stats.violationsList)
+                .catch(err => console.error("Error resolving violation:", err));
+        }
     }
 }
 
@@ -3458,10 +3650,17 @@ function resolveViolation(workerId, violationId, action) {
 function manuallyUpdateRank(workerId, newRank) {
     if (!newRank) return;
     if (!confirm(`Change rank to ${newRank}?`)) return;
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
     worker.rank = newRank;
     worker.lastEvalDate = Date.now();
-    saveData();
+    
+    // Targeted update to worker rank and evaluation date attributes
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}`).update({
+        rank: newRank,
+        lastEvalDate: worker.lastEvalDate
+    }).catch(err => console.error("Error manually updating rank:", err));
 }
 
 function renderRanksTable() {
@@ -3530,20 +3729,25 @@ function renderRanksTable() {
 }
 
 
-// --- TASKS (FORMERLY JOBS) SYSTEM ---
 function addTaskTemplate() {
     const input = document.getElementById('task-template-input').value.trim();
     if (!input) return alert("Enter a task template name.");
     if (!getCompanyData().jobCatalog.includes(input)) {
         getCompanyData().jobCatalog.push(input);
         document.getElementById('task-template-input').value = '';
-        saveData();
+        
+        // Targeted write to task templates list
+        db.ref('companies/' + currentCompany + '/jobCatalog').set(getCompanyData().jobCatalog)
+            .catch(err => console.error("Error adding task template:", err));
     }
 }
 
 function deleteTaskTemplate(templateName) {
     getCompanyData().jobCatalog = getCompanyData().jobCatalog.filter(t => t !== templateName);
-    saveData();
+    
+    // Targeted write to task templates list
+    db.ref('companies/' + currentCompany + '/jobCatalog').set(getCompanyData().jobCatalog)
+        .catch(err => console.error("Error deleting task template:", err));
 }
 
 function assignTask() {
@@ -3554,7 +3758,9 @@ function assignTask() {
 
     if (!workerId || !text) { alert("Select an employee and describe a task."); return; }
 
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
     if (!worker.jobs) worker.jobs = [];
     worker.jobs.push({
         id: Date.now().toString(),
@@ -3570,32 +3776,47 @@ function assignTask() {
     document.getElementById('task-assign-input').value = '';
     if (document.getElementById('task-deadline')) document.getElementById('task-deadline').value = '';
     if (document.getElementById('task-urgency')) document.getElementById('task-urgency').value = 'normal';
-    saveData();
+    
+    // Targeted write to worker jobs path
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
+        .catch(err => console.error("Error assigning task:", err));
 }
 
 function seeTask(workerId, taskId) {
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
     const t = worker.jobs.find(j => j.id === taskId);
     if (t) {
         t.status = 'seen';
         t.seenAt = Date.now();
-        saveData();
+        
+        // Targeted write to worker jobs path
+        db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
+            .catch(err => console.error("Error seeing task:", err));
     }
 }
 
 function completeTask(workerId, taskId) {
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
     const t = worker.jobs.find(j => j.id === taskId);
     if (t) {
         t.status = 'completed';
         t.done = true;
         t.completedAt = Date.now();
-        saveData();
+        
+        // Targeted write to worker jobs path
+        db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
+            .catch(err => console.error("Error completing task:", err));
     }
 }
 
 function toggleTaskDone(workerId, taskId) {
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
     const t = worker.jobs.find(j => j.id === taskId);
     if (t) {
         t.done = !t.done;
@@ -3605,15 +3826,23 @@ function toggleTaskDone(workerId, taskId) {
             t.status = 'completed';
             t.completedAt = Date.now();
         }
-        saveData();
+        
+        // Targeted write to worker jobs path
+        db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
+            .catch(err => console.error("Error toggling task done:", err));
     }
 }
 
 function deleteTask(workerId, taskId) {
     if (!confirm("Delete this task?")) return;
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
     worker.jobs = worker.jobs.filter(j => j.id !== taskId);
-    saveData();
+    
+    // Targeted write to worker jobs path
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
+        .catch(err => console.error("Error deleting task:", err));
 }
 
 function renderTasks() {
@@ -3767,7 +3996,9 @@ function startDriverOrder() {
         if (isNaN(prepMins) || prepMins <= 0) { alert("Enter valid prep time in minutes."); return; }
     }
 
-    const worker = getCompanyData().workers.find(w => w.id === activeDriverId);
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === activeDriverId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
     worker.activeOrder = {
         startTime: Date.now(),
         allocatedMs: mins * 60 * 1000,
@@ -3782,20 +4013,28 @@ function startDriverOrder() {
     if (document.getElementById('driver-prep-time')) document.getElementById('driver-prep-time').value = '';
     document.getElementById('driver-order-status').value = 'ready';
     toggleDriverPrepTime();
-    saveData();
+    
+    // Targeted write to activeOrder
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/activeOrder`).set(worker.activeOrder)
+        .catch(err => console.error("Error starting driver order:", err));
 }
 
 function pickupDriverOrder(workerId) {
     if (!workerId) workerId = activeDriverId;
     if (!workerId) return;
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
     if (worker && worker.activeOrder) {
         if (worker.activeOrder.status === 'preparing') {
             worker.activeOrder.prepEndTime = Date.now();
         }
         worker.activeOrder.status = 'picked_up';
         worker.activeOrder.startTime = Date.now(); // Restart timer exactly when picked up
-        saveData();
+        
+        // Targeted write to activeOrder
+        db.ref(`companies/${currentCompany}/workers/${workerIndex}/activeOrder`).set(worker.activeOrder)
+            .catch(err => console.error("Error picking up order:", err));
     }
 }
 
@@ -3803,11 +4042,16 @@ function forceOrderReady(workerId) {
     if (!confirm("Force this order to Ready status immediately?")) return;
     if (!workerId) workerId = activeDriverId;
     if (!workerId) return;
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
     if (worker && worker.activeOrder && worker.activeOrder.status === 'preparing') {
         worker.activeOrder.status = 'ready';
         worker.activeOrder.prepEndTime = Date.now(); // Log exactly when kitchen finished
-        saveData();
+        
+        // Targeted write to activeOrder
+        db.ref(`companies/${currentCompany}/workers/${workerIndex}/activeOrder`).set(worker.activeOrder)
+            .catch(err => console.error("Error forcing order ready:", err));
     }
 }
 
@@ -3820,7 +4064,9 @@ function finishDriverOrder(isSuccess, workerId) {
         return;
     }
 
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
     if (isSuccess && worker.activeOrder) {
         const stats = getMonthlyStats(worker, currentGlobalMonth);
 
@@ -3840,26 +4086,41 @@ function finishDriverOrder(isSuccess, workerId) {
             prepTimeMs: worker.activeOrder.prepTimeMs || 0,
             prepEndTime: prepEnd || null
         });
+        
+        // Write the deliveriesList
+        db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/deliveriesList`).set(stats.deliveriesList)
+            .catch(err => console.error("Error logging delivery record:", err));
     }
     worker.activeOrder = null;
-    saveData();
+    
+    // Clear active order
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/activeOrder`).set(null)
+        .catch(err => console.error("Error clearing active order:", err));
 }
 
 function deleteDeliveryRecord(workerId, deliveryId) {
     if (!confirm(t('confirm-delete-delivery') || "Delete delivery record?")) return;
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
     const stats = getMonthlyStats(worker, currentGlobalMonth);
     stats.deliveriesList = stats.deliveriesList.filter(d => d.id !== deliveryId);
-    saveData();
+    
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/deliveriesList`).set(stats.deliveriesList)
+        .catch(err => console.error("Error deleting delivery record:", err));
 }
 
 function deleteLegacyDelivery(workerId) {
     if (!confirm(t('confirm-remove-legacy') || "Remove legacy record?")) return;
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
     const stats = getMonthlyStats(worker, currentGlobalMonth);
     if (stats.legacyDeliveries > 0) {
         stats.legacyDeliveries--;
-        saveData();
+        
+        db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/legacyDeliveries`).set(stats.legacyDeliveries)
+            .catch(err => console.error("Error deleting legacy delivery:", err));
     }
 }
 
@@ -4097,20 +4358,28 @@ function addPaymentRecord() {
     const amount = parseFloat(document.getElementById('payment-amount').value);
     if (!workerId || isNaN(amount) || amount <= 0) return;
 
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
     const stats = getMonthlyStats(worker, currentGlobalMonth);
 
     stats.paymentsList.unshift({ id: Date.now().toString(), date: formatTimestamp(), amount: amount });
     document.getElementById('payment-amount').value = '';
-    saveData();
+    
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/paymentsList`).set(stats.paymentsList)
+        .catch(err => console.error("Error adding payment:", err));
 }
 
 function deletePaymentRecord(workerId, paymentId) {
     if (!confirm("Remove this payment log?")) return;
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
     const stats = getMonthlyStats(worker, currentGlobalMonth);
     stats.paymentsList = stats.paymentsList.filter(p => p.id !== paymentId);
-    saveData();
+    
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/paymentsList`).set(stats.paymentsList)
+        .catch(err => console.error("Error deleting payment:", err));
 }
 
 function addRewardRecord() {
@@ -4118,20 +4387,28 @@ function addRewardRecord() {
     const amount = parseFloat(document.getElementById('reward-amount').value);
     if (!workerId || isNaN(amount) || amount <= 0) return;
 
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
     const stats = getMonthlyStats(worker, currentGlobalMonth);
 
     stats.rewardsList.unshift({ id: Date.now().toString(), date: formatTimestamp(), amount: amount });
     document.getElementById('reward-amount').value = '';
-    saveData();
+    
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/rewardsList`).set(stats.rewardsList)
+        .catch(err => console.error("Error adding reward:", err));
 }
 
 function deleteRewardRecord(workerId, rewardId) {
     if (!confirm("Remove this reward log?")) return;
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
     const stats = getMonthlyStats(worker, currentGlobalMonth);
     stats.rewardsList = stats.rewardsList.filter(r => r.id !== rewardId);
-    saveData();
+    
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/rewardsList`).set(stats.rewardsList)
+        .catch(err => console.error("Error deleting reward:", err));
 }
 
 function addCustodyRecord(type) {
@@ -4139,28 +4416,47 @@ function addCustodyRecord(type) {
     const amount = parseFloat(document.getElementById('custody-amount').value);
     if (!workerId || isNaN(amount) || amount <= 0) return;
 
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
     const stats = getMonthlyStats(worker, currentGlobalMonth);
 
     stats.custodyList.unshift({ id: Date.now().toString(), date: formatTimestamp(), amount: amount, type: type });
     document.getElementById('custody-amount').value = '';
-    saveData();
+    
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/custodyList`).set(stats.custodyList)
+        .catch(err => console.error("Error adding custody:", err));
 }
 
 function deleteCustodyRecord(workerId, custodyId) {
     if (!confirm("Remove this custody log?")) return;
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
     const stats = getMonthlyStats(worker, currentGlobalMonth);
     stats.custodyList = stats.custodyList.filter(c => c.id !== custodyId);
-    saveData();
+    
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/custodyList`).set(stats.custodyList)
+        .catch(err => console.error("Error deleting custody:", err));
 }
 
 function addBranch() {
     const nameInput = document.getElementById('new-branch-name'); const name = nameInput.value.trim();
-    if (name && !getCompanyData().branches.includes(name)) { getCompanyData().branches.push(name); nameInput.value = ''; saveData(); }
+    if (name && !getCompanyData().branches.includes(name)) { 
+        getCompanyData().branches.push(name); 
+        nameInput.value = ''; 
+        db.ref('companies/' + currentCompany + '/branches').set(getCompanyData().branches)
+            .catch(err => console.error("Error adding branch:", err));
+    }
     else { alert("Invalid or existing branch."); }
 }
-function deleteBranch(branchName) { if (confirm(`Remove branch: ${branchName}?`)) { getCompanyData().branches = getCompanyData().branches.filter(b => b !== branchName); saveData(); } }
+function deleteBranch(branchName) { 
+    if (confirm(`Remove branch: ${branchName}?`)) { 
+        getCompanyData().branches = getCompanyData().branches.filter(b => b !== branchName); 
+        db.ref('companies/' + currentCompany + '/branches').set(getCompanyData().branches)
+            .catch(err => console.error("Error deleting branch:", err));
+    } 
+}
 
 function addWorker() {
     const name = document.getElementById('w-name').value.trim();
@@ -4181,25 +4477,46 @@ function addWorker() {
     };
 
     newWorker.monthlyStats[currentGlobalMonth] = { custodyList: [], violationsList: [], rewardsList: [], costs: 0, paymentsList: [], deliveriesList: [], legacyDeliveries: 0 };
+    if (!getCompanyData().workers) getCompanyData().workers = [];
     getCompanyData().workers.push(newWorker);
 
     ['w-name', 'w-email', 'w-role', 'w-start-time', 'w-end-time', 'w-income'].forEach(id => document.getElementById(id).value = '');
-    saveData();
+    
+    // Targeted write to workers list
+    db.ref('companies/' + currentCompany + '/workers').set(getCompanyData().workers)
+        .catch(err => console.error("Error adding worker:", err));
 }
 
 function deleteWorker(workerId) {
-    if (confirm('Permanently delete this employee?')) { getCompanyData().workers = getCompanyData().workers.filter(w => w.id !== workerId); document.getElementById('ops-worker-select').value = ""; document.getElementById('fin-worker-select').value = ""; document.getElementById('task-worker-select').value = ""; activeDriverId = null; saveData(); }
+    if (confirm('Permanently delete this employee?')) { 
+        getCompanyData().workers = getCompanyData().workers.filter(w => w.id !== workerId); 
+        document.getElementById('ops-worker-select').value = ""; 
+        document.getElementById('fin-worker-select').value = ""; 
+        document.getElementById('task-worker-select').value = ""; 
+        activeDriverId = null; 
+        
+        // Targeted write to workers list
+        db.ref('companies/' + currentCompany + '/workers').set(getCompanyData().workers)
+            .catch(err => console.error("Error deleting worker:", err));
+    }
 }
 
 function setInitialBalance() {
     const workerId = document.getElementById('fin-worker-select').value;
     if (!workerId) { alert("Select an employee first."); return; }
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
     let amountText = document.getElementById('initial-balance-amount').value;
     const amount = parseFloat(amountText);
     if (isNaN(amount)) return;
+    
     worker.initialBalance = amount;
-    saveData();
+    
+    // Targeted write to initialBalance
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/initialBalance`).set(amount)
+        .catch(err => console.error("Error setting initial balance:", err));
     alert("Initial Carryover Balance Updated.");
 }
 
@@ -4212,7 +4529,10 @@ function getAveragePerfection(logs) {
 function updateFinancialRecord(type, action) {
     const workerId = document.getElementById('fin-worker-select').value;
     if (!workerId) return;
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
     const stats = getMonthlyStats(worker, currentGlobalMonth);
 
     const idMap = { 'costs': 'cost-amount' };
@@ -4225,7 +4545,10 @@ function updateFinancialRecord(type, action) {
         else { stats[type] -= amount; if (stats[type] < 0) stats[type] = 0; }
         inputEl.value = '';
     } else if (action === 'clear' && confirm(`Clear all ${type} for ${worker.name}?`)) { stats[type] = 0; }
-    saveData();
+    
+    // Targeted write to worker's specific monthly finance record
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/${type}`).set(stats[type])
+        .catch(err => console.error(`Error updating financial record ${type}:`, err));
 }
 
 function handleOpsWorkerChange() { renderOpsDetails(); }
@@ -4239,7 +4562,9 @@ function addDailyLog() {
 
     if (!workerId || !startDateStr) { alert("Select an employee and date."); return; }
 
-    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
 
     if (noteType === 'vacation') {
         const numDays = parseInt(document.getElementById('vacation-days').value) || 1;
@@ -4267,13 +4592,17 @@ function addDailyLog() {
     worker.logs.sort((a, b) => new Date(b.date) - new Date(a.date));
     document.getElementById('log-note').value = '';
     document.getElementById('vacation-days').value = '1';
-    saveData();
+    
+    // Targeted write to worker's logs
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/logs`).set(worker.logs)
+        .catch(err => console.error("Error saving daily log:", err));
 }
 
 function deleteLog(workerId, logDate) {
     if (confirm(`Delete record for ${logDate}?`)) {
-        const worker = getCompanyData().workers.find(w => w.id === workerId);
-        if (worker) {
+        const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+        if (workerIndex !== -1) {
+            const worker = getCompanyData().workers[workerIndex];
             worker.logs = worker.logs.filter(l => l.date !== logDate);
 
             // Auto-revert logic
@@ -4288,7 +4617,9 @@ function deleteLog(workerId, logDate) {
                 worker.logs.sort((a, b) => new Date(b.date) - new Date(a.date));
             }
 
-            saveData();
+            // Targeted write to worker's logs
+            db.ref(`companies/${currentCompany}/workers/${workerIndex}/logs`).set(worker.logs)
+                .catch(err => console.error("Error deleting daily log:", err));
         }
     }
 }
@@ -4351,11 +4682,15 @@ function saveMapItem() {
         date: formatTimestamp()
     };
 
+    if (!getCompanyData().adverts) getCompanyData().adverts = [];
     getCompanyData().adverts.push(newItem);
     document.getElementById('map-item-modal').style.display = 'none';
     pendingMapItem = null;
     setAdvertTool('pin'); // Reset back to default
-    saveData(); // Triggers renderAll via Firebase sync
+    
+    // Targeted write to adverts
+    db.ref('companies/' + currentCompany + '/adverts/' + newItem.id).set(newItem)
+        .catch(err => console.error("Error saving map item:", err));
 }
 
 function initPromoMap() {
@@ -4400,7 +4735,10 @@ function initPromoMap() {
 function deleteAdvertPin(id) {
     if (!confirm("Delete this item from the map?")) return;
     getCompanyData().adverts = getCompanyData().adverts.filter(p => p.id !== id);
-    saveData();
+    
+    // Targeted delete from adverts
+    db.ref('companies/' + currentCompany + '/adverts/' + id).remove()
+        .catch(err => console.error("Error deleting map item:", err));
 }
 
 function renderAdverts() {
