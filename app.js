@@ -250,7 +250,13 @@ auth.onAuthStateChanged((user) => {
             document.getElementById('auth-loader').style.display = 'none';
             document.getElementById('auth-btn').style.display = 'block';
             overlay.style.display = 'none';
-            showCompanySelectionHUD();
+            
+            const savedCompany = localStorage.getItem('selected_company');
+            if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc')) {
+                selectCompany(savedCompany);
+            } else {
+                showCompanySelectionHUD();
+            }
         } else {
             // Check databases for worker membership
             Promise.all([
@@ -261,7 +267,7 @@ auth.onAuthStateChanged((user) => {
             ]).then(([bgAdmins, bgWorkers, mvcAdmins, mvcWorkers]) => {
                 document.getElementById('auth-loader').style.display = 'none';
                 document.getElementById('auth-btn').style.display = 'block';
-
+ 
                 let burgeroovAdmins = (bgAdmins && typeof bgAdmins.val === 'function') ? (bgAdmins.val() || {}) : {};
                 if (Array.isArray(burgeroovAdmins)) {
                     const map = {};
@@ -281,16 +287,25 @@ auth.onAuthStateChanged((user) => {
                     mvcAdminsList = map;
                 }
                 const mvcWorkersList = (mvcWorkers && typeof mvcWorkers.val === 'function') ? (mvcWorkers.val() || []) : [];
-
+ 
                 const sanitizedEmail = email.replace(/\./g, ',');
                 const inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
                     burgeroovWorkers.some(w => w.email && w.email.toLowerCase() === email);
-
+ 
                 const inMvc = mvcAdminsList[sanitizedEmail] === true ||
                     mvcWorkersList.some(w => w.email && w.email.toLowerCase() === email);
-
+ 
                 overlay.style.display = 'none';
+                window.isMultiCompany = inBurgeroov && inMvc;
 
+                const savedCompany = localStorage.getItem('selected_company');
+                if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc')) {
+                    if ((savedCompany === 'mvc' && inMvc) || (savedCompany === 'burgeroov' && inBurgeroov)) {
+                        selectCompany(savedCompany);
+                        return;
+                    }
+                }
+ 
                 if (inBurgeroov && inMvc) {
                     showCompanySelectionHUD();
                 } else if (inMvc) {
@@ -302,9 +317,14 @@ auth.onAuthStateChanged((user) => {
                 console.error("Error checking company access:", error);
                 document.getElementById('auth-loader').style.display = 'none';
                 document.getElementById('auth-btn').style.display = 'block';
-
+ 
                 overlay.style.display = 'none';
-                showCompanySelectionHUD();
+                const savedCompany = localStorage.getItem('selected_company');
+                if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc')) {
+                    selectCompany(savedCompany);
+                } else {
+                    showCompanySelectionHUD();
+                }
             });
         }
     } else {
@@ -367,7 +387,10 @@ function handleAuthSubmit() {
     }
 }
 
-function logout() { auth.signOut(); }
+function logout() {
+    localStorage.removeItem('selected_company');
+    auth.signOut();
+}
 
 // --- ROLE BASED ACCESS CONTROL (RBAC) ---
 function applyUserRoles() {
@@ -377,6 +400,15 @@ function applyUserRoles() {
 
     let isKinan = email === 'kinan.rahal@hotmail.com';
     let isAdmin = isKinan || admins[email.replace(/\./g, ',')] === true;
+
+    const swapBtn = document.getElementById('company-swap-btn');
+    if (swapBtn) {
+        if (isKinan || window.isMultiCompany) {
+            swapBtn.style.display = 'inline-block';
+        } else {
+            swapBtn.style.display = 'none';
+        }
+    }
 
     let wPerms = { warehouse: false, drivers: false, finance: false, sales: false, costs: false, adverts: false };
 
