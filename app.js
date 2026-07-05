@@ -254,18 +254,18 @@ auth.onAuthStateChanged((user) => {
         } else {
             // Check databases for worker membership
             Promise.all([
-                db.ref('companies/burgeroov/admins').once('value'),
-                db.ref('companies/burgeroov/workers').once('value'),
-                db.ref('companies/mvc/admins').once('value'),
-                db.ref('companies/mvc/workers').once('value')
+                db.ref('companies/burgeroov/admins').once('value').catch(() => null),
+                db.ref('companies/burgeroov/workers').once('value').catch(() => null),
+                db.ref('companies/mvc/admins').once('value').catch(() => null),
+                db.ref('companies/mvc/workers').once('value').catch(() => null)
             ]).then(([bgAdmins, bgWorkers, mvcAdmins, mvcWorkers]) => {
                 document.getElementById('auth-loader').style.display = 'none';
                 document.getElementById('auth-btn').style.display = 'block';
 
-                const burgeroovAdmins = bgAdmins.val() || [];
-                const burgeroovWorkers = bgWorkers.val() || [];
-                const mvcAdminsList = mvcAdmins.val() || [];
-                const mvcWorkersList = mvcWorkers.val() || [];
+                const burgeroovAdmins = (bgAdmins && typeof bgAdmins.val === 'function') ? (bgAdmins.val() || []) : [];
+                const burgeroovWorkers = (bgWorkers && typeof bgWorkers.val === 'function') ? (bgWorkers.val() || []) : [];
+                const mvcAdminsList = (mvcAdmins && typeof mvcAdmins.val === 'function') ? (mvcAdmins.val() || []) : [];
+                const mvcWorkersList = (mvcWorkers && typeof mvcWorkers.val === 'function') ? (mvcWorkers.val() || []) : [];
 
                 const inBurgeroov = burgeroovAdmins.map(e => e.toLowerCase()).includes(email) ||
                     burgeroovWorkers.some(w => w.email && w.email.toLowerCase() === email);
@@ -710,23 +710,42 @@ function saveWorkerFCMToken(token) {
 function migrateMonthlyData() {
     let migrated = false;
     let company = getCompanyData();
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    const email = currentUser ? currentUser.email.toLowerCase() : "";
 
-    company.workers.forEach(w => {
-        if (!w.email) { w.email = ""; migrated = true; }
-        if (!w.permissions) { w.permissions = { warehouse: false, drivers: false, finance: false }; migrated = true; }
-        if (!w.monthlyStats) { w.monthlyStats = {}; migrated = true; }
+    company.workers.forEach((w, workerIndex) => {
+        // If not admin, the worker can ONLY migrate their own record
+        if (!isAdmin && (!w.email || w.email.toLowerCase() !== email)) {
+            return;
+        }
+
+        let workerMigrated = false;
+        if (!w.email) { w.email = ""; workerMigrated = true; }
+        if (!w.permissions) { w.permissions = { warehouse: false, drivers: false, finance: false }; workerMigrated = true; }
+        if (!w.monthlyStats) { w.monthlyStats = {}; workerMigrated = true; }
         if (!w.monthlyStats[currentGlobalMonth]) {
             w.monthlyStats[currentGlobalMonth] = { custodyList: [], rewardsList: [], costs: 0, paymentsList: [], violationsList: [], deliveriesList: [], legacyDeliveries: 0 };
-            migrated = true;
+            workerMigrated = true;
         }
-        if (!w.role) { w.role = "General Staff"; migrated = true; }
-        if (!w.initialBalance) { w.initialBalance = 0; migrated = true; }
-        if (!w.jobs) { w.jobs = []; migrated = true; }
-        if (!w.rank) { w.rank = "Unranked"; migrated = true; }
-        if (w.lastEvalDate === undefined) { w.lastEvalDate = Date.now(); migrated = true; }
+        if (!w.role) { w.role = "General Staff"; workerMigrated = true; }
+        if (!w.initialBalance) { w.initialBalance = 0; workerMigrated = true; }
+        if (!w.jobs) { w.jobs = []; workerMigrated = true; }
+        if (!w.rank) { w.rank = "Unranked"; workerMigrated = true; }
+        if (w.lastEvalDate === undefined) { w.lastEvalDate = Date.now(); workerMigrated = true; }
+
+        if (workerMigrated) {
+            migrated = true;
+            if (!isAdmin) {
+                // Targeted write to their own worker path
+                db.ref(`companies/${currentCompany}/workers/${workerIndex}`).set(w)
+                    .catch(err => console.error("Error migrating worker profile:", err));
+            }
+        }
     });
 
-    if (migrated) saveData();
+    if (migrated && isAdmin) {
+        saveData();
+    }
 }
 
 function startGlobalTick() {
@@ -4460,7 +4479,7 @@ function deleteBranch(branchName) {
 
 function addWorker() {
     const name = document.getElementById('w-name').value.trim();
-    const email = document.getElementById('w-email').value.trim();
+    const email = document.getElementById('w-email').value.trim().toLowerCase();
     let role = document.getElementById('w-role').value.trim() || "General Staff";
     const startTime = document.getElementById('w-start-time').value;
     const endTime = document.getElementById('w-end-time').value;
