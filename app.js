@@ -2721,6 +2721,10 @@ function addWhFolder() {
 }
 
 function deleteWhFolder(folderName) {
+    if (!currentUser || currentUser.role !== 'admin') {
+        alert("Only administrators can delete folders.");
+        return;
+    }
     if (!confirm(`Delete folder '${folderName}'? Products inside will be moved to 'Uncategorized'.`)) return;
 
     getCompanyData().whCategories = getCompanyData().whCategories.filter(f => f !== folderName);
@@ -2780,8 +2784,13 @@ function addWarehouseItem() {
 
     if (!name || isNaN(stock) || isNaN(risk) || stock < 0 || risk < 0) { alert("Please fill out all product details correctly."); return; }
 
-    const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
-    const workerId = myWorker ? myWorker.id : "";
+    let workerId = "";
+    if (currentUser && currentUser.role === 'admin') {
+        workerId = "admin";
+    } else {
+        const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+        workerId = myWorker ? myWorker.id : "";
+    }
 
     const newItem = {
         id: 'wh-' + Date.now().toString(),
@@ -2818,19 +2827,22 @@ function updateWarehouseStock(itemId) {
     const diff = newStock - item.currentStock;
     if (diff === 0) { inputEl.value = ''; return; }
 
-    const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
-    const workerId = myWorker ? myWorker.id : "";
+    let workerId = "";
+    if (currentUser && currentUser.role === 'admin') {
+        workerId = "admin";
+    } else {
+        const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+        workerId = myWorker ? myWorker.id : "";
+    }
 
     item.currentStock = newStock;
     item.logs.unshift({ date: formatTimestamp(), amount: newStock, difference: diff, note: diff > 0 ? 'Refill' : 'Consumption', workerId: workerId });
     inputEl.value = ''; 
+    item.workerId = workerId;
     
-    // Targeted update to warehouse item index
-    db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex).update({
-        currentStock: newStock,
-        logs: item.logs,
-        workerId: workerId
-    }).catch(err => console.error("Error updating warehouse stock:", err));
+    // Targeted write to item index in warehouse
+    db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex).set(item)
+        .catch(err => console.error("Error updating warehouse stock:", err));
 }
 
 function editMaxStock(itemId) {
@@ -2843,13 +2855,26 @@ function editMaxStock(itemId) {
     if (!isNaN(parsed) && parsed > 0) {
         item.maxStock = parsed;
         
-        // Targeted write to maxStock attribute
-        db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex + '/maxStock').set(parsed)
+        let workerId = "";
+        if (currentUser && currentUser.role === 'admin') {
+            workerId = "admin";
+        } else {
+            const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+            workerId = myWorker ? myWorker.id : "";
+        }
+        item.workerId = workerId;
+
+        // Targeted write to item index in warehouse using .set()
+        db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex).set(item)
             .catch(err => console.error("Error editing max stock:", err));
     }
 }
 
 function deleteWarehouseItem(itemId) {
+    if (!currentUser || currentUser.role !== 'admin') {
+        alert("Only administrators can delete products.");
+        return;
+    }
     if (!confirm(t('confirm-delete-product'))) return;
     getCompanyData().warehouse = getCompanyData().warehouse.filter(i => i.id !== itemId);
     
@@ -2882,10 +2907,20 @@ function executeMove(itemId, folderName) {
     }
     const itemIndex = getCompanyData().warehouse.findIndex(i => i.id === itemId);
     if (itemIndex !== -1) {
-        getCompanyData().warehouse[itemIndex].category = folderName;
+        const item = getCompanyData().warehouse[itemIndex];
+        item.category = folderName;
         
-        // Targeted write to item category attribute
-        db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex + '/category').set(folderName)
+        let workerId = "";
+        if (currentUser && currentUser.role === 'admin') {
+            workerId = "admin";
+        } else {
+            const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+            workerId = myWorker ? myWorker.id : "";
+        }
+        item.workerId = workerId;
+
+        // Targeted write to item index in warehouse using .set()
+        db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex).set(item)
             .catch(err => console.error("Error moving warehouse item:", err));
     }
 }
