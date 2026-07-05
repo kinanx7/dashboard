@@ -262,9 +262,24 @@ auth.onAuthStateChanged((user) => {
                 document.getElementById('auth-loader').style.display = 'none';
                 document.getElementById('auth-btn').style.display = 'block';
 
-                const burgeroovAdmins = (bgAdmins && typeof bgAdmins.val === 'function') ? (bgAdmins.val() || {}) : {};
+                let burgeroovAdmins = (bgAdmins && typeof bgAdmins.val === 'function') ? (bgAdmins.val() || {}) : {};
+                if (Array.isArray(burgeroovAdmins)) {
+                    const map = {};
+                    burgeroovAdmins.forEach(e => {
+                        if (e) map[e.toLowerCase().replace(/\./g, ',')] = true;
+                    });
+                    burgeroovAdmins = map;
+                }
                 const burgeroovWorkers = (bgWorkers && typeof bgWorkers.val === 'function') ? (bgWorkers.val() || []) : [];
-                const mvcAdminsList = (mvcAdmins && typeof mvcAdmins.val === 'function') ? (mvcAdmins.val() || {}) : {};
+                
+                let mvcAdminsList = (mvcAdmins && typeof mvcAdmins.val === 'function') ? (mvcAdmins.val() || {}) : {};
+                if (Array.isArray(mvcAdminsList)) {
+                    const map = {};
+                    mvcAdminsList.forEach(e => {
+                        if (e) map[e.toLowerCase().replace(/\./g, ',')] = true;
+                    });
+                    mvcAdminsList = map;
+                }
                 const mvcWorkersList = (mvcWorkers && typeof mvcWorkers.val === 'function') ? (mvcWorkers.val() || []) : [];
 
                 const sanitizedEmail = email.replace(/\./g, ',');
@@ -440,15 +455,6 @@ function markLockedTabs() {
 
 // --- REAL-TIME DATABASE SYNC ---
 function ensureArraysExist(data) {
-    if (data.admins && Array.isArray(data.admins)) {
-        const map = {};
-        data.admins.forEach(email => {
-            if (email) {
-                map[email.toLowerCase().replace(/\./g, ',')] = true;
-            }
-        });
-        data.admins = map;
-    }
     if (!data.admins) data.admins = { "kinan,rahal@hotmail,com": true };
     if (!data.branches) data.branches = [];
     if (!data.workers) data.workers = [];
@@ -762,10 +768,19 @@ function migrateMonthlyData() {
     if (isAdmin) {
         if (migrated) saveData();
         company.workers.forEach(w => {
-            if (w.email) {
+            if (w.id && w.email) {
                 const key = w.email.toLowerCase().replace(/\./g, ',');
-                db.ref(`companies/${currentCompany}/userPermissions/${key}`).set(w.permissions || { warehouse: false, drivers: false, finance: false, sales: false, costs: false, adverts: false })
-                    .catch(err => console.error("Error syncing user permissions:", err));
+                db.ref(`companies/${currentCompany}/users/${key}`).set(w.id)
+                    .catch(err => console.error("Error syncing user email mapping:", err));
+                db.ref(`companies/${currentCompany}/userPermissions/${w.id}`).set({
+                    email: w.email.toLowerCase(),
+                    warehouse: w.permissions ? !!w.permissions.warehouse : false,
+                    drivers: w.permissions ? !!w.permissions.drivers : false,
+                    finance: w.permissions ? !!w.permissions.finance : false,
+                    sales: w.permissions ? !!w.permissions.sales : false,
+                    costs: w.permissions ? !!w.permissions.costs : false,
+                    adverts: w.permissions ? !!w.permissions.adverts : false
+                }).catch(err => console.error("Error syncing user permissions:", err));
             }
         });
     }
@@ -1053,10 +1068,14 @@ function saveWorkerPerms() {
         .catch(err => console.error("Error saving worker perms:", err));
         
     // Flat lookup update for rules scalability
-    if (worker.email) {
+    if (worker.id && worker.email) {
         const key = worker.email.toLowerCase().replace(/\./g, ',');
-        db.ref(`companies/${currentCompany}/userPermissions/${key}`).set(worker.permissions)
-            .catch(err => console.error("Error updating flat user permissions:", err));
+        db.ref(`companies/${currentCompany}/users/${key}`).set(worker.id)
+            .catch(err => console.error("Error updating user email mapping:", err));
+        db.ref(`companies/${currentCompany}/userPermissions/${worker.id}`).set({
+            email: worker.email.toLowerCase(),
+            ...worker.permissions
+        }).catch(err => console.error("Error updating flat user permissions:", err));
     }
     alert("Permissions updated!");
 }
@@ -1542,6 +1561,32 @@ function addNoteReply(noteId) {
     }
 }
 
+function deleteNoteReply(noteId, replyKey) {
+    if (!confirm("Are you sure you want to delete this reply?")) return;
+    const note = getCompanyData().managerNotes.find(n => n.id === noteId);
+    if (note && note.replies && note.replies[replyKey]) {
+        const r = note.replies[replyKey];
+        const isAdmin = currentUser && currentUser.role === 'admin';
+        const isAuthor = currentUser && r.author === currentUser.email;
+        if (!isAdmin && !isAuthor) {
+            alert("You don't have permission to delete this reply.");
+            return;
+        }
+
+        delete note.replies[replyKey];
+
+        // Targeted write to remove from Firebase
+        db.ref(`companies/${currentCompany}/managerNotes/${noteId}/replies/${replyKey}`).remove()
+            .then(() => {
+                renderNotes();
+            })
+            .catch(err => {
+                console.error("Error deleting reply:", err);
+                alert("Failed to delete reply.");
+            });
+    }
+}
+
 function renderNotes() {
     if (currentTab !== 'notes') return;
 
@@ -1581,9 +1626,9 @@ function renderNotes() {
         let lockIcon = n.isPrivate ? `<span class="badge" style="background:var(--danger); font-size:0.85rem;">🔒 Private Note</span>` : `<span class="badge" style="background:var(--info); font-size:0.85rem;">📢 Public Announcement</span>`;
 
         let repliesHtml = '';
-        const replies = n.replies ? Object.values(n.replies) : [];
+        const replies = n.replies ? Object.entries(n.replies) : [];
         if (replies.length > 0) {
-            repliesHtml = replies.map(r => {
+            repliesHtml = replies.map(([replyKey, r]) => {
                 let replyTextHtml = r.text ? `<div style="color:var(--text-main); font-size:0.95rem;">${r.text}</div>` : '';
                 let replyAttachmentHtml = '';
                 if (r.attachmentType === 'image' && r.attachmentData) {
@@ -1601,10 +1646,15 @@ function renderNotes() {
                             `;
                 }
 
+                let deleteReplyBtn = '';
+                if (currentUser && (r.author === currentUser.email || currentUser.role === 'admin')) {
+                    deleteReplyBtn = `<button onclick="deleteNoteReply('${n.id}', '${replyKey}')" class="btn-outline-danger" style="border:none; background:none; text-decoration:underline; font-size:0.75rem; padding:0 0 0 8px; cursor:pointer;">Delete</button>`;
+                }
+
                 return `
                             <div style="background: var(--bg-color); padding: 12px 16px; border-radius: 8px; margin-top: 10px; border-left: 3px solid var(--border-color);">
                                 <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--text-muted); margin-bottom:6px;">
-                                    <strong>${r.author}</strong> <span>🕒 ${r.date}</span>
+                                    <strong>${r.author}</strong> <span>🕒 ${r.date}${deleteReplyBtn}</span>
                                 </div>
                                 ${replyTextHtml}
                                 ${replyAttachmentHtml}
@@ -2750,8 +2800,8 @@ function addWhFolder() {
 }
 
 function deleteWhFolder(folderName) {
-    if (!currentUser || currentUser.role !== 'admin') {
-        alert("Only administrators can delete folders.");
+    if (!currentUser || (currentUser.role !== 'admin' && !document.body.classList.contains('perm-warehouse'))) {
+        alert("You do not have permission to delete folders.");
         return;
     }
     if (!confirm(`Delete folder '${folderName}'? Products inside will be moved to 'Uncategorized'.`)) return;
@@ -2900,14 +2950,14 @@ function editMaxStock(itemId) {
 }
 
 function deleteWarehouseItem(itemId) {
-    if (!currentUser || currentUser.role !== 'admin') {
-        alert("Only administrators can delete products.");
+    if (!currentUser || (currentUser.role !== 'admin' && !document.body.classList.contains('perm-warehouse'))) {
+        alert("You do not have permission to delete products.");
         return;
     }
     if (!confirm(t('confirm-delete-product'))) return;
     getCompanyData().warehouse = getCompanyData().warehouse.filter(i => i.id !== itemId);
     
-    // Targeted write of modified list (admin action)
+    // Targeted write of modified list
     db.ref('companies/' + currentCompany + '/warehouse').set(getCompanyData().warehouse)
         .catch(err => console.error("Error deleting warehouse item:", err));
 }
@@ -4609,8 +4659,12 @@ function addWorker() {
     db.ref('companies/' + currentCompany + '/workers').set(getCompanyData().workers)
         .then(() => {
             const key = email.replace(/\./g, ',');
-            db.ref(`companies/${currentCompany}/userPermissions/${key}`).set(newWorker.permissions)
-                .catch(err => console.error("Error writing worker flat permission:", err));
+            db.ref(`companies/${currentCompany}/users/${key}`).set(newWorker.id)
+                .catch(err => console.error("Error writing worker flat email mapping:", err));
+            db.ref(`companies/${currentCompany}/userPermissions/${newWorker.id}`).set({
+                email: newWorker.email.toLowerCase(),
+                ...newWorker.permissions
+            }).catch(err => console.error("Error writing worker flat permission:", err));
         })
         .catch(err => console.error("Error adding worker:", err));
 }
@@ -4629,7 +4683,9 @@ function deleteWorker(workerId) {
             .then(() => {
                 if (worker && worker.email) {
                     const key = worker.email.toLowerCase().replace(/\./g, ',');
-                    db.ref(`companies/${currentCompany}/userPermissions/${key}`).remove()
+                    db.ref(`companies/${currentCompany}/users/${key}`).remove()
+                        .catch(err => console.error("Error deleting worker flat email mapping:", err));
+                    db.ref(`companies/${currentCompany}/userPermissions/${workerId}`).remove()
                         .catch(err => console.error("Error deleting worker flat permission:", err));
                 }
             })
