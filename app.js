@@ -535,14 +535,22 @@ function ensureArraysExist(data) {
     }
     if (!data.managerNotes) data.managerNotes = [];
     data.managerNotes = data.managerNotes.filter(n => n && n.id);
-    data.managerNotes.sort((a, b) => b.id.localeCompare(a.id));
+    data.managerNotes.sort((a, b) => {
+        const idA = a && a.id ? String(a.id) : '';
+        const idB = b && b.id ? String(b.id) : '';
+        return idB.localeCompare(idA);
+    });
 
     if (data.adverts && !Array.isArray(data.adverts)) {
         data.adverts = Object.values(data.adverts);
     }
     if (!data.adverts) data.adverts = [];
     data.adverts = data.adverts.filter(a => a && a.id);
-    data.adverts.sort((a, b) => b.id.localeCompare(a.id));
+    data.adverts.sort((a, b) => {
+        const idA = a && a.id ? String(a.id) : '';
+        const idB = b && b.id ? String(b.id) : '';
+        return idB.localeCompare(idA);
+    });
 
     // Privacy & Management Data
     if (!data.deptPrivacy) data.deptPrivacy = { warehouse: 'restricted', drivers: 'restricted', finance: 'restricted', sales: 'restricted', costs: 'restricted', adverts: 'restricted' };
