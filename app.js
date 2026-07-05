@@ -440,6 +440,15 @@ function markLockedTabs() {
 
 // --- REAL-TIME DATABASE SYNC ---
 function ensureArraysExist(data) {
+    if (data.admins && Array.isArray(data.admins)) {
+        const map = {};
+        data.admins.forEach(email => {
+            if (email) {
+                map[email.toLowerCase().replace(/\./g, ',')] = true;
+            }
+        });
+        data.admins = map;
+    }
     if (!data.admins) data.admins = { "kinan,rahal@hotmail,com": true };
     if (!data.branches) data.branches = [];
     if (!data.workers) data.workers = [];
