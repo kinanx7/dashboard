@@ -721,7 +721,13 @@ function migrateMonthlyData() {
         }
 
         let workerMigrated = false;
-        if (!w.email) { w.email = ""; workerMigrated = true; }
+        if (!w.email) {
+            w.email = "";
+            workerMigrated = true;
+        } else if (w.email !== w.email.toLowerCase()) {
+            w.email = w.email.toLowerCase();
+            workerMigrated = true;
+        }
         if (!w.permissions) { w.permissions = { warehouse: false, drivers: false, finance: false }; workerMigrated = true; }
         if (!w.monthlyStats) { w.monthlyStats = {}; workerMigrated = true; }
         if (!w.monthlyStats[currentGlobalMonth]) {
@@ -744,8 +750,15 @@ function migrateMonthlyData() {
         }
     });
 
-    if (migrated && isAdmin) {
-        saveData();
+    if (isAdmin) {
+        if (migrated) saveData();
+        company.workers.forEach(w => {
+            if (w.email) {
+                const key = w.email.toLowerCase().replace(/\./g, ',');
+                db.ref(`companies/${currentCompany}/userPermissions/${key}`).set(w.permissions || { warehouse: false, drivers: false, finance: false, sales: false, costs: false, adverts: false })
+                    .catch(err => console.error("Error syncing user permissions:", err));
+            }
+        });
     }
 }
 
@@ -1029,6 +1042,13 @@ function saveWorkerPerms() {
     // Targeted write to worker permissions path
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/permissions`).set(worker.permissions)
         .catch(err => console.error("Error saving worker perms:", err));
+        
+    // Flat lookup update for rules scalability
+    if (worker.email) {
+        const key = worker.email.toLowerCase().replace(/\./g, ',');
+        db.ref(`companies/${currentCompany}/userPermissions/${key}`).set(worker.permissions)
+            .catch(err => console.error("Error updating flat user permissions:", err));
+    }
     alert("Permissions updated!");
 }
 
@@ -4578,10 +4598,16 @@ function addWorker() {
     
     // Targeted write to workers list
     db.ref('companies/' + currentCompany + '/workers').set(getCompanyData().workers)
+        .then(() => {
+            const key = email.replace(/\./g, ',');
+            db.ref(`companies/${currentCompany}/userPermissions/${key}`).set(newWorker.permissions)
+                .catch(err => console.error("Error writing worker flat permission:", err));
+        })
         .catch(err => console.error("Error adding worker:", err));
 }
 
 function deleteWorker(workerId) {
+    const worker = getCompanyData().workers.find(w => w.id === workerId);
     if (confirm('Permanently delete this employee?')) { 
         getCompanyData().workers = getCompanyData().workers.filter(w => w.id !== workerId); 
         document.getElementById('ops-worker-select').value = ""; 
@@ -4591,6 +4617,13 @@ function deleteWorker(workerId) {
         
         // Targeted write to workers list
         db.ref('companies/' + currentCompany + '/workers').set(getCompanyData().workers)
+            .then(() => {
+                if (worker && worker.email) {
+                    const key = worker.email.toLowerCase().replace(/\./g, ',');
+                    db.ref(`companies/${currentCompany}/userPermissions/${key}`).remove()
+                        .catch(err => console.error("Error deleting worker flat permission:", err));
+                }
+            })
             .catch(err => console.error("Error deleting worker:", err));
     }
 }
