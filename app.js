@@ -4608,6 +4608,12 @@ function renderDriverPanel() {
 
     mngArea.style.display = 'block';
     const worker = getCompanyData().workers.find(w => w.id === activeDriverId);
+    if (!worker) {
+        activeDriverId = null;
+        mngArea.style.display = 'none';
+        document.getElementById('active-driver-name').textContent = t('span-select-driver');
+        return;
+    }
     document.getElementById('active-driver-name').textContent = `${t('label-managing') || 'Managing: '}${worker.name}`;
 
     const stats = getMonthlyStats(worker, currentGlobalMonth);

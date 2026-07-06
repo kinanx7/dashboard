@@ -382,6 +382,10 @@ header h1 {
     font-size: 0.9rem;
 }
 
+.swap-btn-text-short {
+    display: none;
+}
+
 .user-menu-container {
     position: relative;
     display: inline-block;
@@ -1493,6 +1497,22 @@ body:not(.role-admin) .task-grid {
 
     .user-profile {
         gap: 8px;
+    }
+
+    .swap-btn-text-full {
+        display: none !important;
+    }
+    .swap-btn-text-short {
+        display: inline !important;
+    }
+    #company-swap-btn {
+        padding: 5px 8px !important;
+        font-size: 0.75rem !important;
+        margin-right: 4px !important;
+        min-height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
     }
 
     /* --- Hide desktop tab pills on mobile --- */
