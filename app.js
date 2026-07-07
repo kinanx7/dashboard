@@ -552,6 +552,12 @@ function ensureArraysExist(data) {
         return idB.localeCompare(idA);
     });
 
+    if (data.generalTasks && !Array.isArray(data.generalTasks)) {
+        data.generalTasks = Object.values(data.generalTasks);
+    }
+    if (!data.generalTasks) data.generalTasks = [];
+    data.generalTasks = data.generalTasks.filter(t => t && t.id);
+
     // Privacy & Management Data
     if (!data.deptPrivacy) data.deptPrivacy = { warehouse: 'restricted', drivers: 'restricted', finance: 'restricted', sales: 'restricted', costs: 'restricted', adverts: 'restricted' };
     if (!data.deptPrivacy.adverts) data.deptPrivacy.adverts = 'restricted';
@@ -2956,11 +2962,14 @@ function addWarehouseItem() {
     if (!name || isNaN(stock) || isNaN(risk) || stock < 0 || risk < 0) { alert("Please fill out all product details correctly."); return; }
 
     let workerId = "";
+    let workerName = "Admin";
     if (currentUser && currentUser.role === 'admin') {
         workerId = "admin";
+        workerName = currentUser.email ? currentUser.email.split('@')[0] : "Admin";
     } else {
         const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
         workerId = myWorker ? myWorker.id : "";
+        workerName = myWorker ? myWorker.name : "Staff";
     }
 
     const newItem = {
@@ -2971,7 +2980,7 @@ function addWarehouseItem() {
         currentStock: stock,
         riskAmount: risk,
         workerId: workerId,
-        logs: [{ date: formatTimestamp(), amount: stock, difference: stock, note: 'Initial Stock Setup', workerId: workerId }]
+        logs: [{ date: formatTimestamp(), amount: stock, difference: stock, note: 'Initial Stock Setup', workerId: workerId, workerName: workerName }]
     };
 
     if (!getCompanyData().warehouse) getCompanyData().warehouse = [];
@@ -2999,15 +3008,18 @@ function updateWarehouseStock(itemId) {
     if (diff === 0) { inputEl.value = ''; return; }
 
     let workerId = "";
+    let workerName = "Admin";
     if (currentUser && currentUser.role === 'admin') {
         workerId = "admin";
+        workerName = currentUser.email ? currentUser.email.split('@')[0] : "Admin";
     } else {
         const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
         workerId = myWorker ? myWorker.id : "";
+        workerName = myWorker ? myWorker.name : "Staff";
     }
 
     item.currentStock = newStock;
-    item.logs.unshift({ date: formatTimestamp(), amount: newStock, difference: diff, note: diff > 0 ? 'Refill' : 'Consumption', workerId: workerId });
+    item.logs.unshift({ date: formatTimestamp(), amount: newStock, difference: diff, note: diff > 0 ? 'Refill' : 'Consumption', workerId: workerId, workerName: workerName });
     inputEl.value = ''; 
     item.workerId = workerId;
     
@@ -3027,13 +3039,18 @@ function editMaxStock(itemId) {
         item.maxStock = parsed;
         
         let workerId = "";
+        let workerName = "Admin";
         if (currentUser && currentUser.role === 'admin') {
             workerId = "admin";
+            workerName = currentUser.email ? currentUser.email.split('@')[0] : "Admin";
         } else {
             const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
             workerId = myWorker ? myWorker.id : "";
+            workerName = myWorker ? myWorker.name : "Staff";
         }
         item.workerId = workerId;
+        if (!item.logs) item.logs = [];
+        item.logs.unshift({ date: formatTimestamp(), amount: item.currentStock, difference: 0, note: `Max Stock changed to ${parsed}`, workerId: workerId, workerName: workerName });
 
         // Targeted write to item index in warehouse using .set()
         db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex).set(item)
@@ -3207,11 +3224,25 @@ function renderWarehouse() {
                 const isLow = item.currentStock <= item.riskAmount;
                 const div = document.createElement('div'); div.className = `wh-item ${isLow ? 'low-stock' : ''}`;
 
-                let logsHtml = item.logs.map(l => `
-                            <div class="flex-between" style="border-bottom: 1px solid var(--border-color); padding: 6px 0;">
-                                <span>🕒 ${l.date}</span>
-                                <span>Total: <strong>${l.amount}</strong> <span style="color:${l.difference > 0 ? 'var(--success)' : 'var(--danger)'}">(${l.difference > 0 ? '+' : ''}${l.difference})</span></span>
-                            </div>`).join('');
+                let logsHtml = item.logs.map(l => {
+                    let changerName = l.workerName;
+                    if (!changerName) {
+                        if (l.workerId === 'admin') {
+                            changerName = 'Admin';
+                        } else if (l.workerId) {
+                            const wObj = data.workers ? data.workers.find(w => w.id === l.workerId) : null;
+                            changerName = wObj ? wObj.name : 'Staff';
+                        } else {
+                            changerName = 'Staff';
+                        }
+                    }
+                    return `
+                             <div class="flex-between" style="border-bottom: 1px solid var(--border-color); padding: 6px 0; font-size: 0.85rem;">
+                                 <span>🕒 ${l.date}</span>
+                                 <span>By: <strong style="color:var(--primary);">${changerName}</strong></span>
+                                 <span>Total: <strong>${l.amount}</strong> <span style="color:${l.difference > 0 ? 'var(--success)' : 'var(--danger)'}">(${l.difference > 0 ? '+' : ''}${l.difference})</span></span>
+                             </div>`;
+                }).join('');
 
                 const logId = `wh-logs-${item.id}`;
                 window.expandedWhLogs = window.expandedWhLogs || {};
@@ -4052,6 +4083,32 @@ function assignTask() {
 
     if (!workerId || !text) { alert("Select an employee and describe a task."); return; }
 
+    if (workerId === 'general') {
+        const newGeneralTask = {
+            id: 'gt-' + Date.now().toString(),
+            title: text,
+            date: formatTimestamp(),
+            timestamp: Date.now(),
+            urgency: urgency,
+            deadlineMins: deadlineMins,
+            status: 'pending',
+            acceptedBy: null,
+            acceptedById: null,
+            acceptedAt: null
+        };
+
+        db.ref(`companies/${currentCompany}/generalTasks/${newGeneralTask.id}`).set(newGeneralTask)
+            .then(() => {
+                alert("General task created successfully!");
+                document.getElementById('task-assign-input').value = '';
+                if (document.getElementById('task-deadline')) document.getElementById('task-deadline').value = '';
+                if (document.getElementById('task-urgency')) document.getElementById('task-urgency').value = 'normal';
+                document.getElementById('task-worker-select').value = '';
+            })
+            .catch(err => console.error("Error creating general task:", err));
+        return;
+    }
+
     const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
     if (workerIndex === -1) return;
     const worker = getCompanyData().workers[workerIndex];
@@ -4157,7 +4214,10 @@ function renderTasks() {
     const assignSel = document.getElementById('task-worker-select');
     if (assignSel) {
         const oldVal = assignSel.value;
-        assignSel.innerHTML = `<option value="">-- ${t('label-select-emp')} --</option>`;
+        assignSel.innerHTML = `
+            <option value="">-- Choose Employee --</option>
+            <option value="general">🌍 [General Task for All Workers]</option>
+        `;
         getCompanyData().workers.forEach(w => {
             const opt = document.createElement('option'); opt.value = w.id; opt.textContent = w.name; assignSel.appendChild(opt);
         });
@@ -4170,10 +4230,62 @@ function renderTasks() {
     board.innerHTML = '';
 
     const isAdmin = currentUser && currentUser.role === 'admin';
+    const data = getCompanyData();
+
+    // Render General Tasks at the top of the board
+    const generalTasks = data.generalTasks || [];
+    const pendingGeneralTasks = generalTasks.filter(gt => gt.status === 'pending');
+
+    if (pendingGeneralTasks.length > 0) {
+        const genCard = document.createElement('div');
+        genCard.className = "card";
+        genCard.style.padding = "20px";
+        genCard.style.marginBottom = "16px";
+        genCard.style.border = "2px dashed var(--warning)";
+        genCard.style.background = "var(--warning-bg)";
+        
+        let genHtml = `<h3 style="margin-top:0; color:var(--warning); display:flex; align-items:center; gap:8px; font-size:1.15rem;">🌍 Available General Tasks</h3>`;
+        
+        pendingGeneralTasks.forEach(gt => {
+            const urgencyBadge = gt.urgency === 'urgent' ? `<span class="badge" style="background:var(--danger); margin-left:8px;">🔴 Urgent</span>` : '';
+            const deadlineText = gt.deadlineMins > 0 ? `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">⏱️ Deadline: ${gt.deadlineMins} mins</div>` : '';
+            
+            const isWorker = currentUser && currentUser.role === 'worker';
+            let actionBtn = '';
+            if (isWorker) {
+                actionBtn = `<button onclick="acceptGeneralTask('${gt.id}')" class="btn-warning" style="padding:8px 16px; font-size:0.85rem; min-height: unset; height: auto;">📥 Accept Task</button>`;
+            } else if (isAdmin) {
+                actionBtn = `
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <span style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">Available to all workers</span>
+                        <button onclick="deleteGeneralTask('${gt.id}')" style="background:none; border:none; color: var(--danger); cursor:pointer; font-size:1.2rem; padding:0 6px;" title="Delete General Task">✖</button>
+                    </div>`;
+            }
+            
+            genHtml += `
+                <div style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                    <div>
+                        <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">Created: ${gt.date}</div>
+                        <div style="font-size:1.05rem; font-weight:700; color:var(--text-main);">${gt.title} ${urgencyBadge}</div>
+                        ${deadlineText}
+                    </div>
+                    <div>
+                        ${actionBtn}
+                    </div>
+                </div>
+            `;
+        });
+        
+        genCard.innerHTML = genHtml;
+        board.appendChild(genCard);
+    }
+
     const workers = getVisibleWorkers();
 
     if (workers.length === 0 && !isAdmin) {
-        board.innerHTML = `<p style="text-align:center; color:var(--text-muted);">${t('not-linked-worker')}</p>`;
+        if (board.innerHTML === '') {
+            board.innerHTML = `<p style="text-align:center; color:var(--text-muted);">${t('not-linked-worker')}</p>`;
+        }
         return;
     }
 
@@ -4223,6 +4335,7 @@ function renderTasks() {
 
             const doneColor = status === 'completed' ? 'var(--success)' : (j.urgency === 'urgent' ? 'var(--danger)' : 'var(--primary)');
             const doneText = status === 'completed' ? 'line-through' : 'none';
+            let isGeneralBadge = j.isGeneral ? `<span class="badge" style="background:var(--info); color:var(--text-light); margin-right:8px; font-size:0.75rem; vertical-align:middle;">🌍 General Task</span>` : '';
 
             return `
                         <div class="mission-item" style="border-left: 4px solid ${doneColor}; display:flex; flex-direction:column; align-items:stretch;">
@@ -4230,6 +4343,7 @@ function renderTasks() {
                                 <div>
                                     <div style="font-size: 0.75rem; color:var(--text-muted); margin-bottom:4px;">Assigned: ${j.date}</div>
                                     <div style="display:flex; align-items:center; flex-wrap:wrap; gap:4px;">
+                                        ${isGeneralBadge}
                                         <span class="mission-text" style="text-decoration: ${doneText}; margin-right:4px;">${j.title}</span>
                                         ${urgencyBadge}
                                     </div>
@@ -4262,6 +4376,76 @@ function renderTasks() {
     if (board.innerHTML === '') {
         board.innerHTML = `<p style="text-align:center; color:var(--text-muted);">No active tasks.</p>`;
     }
+}
+
+function acceptGeneralTask(taskId) {
+    if (!currentUser || currentUser.role !== 'worker') return;
+    
+    // Check if task is already taken/accepted by fetching it fresh from database
+    db.ref(`companies/${currentCompany}/generalTasks/${taskId}`).once('value')
+        .then(snapshot => {
+            const task = snapshot.val();
+            if (!task) return alert("Task not found.");
+            if (task.status !== 'pending') {
+                alert(`This task was already accepted by ${task.acceptedBy || 'another worker'}.`);
+                return;
+            }
+            
+            // Find current worker
+            const workers = getCompanyData().workers || [];
+            const myIndex = workers.findIndex(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+            if (myIndex === -1) {
+                alert("Worker profile not found.");
+                return;
+            }
+            
+            const myWorker = workers[myIndex];
+            if (!myWorker.jobs) myWorker.jobs = [];
+            
+            // Construct new job
+            const newJob = {
+                id: task.id,
+                title: task.title,
+                isGeneral: true,
+                date: formatTimestamp(),
+                timestamp: Date.now(),
+                urgency: task.urgency,
+                deadlineMins: task.deadlineMins,
+                status: 'seen',
+                seenAt: Date.now(),
+                done: false
+            };
+            
+            myWorker.jobs.push(newJob);
+            
+            const updates = {};
+            updates[`companies/${currentCompany}/workers/${myIndex}/jobs`] = myWorker.jobs;
+            updates[`companies/${currentCompany}/generalTasks/${taskId}`] = {
+                ...task,
+                status: 'accepted',
+                acceptedBy: myWorker.name,
+                acceptedById: myWorker.id,
+                acceptedAt: Date.now()
+            };
+            
+            return db.ref().update(updates)
+                .then(() => {
+                    alert(`Success! You have accepted: "${task.title}"`);
+                });
+        })
+        .catch(err => {
+            console.error("Error accepting task:", err);
+            alert("Failed to accept task. It may have been taken already.");
+        });
+}
+
+function deleteGeneralTask(taskId) {
+    if (!confirm("Delete this general task?")) return;
+    db.ref(`companies/${currentCompany}/generalTasks/${taskId}`).remove()
+        .then(() => {
+            alert("General task deleted.");
+        })
+        .catch(err => console.error("Error deleting general task:", err));
 }
 
 // --- DRIVERS SYSTEM ---

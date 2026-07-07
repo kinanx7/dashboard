@@ -177,6 +177,44 @@ exports.notifyWorkerOnUpdate = functions
         return null;
     });
 
+exports.notifyWorkersOnGeneralTask = functions
+    .region('europe-west1')
+    .database.ref('companies/{companyId}/generalTasks/{taskId}')
+    .onCreate(async (snapshot, context) => {
+        const task = snapshot.val();
+        if (!task) return null;
+
+        const companyId = context.params.companyId;
+        const title = task.title || 'New General Task';
+
+        // Fetch all workers of this company
+        const companySnapshot = await admin.database().ref(`companies/${companyId}`).once('value');
+        if (!companySnapshot.exists()) return null;
+        const companyData = companySnapshot.val();
+        const workers = companyData.workers || [];
+
+        const sends = [];
+        workers.forEach(w => {
+            if (w && w.fcmToken) {
+                sends.push(safeSend({
+                    token: w.fcmToken,
+                    notification: {
+                        title: '🌍 New General Task Available',
+                        body: `${title} — open your task board to accept it.`
+                    },
+                    data: { type: 'generalTask', tab: 'tasks' },
+                    android: { priority: 'high', notification: { channelId: 'burgeroov_tasks' } },
+                    apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
+                }, `GENERAL TASK → ${w.name}: "${title}"`));
+            }
+        });
+
+        if (sends.length > 0) {
+            await Promise.all(sends);
+        }
+        return null;
+    });
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ADMIN TOKEN TRIGGER — notify admin devices (e.g. owner's phone)
