@@ -2053,7 +2053,9 @@ function renderManaging() {
     else if (currentSalesTimeframe === 'week') {
         const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).getTime();
         filteredLogs = allLogs.filter(l => l.timestamp >= startOfWeek);
-        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const days = currentAppLang === 'ar' ? 
+            ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'] :
+            ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         filteredLogs.forEach(l => {
             if (disabledMethods.includes(l.method)) return;
             histoData[days[new Date(l.timestamp).getDay()]] = (histoData[days[new Date(l.timestamp).getDay()]] || 0) + l.amount;
@@ -2071,7 +2073,9 @@ function renderManaging() {
     else if (currentSalesTimeframe === 'year') {
         const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
         filteredLogs = allLogs.filter(l => l.timestamp >= startOfYear);
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const months = currentAppLang === 'ar' ?
+            ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'] :
+            ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         filteredLogs.forEach(l => {
             if (disabledMethods.includes(l.method)) return;
             histoData[months[new Date(l.timestamp).getMonth()]] = (histoData[months[new Date(l.timestamp).getMonth()]] || 0) + l.amount;
@@ -2257,7 +2261,7 @@ function renderManaging() {
                 data: {
                     labels,
                     datasets: [{
-                        label: 'Sales (SAR)',
+                        label: t('label-sales') + ' (SAR)',
                         data: values,
                         backgroundColor: isLine ? grad : values.map((v, i) => {
                             const max = Math.max(...values, 1);
@@ -2329,9 +2333,9 @@ function renderManaging() {
                 const peak = Math.max(...values);
                 const peakLabel = labels[values.indexOf(peak)];
                 summaryDiv.innerHTML = [
-                    { icon: '💰', label: 'Total', val: 'SAR ' + total.toLocaleString(undefined, { minimumFractionDigits: 2 }) },
-                    { icon: '📈', label: 'Average', val: 'SAR ' + avg.toFixed(2) },
-                    { icon: '🏆', label: 'Peak', val: `${peakLabel} · SAR ${peak.toLocaleString(undefined, { minimumFractionDigits: 2 })}` }
+                    { icon: '💰', label: t('label-total'), val: 'SAR ' + total.toLocaleString(undefined, { minimumFractionDigits: 2 }) },
+                    { icon: '📈', label: t('label-avg'), val: 'SAR ' + avg.toFixed(2) },
+                    { icon: '🏆', label: t('label-peak'), val: `${peakLabel} · SAR ${peak.toLocaleString(undefined, { minimumFractionDigits: 2 })}` }
                 ].map(s => `
                             <div style="flex:1; min-width:100px; text-align:center; background:var(--bg-color); border:1px solid var(--border-color); border-radius:10px; padding:8px 12px;">
                                 <div style="font-size:1.1rem;">${s.icon}</div>
@@ -2347,14 +2351,14 @@ function renderManaging() {
     if (logDiv) {
         logDiv.innerHTML = '';
         if (filteredLogs.length === 0) {
-            logDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.95rem; padding: 20px;">No transactions logged for this timeframe.</p>`;
+            logDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.95rem; padding: 20px;">${t('msg-no-transactions')}</p>`;
         } else {
             filteredLogs.forEach(l => {
                 const isCounted = !disabledMethods.includes(l.method);
                 const opacity = isCounted ? '1' : '0.5';
                 const strike = isCounted ? 'none' : 'line-through';
                 let isSalesAdmin = isAdmin || document.body.classList.contains('perm-finance') || document.body.classList.contains('perm-sales');
-                let delBtn = isSalesAdmin ? `<button onclick="deleteSaleTransaction('${l.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="Delete">Undo</button>` : '';
+                let delBtn = isSalesAdmin ? `<button onclick="deleteSaleTransaction('${l.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="${t('btn-remove')}">${t('btn-undo-action')}</button>` : '';
 
                 logDiv.innerHTML += `
                             <div class="ledger-card" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; opacity: ${opacity}; margin-bottom: 0;">
@@ -2596,19 +2600,19 @@ function renderCosts() {
         const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).getTime();
         filteredSales = allSales.filter(l => l.timestamp >= startOfWeek);
         filteredCosts = allCosts.filter(l => l.timestamp >= startOfWeek);
-        labelText = 'Past 7 Days';
+        labelText = t('label-past-7-days');
     }
     else if (currentCostsTimeframe === 'month') {
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
         filteredSales = allSales.filter(l => l.timestamp >= startOfMonth);
         filteredCosts = allCosts.filter(l => l.timestamp >= startOfMonth);
-        labelText = 'This Month';
+        labelText = t('label-this-month');
     }
     else if (currentCostsTimeframe === 'year') {
         const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
         filteredSales = allSales.filter(l => l.timestamp >= startOfYear);
         filteredCosts = allCosts.filter(l => l.timestamp >= startOfYear);
-        labelText = 'This Year';
+        labelText = t('label-this-year');
     }
     else if (currentCostsTimeframe === 'custom') {
         const fromPicker = document.getElementById('costs-from-date');
@@ -2648,9 +2652,9 @@ function renderCosts() {
 
     const statusDiv = document.getElementById('pl-status-message');
     if (statusDiv) {
-        if (netProfit > 0) { statusDiv.textContent = '📈 Healthy Profit Margin'; statusDiv.style.color = 'var(--success)'; }
-        else if (netProfit < 0) { statusDiv.textContent = '⚠️ Operating at a Loss'; statusDiv.style.color = 'var(--danger)'; }
-        else { statusDiv.textContent = '➖ Breaking Even'; statusDiv.style.color = 'var(--text-muted)'; }
+        if (netProfit > 0) { statusDiv.textContent = t('status-healthy-profit'); statusDiv.style.color = 'var(--success)'; }
+        else if (netProfit < 0) { statusDiv.textContent = t('status-operating-loss'); statusDiv.style.color = 'var(--danger)'; }
+        else { statusDiv.textContent = t('status-breaking-even'); statusDiv.style.color = 'var(--text-muted)'; }
     }
 
     const grossSalesEl = document.getElementById('pl-gross-sales');
@@ -2668,7 +2672,12 @@ function renderCosts() {
     function getLocalKey(ts, mode) {
         const d = new Date(ts);
         if (mode === 'hour') return String(d.getHours()).padStart(2, '0') + ':00';
-        if (mode === 'month') return ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()];
+        if (mode === 'month') {
+            const months = currentAppLang === 'ar' ?
+                ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'] :
+                ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            return months[d.getMonth()];
+        }
         return String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     }
     const groupMode = currentCostsTimeframe === 'day' ? 'hour' : currentCostsTimeframe === 'year' ? 'month' : 'date';
@@ -2693,7 +2702,7 @@ function renderCosts() {
         const labels = Object.keys(histoMap).sort();
 
         if (labels.length === 0) {
-            histoDiv.innerHTML = '<div style="width:100%; text-align:center; color:var(--text-muted); padding-top:100px; font-size:0.95rem;">No data for this timeframe.</div>';
+            histoDiv.innerHTML = `<div style="width:100%; text-align:center; color:var(--text-muted); padding-top:100px; font-size:0.95rem;">${t('msg-no-data-timeframe')}</div>`;
         } else {
             const allVals = labels.flatMap(k => [histoMap[k].sales, histoMap[k].costs]).filter(v => v > 0);
             const maxV = allVals.length > 0 ? Math.max(...allVals) : 1;
@@ -2710,7 +2719,7 @@ function renderCosts() {
                 // Structure: outer column (flex col, align-items:flex-end, height=CHART_H px)
                 // label row floats above; bars sit at the bottom baseline
                 histoDiv.innerHTML += `
-                            <div title="${label}&#10;Sales: SAR ${sVal.toLocaleString()}&#10;Costs: SAR ${cVal.toLocaleString()}"
+                            <div title="${label}&#10;${t('label-sales')}: SAR ${sVal.toLocaleString()}&#10;${t('label-costs')}: SAR ${cVal.toLocaleString()}"
                                  style="flex:1; min-width:24px; max-width:55px; display:flex; flex-direction:column; align-items:center; height:${CHART_H}px; justify-content:flex-end; cursor:default; position:relative;">
                                 <!-- value labels pinned at top of each bar -->
                                 <div style="position:absolute; bottom:${sPx}px; left:0; right:50%; text-align:center; font-size:0.5rem; color:#059669; font-weight:800; white-space:nowrap; line-height:1; padding-bottom:1px;">${sVal > 0 ? fmt(sVal) : ''}</div>
@@ -2735,7 +2744,7 @@ function renderCosts() {
     if (logDiv) {
         logDiv.innerHTML = '';
         if (filteredCosts.length === 0) {
-            logDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.95rem; padding: 20px;">No costs logged for this timeframe.</p>`;
+            logDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.95rem; padding: 20px;">${t('msg-no-costs')}</p>`;
         } else {
             // Group totals by source/category for the summary table
             const sourceMap = {};
@@ -2757,20 +2766,20 @@ function renderCosts() {
 
             logDiv.innerHTML = `
                         <div style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:12px; padding:14px; margin-bottom:16px;">
-                            <div style="font-size:0.8rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:10px;">📊 Summary by Source</div>
+                            <div style="font-size:0.8rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:10px;">📊 ${t('title-summary-source')}</div>
                             <div style="display:flex; flex-direction:column; gap:6px;">${sourcesHtml}</div>
                             <div style="border-top:1px dashed var(--border-color); margin-top:12px; padding-top:10px; display:flex; justify-content:space-between; align-items:center;">
-                                <span style="font-size:0.9rem; font-weight:700; color:var(--text-muted);">Total Costs</span>
+                                <span style="font-size:0.9rem; font-weight:700; color:var(--text-muted);">${t('label-gross-costs')}</span>
                                 <span style="font-size:1.2rem; font-weight:800; color:var(--danger);">SAR ${totalCosts.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                             </div>
                         </div>
-                        <div style="font-size:0.8rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:8px; padding-left:4px;">📋 All Transactions</div>
+                        <div style="font-size:0.8rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:8px; padding-left:4px;">📋 ${t('title-all-transactions')}</div>
                     `;
 
             // Render individual transaction entries
             filteredCosts.forEach(l => {
                 let isCostsAdmin = isAdmin || document.body.classList.contains('perm-finance') || document.body.classList.contains('perm-costs');
-                let delBtn = isCostsAdmin ? `<button onclick="deleteCostTransaction('${l.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="Delete">Undo</button>` : '';
+                let delBtn = isCostsAdmin ? `<button onclick="deleteCostTransaction('${l.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="${t('btn-remove')}">${t('btn-undo-action')}</button>` : '';
 
                 logDiv.innerHTML += `
                             <div class="ledger-card" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; margin-bottom: 0;">
@@ -2810,17 +2819,17 @@ function exportCostsPDF() {
         const s = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).getTime();
         filteredSales = allSales.filter(l => l.timestamp >= s);
         filteredCosts = allCosts.filter(l => l.timestamp >= s);
-        labelText = 'Past 7 Days';
+        labelText = t('label-past-7-days');
     } else if (currentCostsTimeframe === 'month') {
         const s = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
         filteredSales = allSales.filter(l => l.timestamp >= s);
         filteredCosts = allCosts.filter(l => l.timestamp >= s);
-        labelText = 'This Month';
+        labelText = t('label-this-month');
     } else if (currentCostsTimeframe === 'year') {
         const s = new Date(now.getFullYear(), 0, 1).getTime();
         filteredSales = allSales.filter(l => l.timestamp >= s);
         filteredCosts = allCosts.filter(l => l.timestamp >= s);
-        labelText = 'This Year';
+        labelText = t('label-this-year');
     } else if (currentCostsTimeframe === 'custom') {
         const fp = document.getElementById('costs-from-date');
         const tp = document.getElementById('costs-to-date');
@@ -2844,25 +2853,50 @@ function exportCostsPDF() {
     // Source breakdown
     const sourceMap = {};
     filteredCosts.forEach(l => { sourceMap[l.method] = (sourceMap[l.method] || 0) + l.amount; });
+    const isAr = currentAppLang === 'ar';
     const sourceRows = Object.entries(sourceMap)
         .sort((a, b) => b[1] - a[1])
-        .map(([src, total]) => `<tr><td>${src}</td><td style="text-align:right; font-weight:700;">SAR ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td><td style="text-align:right;">${totalCosts > 0 ? ((total / totalCosts) * 100).toFixed(1) + '%' : '—'}</td></tr>`).join('');
+        .map(([src, total]) => `<tr><td>${src}</td><td style="text-align:${isAr ? 'left' : 'right'}; font-weight:700;">SAR ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td><td style="text-align:${isAr ? 'left' : 'right'};">${totalCosts > 0 ? ((total / totalCosts) * 100).toFixed(1) + '%' : '—'}</td></tr>`).join('');
 
     // Transaction rows
     const txRows = filteredCosts.map(l => `
                 <tr>
                     <td>${l.date || '—'}</td>
                     <td>${l.method}</td>
-                    <td style="text-align:right; font-weight:700; color:#dc2626;">SAR ${l.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td style="text-align:${isAr ? 'left' : 'right'}; font-weight:700; color:#dc2626;">SAR ${l.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     <td>${l.cashier ? l.cashier.split('@')[0] : 'System'}${l.isPastEntry ? ' <em style="color:#f59e0b;">(past)</em>' : ''}</td>
                 </tr>`).join('');
 
+    const reportTitle = isAr ? 'تقرير التكاليف والأرباح والخسائر' : 'Cost & P&L Report';
+    const companyLabel = currentCompany === 'mvc' ? 'MVC Fresh' : 'Burgeroov';
+    const periodLabel = isAr ? 'الفترة' : 'Period';
+    const generatedLabel = isAr ? 'تاريخ الإنشاء' : 'Generated';
+    const netProfitLabel = t('label-net-profit');
+    const grossSalesLabel = t('label-gross-sales');
+    const grossCostsLabel = t('label-gross-costs');
+    const transactionsLabel = t('label-transactions');
+    const sourceBreakdownLabel = isAr ? 'تحليل التكاليف حسب الفئة' : 'Cost Breakdown by Source';
+    const colSourceCategory = isAr ? 'الفئة / المصدر' : 'Source / Category';
+    const colTotalSar = isAr ? 'الإجمالي (ريال)' : 'Total (SAR)';
+    const colPctTotal = isAr ? '٪ من إجمالي التكاليف' : '% of Total Costs';
+    const labelTotal = t('label-total');
+    const titleAllTx = t('title-all-transactions');
+    const colDate = isAr ? 'التاريخ' : 'Date';
+    const colCategory = isAr ? 'الفئة' : 'Category';
+    const colAmount = isAr ? 'المبلغ' : 'Amount';
+    const colLoggedBy = isAr ? 'بواسطة' : 'Logged By';
+    const noCostRecordsMsg = t('msg-no-costs');
+    const noTxMsg = t('msg-no-transactions');
+    const footerMsg = isAr ? 
+        `بوابة عمليات ${companyLabel} — سري للغاية | تقرير التكاليف لـ ${labelText}` : 
+        `${companyLabel} Operations Portal — Confidential | Costs Report for ${labelText}`;
+
     const printHTML = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-            <title>Costs Report — ${labelText}</title>
+            <title>${reportTitle} — ${labelText}</title>
             <style>
                 @page { margin: 16mm 12mm; size: A4; }
                 * { box-sizing: border-box; }
-                body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #1e293b; margin: 0; }
+                body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #1e293b; margin: 0; direction: ${isAr ? 'rtl' : 'ltr'}; }
                 h1 { font-size: 20px; margin: 0 0 4px; color: #0f172a; }
                 .sub { font-size: 11px; color: #64748b; margin-bottom: 18px; }
                 .hud { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
@@ -2870,49 +2904,49 @@ function exportCostsPDF() {
                 .hud-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #64748b; }
                 .hud-val { font-size: 17px; font-weight: 900; margin-top: 6px; }
                 table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-                th { background: #f1f5f9; padding: 8px 10px; text-align: left; font-size: 11px; text-transform: uppercase; color: #475569; border-bottom: 2px solid #cbd5e1; }
-                td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
+                th { background: #f1f5f9; padding: 8px 10px; text-align: ${isAr ? 'right' : 'left'}; font-size: 11px; text-transform: uppercase; color: #475569; border-bottom: 2px solid #cbd5e1; }
+                td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 12px; text-align: ${isAr ? 'right' : 'left'}; }
                 tr:last-child td { border-bottom: none; }
                 .section-title { font-size: 13px; font-weight: 800; color: #0f172a; margin: 18px 0 8px; border-bottom: 2px solid #e2e8f0; padding-bottom: 4px; }
                 .profit { color: #16a34a; } .loss { color: #dc2626; } .neutral { color: #475569; }
                 .footer { margin-top: 20px; font-size: 10px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 10px; }
             </style></head><body>
-            <h1>🧾 Burgeroov — Cost & P&L Report</h1>
-            <div class="sub">Period: <strong>${labelText}</strong> &nbsp;|&nbsp; Generated: ${new Date().toLocaleString()}</div>
+            <h1>🧾 ${companyLabel} — ${reportTitle}</h1>
+            <div class="sub">${periodLabel}: <strong>${labelText}</strong> &nbsp;|&nbsp; ${generatedLabel}: ${new Date().toLocaleString()}</div>
 
             <div class="hud">
                 <div class="hud-box">
-                    <div class="hud-label">Net Profit</div>
+                    <div class="hud-label">${netProfitLabel}</div>
                     <div class="hud-val ${netProfit > 0 ? 'profit' : netProfit < 0 ? 'loss' : 'neutral'}">${profitSign}SAR ${Math.abs(netProfit).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                 </div>
                 <div class="hud-box">
-                    <div class="hud-label">Gross Sales</div>
+                    <div class="hud-label">${grossSalesLabel}</div>
                     <div class="hud-val profit">SAR ${totalSales.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                 </div>
                 <div class="hud-box">
-                    <div class="hud-label">Gross Costs</div>
+                    <div class="hud-label">${grossCostsLabel}</div>
                     <div class="hud-val loss">SAR ${totalCosts.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                 </div>
                 <div class="hud-box">
-                    <div class="hud-label">Transactions</div>
+                    <div class="hud-label">${transactionsLabel}</div>
                     <div class="hud-val neutral">${filteredSales.length + filteredCosts.length}</div>
                 </div>
             </div>
 
-            <div class="section-title">📊 Cost Breakdown by Source</div>
+            <div class="section-title">📊 ${sourceBreakdownLabel}</div>
             <table>
-                <thead><tr><th>Source / Category</th><th style="text-align:right;">Total (SAR)</th><th style="text-align:right;">% of Total Costs</th></tr></thead>
-                <tbody>${sourceRows || '<tr><td colspan="3" style="text-align:center;color:#94a3b8;">No cost records.</td></tr>'}</tbody>
-                <tfoot><tr style="background:#fef2f2;"><td><strong>Total</strong></td><td style="text-align:right;font-weight:900;color:#dc2626;">SAR ${totalCosts.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td><td style="text-align:right;font-weight:700;">100%</td></tr></tfoot>
+                <thead><tr><th>${colSourceCategory}</th><th style="text-align:${isAr ? 'left' : 'right'};">${colTotalSar}</th><th style="text-align:${isAr ? 'left' : 'right'};">${colPctTotal}</th></tr></thead>
+                <tbody>${sourceRows || `<tr><td colspan="3" style="text-align:center;color:#94a3b8;">${noCostRecordsMsg}</td></tr>`}</tbody>
+                <tfoot><tr style="background:#fef2f2;"><td><strong>${labelTotal}</strong></td><td style="text-align:${isAr ? 'left' : 'right'};font-weight:900;color:#dc2626;">SAR ${totalCosts.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td><td style="text-align:${isAr ? 'left' : 'right'};font-weight:700;">100%</td></tr></tfoot>
             </table>
 
-            <div class="section-title">🧾 Individual Cost Transactions</div>
+            <div class="section-title">🧾 ${titleAllTx}</div>
             <table>
-                <thead><tr><th>Date</th><th>Category</th><th style="text-align:right;">Amount</th><th>Logged By</th></tr></thead>
-                <tbody>${txRows || '<tr><td colspan="4" style="text-align:center;color:#94a3b8;">No transactions in this period.</td></tr>'}</tbody>
+                <thead><tr><th>${colDate}</th><th>${colCategory}</th><th style="text-align:${isAr ? 'left' : 'right'};">${colAmount}</th><th>${colLoggedBy}</th></tr></thead>
+                <tbody>${txRows || `<tr><td colspan="4" style="text-align:center;color:#94a3b8;">${noTxMsg}</td></tr>`}</tbody>
             </table>
 
-            <div class="footer">Burgeroov Operations Portal — Confidential &nbsp;|&nbsp; Costs Report for ${labelText}</div>
+            <div class="footer">${footerMsg}</div>
             </body></html>`;
 
     const blob = new Blob([printHTML], { type: 'text/html' });
@@ -3284,7 +3318,7 @@ function renderWarehouse() {
                     return `
                              <div class="flex-between" style="border-bottom: 1px solid var(--border-color); padding: 6px 0; font-size: 0.85rem;">
                                  <span>🕒 ${l.date}</span>
-                                 <span>By: <strong style="color:var(--primary);">${changerName}</strong></span>
+                                 <span>${t('label-by')}: <strong style="color:var(--primary);">${changerName}</strong></span>
                                  <span>Total: <strong>${l.amount}</strong> <span style="color:${l.difference > 0 ? 'var(--success)' : 'var(--danger)'}">(${l.difference > 0 ? '+' : ''}${l.difference})</span></span>
                              </div>`;
                 }).join('');
@@ -4260,8 +4294,8 @@ function renderTasks() {
     if (assignSel) {
         const oldVal = assignSel.value;
         assignSel.innerHTML = `
-            <option value="">-- Choose Employee --</option>
-            <option value="general">🌍 [General Task for All Workers]</option>
+            <option value="">-- ${t('opt-choose-emp')} --</option>
+            <option value="general">🌍 ${t('opt-general-task')}</option>
         `;
         getCompanyData().workers.forEach(w => {
             const opt = document.createElement('option'); opt.value = w.id; opt.textContent = w.name; assignSel.appendChild(opt);
@@ -4289,21 +4323,21 @@ function renderTasks() {
         genCard.style.border = "2px dashed var(--warning)";
         genCard.style.background = "var(--warning-bg)";
         
-        let genHtml = `<h3 style="margin-top:0; color:var(--warning); display:flex; align-items:center; gap:8px; font-size:1.15rem;">🌍 Available General Tasks</h3>`;
+        let genHtml = `<h3 style="margin-top:0; color:var(--warning); display:flex; align-items:center; gap:8px; font-size:1.15rem;">🌍 ${t('title-available-general-tasks')}</h3>`;
         
         pendingGeneralTasks.forEach(gt => {
-            const urgencyBadge = gt.urgency === 'urgent' ? `<span class="badge" style="background:var(--danger); margin-left:8px;">🔴 Urgent</span>` : '';
-            const deadlineText = gt.deadlineMins > 0 ? `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">⏱️ Deadline: ${gt.deadlineMins} mins</div>` : '';
+            const urgencyBadge = gt.urgency === 'urgent' ? `<span class="badge" style="background:var(--danger); margin-left:8px;">🔴 ${t('opt-urgency-high').replace('🔴 ', '')}</span>` : '';
+            const deadlineText = gt.deadlineMins > 0 ? `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">⏱️ ${t('status-time-remaining').replace('⏳ ', '')} ${gt.deadlineMins} mins</div>` : '';
             
             const isWorker = currentUser && currentUser.role === 'worker';
             let actionBtn = '';
             if (isWorker) {
-                actionBtn = `<button onclick="acceptGeneralTask('${gt.id}')" class="btn-warning" style="padding:8px 16px; font-size:0.85rem; min-height: unset; height: auto;">📥 Accept Task</button>`;
+                actionBtn = `<button onclick="acceptGeneralTask('${gt.id}')" class="btn-warning" style="padding:8px 16px; font-size:0.85rem; min-height: unset; height: auto;">📥 ${t('btn-accept-task')}</button>`;
             } else if (isAdmin) {
                 actionBtn = `
                     <div style="display:flex; gap:8px; align-items:center;">
-                        <span style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">Available to all workers</span>
-                        <button onclick="deleteGeneralTask('${gt.id}')" style="background:none; border:none; color: var(--danger); cursor:pointer; font-size:1.2rem; padding:0 6px;" title="Delete General Task">✖</button>
+                        <span style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">${t('label-available-all-workers')}</span>
+                        <button onclick="deleteGeneralTask('${gt.id}')" style="background:none; border:none; color: var(--danger); cursor:pointer; font-size:1.2rem; padding:0 6px;" title="${t('btn-remove')}">✖</button>
                     </div>`;
             }
             
@@ -4760,8 +4794,8 @@ function renderDriversList() {
             div.style.borderColor = isSelected ? 'var(--primary)' : 'var(--border-color)';
             div.style.borderWidth = isSelected ? '2px' : '1px';
 
-            let statusBadge = isBusy ? `<span class="badge" style="background:var(--warning);">In Transit</span>` : `<span class="badge" style="background:var(--success);">Available</span>`;
-            let removeBtn = isDriversAdmin ? `<button onclick="demoteFromDriver(event, '${d.id}')" style="background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger-border); border-radius:6px; padding:2px 8px; font-size:0.75rem; cursor:pointer;" title="Remove Driver Role">Remove</button>` : '';
+            let statusBadge = isBusy ? `<span class="badge" style="background:var(--warning);">${t('status-in-transit')}</span>` : `<span class="badge" style="background:var(--success);">${t('status-available')}</span>`;
+            let removeBtn = isDriversAdmin ? `<button onclick="demoteFromDriver(event, '${d.id}')" style="background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger-border); border-radius:6px; padding:2px 8px; font-size:0.75rem; cursor:pointer;" title="${t('btn-remove')}">${t('btn-remove')}</button>` : '';
 
             div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><strong style="color:var(--text-main);">${d.name}</strong><div style="display:flex; gap:6px; align-items:center;">${statusBadge}${removeBtn}</div></div>`;
             div.onclick = () => selectDriver(d.id);
@@ -5625,7 +5659,7 @@ function renderOpsWorkersTable() {
     const workersToRender = getVisibleWorkers();
 
     if (workersToRender.length === 0 && !isAdmin) {
-        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;">Your account is not linked to any worker profile yet.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;">${t('msg-account-not-linked')}</td></tr>`;
         return;
     }
 
@@ -5634,12 +5668,12 @@ function renderOpsWorkersTable() {
 
         const tr = document.createElement('tr');
         let html = `
-                    <td><strong style="color:var(--text-main);">${worker.name}</strong><br><span class="badge" style="margin-left:0;margin-top:6px;">${worker.role || 'Staff'}</span></td>
+                    <td><strong style="color:var(--text-main);">${worker.name}</strong><br><span class="badge" style="margin-left:0;margin-top:6px;">${worker.role || t('label-staff')}</span></td>
                     <td><span class="badge" style="background: var(--primary); margin:0;">${avg}</span></td>`;
         if (isAdmin) {
             html += `
                     <td class="admin-only">
-                        <button class="btn-outline-danger" style="padding:6px 12px;font-size:0.8rem;" onclick="deleteWorker('${worker.id}')">Delete Worker</button>
+                        <button class="btn-outline-danger" style="padding:6px 12px;font-size:0.8rem;" onclick="deleteWorker('${worker.id}')">${t('btn-delete-worker')}</button>
                     </td>`;
         }
         tr.innerHTML = html;
@@ -5660,24 +5694,24 @@ function renderOpsDetails() {
     if (!worker) return;
     let displayLogs = getLogsForMonth(worker, currentGlobalMonth);
 
-    if (displayLogs.length === 0) { if (hist) hist.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:24px;background:var(--input-bg);border-radius:var(--radius-md);">No logs found for this month.</p>`; return; }
+    if (displayLogs.length === 0) { if (hist) hist.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:24px;background:var(--input-bg);border-radius:var(--radius-md);">${t('msg-no-logs-month')}</p>`; return; }
 
     displayLogs.forEach(log => {
         const div = document.createElement('div'); div.className = 'log-entry';
 
         let typeBadge = '';
         if (log.noteType === 'vacation' || log.score === 'vacation') {
-            typeBadge = `<span class="badge" style="background:var(--warning); color:var(--text-main);">Vacation 🌴</span>`;
+            typeBadge = `<span class="badge" style="background:var(--warning); color:var(--text-main);">${t('badge-vacation')}</span>`;
         } else if (log.noteType === 'good' || log.score == 100) {
-            typeBadge = `<span class="badge badge-good">Good Note ✅</span>`;
+            typeBadge = `<span class="badge badge-good">${t('badge-good-note')}</span>`;
         } else {
-            typeBadge = `<span class="badge badge-bad">Bad Note ❌</span>`;
+            typeBadge = `<span class="badge badge-bad">${t('badge-bad-note')}</span>`;
         }
 
-        let delBtn = isAdmin ? `<button class="btn-outline-danger admin-only" style="padding:4px 8px;font-size:0.75rem;border:none;text-decoration:underline;" onclick="deleteLog('${worker.id}', '${log.date}')">Delete</button>` : '';
+        let delBtn = isAdmin ? `<button class="btn-outline-danger admin-only" style="padding:4px 8px;font-size:0.75rem;border:none;text-decoration:underline;" onclick="deleteLog('${worker.id}', '${log.date}')">${t('btn-delete')}</button>` : '';
         div.innerHTML = `
                     <div class="flex-between log-date"><strong style="color:var(--text-main);">📅 ${log.date}</strong><div style="display:flex;align-items:center;gap:8px;">${typeBadge} ${delBtn}</div></div>
-                    <div class="log-note-text">${log.note ? log.note : '<em style="color:var(--text-muted);">No manual notes.</em>'}</div>`;
+                    <div class="log-note-text">${log.note ? log.note : `<em style="color:var(--text-muted);">${t('msg-no-manual-notes')}</em>`}</div>`;
         if (hist) hist.appendChild(div);
     });
 }
@@ -6055,6 +6089,10 @@ const uiTranslations = {
         "tab-drivers": "🚚 Drivers",
         "tab-finance": "💰 Financial",
         "tab-summary": "📊 Summary",
+        "tab-ads": "📢 Ads",
+        "tab-notes": "📝 Notes",
+        "tab-sales": "💰 Sales",
+        "tab-costs": "📉 Costs",
 
         // Operations Section
         "title-manager-access": "Manager Access Control",
@@ -6066,6 +6104,49 @@ const uiTranslations = {
         "title-ops-directory": "Ops Directory",
         "label-full-name": "Full Name",
         "label-role": "Role / Position",
+        "label-assign-access": "Assign Restricted Access to Specific Worker",
+        "opt-choose-employee": "-- Choose Employee --",
+        "btn-save-worker-perms": "Save Worker Permissions",
+        "placeholder-enter-branch": "Enter branch name...",
+        "btn-add": "Add",
+        "desc-violation-rules": "Define standard penalties to quickly apply them later.",
+        "placeholder-vrule-example": "e.g. Late 15 mins",
+        "placeholder-currency-sar": "SAR",
+        "placeholder-w-name-example": "e.g. Ahmed Ali",
+        "label-app-email": "App Account Email",
+        "placeholder-w-email-login": "Worker's Login Email",
+        "placeholder-w-role-example": "e.g. Head Chef, Manager, Driver...",
+        "label-start-time": "Start Time",
+        "label-end-time": "End Time",
+        "label-base-salary-sar": "Base Salary (SAR)",
+        "placeholder-zero-double": "0.00",
+        "label-branch": "Branch",
+        "btn-create-record": "Create Record",
+        "label-select-employee-record": "Select Employee Record",
+        "title-log-daily-perf": "Log Daily Performance / Vacation",
+        "label-start-date": "Start Date",
+        "label-note-type": "Note Type",
+        "opt-good-note": "Good Note ✅ (100% Score)",
+        "opt-bad-note": "Bad Note ❌ (2.5% Score)",
+        "opt-vacation": "Vacation 🌴 (No Score)",
+        "label-consec-vacation-days": "Number of Consecutive Vacation Days",
+        "placeholder-vacation-example": "e.g. 20",
+        "label-supervisor-notes": "Supervisor Notes",
+        "placeholder-log-note-obs": "Enter optional observations...",
+        "btn-submit-record": "Submit Record",
+        "title-perf-log": "Performance Log",
+        "th-employee-role": "Employee & Role",
+        "th-avg-perf": "Avg Perf",
+        "th-manage": "Manage",
+        "msg-account-not-linked": "Your account is not linked to any worker profile yet.",
+        "label-staff": "Staff",
+        "btn-delete-worker": "Delete Worker",
+        "msg-no-logs-month": "No logs found for this month.",
+        "badge-vacation": "Vacation 🌴",
+        "badge-good-note": "Good Note ✅",
+        "badge-bad-note": "Bad Note ❌",
+        "btn-delete": "Delete",
+        "msg-no-manual-notes": "No manual notes.",
 
         // Financial Section
         "title-fin-adj": "Financial Adjustments",
@@ -6232,7 +6313,71 @@ const uiTranslations = {
         "label-penalty-applied": "Penalty Applied – SAR ",
         "label-time-expired": "Time Expired – Penalty Applied (SAR ",
         "label-fix-within": "⏳ Fix within: ",
-        "label-penalty-not-fixed": "Penalty if not fixed: SAR "
+        "label-penalty-not-fixed": "Penalty if not fixed: SAR ",
+        "btn-swap-company": "Swap Company",
+        "btn-swap-short": "Swap",
+        "title-promote-driver": "➕ Assign Driver Role",
+        "desc-promote-driver": "Promote an existing employee to Driver role.",
+        "btn-assign-driver": "Assign",
+        "opt-general-task": "[General Task for All Workers]",
+        "title-available-general-tasks": "Available General Tasks",
+        "btn-accept-task": "Accept Task",
+        "label-available-all-workers": "Available to all workers",
+        "status-in-transit": "In Transit",
+        "status-available": "Available",
+        "title-sales-analytics": "💰 Advanced Sales Analytics",
+        "btn-tf-day": "Daily",
+        "btn-tf-week": "Week",
+        "btn-tf-month": "Month",
+        "btn-tf-year": "Year",
+        "btn-tf-custom": "📅 Range",
+        "label-to": "to",
+        "label-tf-total": "Selected Timeframe Total",
+        "title-sales-trend": "📊 Sales Trend",
+        "btn-sct-bar": "Bar",
+        "btn-sct-line": "Line",
+        "btn-sct-method": "Method",
+        "title-log-sale": "Log a New Transaction",
+        "placeholder-amount-sar": "Amount (SAR)...",
+        "btn-log-sale": "✅ Log Sale",
+        "title-manage-income": "Admin: Manage Income Sources",
+        "placeholder-add-source": "Add new source...",
+        "btn-add-source": "Add Source",
+        "title-transaction-feed": "Transaction Feed",
+        "label-filtered-tf": "Filtered by Timeframe",
+        "title-costs-dashboard": "📉 Costs & P&L Dashboard",
+        "label-net-profit": "Net Profit",
+        "label-gross-sales": "Gross Sales",
+        "label-gross-costs": "Gross Costs",
+        "label-transactions": "Transactions",
+        "title-sales-vs-costs": "📊 Sales vs Costs — Trend Chart",
+        "label-sales": "Sales",
+        "label-costs": "Costs",
+        "title-log-cost": "Log a New Cost/Expense",
+        "btn-log-cost": "✅ Log Cost (Now)",
+        "title-past-cost": "Log Cost for a Past Day",
+        "placeholder-manager-password": "🔑 Manager Password",
+        "btn-submit-past-cost": "Submit Past Day Cost",
+        "title-manage-categories": "Admin: Manage Cost Categories",
+        "placeholder-add-category": "Add new category...",
+        "btn-add-category": "Add Category",
+        "title-costs-feed": "Costs Feed",
+        "title-export-cost": "📄 Export Cost Summary Report",
+        "desc-export-cost": "Download a full PDF of the current timeframe — HUD stats, source breakdown & all transactions.",
+        "btn-print-pdf": "🖨️ Print / Save PDF",
+        "status-healthy-profit": "📈 Healthy Profit Margin",
+        "status-operating-loss": "⚠️ Operating at a Loss",
+        "status-breaking-even": "➖ Breaking Even",
+        "label-past-7-days": "Past 7 Days",
+        "label-this-month": "This Month",
+        "label-this-year": "This Year",
+        "msg-no-transactions": "No transactions logged for this timeframe.",
+        "msg-no-costs": "No costs logged for this timeframe.",
+        "msg-no-data-timeframe": "No data for this timeframe.",
+        "label-total": "Total",
+        "label-avg": "Average",
+        "label-peak": "Peak",
+        "label-by": "By"
     },
     ar: {
         // شاشة الدخول
@@ -6261,6 +6406,10 @@ const uiTranslations = {
         "tab-drivers": "🚚 السائقين",
         "tab-finance": "💰 المالية",
         "tab-summary": "📊 الملخص",
+        "tab-ads": "📢 الإعلانات",
+        "tab-notes": "📝 الملاحظات",
+        "tab-sales": "💰 المبيعات",
+        "tab-costs": "📉 التكاليف",
 
         // قسم العمليات
         "title-manager-access": "التحكم في وصول المديرين",
@@ -6272,6 +6421,49 @@ const uiTranslations = {
         "title-ops-directory": "دليل الموظفين",
         "label-full-name": "الاسم الكامل",
         "label-role": "الوظيفة / المسمى الوظيفي",
+        "label-assign-access": "تعيين وصول محدود لموظف معين",
+        "opt-choose-employee": "-- اختر الموظف --",
+        "btn-save-worker-perms": "حفظ صلاحيات الموظف",
+        "placeholder-enter-branch": "أدخل اسم الفرع...",
+        "btn-add": "إضافة",
+        "desc-violation-rules": "تعيين المخالفات والغرامات القياسية لتطبيقها بسرعة لاحقًا.",
+        "placeholder-vrule-example": "مثال: تأخير 15 دقيقة",
+        "placeholder-currency-sar": "ريال",
+        "placeholder-w-name-example": "مثال: أحمد علي",
+        "label-app-email": "البريد الإلكتروني لحساب التطبيق",
+        "placeholder-w-email-login": "البريد الإلكتروني لتسجيل دخول الموظف",
+        "placeholder-w-role-example": "مثال: رئيس طهاة، مدير، سائق...",
+        "label-start-time": "وقت البدء",
+        "label-end-time": "وقت الانتهاء",
+        "label-base-salary-sar": "الراتب الأساسي (ريال)",
+        "placeholder-zero-double": "0.00",
+        "label-branch": "الفرع",
+        "btn-create-record": "إنشاء السجل",
+        "label-select-employee-record": "اختر سجل الموظف",
+        "title-log-daily-perf": "تسجيل الأداء اليومي / الإجازات",
+        "label-start-date": "تاريخ البدء",
+        "label-note-type": "نوع الملاحظة",
+        "opt-good-note": "ملاحظة جيدة ✅ (درجة 100٪)",
+        "opt-bad-note": "ملاحظة سيئة ❌ (درجة 2.5٪)",
+        "opt-vacation": "إجازة 🌴 (بدون درجة)",
+        "label-consec-vacation-days": "عدد أيام الإجازة المتتالية",
+        "placeholder-vacation-example": "مثال: 20",
+        "label-supervisor-notes": "ملاحظات المشرف",
+        "placeholder-log-note-obs": "أدخل أي ملاحظات اختيارية...",
+        "btn-submit-record": "إرسال السجل",
+        "title-perf-log": "سجل الأداء",
+        "th-employee-role": "الموظف والوظيفة",
+        "th-avg-perf": "متوسط الأداء",
+        "th-manage": "إدارة",
+        "msg-account-not-linked": "حسابك غير مرتبط بملف موظف بعد.",
+        "label-staff": "موظف",
+        "btn-delete-worker": "حذف الموظف",
+        "msg-no-logs-month": "لا توجد سجلات لهذا الشهر.",
+        "badge-vacation": "إجازة 🌴",
+        "badge-good-note": "ملاحظة جيدة ✅",
+        "badge-bad-note": "ملاحظة سيئة ❌",
+        "btn-delete": "حذف",
+        "msg-no-manual-notes": "لا توجد ملاحظات يدوية.",
 
         // القسم المالي
         "title-fin-adj": "التسويات المالية",
@@ -6416,7 +6608,71 @@ const uiTranslations = {
         "label-penalty-applied": "تم تطبيق الخصم – ريال ",
         "label-time-expired": "انتهى الوقت – تم الخصم (ريال ",
         "label-fix-within": "⏳ الإصلاح خلال: ",
-        "label-penalty-not-fixed": "الخصم في حال عدم الإصلاح: ريال "
+        "label-penalty-not-fixed": "الخصم في حال عدم الإصلاح: ريال ",
+        "btn-swap-company": "تغيير الشركة",
+        "btn-swap-short": "تغيير",
+        "title-promote-driver": "➕ تعيين دور سائق",
+        "desc-promote-driver": "ترقية موظف حالي إلى دور سائق.",
+        "btn-assign-driver": "تعيين",
+        "opt-general-task": "[مهمة عامة لجميع الموظفين]",
+        "title-available-general-tasks": "المهام العامة المتاحة",
+        "btn-accept-task": "قبول المهمة",
+        "label-available-all-workers": "متاحة لجميع الموظفين",
+        "status-in-transit": "في الطريق",
+        "status-available": "متاح",
+        "title-sales-analytics": "💰 تحليلات المبيعات المتقدمة",
+        "btn-tf-day": "يومي",
+        "btn-tf-week": "أسبوعي",
+        "btn-tf-month": "شهري",
+        "btn-tf-year": "سنوي",
+        "btn-tf-custom": "📅 نطاق مخصص",
+        "label-to": "إلى",
+        "label-tf-total": "إجمالي الفترة المحددة",
+        "title-sales-trend": "📊 اتجاه المبيعات",
+        "btn-sct-bar": "شريط",
+        "btn-sct-line": "خطي",
+        "btn-sct-method": "طريقة الدفع",
+        "title-log-sale": "تسجيل عملية مبيعات جديدة",
+        "placeholder-amount-sar": "المبلغ (ريال)...",
+        "btn-log-sale": "✅ تسجيل المبيعات",
+        "title-manage-income": "المدير: إدارة مصادر الدخل",
+        "placeholder-add-source": "إضافة مصدر جديد...",
+        "btn-add-source": "إضافة مصدر",
+        "title-transaction-feed": "سجل العمليات",
+        "label-filtered-tf": "مصفى حسب الفترة المحددة",
+        "title-costs-dashboard": "📉 لوحة الأرباح والخسائر والتكاليف",
+        "label-net-profit": "صافي الأرباح",
+        "label-gross-sales": "إجمالي المبيعات",
+        "label-gross-costs": "إجمالي التكاليف",
+        "label-transactions": "العمليات",
+        "title-sales-vs-costs": "📊 مقارنة المبيعات والتكاليف — مخطط الاتجاه",
+        "label-sales": "المبيعات",
+        "label-costs": "التكاليف",
+        "title-log-cost": "تسجيل تكلفة / مصروف جديد",
+        "btn-log-cost": "✅ تسجيل التكلفة (الآن)",
+        "title-past-cost": "تسجيل تكلفة ليوم سابق",
+        "placeholder-manager-password": "🔑 رمز مرور المدير",
+        "btn-submit-past-cost": "إرسال تكلفة اليوم السابق",
+        "title-manage-categories": "المدير: إدارة فئات التكاليف",
+        "placeholder-add-category": "إضافة فئة جديدة...",
+        "btn-add-category": "إضافة فئة",
+        "title-costs-feed": "سجل التكاليف",
+        "title-export-cost": "📄 تصدير تقرير ملخص التكاليف",
+        "desc-export-cost": "تنزيل تقرير PDF كامل للفترة المحددة — إحصائيات لوحة التحكم، تفصيل الفئات، والعمليات كافّة.",
+        "btn-print-pdf": "🖨️ طباعة / حفظ بصيغة PDF",
+        "status-healthy-profit": "📈 هامش ربح صحي",
+        "status-operating-loss": "⚠️ خسارة تشغيلية",
+        "status-breaking-even": "➖ تعادل مالي",
+        "label-past-7-days": "آخر 7 أيام",
+        "label-this-month": "هذا الشهر",
+        "label-this-year": "هذه السنة",
+        "msg-no-transactions": "لا توجد عمليات مسجلة خلال هذه الفترة.",
+        "msg-no-costs": "لا توجد تكاليف مسجلة خلال هذه الفترة.",
+        "msg-no-data-timeframe": "لا توجد بيانات لهذه الفترة.",
+        "label-total": "الإجمالي",
+        "label-avg": "المتوسط",
+        "label-peak": "الأعلى",
+        "label-by": "بواسطة"
     }
 };
 
