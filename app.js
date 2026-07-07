@@ -251,11 +251,27 @@ auth.onAuthStateChanged((user) => {
             document.getElementById('auth-btn').style.display = 'block';
             overlay.style.display = 'none';
             
-            const savedCompany = localStorage.getItem('selected_company');
-            if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc')) {
-                selectCompany(savedCompany);
+            const urlParams = new URLSearchParams(window.location.search);
+            const queryCompany = urlParams.get('companyId');
+            const queryTab = urlParams.get('tab');
+
+            if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc')) {
+                selectCompany(queryCompany);
+                if (queryTab) {
+                    setTimeout(() => {
+                        switchTab(queryTab);
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }, 500);
+                } else {
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
             } else {
-                showCompanySelectionHUD();
+                const savedCompany = localStorage.getItem('selected_company');
+                if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc')) {
+                    selectCompany(savedCompany);
+                } else {
+                    showCompanySelectionHUD();
+                }
             }
         } else {
             // Check databases for worker membership
@@ -298,20 +314,42 @@ auth.onAuthStateChanged((user) => {
                 overlay.style.display = 'none';
                 window.isMultiCompany = inBurgeroov && inMvc;
 
-                const savedCompany = localStorage.getItem('selected_company');
-                if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc')) {
-                    if ((savedCompany === 'mvc' && inMvc) || (savedCompany === 'burgeroov' && inBurgeroov)) {
-                        selectCompany(savedCompany);
-                        return;
+                const urlParams = new URLSearchParams(window.location.search);
+                const queryCompany = urlParams.get('companyId');
+                const queryTab = urlParams.get('tab');
+
+                let chosenCompany = null;
+                if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc')) {
+                    if ((queryCompany === 'mvc' && inMvc) || (queryCompany === 'burgeroov' && inBurgeroov)) {
+                        chosenCompany = queryCompany;
                     }
                 }
- 
-                if (inBurgeroov && inMvc) {
-                    showCompanySelectionHUD();
-                } else if (inMvc) {
-                    selectCompany('mvc');
+
+                if (chosenCompany) {
+                    selectCompany(chosenCompany);
+                    if (queryTab) {
+                        setTimeout(() => {
+                            switchTab(queryTab);
+                            window.history.replaceState({}, document.title, window.location.pathname);
+                        }, 500);
+                    } else {
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
                 } else {
-                    selectCompany('burgeroov');
+                    const savedCompany = localStorage.getItem('selected_company');
+                    if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc')) {
+                        if ((savedCompany === 'mvc' && inMvc) || (savedCompany === 'burgeroov' && inBurgeroov)) {
+                            selectCompany(savedCompany);
+                            return;
+                        }
+                    }
+                    if (inBurgeroov && inMvc) {
+                        showCompanySelectionHUD();
+                    } else if (inMvc) {
+                        selectCompany('mvc');
+                    } else {
+                        selectCompany('burgeroov');
+                    }
                 }
             }).catch((error) => {
                 console.error("Error checking company access:", error);
@@ -4412,7 +4450,7 @@ function acceptGeneralTask(taskId) {
             // Construct new job
             const newJob = {
                 id: task.id,
-                title: task.title,
+                title: `${task.title} (Accepted by ${myWorker.name})`,
                 isGeneral: true,
                 date: formatTimestamp(),
                 timestamp: Date.now(),

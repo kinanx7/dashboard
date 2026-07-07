@@ -84,6 +84,7 @@ function startNotificationListeners(companyId) {
         if (!workers) return;
 
         const sends = [];
+        const companyLabel = companyId === 'mvc' ? 'MVC' : 'Burgeroov';
 
         workers.forEach((after, index) => {
             if (!after) return;
@@ -116,10 +117,10 @@ function startNotificationListeners(companyId) {
                     sends.push(safeSend({
                         token: fcmToken,
                         notification: {
-                            title: '📋 New Task Assigned',
+                            title: `📋 New Task Assigned [${companyLabel}]`,
                             body:  `${title} — tap to open your task board.`
                         },
-                        data: { type: 'task', tab: 'tasks', workerName },
+                        data: { type: 'task', tab: 'tasks', workerName, companyId },
                         android: { priority: 'high', notification: { channelId: 'burgeroov_tasks' } },
                         apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
                     }, `[${companyId}] TASK → ${workerName}: "${title}"`));
@@ -136,10 +137,10 @@ function startNotificationListeners(companyId) {
                 sends.push(safeSend({
                     token: fcmToken,
                     notification: {
-                        title: '🛵 New Delivery Order',
+                        title: `🛵 New Delivery Order [${companyLabel}]`,
                         body:  `Order for ${customer} — open the app to start.`
                     },
-                    data: { type: 'delivery', tab: 'drivers', workerName },
+                    data: { type: 'delivery', tab: 'drivers', workerName, companyId },
                     android: { priority: 'high', notification: { channelId: 'burgeroov_orders' } },
                     apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
                 }, `[${companyId}] ORDER → ${workerName}`));
@@ -163,8 +164,8 @@ function startNotificationListeners(companyId) {
                 }
                 sends.push(safeSend({
                     token: fcmToken,
-                    notification: { title: '⚠️ Violation Recorded', body: reason },
-                    data: { type: 'violation', tab: 'finance', workerName },
+                    notification: { title: `⚠️ Violation Recorded [${companyLabel}]`, body: reason },
+                    data: { type: 'violation', tab: 'finance', workerName, companyId },
                     android: { priority: 'high', notification: { channelId: 'burgeroov_alerts' } },
                     apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
                 }, `[${companyId}] VIOLATION → ${workerName}`));
@@ -191,8 +192,8 @@ function startNotificationListeners(companyId) {
                 }
                 sends.push(safeSend({
                     token: fcmToken,
-                    notification: { title: '🎉 Reward Added!', body: rewardNote },
-                    data: { type: 'reward', tab: 'finance', workerName },
+                    notification: { title: `🎉 Reward Added [${companyLabel}]`, body: rewardNote },
+                    data: { type: 'reward', tab: 'finance', workerName, companyId },
                     android: { priority: 'normal', notification: { channelId: 'burgeroov_rewards' } },
                     apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
                 }, `[${companyId}] REWARD → ${workerName}`));
@@ -223,6 +224,7 @@ function startNotificationListeners(companyId) {
         if (!tasksObj) return;
 
         const sends = [];
+        const companyLabel = companyId === 'mvc' ? 'MVC' : 'Burgeroov';
 
         // Fetch workers to retrieve tokens
         const workersSnapshot = await db.ref(`companies/${companyId}/workers`).once('value');
@@ -240,10 +242,10 @@ function startNotificationListeners(companyId) {
                         sends.push(safeSend({
                             token: w.fcmToken,
                             notification: {
-                                title: '🌍 New General Task Available',
+                                title: `🌍 New General Task Available [${companyLabel}]`,
                                 body: `${title} — open your task board to accept it.`
                             },
-                            data: { type: 'generalTask', tab: 'tasks', workerName: w.name || `Worker #${index}` },
+                            data: { type: 'generalTask', tab: 'tasks', workerName: w.name || `Worker #${index}`, companyId },
                             android: { priority: 'high', notification: { channelId: 'burgeroov_tasks' } },
                             apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
                         }, `[${companyId}] GENERAL TASK → ${w.name || `Worker #${index}`}: "${title}"`));
