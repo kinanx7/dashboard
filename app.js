@@ -784,37 +784,44 @@ function saveWorkerFCMToken(token) {
     if (!currentUser || !token) return;
 
     const email = currentUser.email.toLowerCase();
-    const workers = getCompanyData().workers || [];
-    const workerIndex = workers.findIndex(
-        w => w.email && w.email.toLowerCase() === email
-    );
+    
+    // Save token to both companies if worker is registered in them
+    saveTokenForCompany('burgeroov', email, token);
+    saveTokenForCompany('mvc', email, token);
+}
 
-    if (workerIndex === -1) {
-        // Admin or un-matched email: store token in a separate lookup node
-        db.ref('companies/' + currentCompany + '/adminTokens/' + btoa(email).replace(/=/g, ''))
-            .set({ email, fcmToken: token, updatedAt: Date.now() })
-            .then(() => console.log('[FCM] Admin token stored.'))
-            .catch(err => console.error('[FCM] Failed to store admin token:', err));
-        return;
-    }
-
-    const workerRef = db.ref(`companies/${currentCompany}/workers/${workerIndex}`);
-
-    // Only write if the token actually changed (avoids noisy RTDB writes)
-    const currentToken = workers[workerIndex].fcmToken;
-    if (currentToken === token) {
-        console.log('[FCM] Token unchanged — no write needed.');
-        return;
-    }
-
-    workerRef.update({ fcmToken: token, fcmUpdatedAt: Date.now() })
-        .then(() => {
-            console.log('[FCM] Token saved for worker:', workers[workerIndex].name);
-            // Mirror into local appData so the next save() includes it
-            workers[workerIndex].fcmToken = token;
-            workers[workerIndex].fcmUpdatedAt = Date.now();
+function saveTokenForCompany(companyId, email, token) {
+    db.ref(`companies/${companyId}/workers`).once('value')
+        .then(snapshot => {
+            if (!snapshot.exists()) return;
+            const workers = snapshot.val() || [];
+            const workerIndex = workers.findIndex(w => w && w.email && w.email.toLowerCase() === email);
+            
+            if (workerIndex !== -1) {
+                const workerRef = db.ref(`companies/${companyId}/workers/${workerIndex}`);
+                const currentToken = workers[workerIndex].fcmToken;
+                if (currentToken === token) {
+                    console.log(`[FCM] Token unchanged in ${companyId} — no write needed.`);
+                    return;
+                }
+                
+                workerRef.update({ fcmToken: token, fcmUpdatedAt: Date.now() })
+                    .then(() => {
+                        console.log(`[FCM] Token saved for worker in ${companyId}:`, workers[workerIndex].name);
+                        if (currentCompany === companyId && getCompanyData().workers && getCompanyData().workers[workerIndex]) {
+                            getCompanyData().workers[workerIndex].fcmToken = token;
+                        }
+                    })
+                    .catch(err => console.error(`[FCM] Failed to save token in ${companyId}:`, err));
+            } else {
+                if (currentCompany === companyId && currentUser && currentUser.role === 'admin') {
+                    db.ref(`companies/${companyId}/adminTokens/${btoa(email).replace(/=/g, '')}`)
+                        .set({ email, fcmToken: token, updatedAt: Date.now() })
+                        .catch(err => console.error(`[FCM] Failed to store admin token in ${companyId}:`, err));
+                }
+            }
         })
-        .catch(err => console.error('[FCM] Failed to save token:', err));
+        .catch(err => console.error(`[FCM] Error reading workers list for ${companyId}:`, err));
 }
 
 

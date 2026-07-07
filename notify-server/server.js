@@ -66,190 +66,200 @@ async function safeSend(message, label) {
 }
 
 // ─── Cache of previous worker states ─────────────────────────────────────────
-// Key = workerIndex (string), Value = last-known worker object
+// Key = companyId_workerIndex, Value = last-known worker object
 const prevState = {};
 
-// ─── Main RTDB listener ───────────────────────────────────────────────────────
-console.log('[Server] Connecting to Firebase RTDB...');
+// ─── Cache of previous general tasks ─────────────────────────────────────────
+// Key = companyId_taskId, Value = true
+const notifiedGeneralTasks = {};
+const isFirstGeneralTasksLoad = {};
 
-db.ref('companies/burgeroov/workers').on('value', async (snapshot) => {
-    const workers = snapshot.val();
-    if (!workers) return;
+function startNotificationListeners(companyId) {
+    console.log(`[Server] Starting listeners for company: ${companyId}...`);
+    isFirstGeneralTasksLoad[companyId] = true;
 
-    const sends = [];
+    // ─── Workers Listener ────────────────────────────────────────────────────
+    db.ref(`companies/${companyId}/workers`).on('value', async (snapshot) => {
+        const workers = snapshot.val();
+        if (!workers) return;
 
-    workers.forEach((after, index) => {
-        if (!after) return;
+        const sends = [];
 
-        const fcmToken   = after.fcmToken;
-        const workerName = after.name || `Worker #${index}`;
-        const before     = prevState[index] || null;
+        workers.forEach((after, index) => {
+            if (!after) return;
 
-        // Update cache
-        prevState[index] = JSON.parse(JSON.stringify(after));
+            const fcmToken   = after.fcmToken;
+            const workerName = after.name || `Worker #${index}`;
+            const cacheKey   = `${companyId}_${index}`;
+            const before     = prevState[cacheKey] || null;
 
-        // Skip on first load (no "before" = just initializing)
-        if (!before) return;
-        if (!fcmToken)  {
-            console.log(`[FCM] "${workerName}" has no token — skip.`);
-            return;
-        }
+            // Update cache
+            prevState[cacheKey] = JSON.parse(JSON.stringify(after));
 
-        // ── 1. NEW TASK ──────────────────────────────────────────────────────
-        const beforeJobs = Array.isArray(before.jobs) ? before.jobs : [];
-        const afterJobs  = Array.isArray(after.jobs)  ? after.jobs  : [];
+            // Skip on first load
+            if (!before) return;
+            if (!fcmToken)  {
+                console.log(`[FCM] [${companyId}] "${workerName}" has no token — skip.`);
+                return;
+            }
 
-        if (afterJobs.length > beforeJobs.length) {
-            const beforeIds = new Set(beforeJobs.map(j => j.id));
-            const newJobs   = afterJobs.filter(j => !beforeIds.has(j.id));
+            // ── 1. NEW TASK ──────────────────────────────────────────────────
+            const beforeJobs = Array.isArray(before.jobs) ? before.jobs : [];
+            const afterJobs  = Array.isArray(after.jobs)  ? after.jobs  : [];
 
-            for (const job of newJobs) {
-                const title = job.title || job.name || 'New task';
+            if (afterJobs.length > beforeJobs.length) {
+                const beforeIds = new Set(beforeJobs.map(j => j.id));
+                const newJobs   = afterJobs.filter(j => !beforeIds.has(j.id));
+
+                for (const job of newJobs) {
+                    const title = job.title || job.name || 'New task';
+                    sends.push(safeSend({
+                        token: fcmToken,
+                        notification: {
+                            title: '📋 New Task Assigned',
+                            body:  `${title} — tap to open your task board.`
+                        },
+                        data: { type: 'task', tab: 'tasks', workerName },
+                        android: { priority: 'high', notification: { channelId: 'burgeroov_tasks' } },
+                        apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
+                    }, `[${companyId}] TASK → ${workerName}: "${title}"`));
+                }
+            }
+
+            // ── 2. NEW DELIVERY ORDER ────────────────────────────────────────────
+            const hadOrder = before?.activeOrder?.startTime;
+            const hasOrder = after?.activeOrder?.startTime;
+
+            if (!hadOrder && hasOrder) {
+                const order    = after.activeOrder;
+                const customer = order.customerName || order.address || 'a customer';
                 sends.push(safeSend({
                     token: fcmToken,
                     notification: {
-                        title: '📋 New Task Assigned',
-                        body:  `${title} — tap to open your task board.`
+                        title: '🛵 New Delivery Order',
+                        body:  `Order for ${customer} — open the app to start.`
                     },
-                    data: { type: 'task', tab: 'tasks', workerName },
-                    android: { priority: 'high', notification: { channelId: 'burgeroov_tasks' } },
+                    data: { type: 'delivery', tab: 'drivers', workerName },
+                    android: { priority: 'high', notification: { channelId: 'burgeroov_orders' } },
                     apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
-                }, `TASK → ${workerName}: "${title}"`));
+                }, `[${companyId}] ORDER → ${workerName}`));
             }
-        }
 
-        // ── 2. NEW DELIVERY ORDER ────────────────────────────────────────────
-        const hadOrder = before?.activeOrder?.startTime;
-        const hasOrder = after?.activeOrder?.startTime;
+            // ── 3. NEW VIOLATION ─────────────────────────────────────────────────
+            const beforeViol = countAcrossMonths(before?.monthlyStats, 'violationsList');
+            const afterViol  = countAcrossMonths(after?.monthlyStats,  'violationsList');
 
-        if (!hadOrder && hasOrder) {
-            const order    = after.activeOrder;
-            const customer = order.customerName || order.address || 'a customer';
-            sends.push(safeSend({
-                token: fcmToken,
-                notification: {
-                    title: '🛵 New Delivery Order',
-                    body:  `Order for ${customer} — open the app to start.`
-                },
-                data: { type: 'delivery', tab: 'drivers', workerName },
-                android: { priority: 'high', notification: { channelId: 'burgeroov_orders' } },
-                apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
-            }, `ORDER → ${workerName}`));
-        }
-
-        // ── 3. NEW VIOLATION ─────────────────────────────────────────────────
-        const beforeViol = countAcrossMonths(before?.monthlyStats, 'violationsList');
-        const afterViol  = countAcrossMonths(after?.monthlyStats,  'violationsList');
-
-        if (afterViol > beforeViol) {
-            let reason = 'A new violation has been recorded on your profile.';
-            if (after.monthlyStats) {
-                const months = Object.keys(after.monthlyStats).sort().reverse();
-                for (const m of months) {
-                    const list = after.monthlyStats[m]?.violationsList;
-                    if (Array.isArray(list) && list.length > 0) {
-                        reason = list[0].reason || reason;
-                        break;
+            if (afterViol > beforeViol) {
+                let reason = 'A new violation has been recorded on your profile.';
+                if (after.monthlyStats) {
+                    const months = Object.keys(after.monthlyStats).sort().reverse();
+                    for (const m of months) {
+                        const list = after.monthlyStats[m]?.violationsList;
+                        if (Array.isArray(list) && list.length > 0) {
+                            reason = list[0].reason || reason;
+                            break;
+                        }
                     }
                 }
+                sends.push(safeSend({
+                    token: fcmToken,
+                    notification: { title: '⚠️ Violation Recorded', body: reason },
+                    data: { type: 'violation', tab: 'finance', workerName },
+                    android: { priority: 'high', notification: { channelId: 'burgeroov_alerts' } },
+                    apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
+                }, `[${companyId}] VIOLATION → ${workerName}`));
             }
-            sends.push(safeSend({
-                token: fcmToken,
-                notification: { title: '⚠️ Violation Recorded', body: reason },
-                data: { type: 'violation', tab: 'finance', workerName },
-                android: { priority: 'high', notification: { channelId: 'burgeroov_alerts' } },
-                apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
-            }, `VIOLATION → ${workerName}`));
-        }
 
-        // ── 4. NEW REWARD ────────────────────────────────────────────────────
-        const beforeRew = countAcrossMonths(before?.monthlyStats, 'rewardsList');
-        const afterRew  = countAcrossMonths(after?.monthlyStats,  'rewardsList');
+            // ── 4. NEW REWARD ────────────────────────────────────────────────────
+            const beforeRew = countAcrossMonths(before?.monthlyStats, 'rewardsList');
+            const afterRew  = countAcrossMonths(after?.monthlyStats,  'rewardsList');
 
-        if (afterRew > beforeRew) {
-            let rewardNote = 'Your manager gave you a reward — great job!';
-            if (after.monthlyStats) {
-                const months = Object.keys(after.monthlyStats).sort().reverse();
-                for (const m of months) {
-                    const list = after.monthlyStats[m]?.rewardsList;
-                    if (Array.isArray(list) && list.length > 0) {
-                        const r = list[0];
-                        rewardNote = r.reason
-                            ? `${r.reason} (+SAR ${r.amount})`
-                            : `+SAR ${r.amount} reward added!`;
-                        break;
+            if (afterRew > beforeRew) {
+                let rewardNote = 'Your manager gave you a reward — great job!';
+                if (after.monthlyStats) {
+                    const months = Object.keys(after.monthlyStats).sort().reverse();
+                    for (const m of months) {
+                        const list = after.monthlyStats[m]?.rewardsList;
+                        if (Array.isArray(list) && list.length > 0) {
+                            const r = list[0];
+                            rewardNote = r.reason
+                                ? `${r.reason} (+SAR ${r.amount})`
+                                : `+SAR ${r.amount} reward added!`;
+                            break;
+                        }
                     }
                 }
+                sends.push(safeSend({
+                    token: fcmToken,
+                    notification: { title: '🎉 Reward Added!', body: rewardNote },
+                    data: { type: 'reward', tab: 'finance', workerName },
+                    android: { priority: 'normal', notification: { channelId: 'burgeroov_rewards' } },
+                    apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
+                }, `[${companyId}] REWARD → ${workerName}`));
             }
-            sends.push(safeSend({
-                token: fcmToken,
-                notification: { title: '🎉 Reward Added!', body: rewardNote },
-                data: { type: 'reward', tab: 'finance', workerName },
-                android: { priority: 'normal', notification: { channelId: 'burgeroov_rewards' } },
-                apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
-            }, `REWARD → ${workerName}`));
-        }
+        });
+
+        if (sends.length > 0) await Promise.all(sends);
+
+    }, (err) => {
+        console.error(`[RTDB] [${companyId}] Workers Listener error:`, err.message);
     });
 
-    if (sends.length > 0) await Promise.all(sends);
+    // ─── General Tasks Listener ──────────────────────────────────────────────
+    db.ref(`companies/${companyId}/generalTasks`).on('value', async (snapshot) => {
+        const tasksObj = snapshot.val();
 
-}, (err) => {
-    console.error('[RTDB] Listener error:', err.message);
-});
-
-// ─── General Tasks Listener ──────────────────────────────────────────────────
-const notifiedGeneralTasks = {};
-let isFirstGeneralTasksLoad = true;
-
-db.ref('companies/burgeroov/generalTasks').on('value', async (snapshot) => {
-    const tasksObj = snapshot.val();
-    
-    if (isFirstGeneralTasksLoad) {
-        isFirstGeneralTasksLoad = false;
-        if (tasksObj) {
-            Object.keys(tasksObj).forEach(taskId => {
-                notifiedGeneralTasks[taskId] = true;
-            });
+        if (isFirstGeneralTasksLoad[companyId]) {
+            isFirstGeneralTasksLoad[companyId] = false;
+            if (tasksObj) {
+                Object.keys(tasksObj).forEach(taskId => {
+                    const cacheKey = `${companyId}_${taskId}`;
+                    notifiedGeneralTasks[cacheKey] = true;
+                });
+            }
+            return;
         }
-        return;
-    }
-    
-    if (!tasksObj) return;
-    
-    const sends = [];
-    
-    // Fetch workers to retrieve tokens
-    const workersSnapshot = await db.ref('companies/burgeroov/workers').once('value');
-    const workers = workersSnapshot.val() || [];
-    
-    Object.keys(tasksObj).forEach(taskId => {
-        const task = tasksObj[taskId];
-        if (task && task.status === 'pending' && !notifiedGeneralTasks[taskId]) {
-            notifiedGeneralTasks[taskId] = true;
-            
-            const title = task.title || 'New General Task';
-            workers.forEach((w, index) => {
-                if (w && w.fcmToken) {
-                    sends.push(safeSend({
-                        token: w.fcmToken,
-                        notification: {
-                            title: '🌍 New General Task Available',
-                            body: `${title} — open your task board to accept it.`
-                        },
-                        data: { type: 'generalTask', tab: 'tasks', workerName: w.name || `Worker #${index}` },
-                        android: { priority: 'high', notification: { channelId: 'burgeroov_tasks' } },
-                        apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
-                    }, `GENERAL TASK → ${w.name || `Worker #${index}`}: "${title}"`));
-                }
-            });
+
+        if (!tasksObj) return;
+
+        const sends = [];
+
+        // Fetch workers to retrieve tokens
+        const workersSnapshot = await db.ref(`companies/${companyId}/workers`).once('value');
+        const workers = workersSnapshot.val() || [];
+
+        Object.keys(tasksObj).forEach(taskId => {
+            const task = tasksObj[taskId];
+            const cacheKey = `${companyId}_${taskId}`;
+            if (task && task.status === 'pending' && !notifiedGeneralTasks[cacheKey]) {
+                notifiedGeneralTasks[cacheKey] = true;
+
+                const title = task.title || 'New General Task';
+                workers.forEach((w, index) => {
+                    if (w && w.fcmToken) {
+                        sends.push(safeSend({
+                            token: w.fcmToken,
+                            notification: {
+                                title: '🌍 New General Task Available',
+                                body: `${title} — open your task board to accept it.`
+                            },
+                            data: { type: 'generalTask', tab: 'tasks', workerName: w.name || `Worker #${index}` },
+                            android: { priority: 'high', notification: { channelId: 'burgeroov_tasks' } },
+                            apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
+                        }, `[${companyId}] GENERAL TASK → ${w.name || `Worker #${index}`}: "${title}"`));
+                    }
+                });
+            }
+        });
+
+        if (sends.length > 0) {
+            await Promise.all(sends);
         }
+    }, (err) => {
+        console.error(`[RTDB] [${companyId}] General Tasks Listener error:`, err.message);
     });
-    
-    if (sends.length > 0) {
-        await Promise.all(sends);
-    }
-}, (err) => {
-    console.error('[RTDB] General Tasks Listener error:', err.message);
-});
+}
 
-console.log('[Server] Watching workers and general tasks for changes — ready to push notifications.');
+// Start notification listeners for both Burgeroov and MVC companies
+startNotificationListeners('burgeroov');
+startNotificationListeners('mvc');
