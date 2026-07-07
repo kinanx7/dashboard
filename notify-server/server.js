@@ -197,4 +197,59 @@ db.ref('companies/burgeroov/workers').on('value', async (snapshot) => {
     console.error('[RTDB] Listener error:', err.message);
 });
 
-console.log('[Server] Watching workers for changes — ready to push notifications.');
+// ─── General Tasks Listener ──────────────────────────────────────────────────
+const notifiedGeneralTasks = {};
+let isFirstGeneralTasksLoad = true;
+
+db.ref('companies/burgeroov/generalTasks').on('value', async (snapshot) => {
+    const tasksObj = snapshot.val();
+    
+    if (isFirstGeneralTasksLoad) {
+        isFirstGeneralTasksLoad = false;
+        if (tasksObj) {
+            Object.keys(tasksObj).forEach(taskId => {
+                notifiedGeneralTasks[taskId] = true;
+            });
+        }
+        return;
+    }
+    
+    if (!tasksObj) return;
+    
+    const sends = [];
+    
+    // Fetch workers to retrieve tokens
+    const workersSnapshot = await db.ref('companies/burgeroov/workers').once('value');
+    const workers = workersSnapshot.val() || [];
+    
+    Object.keys(tasksObj).forEach(taskId => {
+        const task = tasksObj[taskId];
+        if (task && task.status === 'pending' && !notifiedGeneralTasks[taskId]) {
+            notifiedGeneralTasks[taskId] = true;
+            
+            const title = task.title || 'New General Task';
+            workers.forEach((w, index) => {
+                if (w && w.fcmToken) {
+                    sends.push(safeSend({
+                        token: w.fcmToken,
+                        notification: {
+                            title: '🌍 New General Task Available',
+                            body: `${title} — open your task board to accept it.`
+                        },
+                        data: { type: 'generalTask', tab: 'tasks', workerName: w.name || `Worker #${index}` },
+                        android: { priority: 'high', notification: { channelId: 'burgeroov_tasks' } },
+                        apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
+                    }, `GENERAL TASK → ${w.name || `Worker #${index}`}: "${title}"`));
+                }
+            });
+        }
+    });
+    
+    if (sends.length > 0) {
+        await Promise.all(sends);
+    }
+}, (err) => {
+    console.error('[RTDB] General Tasks Listener error:', err.message);
+});
+
+console.log('[Server] Watching workers and general tasks for changes — ready to push notifications.');
