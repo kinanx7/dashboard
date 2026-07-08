@@ -1063,6 +1063,80 @@
                     <!-- Cards injected via JS -->
                 </div>
             </div>
+
+            <!-- Leaderboard Card -->
+            <div class="card" style="margin-top: 24px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; width: 100%;" class="grid-2-col">
+                    
+                    <!-- General Leaderboard Column -->
+                    <div>
+                        <h2 class="card-title" data-i18n="title-general-leaderboard">🏆 Monthly Employee Leaderboard</h2>
+                        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom: 20px;" data-i18n="desc-general-leaderboard">Based on performance score and completed task points.</p>
+                        
+                        <!-- Podium Layout (Gold, Silver, Bronze) -->
+                        <div style="display:flex; justify-content:center; align-items:flex-end; gap:10px; padding:15px 0; margin-bottom:15px; border-bottom:1px solid var(--border-color);">
+                            <!-- 2nd Place -->
+                            <div style="display:flex; flex-direction:column; align-items:center; width:80px;">
+                                <div id="podium-2-avatar" style="font-size:1.8rem; margin-bottom:5px;">🥈</div>
+                                <div id="podium-2-name" style="font-weight:700; font-size:0.85rem; color:var(--text-main); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:80px;">—</div>
+                                <div id="podium-2-score" style="font-size:0.75rem; color:var(--text-muted);">—</div>
+                                <div style="width:60px; height:60px; background:#cbd5e1; border-top-left-radius:6px; border-top-right-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.2rem; color:#64748b;">2</div>
+                            </div>
+                            <!-- 1st Place -->
+                            <div style="display:flex; flex-direction:column; align-items:center; width:90px;">
+                                <div id="podium-1-avatar" style="font-size:2.2rem; margin-bottom:5px;">🥇</div>
+                                <div id="podium-1-name" style="font-weight:800; font-size:0.95rem; color:var(--primary); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:90px;">—</div>
+                                <div id="podium-1-score" style="font-size:0.8rem; font-weight:700; color:var(--text-main);">—</div>
+                                <div style="width:70px; height:90px; background:#fef08a; border-top-left-radius:6px; border-top-right-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:1.6rem; color:#ca8a04; border:1.5px solid #facc15;">1</div>
+                            </div>
+                            <!-- 3rd Place -->
+                            <div style="display:flex; flex-direction:column; align-items:center; width:80px;">
+                                <div id="podium-3-avatar" style="font-size:1.8rem; margin-bottom:5px;">🥉</div>
+                                <div id="podium-3-name" style="font-weight:700; font-size:0.85rem; color:var(--text-main); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:80px;">—</div>
+                                <div id="podium-3-score" style="font-size:0.75rem; color:var(--text-muted);">—</div>
+                                <div style="width:60px; height:45px; background:#fed7aa; border-top-left-radius:6px; border-top-right-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.1rem; color:#b45309;">3</div>
+                            </div>
+                        </div>
+
+                        <!-- Ranks List -->
+                        <div id="leaderboard-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+                    </div>
+
+                    <!-- Delivery Leaderboard Column -->
+                    <div>
+                        <h2 class="card-title" data-i18n="title-delivery-leaderboard">🚚 Delivery Leaderboard</h2>
+                        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom: 20px;" data-i18n="desc-delivery-leaderboard">Driver rankings based strictly on the number of completed deliveries.</p>
+                        
+                        <!-- Driver Podium Layout -->
+                        <div style="display:flex; justify-content:center; align-items:flex-end; gap:10px; padding:15px 0; margin-bottom:15px; border-bottom:1px solid var(--border-color);">
+                            <!-- 2nd Place Driver -->
+                            <div style="display:flex; flex-direction:column; align-items:center; width:80px;">
+                                <div id="podium-drv-2-avatar" style="font-size:1.8rem; margin-bottom:5px;">🥈</div>
+                                <div id="podium-drv-2-name" style="font-weight:700; font-size:0.85rem; color:var(--text-main); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:80px;">—</div>
+                                <div id="podium-drv-2-score" style="font-size:0.75rem; color:var(--text-muted);">—</div>
+                                <div style="width:60px; height:60px; background:#cbd5e1; border-top-left-radius:6px; border-top-right-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.2rem; color:#64748b;">2</div>
+                            </div>
+                            <!-- 1st Place Driver -->
+                            <div style="display:flex; flex-direction:column; align-items:center; width:90px;">
+                                <div id="podium-drv-1-avatar" style="font-size:2.2rem; margin-bottom:5px;">🥇</div>
+                                <div id="podium-drv-1-name" style="font-weight:800; font-size:0.95rem; color:var(--primary); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:90px;">—</div>
+                                <div id="podium-drv-1-score" style="font-size:0.8rem; font-weight:700; color:var(--text-main);">—</div>
+                                <div style="width:70px; height:90px; background:#fef08a; border-top-left-radius:6px; border-top-right-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:1.6rem; color:#ca8a04; border:1.5px solid #facc15;">1</div>
+                            </div>
+                            <!-- 3rd Place Driver -->
+                            <div style="display:flex; flex-direction:column; align-items:center; width:80px;">
+                                <div id="podium-drv-3-avatar" style="font-size:1.8rem; margin-bottom:5px;">🥉</div>
+                                <div id="podium-drv-3-name" style="font-weight:700; font-size:0.85rem; color:var(--text-main); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:80px;">—</div>
+                                <div id="podium-drv-3-score" style="font-size:0.75rem; color:var(--text-muted);">—</div>
+                                <div style="width:60px; height:45px; background:#fed7aa; border-top-left-radius:6px; border-top-right-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.1rem; color:#b45309;">3</div>
+                            </div>
+                        </div>
+
+                        <!-- Driver List -->
+                        <div id="driver-leaderboard-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div id="view-adverts" class="view-section">
@@ -1691,7 +1765,7 @@
         </div>
     </div>
 
-    <script defer src="app.js?v=16"></script>
+    <script defer src="app.js?v=17"></script>
 </body>
 
 

@@ -5517,7 +5517,7 @@ function renderAll() {
     else if (currentTab === 'ranks') { renderRanksTable(); }
     else if (currentTab === 'tasks') { renderTasks(); }
     else if (currentTab === 'finance') { renderFinanceTable(); renderFinDetails(); }
-    else if (currentTab === 'summary') { renderSummaryTable(); }
+    else if (currentTab === 'summary') { renderSummaryTable(); renderLeaderboard(); }
     else if (currentTab === 'drivers') { renderDriversList(); renderDriverPanel(); }
     else if (currentTab === 'adverts') { renderAdverts(); }
     else if (currentTab === 'notes') { renderNotes(); }
@@ -5631,10 +5631,10 @@ function populateWorkerDropdowns() {
     const taskSelect = document.getElementById('task-worker-select'); const taskVal = taskSelect ? taskSelect.value : '';
     const permSelect = document.getElementById('perm-worker-select'); const permVal = permSelect ? permSelect.value : '';
 
-    if (opsSelect) opsSelect.innerHTML = '<option value="">-- Choose Employee --</option>';
-    if (finSelect) finSelect.innerHTML = '<option value="">-- Choose Employee --</option>';
-    if (taskSelect) taskSelect.innerHTML = '<option value="">-- Choose Employee --</option>';
-    if (permSelect) permSelect.innerHTML = '<option value="">-- Choose Employee --</option>';
+    if (opsSelect) opsSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
+    if (finSelect) finSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
+    if (taskSelect) taskSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
+    if (permSelect) permSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
 
     getCompanyData().workers.forEach(worker => {
         if (opsSelect) opsSelect.appendChild(new Option(worker.name, worker.id));
@@ -6109,6 +6109,22 @@ const uiTranslations = {
         "btn-save-worker-perms": "Save Worker Permissions",
         "placeholder-enter-branch": "Enter branch name...",
         "btn-add": "Add",
+        "title-shift-planner": "Weekly Shift Planner",
+        "desc-shift-planner": "Set the weekly schedule for each worker to validate check-in attendance.",
+        "btn-save-schedule": "Save Schedule",
+        "title-attendance-shift": "Daily Shift Attendance",
+        "btn-checkin": "Check In",
+        "btn-checkout": "Check Out",
+        "btn-pay-slip": "Pay Slip",
+        "label-delivery-stops": "Delivery Route & Stops (Click on Map to Add)",
+        "btn-clear-stops": "Clear Route Stops",
+        "btn-generate-po": "Auto PO",
+        "title-leaderboard": "Monthly Leaderboard Podium",
+        "desc-leaderboard": "Top performing employees based on perfection rates, completed tasks, and driver deliveries.",
+        "title-general-leaderboard": "🏆 Monthly Employee Leaderboard",
+        "desc-general-leaderboard": "Based on performance score and completed task points.",
+        "title-delivery-leaderboard": "🚚 Delivery Leaderboard",
+        "desc-delivery-leaderboard": "Driver rankings based strictly on the number of completed deliveries.",
         "desc-violation-rules": "Define standard penalties to quickly apply them later.",
         "placeholder-vrule-example": "e.g. Late 15 mins",
         "placeholder-currency-sar": "SAR",
@@ -6426,6 +6442,22 @@ const uiTranslations = {
         "btn-save-worker-perms": "حفظ صلاحيات الموظف",
         "placeholder-enter-branch": "أدخل اسم الفرع...",
         "btn-add": "إضافة",
+        "title-shift-planner": "مخطط نوبات العمل الأسبوعية",
+        "desc-shift-planner": "قم بتعيين الجدول الأسبوعي لكل موظف للتحقق من حضورهم وانصرافهم.",
+        "btn-save-schedule": "حفظ الجدول الأسبوعي",
+        "title-attendance-shift": "حضور نوبة العمل اليومية",
+        "btn-checkin": "تسجيل حضور",
+        "btn-checkout": "تسجيل انصراف",
+        "btn-pay-slip": "قسيمة راتب",
+        "label-delivery-stops": "مسار وتوقفات التوصيل (اضغط على الخريطة للإضافة)",
+        "btn-clear-stops": "مسح مسار التوصيل",
+        "btn-generate-po": "طلب تلقائي",
+        "title-leaderboard": "لوحة الصدارة الشهرية",
+        "desc-leaderboard": "أفضل الموظفين أداءً بناءً على معدلات التقييم، المهام المنجزة، وتوصيلات السائقين.",
+        "title-general-leaderboard": "🏆 قائمة متصدري الموظفين الشهرية",
+        "desc-general-leaderboard": "بناءً على تقييم الأداء ونقاط المهام المكتملة.",
+        "title-delivery-leaderboard": "🚚 قائمة متصدري التوصيل",
+        "desc-delivery-leaderboard": "تصنيفات السائقين بناءً على عدد التوصيلات المكتملة.",
         "desc-violation-rules": "تعيين المخالفات والغرامات القياسية لتطبيقها بسرعة لاحقًا.",
         "placeholder-vrule-example": "مثال: تأخير 15 دقيقة",
         "placeholder-currency-sar": "ريال",
@@ -6711,11 +6743,16 @@ function applyTranslations() {
     }
 
     document.querySelectorAll("[data-i18n]").forEach(el => {
-        const key = el.getAttribute("data-i18n");
+        let key = el.getAttribute("data-i18n");
+        let isPlaceholder = false;
+        if (key.startsWith("[placeholder]")) {
+            isPlaceholder = true;
+            key = key.replace("[placeholder]", "");
+        }
         const translation = langDict[key];
 
         if (translation) {
-            if (el.tagName === "INPUT" && el.hasAttribute("placeholder")) {
+            if (isPlaceholder || (el.tagName === "INPUT" && el.hasAttribute("placeholder")) || (el.tagName === "TEXTAREA" && el.hasAttribute("placeholder"))) {
                 el.placeholder = translation;
             } else {
                 el.innerHTML = translation;
@@ -6736,6 +6773,181 @@ function toggleLanguage(event) {
     if (typeof renderAll === "function") renderAll();
     applyTranslations();
     if (typeof applyDarkMode === "function") applyDarkMode();
+}
+
+// --- GAMIFICATION LEADERBOARDS (EMPLOYEES & DRIVERS) ---
+function renderLeaderboard() {
+    const workers = getCompanyData().workers || [];
+    if (workers.length === 0) return;
+
+    const isAr = currentAppLang === 'ar';
+
+    // 1. Calculate general leaderboard (All non-driver/regular tasks & perfection score)
+    const generalRanked = workers.map(worker => {
+        const avg = parseFloat(getAveragePerfection(getLogsForMonth(worker, currentGlobalMonth)) || 0);
+        
+        let taskPoints = 0;
+        let taskHigh = 0;
+        let taskNormal = 0;
+        if (worker.jobs) {
+            worker.jobs.forEach(job => {
+                if (job.status === 'completed' || job.done) {
+                    const urgency = (job.urgency || 'normal').toLowerCase();
+                    if (urgency === 'high' || urgency === 'urgent') {
+                        taskPoints += 30;
+                        taskHigh++;
+                    } else {
+                        taskPoints += 15;
+                        taskNormal++;
+                    }
+                }
+            });
+        }
+
+        const totalScore = Math.round(avg + taskPoints);
+
+        return {
+            id: worker.id,
+            name: worker.name,
+            role: worker.role || (isAr ? 'موظف' : 'Staff'),
+            avg: avg,
+            taskPoints: taskPoints,
+            taskHigh: taskHigh,
+            taskNormal: taskNormal,
+            score: totalScore
+        };
+    }).sort((a, b) => b.score - a.score);
+
+    // Populate General Podium
+    const p1Name = document.getElementById('podium-1-name');
+    const p1Score = document.getElementById('podium-1-score');
+    const p2Name = document.getElementById('podium-2-name');
+    const p2Score = document.getElementById('podium-2-score');
+    const p3Name = document.getElementById('podium-3-name');
+    const p3Score = document.getElementById('podium-3-score');
+
+    if (generalRanked[0]) {
+        if (p1Name) p1Name.textContent = generalRanked[0].name;
+        if (p1Score) p1Score.textContent = `${generalRanked[0].score} pts`;
+    } else {
+        if (p1Name) p1Name.textContent = '—';
+        if (p1Score) p1Score.textContent = '—';
+    }
+    if (generalRanked[1]) {
+        if (p2Name) p2Name.textContent = generalRanked[1].name;
+        if (p2Score) p2Score.textContent = `${generalRanked[1].score} pts`;
+    } else {
+        if (p2Name) p2Name.textContent = '—';
+        if (p2Score) p2Score.textContent = '—';
+    }
+    if (generalRanked[2]) {
+        if (p3Name) p3Name.textContent = generalRanked[2].name;
+        if (p3Score) p3Score.textContent = `${generalRanked[2].score} pts`;
+    } else {
+        if (p3Name) p3Name.textContent = '—';
+        if (p3Score) p3Score.textContent = '—';
+    }
+
+    // Populate General List
+    const genListDiv = document.getElementById('leaderboard-list');
+    if (genListDiv) {
+        genListDiv.innerHTML = '';
+        generalRanked.forEach((worker, idx) => {
+            const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+            
+            let breakdownStr = '';
+            if (isAr) {
+                breakdownStr = `الأداء: ${worker.avg}% | نقاط المهام: ${worker.taskPoints} (عاجل: ${worker.taskHigh}، عادي: ${worker.taskNormal})`;
+            } else {
+                breakdownStr = `Perf: ${worker.avg}% | Task Pts: ${worker.taskPoints} (High: ${worker.taskHigh}, Normal: ${worker.taskNormal})`;
+            }
+
+            genListDiv.innerHTML += `
+                <div class="flex-between" style="padding:10px 14px; background:var(--input-bg); border-radius:10px; border:1px solid var(--border-color); align-items:center;">
+                    <div style="display:flex; align-items:center; gap:10px; overflow:hidden;">
+                        <span style="font-weight:800; font-size:1.1rem; width:24px; text-align:center; color:var(--text-muted);">${medal}</span>
+                        <div style="overflow:hidden;">
+                            <strong style="color:var(--text-main); display:block; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${worker.name}</strong>
+                            <span style="font-size:0.7rem; color:var(--text-muted); display:block;">${breakdownStr}</span>
+                        </div>
+                    </div>
+                    <div style="text-align:right; font-weight:800; color:var(--primary); font-size:1.05rem; white-space:nowrap; margin-left:10px;">
+                        ${worker.score} pts
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    // 2. Calculate driver leaderboard (Strictly deliveries)
+    const driversRanked = workers.filter(worker => {
+        const isDriver = worker.role && (worker.role.toLowerCase().includes('driver') || worker.role.includes('سائق'));
+        const stats = getMonthlyStats(worker, currentGlobalMonth);
+        const deliveries = (stats.deliveriesList ? stats.deliveriesList.length : 0) + (stats.legacyDeliveries || 0);
+        return isDriver || deliveries > 0;
+    }).map(worker => {
+        const stats = getMonthlyStats(worker, currentGlobalMonth);
+        const deliveries = (stats.deliveriesList ? stats.deliveriesList.length : 0) + (stats.legacyDeliveries || 0);
+        return {
+            id: worker.id,
+            name: worker.name,
+            deliveries: deliveries
+        };
+    }).sort((a, b) => b.deliveries - a.deliveries);
+
+    // Populate Driver Podium
+    const pd1Name = document.getElementById('podium-drv-1-name');
+    const pd1Score = document.getElementById('podium-drv-1-score');
+    const pd2Name = document.getElementById('podium-drv-2-name');
+    const pd2Score = document.getElementById('podium-drv-2-score');
+    const pd3Name = document.getElementById('podium-drv-3-name');
+    const pd3Score = document.getElementById('podium-drv-3-score');
+
+    const labelDels = isAr ? 'توصيلة' : 'dels';
+
+    if (driversRanked[0]) {
+        if (pd1Name) pd1Name.textContent = driversRanked[0].name;
+        if (pd1Score) pd1Score.textContent = `${driversRanked[0].deliveries} ${labelDels}`;
+    } else {
+        if (pd1Name) pd1Name.textContent = '—';
+        if (pd1Score) pd1Score.textContent = '—';
+    }
+    if (driversRanked[1]) {
+        if (pd2Name) pd2Name.textContent = driversRanked[1].name;
+        if (pd2Score) pd2Score.textContent = `${driversRanked[1].deliveries} ${labelDels}`;
+    } else {
+        if (pd2Name) pd2Name.textContent = '—';
+        if (pd2Score) pd2Score.textContent = '—';
+    }
+    if (driversRanked[2]) {
+        if (pd3Name) pd3Name.textContent = driversRanked[2].name;
+        if (pd3Score) pd3Score.textContent = `${driversRanked[2].deliveries} ${labelDels}`;
+    } else {
+        if (pd3Name) pd3Name.textContent = '—';
+        if (pd3Score) pd3Score.textContent = '—';
+    }
+
+    // Populate Driver List
+    const drvListDiv = document.getElementById('driver-leaderboard-list');
+    if (drvListDiv) {
+        drvListDiv.innerHTML = '';
+        driversRanked.forEach((worker, idx) => {
+            const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+            drvListDiv.innerHTML += `
+                <div class="flex-between" style="padding:10px 14px; background:var(--input-bg); border-radius:10px; border:1px solid var(--border-color); align-items:center;">
+                    <div style="display:flex; align-items:center; gap:10px; overflow:hidden;">
+                        <span style="font-weight:800; font-size:1.1rem; width:24px; text-align:center; color:var(--text-muted);">${medal}</span>
+                        <div style="overflow:hidden;">
+                            <strong style="color:var(--text-main); display:block; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${worker.name}</strong>
+                        </div>
+                    </div>
+                    <div style="text-align:right; font-weight:800; color:var(--primary); font-size:1.05rem; white-space:nowrap; margin-left:10px;">
+                        ${worker.deliveries} ${labelDels}
+                    </div>
+                </div>
+            `;
+        });
+    }
 }
 
 // --- MOBILE USER DROPDOWN TRIGGER ---
