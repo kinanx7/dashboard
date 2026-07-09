@@ -245,6 +245,10 @@ body:not(.role-admin) .admin-only {
     display: none !important;
 }
 
+body.role-admin .worker-only {
+    display: none !important;
+}
+
 /* Worker self-view violation panel: always hidden from admins, shown via JS for workers */
 body.role-admin #worker-violation-panel {
     display: none !important;

@@ -619,6 +619,7 @@ function ensureArraysExist(data) {
         }
     });
 
+    if (!data.paymentRequests) data.paymentRequests = {};
     if (!data.incomeSources) data.incomeSources = ['Cash', 'Credit Card'];
     if (!data.disabledSalesMethods) data.disabledSalesMethods = [];
 
@@ -699,6 +700,15 @@ function listenToCloudData() {
                     if (myWorker.jobs) previousTaskIds = myWorker.jobs.map(j => j.id);
                     // Track initial active order time to avoid false notification on login
                     window.previousOrderStartTime = myWorker.activeOrder ? myWorker.activeOrder.startTime : null;
+                    
+                    // Track initial payment request statuses
+                    window.prevPaymentReqStatuses = {};
+                    const pRequests = getCompanyData().paymentRequests || {};
+                    Object.values(pRequests).forEach(req => {
+                        if (req.workerId === myWorker.id) {
+                            window.prevPaymentReqStatuses[req.id] = req.status;
+                        }
+                    });
                 }
             }
             isInitialLoad = false;
@@ -722,6 +732,25 @@ function listenToCloudData() {
                         showInAppNotification('🛵 ' + (t('title-current-order') || 'You have a new delivery order!'));
                     }
                     window.previousOrderStartTime = currentOrderStart;
+
+                    // 3. Payment Request Status Check
+                    const pRequests = getCompanyData().paymentRequests || {};
+                    Object.values(pRequests).forEach(req => {
+                        if (req.workerId === myWorker.id) {
+                            if (!window.prevPaymentReqStatuses) window.prevPaymentReqStatuses = {};
+                            const prevStatus = window.prevPaymentReqStatuses[req.id];
+                            if (prevStatus && req.status !== prevStatus) {
+                                if (req.status === 'accepted') {
+                                    showInAppNotification(`✅ Payment request approved! Code: ${req.code}`);
+                                } else if (req.status === 'rejected') {
+                                    showInAppNotification(`❌ Payment request rejected.`);
+                                } else if (req.status === 'given') {
+                                    showInAppNotification(`💰 Payment of SAR ${req.amount} given successfully!`);
+                                }
+                            }
+                            window.prevPaymentReqStatuses[req.id] = req.status;
+                        }
+                    });
                 }
             }
         }
@@ -5523,6 +5552,8 @@ function renderAll() {
     else if (currentTab === 'notes') { renderNotes(); }
     else if (currentTab === 'managing') { renderManaging(); }
     else if (currentTab === 'costs') { renderCosts(); }
+
+    renderPaymentRequests();
 }
 
 function renderWorkerViolationPanel() {
@@ -6125,6 +6156,16 @@ const uiTranslations = {
         "desc-general-leaderboard": "Based on performance score and completed task points.",
         "title-delivery-leaderboard": "🚚 Delivery Leaderboard",
         "desc-delivery-leaderboard": "Driver rankings based strictly on the number of completed deliveries.",
+        "title-ask-payment": "💵 Ask for a Payment",
+        "desc-ask-payment": "Submit a request for an advance payment or salary release. It will be reviewed by the financial department.",
+        "label-request-amount": "Requested Amount (SAR)",
+        "label-request-reason": "Reason",
+        "btn-submit-request": "Submit Request",
+        "title-my-requests": "My Requests History",
+        "title-pending-requests": "Pending Payment Requests",
+        "desc-pending-requests": "Review worker requests for advance payments. Accepting generates a unique 6-digit code for the worker to provide at the sales checkout.",
+        "title-accepted-payments": "Accepted Payment Releases",
+        "desc-accepted-payments": "Verify the private code with the worker before releasing the salary, then click 'Payment Given Successfully'.",
         "desc-violation-rules": "Define standard penalties to quickly apply them later.",
         "placeholder-vrule-example": "e.g. Late 15 mins",
         "placeholder-currency-sar": "SAR",
@@ -6458,6 +6499,16 @@ const uiTranslations = {
         "desc-general-leaderboard": "بناءً على تقييم الأداء ونقاط المهام المكتملة.",
         "title-delivery-leaderboard": "🚚 قائمة متصدري التوصيل",
         "desc-delivery-leaderboard": "تصنيفات السائقين بناءً على عدد التوصيلات المكتملة.",
+        "title-ask-payment": "💵 طلب سلفة / دفعة مالية",
+        "desc-ask-payment": "قم بتقديم طلب للحصول على سلفة أو دفعة مقدمة من الراتب. سيتم مراجعة الطلب من قبل القسم المالي.",
+        "label-request-amount": "المبلغ المطلوب (ريال)",
+        "label-request-reason": "السبب",
+        "btn-submit-request": "إرسال الطلب",
+        "title-my-requests": "سجل طلباتي",
+        "title-pending-requests": "طلبات الدفع المعلقة",
+        "desc-pending-requests": "مراجعة طلبات السلفة المالية المقدمة من الموظفين. قبول الطلب يولد رمزًا خاصًا مكونًا من 6 أرقام يزود به الموظف مسؤول المبيعات لتسليم المبلغ.",
+        "title-accepted-payments": "عمليات دفع معتمدة للتسليم",
+        "desc-accepted-payments": "يرجى التحقق من الرمز الخاص مع الموظف قبل تسليمه المبلغ، ثم اضغط على 'تم تسليم الدفعة بنجاح'.",
         "desc-violation-rules": "تعيين المخالفات والغرامات القياسية لتطبيقها بسرعة لاحقًا.",
         "placeholder-vrule-example": "مثال: تأخير 15 دقيقة",
         "placeholder-currency-sar": "ريال",
@@ -6966,6 +7017,252 @@ document.addEventListener('click', function (e) {
         dropdown.classList.remove('show-dropdown');
     }
 });
+
+// --- WORKER PAYMENT REQUESTS ENGINE ---
+
+// Helper: Get active worker record corresponding to logged-in user
+function getActiveWorker() {
+    if (!currentUser || currentUser.role !== 'worker') return null;
+    const workers = getCompanyData().workers || [];
+    return workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+}
+
+// 1. Submit Payment Request (Worker)
+function submitPaymentRequest() {
+    const worker = getActiveWorker();
+    if (!worker) {
+        alert("Only registered workers can request payments.");
+        return;
+    }
+    const amountVal = parseFloat(document.getElementById('payment-req-amount').value);
+    const reasonVal = document.getElementById('payment-req-reason').value.trim();
+
+    if (isNaN(amountVal) || amountVal <= 0) {
+        alert(currentAppLang === 'ar' ? 'يرجى إدخال مبلغ صحيح أكبر من 0.' : 'Please enter a valid amount greater than 0.');
+        return;
+    }
+    if (!reasonVal) {
+        alert(currentAppLang === 'ar' ? 'يرجى إدخال سبب الطلب.' : 'Please enter a reason for the request.');
+        return;
+    }
+
+    const reqId = 'req-' + Date.now();
+    const requestObj = {
+        id: reqId,
+        workerId: worker.id,
+        workerName: worker.name,
+        amount: amountVal,
+        reason: reasonVal,
+        status: 'pending',
+        timestamp: Date.now()
+    };
+
+    db.ref(`companies/${currentCompany}/paymentRequests/${reqId}`).set(requestObj)
+        .then(() => {
+            document.getElementById('payment-req-amount').value = '';
+            document.getElementById('payment-req-reason').value = '';
+            alert(currentAppLang === 'ar' ? 'تم تقديم الطلب بنجاح وهو قيد المراجعة.' : 'Request submitted successfully and is pending review.');
+        })
+        .catch(err => {
+            console.error("Error submitting payment request:", err);
+            alert("Error: " + err.message);
+        });
+}
+
+// 2. Accept Request (Finance / Admin Manager)
+function acceptPaymentRequest(reqId) {
+    const pRequests = getCompanyData().paymentRequests || {};
+    const req = pRequests[reqId];
+    if (!req) return;
+
+    // Generate random 6 digit code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    db.ref(`companies/${currentCompany}/paymentRequests/${reqId}`).update({
+        status: 'accepted',
+        code: code,
+        handledAt: Date.now()
+    }).catch(err => console.error("Error accepting request:", err));
+}
+
+// 3. Reject Request (Finance / Admin Manager)
+function rejectPaymentRequest(reqId) {
+    const pRequests = getCompanyData().paymentRequests || {};
+    const req = pRequests[reqId];
+    if (!req) return;
+
+    db.ref(`companies/${currentCompany}/paymentRequests/${reqId}`).update({
+        status: 'rejected',
+        handledAt: Date.now()
+    }).catch(err => console.error("Error rejecting request:", err));
+}
+
+// 4. Confirm Payment Given (Sales / Salary Man)
+function confirmPaymentGiven(reqId) {
+    const pRequests = getCompanyData().paymentRequests || {};
+    const req = pRequests[reqId];
+    if (!req) return;
+
+    // Verify verification code entered (or just standard confirmation)
+    const enteredCode = document.getElementById(`verify-code-${reqId}`).value.trim();
+    if (enteredCode !== req.code) {
+        alert(currentAppLang === 'ar' ? 'الرمز المدخل غير صحيح!' : 'Incorrect verification code!');
+        return;
+    }
+
+    // Find worker
+    const workers = getCompanyData().workers || [];
+    const workerIndex = workers.findIndex(w => w.id === req.workerId);
+    if (workerIndex === -1) {
+        alert("Worker not found in database.");
+        return;
+    }
+    const worker = workers[workerIndex];
+    const stats = getMonthlyStats(worker, currentGlobalMonth);
+
+    // Save payment log in worker's monthlyStats
+    if (!stats.paymentsList) stats.paymentsList = [];
+    stats.paymentsList.unshift({
+        id: Date.now().toString(),
+        date: formatTimestamp(),
+        amount: req.amount,
+        reason: req.reason
+    });
+
+    // Write payment to worker stats, then change request status to 'given'
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/paymentsList`).set(stats.paymentsList)
+        .then(() => {
+            return db.ref(`companies/${currentCompany}/paymentRequests/${reqId}`).update({
+                status: 'given',
+                givenAt: Date.now()
+            });
+        })
+        .then(() => {
+            alert(currentAppLang === 'ar' ? 'تم تسجيل الدفعة وتسليمها بنجاح!' : 'Payment logged and released successfully!');
+        })
+        .catch(err => {
+            console.error("Error confirming payment release:", err);
+            alert("Error: " + err.message);
+        });
+}
+
+// 5. Render Worker requests lists
+function renderPaymentRequests() {
+    const isAr = currentAppLang === 'ar';
+    const companyData = getCompanyData();
+    const pRequests = companyData.paymentRequests || {};
+    const reqList = Object.values(pRequests).sort((a, b) => b.timestamp - a.timestamp);
+
+    // Render for Worker (Self Request History)
+    const worker = getActiveWorker();
+    const workerRequestsDiv = document.getElementById('worker-requests-list');
+    if (worker && workerRequestsDiv) {
+        workerRequestsDiv.innerHTML = '';
+        const myReqs = reqList.filter(r => r.workerId === worker.id);
+        if (myReqs.length === 0) {
+            workerRequestsDiv.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted); text-align:center;">${isAr ? 'لا يوجد طلبات سابقة.' : 'No previous requests.'}</p>`;
+        } else {
+            myReqs.forEach(req => {
+                const dateStr = new Date(req.timestamp).toLocaleString();
+                let statusBadge = '';
+                let codeDisplay = '';
+                
+                if (req.status === 'pending') {
+                    statusBadge = `<span class="badge" style="background:#d97706;">${isAr ? 'قيد الانتظار' : 'Pending'}</span>`;
+                } else if (req.status === 'accepted') {
+                    statusBadge = `<span class="badge" style="background:#16a34a;">${isAr ? 'مقبول للتسليم' : 'Approved for Disbursal'}</span>`;
+                    codeDisplay = `<div style="margin-top: 5px; font-weight: 800; font-size: 1rem; color: var(--success);">${isAr ? 'الرمز السري:' : 'Verification Code:'} <span style="background:var(--input-bg); padding: 2px 6px; border-radius: 4px; border: 1px dashed var(--success);">${req.code}</span></div>`;
+                } else if (req.status === 'rejected') {
+                    statusBadge = `<span class="badge" style="background:#dc2626;">${isAr ? 'مرفوض' : 'Rejected'}</span>`;
+                } else if (req.status === 'given') {
+                    statusBadge = `<span class="badge" style="background:#2563eb;">${isAr ? 'تم الاستلام' : 'Given'}</span>`;
+                }
+
+                workerRequestsDiv.innerHTML += `
+                    <div class="ledger-card" style="border-left: 4px solid var(--primary);">
+                        <div class="flex-between">
+                            <strong>SAR ${req.amount}</strong>
+                            ${statusBadge}
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">🕒 ${dateStr}</div>
+                        <div style="font-size: 0.85rem; margin-top: 6px; color: var(--text-main);">${isAr ? 'السبب:' : 'Reason:'} <em>${req.reason}</em></div>
+                        ${codeDisplay}
+                    </div>
+                `;
+            });
+        }
+    }
+
+    // Render for Finance Dept Manager (Pending Requests List)
+    const pendingListDiv = document.getElementById('pending-requests-list');
+    if (pendingListDiv) {
+        pendingListDiv.innerHTML = '';
+        const pendingReqs = reqList.filter(r => r.status === 'pending');
+        if (pendingReqs.length === 0) {
+            pendingListDiv.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted); text-align:center;">${isAr ? 'لا توجد طلبات معلقة حالياً.' : 'No pending requests at the moment.'}</p>`;
+        } else {
+            pendingReqs.forEach(req => {
+                const dateStr = new Date(req.timestamp).toLocaleString();
+                pendingListDiv.innerHTML += `
+                    <div class="ledger-card" style="border-left: 4px solid var(--warning);">
+                        <div class="flex-between">
+                            <div>
+                                <strong style="font-size:1.05rem;">${req.workerName}</strong>
+                                <span style="font-size:0.75rem; color:var(--text-muted); margin-left: 8px;">🕒 ${dateStr}</span>
+                            </div>
+                            <strong class="text-primary" style="font-size:1.1rem;">SAR ${req.amount}</strong>
+                        </div>
+                        <div style="font-size: 0.85rem; margin-top: 8px; color:var(--text-main);">${isAr ? 'السبب:' : 'Reason:'} <em>${req.reason}</em></div>
+                        <div style="display:flex; gap:8px; margin-top: 12px; justify-content: flex-end;">
+                            <button onclick="rejectPaymentRequest('${req.id}')" class="btn-outline-danger" style="padding: 6px 14px; font-size: 0.8rem;">${isAr ? 'رفض' : 'Reject'}</button>
+                            <button onclick="acceptPaymentRequest('${req.id}')" class="btn-success" style="padding: 6px 14px; font-size: 0.8rem;">${isAr ? 'قبول واعتماد' : 'Accept & Approve'}</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+    }
+
+    // Render for Sales Dept Worker (Accepted Payment Releases List)
+    const acceptedListDiv = document.getElementById('accepted-payments-list');
+    if (acceptedListDiv) {
+        acceptedListDiv.innerHTML = '';
+        const acceptedReqs = reqList.filter(r => r.status === 'accepted');
+        if (acceptedReqs.length === 0) {
+            acceptedListDiv.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted); text-align:center;">${isAr ? 'لا توجد دفعات معتمدة بانتظار التسليم.' : 'No approved payments waiting for release.'}</p>`;
+        } else {
+            acceptedReqs.forEach(req => {
+                acceptedListDiv.innerHTML += `
+                    <div class="ledger-card" style="border-left: 4px solid var(--success);">
+                        <div class="flex-between" style="align-items: flex-start; flex-wrap:wrap;">
+                            <div>
+                                <strong style="font-size:1.05rem; display:block;">${req.workerName}</strong>
+                                <span style="font-size:0.85rem; color:var(--text-muted);">${isAr ? 'السبب:' : 'Reason:'} <em>${req.reason}</em></span>
+                            </div>
+                            <div style="text-align: right;">
+                                <strong class="text-success" style="font-size:1.15rem; display:block;">SAR ${req.amount}</strong>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 10px; margin-top: 14px; align-items: center; flex-wrap: wrap;">
+                            <input type="text" id="verify-code-${req.id}" placeholder="${isAr ? 'أدخل الرمز للتأكيد...' : 'Enter verification code...'}" 
+                                style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem;">
+                            <button onclick="confirmPaymentGiven('${req.id}')" class="btn-success" style="padding: 8px 16px; font-size: 0.85rem; font-weight:700;">
+                                ${isAr ? 'تم تسليم المبلغ بنجاح ✅' : 'Payment Given Successfully ✅'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+    }
+}
+
+// Bind to window
+window.submitPaymentRequest = submitPaymentRequest;
+window.acceptPaymentRequest = acceptPaymentRequest;
+window.rejectPaymentRequest = rejectPaymentRequest;
+window.confirmPaymentGiven = confirmPaymentGiven;
+window.renderPaymentRequests = renderPaymentRequests;
 
 // Initial run
 applyTranslations();

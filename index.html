@@ -499,6 +499,31 @@
                         </table>
                     </div>
                 </div>
+
+                <!-- Worker Self-View: Ask for a Payment Card -->
+                <div class="card worker-only" style="border-top: 4px solid var(--warning);">
+                    <h2 class="card-title" data-i18n="title-ask-payment">💵 Ask for a Payment</h2>
+                    <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:16px;" data-i18n="desc-ask-payment">Submit a request for an advance payment or salary release. It will be reviewed by the financial department.</p>
+                    
+                    <div class="grid-2-col" style="margin-bottom: 16px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label data-i18n="label-request-amount">Requested Amount (SAR)</label>
+                            <input type="number" id="payment-req-amount" placeholder="e.g. 500" min="1">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label data-i18n="label-request-reason">Reason</label>
+                            <input type="text" id="payment-req-reason" placeholder="e.g. Emergency medical expense">
+                        </div>
+                    </div>
+                    <button onclick="submitPaymentRequest()" class="btn-warning" style="width:100%; font-weight:700; padding:12px; margin-top: 16px;" data-i18n="btn-submit-request">Submit Request</button>
+
+                    <div style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+                        <h3 data-i18n="title-my-requests">My Requests History</h3>
+                        <div id="worker-requests-list" style="display:flex; flex-direction:column; gap:10px; margin-top:12px;">
+                            <!-- Rendered dynamically -->
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -974,6 +999,17 @@
 
             <!-- Main Content: Financial Table & Export -->
             <div>
+                <!-- Pending Payment Requests Card -->
+                <div class="card" style="border-top: 4px solid var(--warning); margin-bottom: 24px;">
+                    <h2 class="card-title" data-i18n="title-pending-requests">Pending Payment Requests</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;" data-i18n="desc-pending-requests">
+                        Review worker requests for advance payments. Accepting generates a unique 6-digit code for the worker to provide at the sales checkout.
+                    </p>
+                    <div id="pending-requests-list" style="display:flex; flex-direction:column; gap:12px;">
+                        <!-- Rendered dynamically -->
+                    </div>
+                </div>
+
                 <div class="card">
                     <div class="card-header-flex">
                         <h2 class="card-title in-flex"><span data-i18n="title-payroll-ledger">Payroll & Finance
@@ -1066,7 +1102,7 @@
 
             <!-- Leaderboard Card -->
             <div class="card" style="margin-top: 24px;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; width: 100%;" class="grid-2-col">
+                <div class="grid-2-col" style="gap: 24px; width: 100%;">
                     
                     <!-- General Leaderboard Column -->
                     <div>
@@ -1422,6 +1458,17 @@
                         <div id="sales-transaction-log"
                             style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; padding-right: 5px;">
                         </div>
+                    </div>
+                </div>
+
+                <!-- Accepted Payment Releases Card -->
+                <div class="card" style="margin-top: 30px; border-top: 4px solid var(--success);">
+                    <h2 class="card-title" data-i18n="title-accepted-payments">Accepted Payment Releases</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;" data-i18n="desc-accepted-payments">
+                        Verify the private code with the worker before releasing the salary, then click "Payment Given Successfully".
+                    </p>
+                    <div id="accepted-payments-list" style="display:flex; flex-direction:column; gap:12px;">
+                        <!-- Rendered dynamically -->
                     </div>
                 </div>
             </div>
