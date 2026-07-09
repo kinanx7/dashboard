@@ -7075,11 +7075,22 @@ function acceptPaymentRequest(reqId) {
     const req = pRequests[reqId];
     if (!req) return;
 
+    // Get adjusted amount from input
+    let approvedAmount = req.amount;
+    const adjustInput = document.getElementById(`adjust-amount-${reqId}`);
+    if (adjustInput) {
+        const parsed = parseFloat(adjustInput.value);
+        if (!isNaN(parsed) && parsed > 0) {
+            approvedAmount = parsed;
+        }
+    }
+
     // Generate random 6 digit code
     const code = Math.floor(100000 + Math.random() * 900000).toString();
 
     db.ref(`companies/${currentCompany}/paymentRequests/${reqId}`).update({
         status: 'accepted',
+        amount: approvedAmount,
         code: code,
         handledAt: Date.now()
     }).catch(err => console.error("Error accepting request:", err));
@@ -7213,9 +7224,12 @@ function renderPaymentRequests() {
                             <strong class="text-primary" style="font-size:1.1rem;">SAR ${req.amount}</strong>
                         </div>
                         <div style="font-size: 0.85rem; margin-top: 8px; color:var(--text-main);">${isAr ? 'السبب:' : 'Reason:'} <em>${req.reason}</em></div>
-                        <div style="display:flex; gap:8px; margin-top: 12px; justify-content: flex-end;">
-                            <button onclick="rejectPaymentRequest('${req.id}')" class="btn-outline-danger" style="padding: 6px 14px; font-size: 0.8rem;">${isAr ? 'رفض' : 'Reject'}</button>
-                            <button onclick="acceptPaymentRequest('${req.id}')" class="btn-success" style="padding: 6px 14px; font-size: 0.8rem;">${isAr ? 'قبول واعتماد' : 'Accept & Approve'}</button>
+                        <div style="display:flex; gap:8px; margin-top: 12px; justify-content: flex-end; align-items:center; flex-wrap:wrap;">
+                            <label style="margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">${isAr ? 'تعديل المبلغ (ريال):' : 'Adjust Amount (SAR):'}</label>
+                            <input type="number" id="adjust-amount-${req.id}" value="${req.amount}" min="1" 
+                                style="max-width: 90px; padding: 6px 10px; font-size: 0.85rem; height: 34px;">
+                            <button onclick="rejectPaymentRequest('${req.id}')" class="btn-outline-danger" style="padding: 6px 14px; font-size: 0.8rem; height: 34px;">${isAr ? 'رفض' : 'Reject'}</button>
+                            <button onclick="acceptPaymentRequest('${req.id}')" class="btn-success" style="padding: 6px 14px; font-size: 0.8rem; height: 34px;">${isAr ? 'قبول واعتماد' : 'Accept & Approve'}</button>
                         </div>
                     </div>
                 `;
