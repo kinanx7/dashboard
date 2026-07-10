@@ -410,6 +410,33 @@
                     <ul id="branches-list" style="list-style: none; margin-top: 16px;"></ul>
                 </div>
 
+                <!-- System Violations Management (Admin Only) -->
+                <div class="card">
+                    <h2 class="card-title">⚠️ System Violations System</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
+                        Manage escalation levels for worker system violations (not normal infractions).
+                    </p>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <label style="font-size:0.8rem; font-weight:700; color:var(--text-muted);">Select Worker:</label>
+                        <select id="sys-viol-worker-select" onchange="renderSelectedWorkerSysViolations()" style="padding: 10px; border-radius: 8px; background:var(--input-bg); border: 1px solid var(--border-color); color:var(--text-main);">
+                            <option value="">-- Choose Worker --</option>
+                        </select>
+                        
+                        <label style="font-size:0.8rem; font-weight:700; color:var(--text-muted); margin-top:8px;">Reason for Violation:</label>
+                        <input type="text" id="sys-viol-reason" placeholder="Enter reason..." style="padding:10px;">
+                        
+                        <button onclick="addSystemViolation()" class="btn-danger" style="width: 100%; margin-top: 8px;">Add System Violation</button>
+                    </div>
+                    
+                    <div id="sys-viol-unlocked-section" style="margin-top: 16px; display:none; padding:12px; background:var(--input-bg); border-radius:8px; border:1px solid var(--border-color);">
+                        <div style="font-size:0.85rem; font-weight:700; color:var(--text-main); margin-bottom:8px;">Account Termination Status:</div>
+                        <div id="sys-viol-status-label" style="font-size:0.85rem; margin-bottom:8px;"></div>
+                        <button id="sys-viol-unlock-btn" onclick="toggleWorkerCloseStatus()" class="btn-success" style="width:100%; padding:6px; font-size:0.85rem;"></button>
+                    </div>
+
+                    <ul id="sys-viol-list" style="list-style: none; margin-top: 16px; padding: 0;"></ul>
+                </div>
+
                 <!-- Violation Rules Editor -->
                 <div class="card">
                     <h2 class="card-title" data-i18n="title-violation-rules">Violation Rules System</h2>

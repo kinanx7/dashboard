@@ -486,6 +486,9 @@ function applyUserRoles() {
         if (wPerms.adverts || deptPrivacy.adverts === 'public') document.body.classList.add('perm-adverts');
         if (wPerms.attendance) document.body.classList.add('perm-attendance');
         if (isDriver) document.body.classList.add('is-driver');
+        if (typeof checkWorkerSystemViolationAlerts === 'function') {
+            checkWorkerSystemViolationAlerts(worker);
+        }
     }
 
     const roleBadge = document.getElementById('display-user-role');
@@ -3719,7 +3722,8 @@ function getCumulativeBalance(worker, maxMonthStr) {
         const rew = calculateRewardsTotal(stats.rewardsList);
         const viol = calculateViolationsTotal(stats.violationsList);
 
-        const netThisMonth = base + rew - viol;
+        const sysViolDeduction = typeof getSystemViolationDeductionsForMonth === 'function' ? getSystemViolationDeductionsForMonth(worker, m) : 0;
+        const netThisMonth = base + rew - viol - sysViolDeduction;
         const paidThisMonth = calculatePaymentsTotal(stats.paymentsList);
         balance += (netThisMonth - paidThisMonth);
         if (m === maxMonthStr) break;
@@ -3764,7 +3768,8 @@ function getExportData(lang) {
         const violations = calculateViolationsTotal(stats.violationsList);
         const paid = calculatePaymentsTotal(stats.paymentsList);
 
-        const netIncome = baseIncome + rewards - violations - paid;
+        const sysViolDeduction = typeof getSystemViolationDeductionsForMonth === 'function' ? getSystemViolationDeductionsForMonth(w, currentGlobalMonth) : 0;
+        const netIncome = baseIncome + rewards - violations - sysViolDeduction - paid;
         const remaining = getCumulativeBalance(w, currentGlobalMonth);
         const custodyTotal = calculateCustodyTotal(stats.custodyList);
 
@@ -5581,7 +5586,13 @@ function renderAll() {
     renderManagersList();
     renderWorkerViolationPanel();
 
-    if (currentTab === 'ops') { renderOpsWorkersTable(); renderOpsDetails(); }
+    if (currentTab === 'ops') { 
+        renderOpsWorkersTable(); 
+        renderOpsDetails(); 
+        if (typeof renderSelectedWorkerSysViolations === 'function') {
+            renderSelectedWorkerSysViolations();
+        }
+    }
     else if (currentTab === 'ranks') { renderRanksTable(); }
     else if (currentTab === 'attendance') { renderAttendance(); }
     else if (currentTab === 'tasks') { renderTasks(); }
@@ -5702,23 +5713,27 @@ function populateWorkerDropdowns() {
     const finSelect = document.getElementById('fin-worker-select'); const finVal = finSelect.value;
     const taskSelect = document.getElementById('task-worker-select'); const taskVal = taskSelect ? taskSelect.value : '';
     const permSelect = document.getElementById('perm-worker-select'); const permVal = permSelect ? permSelect.value : '';
+    const sysSelect = document.getElementById('sys-viol-worker-select'); const sysVal = sysSelect ? sysSelect.value : '';
 
     if (opsSelect) opsSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
     if (finSelect) finSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
     if (taskSelect) taskSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
     if (permSelect) permSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
+    if (sysSelect) sysSelect.innerHTML = `<option value="">-- Choose Worker --</option>`;
 
     getCompanyData().workers.forEach(worker => {
         if (opsSelect) opsSelect.appendChild(new Option(worker.name, worker.id));
         if (finSelect) finSelect.appendChild(new Option(worker.name, worker.id));
         if (taskSelect) taskSelect.appendChild(new Option(worker.name, worker.id));
         if (permSelect) permSelect.appendChild(new Option(worker.name, worker.id));
+        if (sysSelect) sysSelect.appendChild(new Option(worker.name, worker.id));
     });
 
     if (opsSelect) opsSelect.value = opsVal;
     if (finSelect) finSelect.value = finVal;
     if (taskSelect) taskSelect.value = taskVal;
     if (permSelect) permSelect.value = permVal;
+    if (sysSelect) sysSelect.value = sysVal;
 }
 
 // OPERATIONS TAB RENDERING
@@ -5817,13 +5832,18 @@ function renderFinanceTable() {
         const viol = calculateViolationsTotal(stats.violationsList);
         const paidThisMonth = calculatePaymentsTotal(stats.paymentsList);
 
-        // UI display for Net reflects the subtraction of the advance payment
-        const net = base + rew - viol - paidThisMonth;
+        // UI display for Net reflects the subtraction of the advance payment and system violations
+        const sysViolDeduction = typeof getSystemViolationDeductionsForMonth === 'function' ? getSystemViolationDeductionsForMonth(worker, currentGlobalMonth) : 0;
+        const net = base + rew - viol - paidThisMonth - sysViolDeduction;
 
         const remainingAllTime = getCumulativeBalance(worker, currentGlobalMonth);
         const detailsId = `net-details-${worker.id}`;
 
         const tr = document.createElement('tr');
+        let sysViolHtml = '';
+        if (sysViolDeduction > 0) {
+            sysViolHtml = `<div class="breakdown-row" style="color:var(--danger);"><span>System Violations:</span> <span>- SAR ${sysViolDeduction.toLocaleString()}</span></div>`;
+        }
         tr.innerHTML = `
                     <td><strong style="color:var(--text-main);">${worker.name}</strong><br><span class="text-muted-heavy">${worker.branch}</span></td>
                     <td>SAR ${base.toLocaleString()}</td>
@@ -5836,6 +5856,7 @@ function renderFinanceTable() {
                             <div class="breakdown-row" style="color:var(--text-main);"><span>Base:</span> <span>SAR ${base.toLocaleString()}</span></div>
                             <div class="breakdown-row" style="color:var(--success);"><span>Rewards:</span> <span>+ SAR ${rew.toLocaleString()}</span></div>
                             <div class="breakdown-row" style="color:var(--danger);"><span>Violations:</span> <span>- SAR ${viol.toLocaleString()}</span></div>
+                            ${sysViolHtml}
                             <div class="breakdown-row" style="color:var(--info);"><span>Paid Advance:</span> <span>- SAR ${paidThisMonth.toLocaleString()}</span></div>
                         </div>
                     </td>
@@ -6080,6 +6101,39 @@ function renderSummaryTable() {
             });
         }
 
+        // System violations block
+        const sysViolList = worker.systemViolations || [];
+        const sysViolLogs = typeof getSystemViolationLogsForMonth === 'function' ? getSystemViolationLogsForMonth(worker, currentGlobalMonth) : [];
+        const sysViolCount = sysViolList.length;
+
+        let sysViolHtml = '';
+        if (sysViolCount > 0) {
+            let logRows = '';
+            sysViolLogs.forEach(l => {
+                logRows += `<div style="font-size:0.8rem; color:var(--danger); margin-top:4px; font-weight:600;">
+                    • ${l.text} ${l.amount > 0 ? `(- SAR ${l.amount})` : ''}
+                </div>`;
+            });
+            sysViolHtml = `
+                <div style="margin-top: 12px; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg);">
+                    <div style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); display: flex; justify-content: space-between;">
+                        <span>⚠️ System Violations</span>
+                        <span class="badge badge-bad" style="margin: 0; font-size: 0.75rem; padding: 2px 6px;">${sysViolCount}/6</span>
+                    </div>
+                    ${logRows}
+                </div>
+            `;
+        } else {
+            sysViolHtml = `
+                <div style="margin-top: 12px; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg);">
+                    <div style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); display: flex; justify-content: space-between;">
+                        <span>⚠️ System Violations</span>
+                        <span class="badge" style="margin: 0; font-size: 0.75rem; padding: 2px 6px; background:var(--success); color:white;">0/6</span>
+                    </div>
+                </div>
+            `;
+        }
+
         const card = document.createElement('div');
         card.className = 'summary-worker-card';
         card.innerHTML = `
@@ -6089,6 +6143,7 @@ function renderSummaryTable() {
                             <div style="font-size:0.9rem; color:var(--text-muted); display:flex; align-items:center; gap:8px;">
                                 ${worker.branch} <span class="rank-badge rank-${worker.rank}" style="margin:0;">${worker.rank}</span>
                             </div>
+                            ${sysViolHtml}
                         </div>
                         <div style="text-align:right; background:var(--input-bg); padding:12px 16px; border-radius:8px; border:1px solid var(--border-color);">
                             <div style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; font-weight:600; letter-spacing:0.5px; margin-bottom:4px;">${t('th-total-remaining')}</div>
@@ -7664,6 +7719,333 @@ window.deleteManager = deleteManager;
 window.logActivity = logActivity;
 window.renderActivityLog = renderActivityLog;
 window.deleteActivityLog = deleteActivityLog;
+
+// --- SYSTEM VIOLATIONS SYSTEM ---
+
+function getSystemViolationDeductionsForMonth(worker, monthStr) {
+    const list = worker.systemViolations || [];
+    const sorted = [...list].sort((a, b) => a.timestamp - b.timestamp);
+    let totalDeduction = 0;
+    const base = parseFloat(worker.income || 0);
+    const dayRate = base / 30;
+
+    sorted.forEach((viol, idx) => {
+        const violDate = new Date(viol.timestamp);
+        const violMonth = `${violDate.getFullYear()}-${String(violDate.getMonth() + 1).padStart(2, '0')}`;
+        if (violMonth === monthStr) {
+            if (idx === 2) {
+                totalDeduction += Math.round(dayRate * 1);
+            } else if (idx === 3) {
+                totalDeduction += Math.round(dayRate * 3);
+            } else if (idx === 4) {
+                totalDeduction += Math.round(dayRate * 7);
+            }
+        }
+    });
+    return totalDeduction;
+}
+
+function getSystemViolationLogsForMonth(worker, monthStr) {
+    const list = worker.systemViolations || [];
+    const sorted = [...list].sort((a, b) => a.timestamp - b.timestamp);
+    const base = parseFloat(worker.income || 0);
+    const dayRate = base / 30;
+    const logs = [];
+
+    sorted.forEach((viol, idx) => {
+        const violDate = new Date(viol.timestamp);
+        const violMonth = `${violDate.getFullYear()}-${String(violDate.getMonth() + 1).padStart(2, '0')}`;
+        if (violMonth === monthStr) {
+            if (idx === 2) {
+                logs.push({ text: `Violation #3: -1 Day Salary`, amount: Math.round(dayRate * 1) });
+            } else if (idx === 3) {
+                logs.push({ text: `Violation #4: -3 Days Salary`, amount: Math.round(dayRate * 3) });
+            } else if (idx === 4) {
+                logs.push({ text: `Violation #5: -7 Days Salary`, amount: Math.round(dayRate * 7) });
+            } else {
+                logs.push({ text: `Violation #${idx + 1}: warning`, amount: 0 });
+            }
+        }
+    });
+    return logs;
+}
+
+function checkWorkerSystemViolationAlerts(worker) {
+    if (!worker) return;
+    const count = (worker.systemViolations || []).length;
+    const ack = worker.alertsAcknowledged || {};
+
+    if (count === 1 && !ack.warning1) {
+        showWorkerAlertOverlay(
+            "Official Warning: First System Violation",
+            "تنبيه رسمي: المخالفة النظامية الأولى",
+            "You have received your first system violation. Please note that further violations will lead to salary deductions and potential termination. Ensure you follow all facility rules and regulations.",
+            "لقد تم تسجيل المخالفة النظامية الأولى بحقك. يرجى العلم بأن تكرار المخالفات سيؤدي إلى خصومات مالية من الراتب وقد يصل إلى الفصل النهائي. يرجى الالتزام بكافة التعليمات والأنظمة.",
+            "warning1",
+            worker.id
+        );
+    } else if (count === 2 && !ack.warning2) {
+        showWorkerAlertOverlay(
+            "URGENT Warning: Salary Cut-off Impending",
+            "تنبيه عاجل: خصم وشيك من الراتب",
+            "This is your SECOND system violation. This is a final warning before salary deductions begin. Your next violation will result in an automatic deduction of one day's salary. Please review your conduct immediately.",
+            "هذا هو التنبيه النظامي الثاني بحقك. هذا هو الإنذار النهائي قبل البدء بالخصومات المالية من راتبك. المخالفة القادمة ستؤدي إلى خصم تلقائي لقيمة يوم عمل كامل من راتبك الشهري. يرجى مراجعة سلوكك فوراً.",
+            "warning2",
+            worker.id
+        );
+    } else if (count >= 6 && !worker.unlockedClose) {
+        const listStr = (worker.systemViolations || []).map((v, i) => `${i+1}. ${v.reason}`).join('<br>');
+        showWorkerAlertOverlay(
+            "Your Account has been Terminated",
+            "تم فصلك عن العمل نهائياً",
+            `Your employment has been permanently terminated due to system violations. Details:<br>${listStr}`,
+            `تم فصلك عن العمل نهائيا للاسباب التالية :<br>${listStr}<br><br>لن يتم احتساب اي دوام لك بعد هذه الرسالة يرجى مراجعة الادارة لتصفية حساباتك وسيتم اتخاذ اللازم.`,
+            "block",
+            worker.id
+        );
+    } else {
+        const m = document.getElementById('worker-alert-modal');
+        if (m && !m.classList.contains('permanent-block-modal')) {
+            m.remove();
+        }
+    }
+}
+
+function showWorkerAlertOverlay(titleEn, titleAr, msgEn, msgAr, type, workerId) {
+    if (document.getElementById('worker-alert-modal')) return;
+
+    const isAr = currentAppLang === 'ar';
+    const modal = document.createElement('div');
+    modal.id = 'worker-alert-modal';
+    if (type === 'block') {
+        modal.classList.add('permanent-block-modal');
+    }
+    modal.style = `
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(0,0,0,0.85);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 100000;
+        padding: 20px;
+        backdrop-filter: blur(8px);
+    `;
+
+    const content = document.createElement('div');
+    content.className = 'card';
+    content.style = `
+        max-width: 600px;
+        width: 100%;
+        background: var(--card-bg);
+        border: 2px solid var(--danger);
+        border-radius: 16px;
+        padding: 30px;
+        box-shadow: var(--shadow-lg);
+        text-align: center;
+    `;
+
+    const enHtml = `
+        <div style="direction: ltr; margin-bottom: 20px; border-bottom: 1px dashed var(--border-color); padding-bottom: 20px;">
+            <h2 style="color: var(--danger); margin-bottom: 12px; font-size: 1.5rem;">🚨 ${titleEn}</h2>
+            <p style="font-size: 1rem; color: var(--text-main); line-height: 1.5; font-weight: 500; text-align: left;">${msgEn}</p>
+        </div>
+    `;
+
+    const arHtml = `
+        <div style="direction: rtl; margin-bottom: 25px;">
+            <h2 style="color: var(--danger); margin-bottom: 12px; font-size: 1.5rem;">🚨 ${titleAr}</h2>
+            <p style="font-size: 1rem; color: var(--text-main); line-height: 1.5; font-weight: 500; text-align: right;">${msgAr}</p>
+        </div>
+    `;
+
+    let buttonHtml = '';
+    if (type === 'block') {
+        buttonHtml = `<p style="font-weight:700; color:var(--danger); font-size:1.1rem; border: 2px solid var(--danger); padding: 12px; border-radius: 8px; background:var(--danger-bg); margin-top:20px; direction:rtl;">
+            الرجاء مراجعة الإدارة لتصفية حساباتك.
+        </p>`;
+    } else {
+        buttonHtml = `
+            <button onclick="confirmWorkerAlert('${workerId}', '${type}')" class="btn-danger" style="padding: 12px 30px; font-size: 1.05rem; font-weight: 800; border-radius: 8px; cursor: pointer; width: 100%; box-shadow: var(--shadow-md);">
+                لقد قرأت الرسالة وأؤكد فهمي لها | Confirm & Close
+            </button>
+        `;
+    }
+
+    content.innerHTML = enHtml + arHtml + buttonHtml;
+    modal.appendChild(content);
+    document.body.appendChild(modal);
+}
+
+function confirmWorkerAlert(workerId, type) {
+    const workers = getCompanyData().workers || [];
+    const idx = workers.findIndex(w => w.id === workerId);
+    if (idx === -1) return;
+
+    db.ref(`companies/${currentCompany}/workers/${idx}/alertsAcknowledged/${type}`).set(true)
+        .then(() => {
+            const m = document.getElementById('worker-alert-modal');
+            if (m) m.remove();
+        })
+        .catch(err => console.error("Error acknowledging alert:", err));
+}
+
+function renderSelectedWorkerSysViolations() {
+    const workerId = document.getElementById('sys-viol-worker-select')?.value;
+    const listUl = document.getElementById('sys-viol-list');
+    const unlockedSection = document.getElementById('sys-viol-unlocked-section');
+    const statusLabel = document.getElementById('sys-viol-status-label');
+    const unlockBtn = document.getElementById('sys-viol-unlock-btn');
+
+    if (!listUl) return;
+    listUl.innerHTML = '';
+
+    if (!workerId) {
+        if (unlockedSection) unlockedSection.style.display = 'none';
+        return;
+    }
+
+    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    if (!worker) return;
+
+    const list = worker.systemViolations || [];
+    const count = list.length;
+
+    list.forEach((v, index) => {
+        const li = document.createElement('li');
+        li.style = "display:flex; justify-content:space-between; align-items:center; padding:10px; background:var(--input-bg); margin-bottom:8px; border-radius:6px; border:1px solid var(--border-color); font-size:0.9rem;";
+        const dateStr = new Date(v.timestamp).toLocaleDateString();
+        li.innerHTML = `
+            <div>
+                <strong style="color:var(--text-main);">${index + 1}. ${v.reason}</strong>
+                <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">📅 ${dateStr}</div>
+            </div>
+            <button onclick="deleteSystemViolation('${workerId}', ${index})" class="btn-outline-danger" style="padding:4px 8px; font-size:0.75rem; border:none; text-decoration:underline;">Remove</button>
+        `;
+        listUl.appendChild(li);
+    });
+
+    if (unlockedSection) {
+        unlockedSection.style.display = 'block';
+        if (count >= 6) {
+            unlockBtn.style.display = 'block';
+            if (worker.unlockedClose) {
+                statusLabel.innerHTML = `<span style="color:var(--success); font-weight:700;">🔓 Unlocked (Allowed App Access)</span>`;
+                unlockBtn.textContent = 'Lock Account';
+                unlockBtn.className = 'btn-danger';
+            } else {
+                statusLabel.innerHTML = `<span style="color:var(--danger); font-weight:700;">🔒 Locked / Terminated (Blocked)</span>`;
+                unlockBtn.textContent = 'Unlock Account';
+                unlockBtn.className = 'btn-success';
+            }
+        } else {
+            statusLabel.innerHTML = `<span style="color:var(--text-muted);">Status: Active (Violations: ${count}/6)</span>`;
+            unlockBtn.style.display = 'none';
+        }
+    }
+}
+
+function addSystemViolation() {
+    const workerId = document.getElementById('sys-viol-worker-select').value;
+    const reason = document.getElementById('sys-viol-reason').value.trim();
+
+    if (!workerId) {
+        alert("Please select a worker first.");
+        return;
+    }
+    if (!reason) {
+        alert("Please enter a reason for the system violation.");
+        return;
+    }
+
+    const workers = getCompanyData().workers || [];
+    const idx = workers.findIndex(w => w.id === workerId);
+    if (idx === -1) return;
+
+    const worker = workers[idx];
+    const list = worker.systemViolations || [];
+    
+    const newViol = {
+        id: 'sv-' + Date.now(),
+        reason: reason,
+        timestamp: Date.now()
+    };
+
+    list.push(newViol);
+
+    const count = list.length;
+    let alertsAck = worker.alertsAcknowledged || {};
+    if (count === 1) alertsAck.warning1 = false;
+    if (count === 2) alertsAck.warning2 = false;
+    
+    const updates = {
+        systemViolations: list,
+        alertsAcknowledged: alertsAck
+    };
+
+    if (count === 6) {
+        updates.unlockedClose = false;
+    }
+
+    db.ref(`companies/${currentCompany}/workers/${idx}`).update(updates)
+        .then(() => {
+            document.getElementById('sys-viol-reason').value = '';
+            if (typeof logActivity === 'function') {
+                logActivity('violation', worker.id, worker.name, `Added system violation to ${worker.name}: "${reason}" (Violation Count: ${count}/6)`);
+            }
+            alert("System violation added successfully!");
+            renderSelectedWorkerSysViolations();
+        })
+        .catch(err => console.error("Error adding system violation:", err));
+}
+
+function deleteSystemViolation(workerId, index) {
+    if (!confirm("Are you sure you want to remove this system violation?")) return;
+
+    const workers = getCompanyData().workers || [];
+    const idx = workers.findIndex(w => w.id === workerId);
+    if (idx === -1) return;
+
+    const worker = workers[idx];
+    const list = [...(worker.systemViolations || [])];
+    const removed = list.splice(index, 1)[0];
+
+    db.ref(`companies/${currentCompany}/workers/${idx}/systemViolations`).set(list)
+        .then(() => {
+            if (typeof logActivity === 'function') {
+                logActivity('violation', worker.id, worker.name, `Removed system violation from ${worker.name}: "${removed ? removed.reason : ''}"`);
+            }
+            alert("System violation removed successfully!");
+            renderSelectedWorkerSysViolations();
+        })
+        .catch(err => console.error("Error deleting system violation:", err));
+}
+
+function toggleWorkerCloseStatus() {
+    const workerId = document.getElementById('sys-viol-worker-select').value;
+    if (!workerId) return;
+
+    const workers = getCompanyData().workers || [];
+    const idx = workers.findIndex(w => w.id === workerId);
+    if (idx === -1) return;
+
+    const worker = workers[idx];
+    const newStatus = !worker.unlockedClose;
+
+    db.ref(`companies/${currentCompany}/workers/${idx}/unlockedClose`).set(newStatus)
+        .then(() => {
+            alert(newStatus ? "Worker account unlocked successfully!" : "Worker account locked successfully!");
+            renderSelectedWorkerSysViolations();
+        })
+        .catch(err => console.error("Error toggling close status:", err));
+}
+
+window.getSystemViolationDeductionsForMonth = getSystemViolationDeductionsForMonth;
+window.getSystemViolationLogsForMonth = getSystemViolationLogsForMonth;
+window.checkWorkerSystemViolationAlerts = checkWorkerSystemViolationAlerts;
+window.confirmWorkerAlert = confirmWorkerAlert;
+window.renderSelectedWorkerSysViolations = renderSelectedWorkerSysViolations;
+window.addSystemViolation = addSystemViolation;
+window.deleteSystemViolation = deleteSystemViolation;
+window.toggleWorkerCloseStatus = toggleWorkerCloseStatus;
 
 // Initial run
 applyTranslations();
