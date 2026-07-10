@@ -439,12 +439,6 @@ function applyUserRoles() {
     let isKinan = email === 'kinan.rahal@hotmail.com';
     let isAdmin = isKinan || admins[email.replace(/\./g, ',')] === true;
 
-    if (isKinan) {
-        document.body.classList.add('user-is-kinan');
-    } else {
-        document.body.classList.remove('user-is-kinan');
-    }
-
     const swapBtn = document.getElementById('company-swap-btn');
     if (swapBtn) {
         if (isKinan || window.isMultiCompany) {
@@ -478,6 +472,7 @@ function applyUserRoles() {
 
     document.body.className = 'theme-' + currentCompany;
     if (isDarkMode) document.body.classList.add('dark-mode');
+    if (isKinan) document.body.classList.add('user-is-kinan');
 
     if (isAdmin) {
         document.body.classList.add('role-admin');
@@ -7631,13 +7626,18 @@ function renderActivityLog() {
         card.style.marginBottom = '8px';
         card.style.boxShadow = 'var(--shadow-sm)';
 
+        const deleteBtn = `<button onclick="deleteActivityLog('${log.id}')" class="btn-outline-danger" style="padding: 2px 6px; font-size: 0.7rem; line-height: 1; border: none; border-radius: 4px; margin-left: 8px;" title="${isAr ? 'حذف النشاط' : 'Delete Activity'}">🗑️</button>`;
+
         card.innerHTML = `
             <div class="flex-between" style="align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 8px;">
                 <div>
                     ${typeBadge}
                     <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 8px;">🕒 ${dateStr}</span>
                 </div>
-                <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">${isAr ? 'بواسطة: ' : 'By: '} <strong style="color:var(--text-main);">${log.actorName || 'System'}</strong></span>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">${isAr ? 'بواسطة: ' : 'By: '} <strong style="color:var(--text-main);">${log.actorName || 'System'}</strong></span>
+                    ${deleteBtn}
+                </div>
             </div>
             <div style="font-size: 0.9rem; color: var(--text-main); font-weight: 500; line-height: 1.4;">
                 ${log.details}
@@ -7645,6 +7645,14 @@ function renderActivityLog() {
         `;
         listDiv.appendChild(card);
     });
+}
+
+function deleteActivityLog(activityId) {
+    const isAr = currentAppLang === 'ar';
+    if (confirm(isAr ? 'هل أنت متأكد من حذف هذا النشاط من السجل؟' : 'Are you sure you want to delete this activity log?')) {
+        db.ref(`companies/${currentCompany}/activityLogs/${activityId}`).remove()
+            .catch(err => console.error("Error deleting activity log:", err));
+    }
 }
 
 // Bind to window
@@ -7655,6 +7663,7 @@ window.addManager = addManager;
 window.deleteManager = deleteManager;
 window.logActivity = logActivity;
 window.renderActivityLog = renderActivityLog;
+window.deleteActivityLog = deleteActivityLog;
 
 // Initial run
 applyTranslations();
