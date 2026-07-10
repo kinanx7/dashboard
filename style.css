@@ -249,6 +249,10 @@ body.role-admin .worker-only {
     display: none !important;
 }
 
+body:not(.user-is-kinan) .kinan-only {
+    display: none !important;
+}
+
 body:not(.role-admin):not(.perm-attendance) .attendance-admin-only {
     display: none !important;
 }
@@ -659,6 +663,7 @@ body {
 #view-summary.active-view,
 #view-ranks.active-view,
 #view-attendance.active-view,
+#view-activity.active-view,
 #view-tasks.active-view,
 #view-notes.active-view,
 #view-managing.active-view,

@@ -330,6 +330,7 @@
                 Summary</button>
             <button id="tab-adverts" class="dept-tab" onclick="switchTab('adverts')" data-i18n="tab-ads">📢 Ads</button>
             <button id="tab-notes" class="dept-tab" onclick="switchTab('notes')" data-i18n="tab-notes">📝 Notes</button>
+            <button id="tab-activity" class="dept-tab admin-only" onclick="switchTab('activity')" data-i18n="tab-activity">📜 Activity Log</button>
             <button id="tab-managing" class="dept-tab" onclick="switchTab('managing')" data-i18n="tab-sales">💰 Sales</button>
             <button id="tab-costs" class="dept-tab" onclick="switchTab('costs')" data-i18n="tab-costs">📉 Costs</button>
         </div>
@@ -384,6 +385,19 @@
                         </label>
                     </div>
                     <button onclick="saveWorkerPerms()" style="width: 100%;" data-i18n="btn-save-worker-perms">Save Worker Permissions</button>
+                </div>
+
+                <!-- Manager Access Control (Kinan Only) -->
+                <div class="card kinan-only" style="border-top: 4px solid var(--secondary);">
+                    <h2 class="card-title" data-i18n="title-manager-access">🔐 Manager Access Control</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
+                        Promote workers to administrators (Managers) by entering their emails. Admins have access to all departments and access controls.
+                    </p>
+                    <div class="form-group flex-between">
+                        <input type="email" id="new-manager-email" placeholder="Worker email..." style="padding: 10px; width: 100%;">
+                        <button onclick="addManager()" class="btn-success" style="margin-left: 8px;">Add</button>
+                    </div>
+                    <ul id="managers-list" style="list-style: none; margin-top: 16px; padding: 0;"></ul>
                 </div>
 
                 <!-- Branches Card -->
@@ -1287,6 +1301,34 @@
                     </div>
                 </div>
 
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- VIEW 7.5: ACTIVITY LOG (Admin Only)        -->
+        <!-- ========================================== -->
+        <div id="view-activity" class="view-section admin-only">
+            <div class="card" style="width: 100%; border-top: 4px solid var(--secondary);">
+                <div class="card-header-flex" style="align-items: center; justify-content: space-between;">
+                    <h2 class="card-title in-flex" data-i18n="title-activity-log" style="margin: 0; padding: 0; border: none;">📜 Daily Activity Log</h2>
+                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                        <label style="margin: 0; font-size: 0.85rem; font-weight: 700; color: var(--text-muted);" data-i18n="label-filter-by">Filter By:</label>
+                        <select id="activity-filter" onchange="renderActivityLog()" 
+                            style="padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border-color); font-size: 0.9rem; background: var(--input-bg); color: var(--text-main); min-width: 155px; height: 36px;">
+                            <option value="all" data-i18n="opt-all-activities">All Activities</option>
+                            <option value="delivery" data-i18n="opt-deliveries">Deliveries</option>
+                            <option value="finance" data-i18n="opt-finance-payouts">Financial Payouts</option>
+                            <option value="violation" data-i18n="opt-violations">Violations</option>
+                            <option value="perf_notes" data-i18n="opt-perf-notes">Performance Notes</option>
+                        </select>
+                    </div>
+                </div>
+                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 20px;" data-i18n="desc-activity-log">
+                    Monitor all real-time events, operations, payouts, and violations logged in the system.
+                </p>
+                <div id="activity-log-list" style="display:flex; flex-direction:column; gap:12px;">
+                    <!-- Rendered dynamically -->
+                </div>
             </div>
         </div>
 

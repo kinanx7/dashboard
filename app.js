@@ -439,6 +439,12 @@ function applyUserRoles() {
     let isKinan = email === 'kinan.rahal@hotmail.com';
     let isAdmin = isKinan || admins[email.replace(/\./g, ',')] === true;
 
+    if (isKinan) {
+        document.body.classList.add('user-is-kinan');
+    } else {
+        document.body.classList.remove('user-is-kinan');
+    }
+
     const swapBtn = document.getElementById('company-swap-btn');
     if (swapBtn) {
         if (isKinan || window.isMultiCompany) {
@@ -510,6 +516,7 @@ function markLockedTabs() {
         managing: isAdmin || document.body.classList.contains('perm-sales'),
         costs: isAdmin || document.body.classList.contains('perm-costs'),
         adverts: isAdmin || document.body.classList.contains('perm-adverts'),
+        activity: isAdmin,
     };
 
     Object.entries(access).forEach(([tabId, hasAccess]) => {
@@ -622,6 +629,7 @@ function ensureArraysExist(data) {
 
     if (!data.paymentRequests) data.paymentRequests = {};
     if (!data.attendance) data.attendance = {};
+    if (!data.activityLogs) data.activityLogs = {};
     if (!data.incomeSources) data.incomeSources = ['Cash', 'Credit Card'];
     if (!data.disabledSalesMethods) data.disabledSalesMethods = [];
 
@@ -1676,6 +1684,16 @@ function postManagerNote() {
     
     // Targeted write to managerNotes
     db.ref('companies/' + currentCompany + '/managerNotes/' + newNote.id).set(newNote)
+        .then(() => {
+            if (typeof logActivity === 'function') {
+                const targetNames = targets.map(tid => {
+                    const w = getCompanyData().workers.find(wk => wk.id === tid);
+                    return w ? w.name : tid;
+                }).join(', ');
+                const detailsStr = privacy === 'private' ? `private note to ${targetNames || 'No targets'}` : 'public note';
+                logActivity('perf_note', targets[0] || 'all', targetNames || 'All Workers', `Posted a performance note: "${text}" (${detailsStr})`);
+            }
+        })
         .catch(error => {
             console.error("Error saving note:", error);
             alert("Failed to save note.");
@@ -1688,6 +1706,11 @@ function deleteManagerNote(id) {
     
     // Targeted delete from managerNotes
     db.ref('companies/' + currentCompany + '/managerNotes/' + id).remove()
+        .then(() => {
+            if (typeof logActivity === 'function') {
+                logActivity('perf_note', 'multiple', 'Workers', `Deleted performance note (ID: ${id})`);
+            }
+        })
         .catch(error => {
             console.error("Error deleting note:", error);
             alert("Failed to delete note.");
@@ -3574,7 +3597,7 @@ function switchTab(tab) {
         }
     }
 
-    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'managing', 'costs'];
+    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs'];
 
     allTabs.forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
@@ -4050,7 +4073,13 @@ function saveViolationRecord(workerId, stats, record) {
     
     const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
     if (workerIndex !== -1) {
+        const worker = getCompanyData().workers[workerIndex];
         db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/violationsList`).set(stats.violationsList)
+            .then(() => {
+                if (typeof logActivity === 'function') {
+                    logActivity('violation', worker.id, worker.name, `Added violation to ${worker.name}: "${record.reason}" (SAR ${record.amount})`);
+                }
+            })
             .catch(err => console.error("Error saving violation record:", err));
     }
 }
@@ -4064,6 +4093,11 @@ function deleteDetailedViolation(workerId, violationId) {
         stats.violationsList = stats.violationsList.filter(v => v.id !== violationId);
         
         db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/violationsList`).set(stats.violationsList)
+            .then(() => {
+                if (typeof logActivity === 'function') {
+                    logActivity('violation', worker.id, worker.name, `Deleted violation record from ${worker.name}`);
+                }
+            })
             .catch(err => console.error("Error deleting violation record:", err));
     }
 }
@@ -4681,6 +4715,11 @@ function finishDriverOrder(isSuccess, workerId) {
         // Write the deliveriesList
         db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/deliveriesList`).set(stats.deliveriesList)
             .catch(err => console.error("Error logging delivery record:", err));
+
+        // Log activity
+        if (typeof logActivity === 'function') {
+            logActivity('delivery', worker.id, worker.name, `${worker.name} delivered: "${worker.activeOrder.details || 'No details'}"`);
+        }
     }
     worker.activeOrder = null;
     
@@ -5556,6 +5595,7 @@ function renderAll() {
     else if (currentTab === 'drivers') { renderDriversList(); renderDriverPanel(); }
     else if (currentTab === 'adverts') { renderAdverts(); }
     else if (currentTab === 'notes') { renderNotes(); }
+    else if (currentTab === 'activity') { renderActivityLog(); }
     else if (currentTab === 'managing') { renderManaging(); }
     else if (currentTab === 'costs') { renderCosts(); }
 
@@ -6138,6 +6178,7 @@ const uiTranslations = {
         "tab-summary": "📊 Summary",
         "tab-ads": "📢 Ads",
         "tab-notes": "📝 Notes",
+        "tab-activity": "📜 Activity Log",
         "tab-sales": "💰 Sales",
         "tab-costs": "📉 Costs",
 
@@ -6151,6 +6192,16 @@ const uiTranslations = {
         "th-checkin-time": "Check-In Time",
         "th-lateness": "Lateness",
         "th-actions": "Actions",
+
+        // Activity Log
+        "title-activity-log": "📜 Daily Activity Log",
+        "label-filter-by": "Filter By:",
+        "opt-all-activities": "All Activities",
+        "opt-deliveries": "Deliveries",
+        "opt-finance-payouts": "Financial Payouts",
+        "opt-violations": "Violations",
+        "opt-perf-notes": "Performance Notes",
+        "desc-activity-log": "Monitor all real-time events, operations, payouts, and violations logged in the system.",
 
         // Operations Section
         "title-manager-access": "Manager Access Control",
@@ -6493,6 +6544,7 @@ const uiTranslations = {
         "tab-summary": "📊 الملخص",
         "tab-ads": "📢 الإعلانات",
         "tab-notes": "📝 الملاحظات",
+        "tab-activity": "📜 سجل الأنشطة",
         "tab-sales": "💰 المبيعات",
         "tab-costs": "📉 التكاليف",
 
@@ -6506,6 +6558,16 @@ const uiTranslations = {
         "th-checkin-time": "وقت الحضور",
         "th-lateness": "التأخر",
         "th-actions": "الإجراءات",
+
+        // سجل الأنشطة
+        "title-activity-log": "📜 سجل الأنشطة اليومي",
+        "label-filter-by": "تصنيف حسب:",
+        "opt-all-activities": "جميع الأنشطة",
+        "opt-deliveries": "توصيل الطلبات",
+        "opt-finance-payouts": "المدفوعات والمالية",
+        "opt-violations": "المخالفات والغرامات",
+        "opt-perf-notes": "تقييمات وملاحظات الموظفين",
+        "desc-activity-log": "مراقبة ومتابعة جميع عمليات التوصيل، المدفوعات المالية، والمخالفات في الوقت الفعلي.",
 
         // قسم العمليات
         "title-manager-access": "التحكم في وصول المديرين",
@@ -7132,6 +7194,10 @@ function acceptPaymentRequest(reqId) {
         amount: approvedAmount,
         code: code,
         handledAt: Date.now()
+    }).then(() => {
+        if (typeof logActivity === 'function') {
+            logActivity('finance', req.workerId, req.workerName, `Accepted payment request of SAR ${approvedAmount} for ${req.workerName}`);
+        }
     }).catch(err => console.error("Error accepting request:", err));
 }
 
@@ -7144,6 +7210,10 @@ function rejectPaymentRequest(reqId) {
     db.ref(`companies/${currentCompany}/paymentRequests/${reqId}`).update({
         status: 'rejected',
         handledAt: Date.now()
+    }).then(() => {
+        if (typeof logActivity === 'function') {
+            logActivity('finance', req.workerId, req.workerName, `Rejected payment request of SAR ${req.amount} for ${req.workerName}`);
+        }
     }).catch(err => console.error("Error rejecting request:", err));
 }
 
@@ -7188,6 +7258,9 @@ function confirmPaymentGiven(reqId) {
             });
         })
         .then(() => {
+            if (typeof logActivity === 'function') {
+                logActivity('finance', req.workerId, req.workerName, `Released payment request of SAR ${req.amount} to ${req.workerName}`);
+            }
             alert(currentAppLang === 'ar' ? 'تم تسجيل الدفعة وتسليمها بنجاح!' : 'Payment logged and released successfully!');
         })
         .catch(err => {
@@ -7466,10 +7539,122 @@ function renderAttendance() {
     });
 }
 
+// --- ACTIVITY LOG SYSTEM ---
+
+function logActivity(type, workerId, workerName, details) {
+    if (!currentCompany) return;
+    const activityId = 'act-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+    
+    let actorName = 'System';
+    let actorId = 'system';
+    if (currentUser) {
+        actorId = currentUser.uid || currentUser.email;
+        const email = currentUser.email.toLowerCase();
+        if (email === 'kinan.rahal@hotmail.com') {
+            actorName = currentAppLang === 'ar' ? 'كينان (المالك)' : 'Kinan (Owner)';
+        } else {
+            const companyData = getCompanyData();
+            const workers = companyData.workers || [];
+            const w = workers.find(wk => wk.email && wk.email.toLowerCase() === email);
+            if (w) {
+                actorName = w.name;
+            } else {
+                actorName = currentUser.email.split('@')[0];
+            }
+        }
+    }
+
+    const logObj = {
+        id: activityId,
+        type: type,
+        workerId: workerId || 'general',
+        workerName: workerName || 'General',
+        actorId: actorId,
+        actorName: actorName,
+        details: details,
+        timestamp: Date.now()
+    };
+
+    db.ref(`companies/${currentCompany}/activityLogs/${activityId}`).set(logObj)
+        .catch(err => console.error("Error writing activity log:", err));
+}
+
+function renderActivityLog() {
+    const isAr = currentAppLang === 'ar';
+    const listDiv = document.getElementById('activity-log-list');
+    if (!listDiv) return;
+    listDiv.innerHTML = '';
+
+    const companyData = getCompanyData();
+    const logsMap = companyData.activityLogs || {};
+    const logsList = Object.values(logsMap);
+
+    if (logsList.length === 0) {
+        listDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.9rem; padding: 20px 0;">${isAr ? 'لا توجد أنشطة مسجلة اليوم.' : 'No activities logged today.'}</p>`;
+        return;
+    }
+
+    logsList.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    const filterVal = document.getElementById('activity-filter')?.value || 'all';
+
+    let filtered = logsList;
+    if (filterVal !== 'all') {
+        filtered = logsList.filter(log => log.type === filterVal);
+    }
+
+    if (filtered.length === 0) {
+        listDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.9rem; padding: 20px 0;">${isAr ? 'لا توجد أنشطة تطابق هذا التصنيف.' : 'No activities matching this category.'}</p>`;
+        return;
+    }
+
+    filtered.forEach(log => {
+        const dateStr = new Date(log.timestamp).toLocaleString(isAr ? 'ar-EG' : 'en-US');
+        
+        let typeBadge = '';
+        if (log.type === 'delivery') {
+            typeBadge = `<span class="badge" style="background:#3b82f6; color:white; font-weight:700;">🚚 ${isAr ? 'توصيل' : 'Delivery'}</span>`;
+        } else if (log.type === 'finance') {
+            typeBadge = `<span class="badge" style="background:#10b981; color:white; font-weight:700;">💰 ${isAr ? 'مالية' : 'Finance'}</span>`;
+        } else if (log.type === 'violation') {
+            typeBadge = `<span class="badge" style="background:#ef4444; color:white; font-weight:700;">⚠️ ${isAr ? 'مخالفة' : 'Violation'}</span>`;
+        } else if (log.type === 'perf_note') {
+            typeBadge = `<span class="badge" style="background:#f59e0b; color:white; font-weight:700;">📝 ${isAr ? 'ملاحظة تقييم' : 'Performance Note'}</span>`;
+        }
+
+        const card = document.createElement('div');
+        card.className = 'ledger-card';
+        card.style.borderLeft = '4px solid var(--text-muted)';
+        card.style.padding = '12px 16px';
+        card.style.background = 'var(--card-bg)';
+        card.style.borderRadius = '8px';
+        card.style.marginBottom = '8px';
+        card.style.boxShadow = 'var(--shadow-sm)';
+
+        card.innerHTML = `
+            <div class="flex-between" style="align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 8px;">
+                <div>
+                    ${typeBadge}
+                    <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 8px;">🕒 ${dateStr}</span>
+                </div>
+                <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">${isAr ? 'بواسطة: ' : 'By: '} <strong style="color:var(--text-main);">${log.actorName || 'System'}</strong></span>
+            </div>
+            <div style="font-size: 0.9rem; color: var(--text-main); font-weight: 500; line-height: 1.4;">
+                ${log.details}
+            </div>
+        `;
+        listDiv.appendChild(card);
+    });
+}
+
 // Bind to window
 window.markWorkerAttendance = markWorkerAttendance;
 window.clearWorkerAttendance = clearWorkerAttendance;
 window.renderAttendance = renderAttendance;
+window.addManager = addManager;
+window.deleteManager = deleteManager;
+window.logActivity = logActivity;
+window.renderActivityLog = renderActivityLog;
 
 // Initial run
 applyTranslations();
