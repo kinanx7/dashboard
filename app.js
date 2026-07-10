@@ -448,7 +448,7 @@ function applyUserRoles() {
         }
     }
 
-    let wPerms = { warehouse: false, drivers: false, finance: false, sales: false, costs: false, adverts: false };
+    let wPerms = { warehouse: false, drivers: false, finance: false, sales: false, costs: false, adverts: false, attendance: false };
 
     // Global Privacy Config
     const deptPrivacy = getCompanyData().deptPrivacy || {
@@ -483,6 +483,7 @@ function applyUserRoles() {
         if (wPerms.sales || deptPrivacy.sales === 'public') document.body.classList.add('perm-sales');
         if (wPerms.costs || deptPrivacy.costs === 'public') document.body.classList.add('perm-costs');
         if (wPerms.adverts || deptPrivacy.adverts === 'public') document.body.classList.add('perm-adverts');
+        if (wPerms.attendance) document.body.classList.add('perm-attendance');
         if (isDriver) document.body.classList.add('is-driver');
     }
 
@@ -620,6 +621,7 @@ function ensureArraysExist(data) {
     });
 
     if (!data.paymentRequests) data.paymentRequests = {};
+    if (!data.attendance) data.attendance = {};
     if (!data.incomeSources) data.incomeSources = ['Cash', 'Credit Card'];
     if (!data.disabledSalesMethods) data.disabledSalesMethods = [];
 
@@ -643,7 +645,7 @@ function ensureArraysExist(data) {
         w.logs = w.logs.filter(l => l);
 
         if (!w.email) w.email = "";
-        if (!w.permissions) w.permissions = { warehouse: false, drivers: false, finance: false, sales: false };
+        if (!w.permissions) w.permissions = { warehouse: false, drivers: false, finance: false, sales: false, costs: false, adverts: false, attendance: false };
         if (!w.monthlyStats) w.monthlyStats = {};
         Object.keys(w.monthlyStats).forEach(month => {
             let ms = w.monthlyStats[month];
@@ -1205,17 +1207,19 @@ function loadWorkerPerms() {
         document.getElementById('perm-sales').checked = false;
         document.getElementById('perm-costs').checked = false;
         document.getElementById('perm-adverts').checked = false;
+        document.getElementById('perm-attendance').checked = false;
         return;
     }
     const worker = getCompanyData().workers.find(w => w.id === wId);
     if (!worker) return;
-    const p = worker.permissions || { warehouse: false, drivers: false, finance: false, sales: false, costs: false, adverts: false };
+    const p = worker.permissions || { warehouse: false, drivers: false, finance: false, sales: false, costs: false, adverts: false, attendance: false };
     document.getElementById('perm-wh').checked = !!p.warehouse;
     document.getElementById('perm-drv').checked = !!p.drivers;
     document.getElementById('perm-fin').checked = !!p.finance;
     document.getElementById('perm-sales').checked = !!p.sales;
     document.getElementById('perm-costs').checked = !!p.costs;
     document.getElementById('perm-adverts').checked = !!p.adverts;
+    document.getElementById('perm-attendance').checked = !!p.attendance;
 }
 
 function saveWorkerPerms() {
@@ -1230,7 +1234,8 @@ function saveWorkerPerms() {
         finance: document.getElementById('perm-fin').checked,
         sales: document.getElementById('perm-sales').checked,
         costs: document.getElementById('perm-costs').checked,
-        adverts: document.getElementById('perm-adverts').checked
+        adverts: document.getElementById('perm-adverts').checked,
+        attendance: document.getElementById('perm-attendance').checked
     };
     
     // Targeted write to worker permissions path
@@ -3569,7 +3574,7 @@ function switchTab(tab) {
         }
     }
 
-    const allTabs = ['ops', 'ranks', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'managing', 'costs'];
+    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'managing', 'costs'];
 
     allTabs.forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
@@ -5544,6 +5549,7 @@ function renderAll() {
 
     if (currentTab === 'ops') { renderOpsWorkersTable(); renderOpsDetails(); }
     else if (currentTab === 'ranks') { renderRanksTable(); }
+    else if (currentTab === 'attendance') { renderAttendance(); }
     else if (currentTab === 'tasks') { renderTasks(); }
     else if (currentTab === 'finance') { renderFinanceTable(); renderFinDetails(); }
     else if (currentTab === 'summary') { renderSummaryTable(); renderLeaderboard(); }
@@ -5697,9 +5703,18 @@ function renderOpsWorkersTable() {
     workersToRender.forEach(worker => {
         const avg = getAveragePerfection(getLogsForMonth(worker, currentGlobalMonth));
 
+        const isAr = currentAppLang === 'ar';
+        const shiftLabel = isAr ? 'المناوبة' : 'Shift';
+        const shiftStr = (worker.startTime && worker.endTime) ? `🕒 ${shiftLabel}: ${worker.startTime} - ${worker.endTime}` : '';
+        const shiftSpan = shiftStr ? `<br><span style="font-size:0.75rem; color:var(--text-muted); display:inline-block; margin-top:4px;">${shiftStr}</span>` : '';
+
         const tr = document.createElement('tr');
         let html = `
-                    <td><strong style="color:var(--text-main);">${worker.name}</strong><br><span class="badge" style="margin-left:0;margin-top:6px;">${worker.role || t('label-staff')}</span></td>
+                    <td>
+                        <strong style="color:var(--text-main);">${worker.name}</strong><br>
+                        <span class="badge" style="margin-left:0;margin-top:6px;">${worker.role || t('label-staff')}</span>
+                        ${shiftSpan}
+                    </td>
                     <td><span class="badge" style="background: var(--primary); margin:0;">${avg}</span></td>`;
         if (isAdmin) {
             html += `
@@ -6115,6 +6130,7 @@ const uiTranslations = {
         // Main Tabs
         "tab-ops": "⚙️ Operations",
         "tab-ranks": "🏆 Ranks",
+        "tab-attendance": "📅 Attendance",
         "tab-tasks": "📋 Tasks",
         "tab-warehouse": "📦 Warehouse",
         "tab-drivers": "🚚 Drivers",
@@ -6124,6 +6140,17 @@ const uiTranslations = {
         "tab-notes": "📝 Notes",
         "tab-sales": "💰 Sales",
         "tab-costs": "📉 Costs",
+
+        // Attendance Log
+        "perm-attendance-label": "Attendance Admin",
+        "title-attendance-log": "📅 Daily Attendance Log",
+        "label-attendance-date": "Select Date:",
+        "desc-attendance-log": "Check the daily attendance of all workers. Green checkmarks indicate present workers, red X marks indicate absent workers. Shift start times and lateness are automatically calculated.",
+        "th-shift-schedule": "Shift Schedule",
+        "th-status": "Status",
+        "th-checkin-time": "Check-In Time",
+        "th-lateness": "Lateness",
+        "th-actions": "Actions",
 
         // Operations Section
         "title-manager-access": "Manager Access Control",
@@ -6458,6 +6485,7 @@ const uiTranslations = {
         // التبويبات الرئيسية
         "tab-ops": "⚙️ العمليات",
         "tab-ranks": "🏆 التقييمات",
+        "tab-attendance": "📅 الحضور",
         "tab-tasks": "📋 المهام",
         "tab-warehouse": "📦 المستودع",
         "tab-drivers": "🚚 السائقين",
@@ -6467,6 +6495,17 @@ const uiTranslations = {
         "tab-notes": "📝 الملاحظات",
         "tab-sales": "💰 المبيعات",
         "tab-costs": "📉 التكاليف",
+
+        // الحضور والغياب
+        "perm-attendance-label": "مسؤول الحضور",
+        "title-attendance-log": "📅 سجل الحضور اليومي",
+        "label-attendance-date": "اختر التاريخ:",
+        "desc-attendance-log": "تحقق من الحضور اليومي لجميع الموظفين. تشير علامات الصح الخضراء إلى الموظفين الحاضرين، وتفيد علامة X باللون الأحمر بالغياب. يتم احتساب وقت بدء المناوبة والتأخر تلقائياً.",
+        "th-shift-schedule": "مناوبة العمل",
+        "th-status": "الحالة",
+        "th-checkin-time": "وقت الحضور",
+        "th-lateness": "التأخر",
+        "th-actions": "الإجراءات",
 
         // قسم العمليات
         "title-manager-access": "التحكم في وصول المديرين",
@@ -7277,6 +7316,160 @@ window.acceptPaymentRequest = acceptPaymentRequest;
 window.rejectPaymentRequest = rejectPaymentRequest;
 window.confirmPaymentGiven = confirmPaymentGiven;
 window.renderPaymentRequests = renderPaymentRequests;
+
+// --- ATTENDANCE SYSTEM ---
+
+function calculateLateness(startTimeStr, checkTimeStr) {
+    if (!startTimeStr || !checkTimeStr) return null;
+    const [sH, sM] = startTimeStr.split(':').map(Number);
+    const [cH, cM] = checkTimeStr.split(':').map(Number);
+    if (isNaN(sH) || isNaN(cH)) return null;
+
+    const startMins = sH * 60 + (sM || 0);
+    const checkMins = cH * 60 + (cM || 0);
+
+    const diff = checkMins - startMins;
+    if (diff <= 0) return null; // Arrived before or on shift start time
+
+    const hours = Math.floor(diff / 60);
+    const mins = diff % 60;
+
+    if (currentAppLang === 'ar') {
+        if (hours > 0) {
+            return `${hours} ساعة ${mins > 0 ? `و ${mins} دقيقة` : ''} تأخير`;
+        } else {
+            return `${mins} دقيقة تأخير`;
+        }
+    } else {
+        if (hours > 0) {
+            return `${hours}h${mins > 0 ? ` ${mins}m` : ''} late`;
+        } else {
+            return `${mins}m late`;
+        }
+    }
+}
+
+function markWorkerAttendance(workerId, status) {
+    // Determine date string from date picker, default to today
+    let dateStr = document.getElementById('attendance-date-picker')?.value;
+    if (!dateStr) {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        dateStr = `${yyyy}-${mm}-${dd}`;
+    }
+
+    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    if (!worker) return;
+
+    if (status === 'present') {
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        const checkTime = `${hh}:${mm}`;
+        const lateness = calculateLateness(worker.startTime, checkTime);
+
+        db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}`).set({
+            status: 'present',
+            time: checkTime,
+            lateness: lateness || '',
+            timestamp: Date.now()
+        }).catch(err => console.error("Error setting attendance present:", err));
+    } else if (status === 'absent') {
+        db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}`).set({
+            status: 'absent',
+            time: '',
+            lateness: '',
+            timestamp: Date.now()
+        }).catch(err => console.error("Error setting attendance absent:", err));
+    }
+}
+
+function clearWorkerAttendance(workerId) {
+    let dateStr = document.getElementById('attendance-date-picker')?.value;
+    if (!dateStr) return;
+
+    if (confirm(currentAppLang === 'ar' ? 'هل تريد مسح سجل الحضور لهذا اليوم؟' : 'Do you want to clear the attendance record for this day?')) {
+        db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}`).remove()
+            .catch(err => console.error("Error clearing attendance:", err));
+    }
+}
+
+function renderAttendance() {
+    const isAr = currentAppLang === 'ar';
+    const datePicker = document.getElementById('attendance-date-picker');
+    if (datePicker && !datePicker.value) {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        datePicker.value = `${yyyy}-${mm}-${dd}`;
+    }
+
+    const dateStr = datePicker ? datePicker.value : '';
+    if (!dateStr) return;
+
+    const tbody = document.getElementById('attendance-table-body');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    const companyData = getCompanyData();
+    const workers = companyData.workers || [];
+    const attendanceMap = (companyData.attendance || {})[dateStr] || {};
+
+    if (workers.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">${isAr ? 'لا يوجد موظفون مسجلون.' : 'No workers registered.'}</td></tr>`;
+        return;
+    }
+
+    workers.forEach(w => {
+        const scheduled = (w.startTime && w.endTime) ? `${w.startTime} - ${w.endTime}` : (isAr ? 'لا يوجد' : 'None');
+        const att = attendanceMap[w.id];
+
+        let statusHtml = '';
+        let checkinTimeHtml = '--';
+        let latenessHtml = '--';
+
+        if (!att) {
+            statusHtml = `<span class="badge" style="background:var(--text-muted);">${isAr ? 'لم يُسجل' : 'Not Marked'}</span>`;
+        } else if (att.status === 'present') {
+            statusHtml = `<span class="badge badge-good" style="display:inline-flex; align-items:center; gap:4px; font-weight:700;">✔️ ${isAr ? 'حاضر' : 'Present'}</span>`;
+            checkinTimeHtml = att.time || '--';
+            if (att.lateness) {
+                latenessHtml = `<span style="color:var(--danger); font-weight:700;">⚠️ ${att.lateness}</span>`;
+            } else {
+                latenessHtml = `<span style="color:var(--success); font-weight:700;">✅ ${isAr ? 'في الوقت' : 'On Time'}</span>`;
+            }
+        } else if (att.status === 'absent') {
+            statusHtml = `<span class="badge badge-bad" style="display:inline-flex; align-items:center; gap:4px; font-weight:700;">❌ ${isAr ? 'غائب' : 'Absent'}</span>`;
+        }
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>
+                <strong style="color:var(--text-main); display:block;">${w.name}</strong>
+                <span style="font-size:0.75rem; color:var(--text-muted);">${w.role || ''}</span>
+            </td>
+            <td style="font-weight: 500;">${scheduled}</td>
+            <td>${statusHtml}</td>
+            <td style="font-family: monospace; font-weight: 600;">${checkinTimeHtml}</td>
+            <td>${latenessHtml}</td>
+            <td class="attendance-admin-only">
+                <button onclick="markWorkerAttendance('${w.id}', 'present')" class="btn-success" style="padding: 4px 8px; font-size: 0.8rem; margin-right: 4px;" title="${isAr ? 'تسجيل حضور' : 'Mark Present'}">✔️</button>
+                <button onclick="markWorkerAttendance('${w.id}', 'absent')" class="btn-danger" style="padding: 4px 8px; font-size: 0.8rem; margin-right: 4px;" title="${isAr ? 'تسجيل غياب' : 'Mark Absent'}">❌</button>
+                <button onclick="clearWorkerAttendance('${w.id}')" class="btn-outline" style="padding: 4px 8px; font-size: 0.8rem;" title="${isAr ? 'إعادة تعيين' : 'Reset'}">🔄</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// Bind to window
+window.markWorkerAttendance = markWorkerAttendance;
+window.clearWorkerAttendance = clearWorkerAttendance;
+window.renderAttendance = renderAttendance;
 
 // Initial run
 applyTranslations();

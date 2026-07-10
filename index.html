@@ -318,6 +318,7 @@
             <button id="tab-ops" class="dept-tab active-tab" onclick="switchTab('ops')" data-i18n="tab-ops">⚙️
                 Operations</button>
             <button id="tab-ranks" class="dept-tab" onclick="switchTab('ranks')" data-i18n="tab-ranks">🏆 Ranks</button>
+            <button id="tab-attendance" class="dept-tab" onclick="switchTab('attendance')" data-i18n="tab-attendance">📅 Attendance</button>
             <button id="tab-tasks" class="dept-tab" onclick="switchTab('tasks')" data-i18n="tab-tasks">📋 Tasks</button>
             <button id="tab-warehouse" class="dept-tab" onclick="switchTab('warehouse')" data-i18n="tab-warehouse">📦
                 Warehouse</button>
@@ -376,6 +377,10 @@
                         <label
                             style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
                             <input type="checkbox" id="perm-adverts" style="width:auto;"> <span data-i18n="tab-ads">Advertise / Ads</span>
+                        </label>
+                        <label
+                            style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                            <input type="checkbox" id="perm-attendance" style="width:auto;"> <span data-i18n="tab-attendance">Attendance</span>
                         </label>
                     </div>
                     <button onclick="saveWorkerPerms()" style="width: 100%;" data-i18n="btn-save-worker-perms">Save Worker Permissions</button>
@@ -523,6 +528,44 @@
                             <!-- Rendered dynamically -->
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- VIEW 1.5: ATTENDANCE DEPARTMENT            -->
+        <!-- ========================================== -->
+        <div id="view-attendance" class="view-section">
+            <div class="card" style="width: 100%; border-top: 4px solid var(--primary);">
+                <div class="card-header-flex" style="align-items: center;">
+                    <h2 class="card-title in-flex" data-i18n="title-attendance-log" style="margin: 0; padding: 0; border: none;">📅 Daily Attendance Log</h2>
+                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                        <label style="margin: 0; font-size: 0.85rem; font-weight: 700; color: var(--text-muted);" data-i18n="label-attendance-date">Select Date:</label>
+                        <input type="date" id="attendance-date-picker" onchange="renderAttendance()"
+                            style="padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border-color); font-size: 0.9rem; background: var(--input-bg); color: var(--text-main); max-width: 165px; height: 36px;">
+                    </div>
+                </div>
+                
+                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 24px;" data-i18n="desc-attendance-log">
+                    Check the daily attendance of all workers. Green checkmarks indicate present workers, red X marks indicate absent workers. Shift start times and lateness are automatically calculated.
+                </p>
+
+                <div class="table-container">
+                    <table id="attendance-table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="th-employee-role">Employee & Role</th>
+                                <th data-i18n="th-shift-schedule">Shift Schedule</th>
+                                <th data-i18n="th-status">Status</th>
+                                <th data-i18n="th-checkin-time">Check-In Time</th>
+                                <th data-i18n="th-lateness">Lateness</th>
+                                <th class="attendance-admin-only" data-i18n="th-actions">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendance-table-body">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
