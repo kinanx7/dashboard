@@ -250,7 +250,7 @@ auth.onAuthStateChanged((user) => {
             document.getElementById('auth-loader').style.display = 'none';
             document.getElementById('auth-btn').style.display = 'block';
             overlay.style.display = 'none';
-            
+
             const urlParams = new URLSearchParams(window.location.search);
             const queryCompany = urlParams.get('companyId');
             const queryTab = urlParams.get('tab');
@@ -283,7 +283,7 @@ auth.onAuthStateChanged((user) => {
             ]).then(([bgAdmins, bgWorkers, mvcAdmins, mvcWorkers]) => {
                 document.getElementById('auth-loader').style.display = 'none';
                 document.getElementById('auth-btn').style.display = 'block';
- 
+
                 let burgeroovAdmins = (bgAdmins && typeof bgAdmins.val === 'function') ? (bgAdmins.val() || {}) : {};
                 if (Array.isArray(burgeroovAdmins)) {
                     const map = {};
@@ -293,7 +293,7 @@ auth.onAuthStateChanged((user) => {
                     burgeroovAdmins = map;
                 }
                 const burgeroovWorkers = (bgWorkers && typeof bgWorkers.val === 'function') ? (bgWorkers.val() || []) : [];
-                
+
                 let mvcAdminsList = (mvcAdmins && typeof mvcAdmins.val === 'function') ? (mvcAdmins.val() || {}) : {};
                 if (Array.isArray(mvcAdminsList)) {
                     const map = {};
@@ -303,14 +303,14 @@ auth.onAuthStateChanged((user) => {
                     mvcAdminsList = map;
                 }
                 const mvcWorkersList = (mvcWorkers && typeof mvcWorkers.val === 'function') ? (mvcWorkers.val() || []) : [];
- 
+
                 const sanitizedEmail = email.replace(/\./g, ',');
                 const inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
                     burgeroovWorkers.some(w => w.email && w.email.toLowerCase() === email);
- 
+
                 const inMvc = mvcAdminsList[sanitizedEmail] === true ||
                     mvcWorkersList.some(w => w.email && w.email.toLowerCase() === email);
- 
+
                 overlay.style.display = 'none';
                 window.isMultiCompany = inBurgeroov && inMvc;
 
@@ -355,7 +355,7 @@ auth.onAuthStateChanged((user) => {
                 console.error("Error checking company access:", error);
                 document.getElementById('auth-loader').style.display = 'none';
                 document.getElementById('auth-btn').style.display = 'block';
- 
+
                 overlay.style.display = 'none';
                 const savedCompany = localStorage.getItem('selected_company');
                 if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc')) {
@@ -543,19 +543,19 @@ function ensureArraysExist(data) {
     if (!data.admins) data.admins = { "kinan,rahal@hotmail,com": true };
     if (!data.branches) data.branches = [];
     data.branches = data.branches.filter(b => b);
-    
+
     if (!data.workers) data.workers = [];
     data.workers = data.workers.filter(w => w);
-    
+
     if (!data.violationRules) data.violationRules = [];
     data.violationRules = data.violationRules.filter(r => r);
-    
+
     if (!data.jobCatalog) data.jobCatalog = [];
     data.jobCatalog = data.jobCatalog.filter(j => j);
-    
+
     if (!data.warehouse) data.warehouse = [];
     data.warehouse = data.warehouse.filter(i => i);
-    
+
     if (!data.whCategories) data.whCategories = [];
     data.whCategories = data.whCategories.filter(f => f);
 
@@ -607,8 +607,8 @@ function ensureArraysExist(data) {
     if (!data.deptPrivacy.adverts) data.deptPrivacy.adverts = 'restricted';
     if (!data.deptPrivacy.costs) data.deptPrivacy.costs = 'restricted';
 
-    data.managerNotes.forEach(n => { 
-        if (!n.replies) n.replies = {}; 
+    data.managerNotes.forEach(n => {
+        if (!n.replies) n.replies = {};
         else if (Array.isArray(n.replies)) {
             const obj = {};
             n.replies.forEach((r, idx) => {
@@ -659,19 +659,19 @@ function ensureArraysExist(data) {
                 if (!ms.custodyList) ms.custodyList = [];
                 else if (!Array.isArray(ms.custodyList)) ms.custodyList = Object.values(ms.custodyList);
                 ms.custodyList = ms.custodyList.filter(x => x);
-                
+
                 if (!ms.violationsList) ms.violationsList = [];
                 else if (!Array.isArray(ms.violationsList)) ms.violationsList = Object.values(ms.violationsList);
                 ms.violationsList = ms.violationsList.filter(x => x);
-                
+
                 if (!ms.rewardsList) ms.rewardsList = [];
                 else if (!Array.isArray(ms.rewardsList)) ms.rewardsList = Object.values(ms.rewardsList);
                 ms.rewardsList = ms.rewardsList.filter(x => x);
-                
+
                 if (!ms.paymentsList) ms.paymentsList = [];
                 else if (!Array.isArray(ms.paymentsList)) ms.paymentsList = Object.values(ms.paymentsList);
                 ms.paymentsList = ms.paymentsList.filter(x => x);
-                
+
                 if (!ms.deliveriesList) ms.deliveriesList = [];
                 else if (!Array.isArray(ms.deliveriesList)) ms.deliveriesList = Object.values(ms.deliveriesList);
                 ms.deliveriesList = ms.deliveriesList.filter(x => x);
@@ -708,7 +708,7 @@ function listenToCloudData() {
                     if (myWorker.jobs) previousTaskIds = myWorker.jobs.map(j => j.id);
                     // Track initial active order time to avoid false notification on login
                     window.previousOrderStartTime = myWorker.activeOrder ? myWorker.activeOrder.startTime : null;
-                    
+
                     // Track initial payment request statuses
                     window.prevPaymentReqStatuses = {};
                     const pRequests = getCompanyData().paymentRequests || {};
@@ -859,7 +859,7 @@ function saveWorkerFCMToken(token) {
     if (!currentUser || !token) return;
 
     const email = currentUser.email.toLowerCase();
-    
+
     // Save token to both companies if worker is registered in them
     saveTokenForCompany('burgeroov', email, token);
     saveTokenForCompany('mvc', email, token);
@@ -871,7 +871,7 @@ function saveTokenForCompany(companyId, email, token) {
             if (!snapshot.exists()) return;
             const workers = snapshot.val() || [];
             const workerIndex = workers.findIndex(w => w && w.email && w.email.toLowerCase() === email);
-            
+
             if (workerIndex !== -1) {
                 const workerRef = db.ref(`companies/${companyId}/workers/${workerIndex}`);
                 const currentToken = workers[workerIndex].fcmToken;
@@ -879,7 +879,7 @@ function saveTokenForCompany(companyId, email, token) {
                     console.log(`[FCM] Token unchanged in ${companyId} — no write needed.`);
                     return;
                 }
-                
+
                 workerRef.update({ fcmToken: token, fcmUpdatedAt: Date.now() })
                     .then(() => {
                         console.log(`[FCM] Token saved for worker in ${companyId}:`, workers[workerIndex].name);
@@ -1181,7 +1181,7 @@ function addManager() {
     if (!getCompanyData().admins[key]) {
         getCompanyData().admins[key] = true;
         document.getElementById('new-manager-email').value = '';
-        
+
         // Targeted write to admins list
         db.ref('companies/' + currentCompany + '/admins/' + key).set(true)
             .catch(err => console.error("Error adding admin manager:", err));
@@ -1196,7 +1196,7 @@ function deleteManager(email) {
         if (getCompanyData().admins) {
             delete getCompanyData().admins[key];
         }
-        
+
         // Targeted write to admins list
         db.ref('companies/' + currentCompany + '/admins/' + key).remove()
             .catch(err => console.error("Error deleting admin manager:", err));
@@ -1243,11 +1243,11 @@ function saveWorkerPerms() {
         adverts: document.getElementById('perm-adverts').checked,
         attendance: document.getElementById('perm-attendance').checked
     };
-    
+
     // Targeted write to worker permissions path
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/permissions`).set(worker.permissions)
         .catch(err => console.error("Error saving worker perms:", err));
-        
+
     // Flat lookup update for rules scalability
     if (worker.id && worker.email) {
         const key = worker.email.toLowerCase().replace(/\./g, ',');
@@ -1274,7 +1274,7 @@ function saveMonthlySales() {
     });
     if (!getCompanyData().monthlySales) getCompanyData().monthlySales = {};
     getCompanyData().monthlySales[currentGlobalMonth] = salesForMonth;
-    
+
     // Targeted write to monthlySales for current month
     db.ref(`companies/${currentCompany}/monthlySales/${currentGlobalMonth}`).set(salesForMonth)
         .catch(err => console.error("Error saving monthly sales:", err));
@@ -1679,7 +1679,7 @@ function postManagerNote() {
 
     document.querySelectorAll('.private-target-cb').forEach(cb => cb.checked = false);
     clearNoteAttachment();
-    
+
     // Targeted write to managerNotes
     db.ref('companies/' + currentCompany + '/managerNotes/' + newNote.id).set(newNote)
         .then(() => {
@@ -1701,7 +1701,7 @@ function postManagerNote() {
 function deleteManagerNote(id) {
     if (!confirm("Delete this note entirely?")) return;
     getCompanyData().managerNotes = getCompanyData().managerNotes.filter(n => n.id !== id);
-    
+
     // Targeted delete from managerNotes
     db.ref('companies/' + currentCompany + '/managerNotes/' + id).remove()
         .then(() => {
@@ -1747,7 +1747,7 @@ function addNoteReply(noteId) {
 
         input.value = '';
         clearReplyAttachment(noteId);
-        
+
         // Targeted write to replies subnode using the unique key
         db.ref('companies/' + currentCompany + '/managerNotes/' + noteId + '/replies/' + replyId).set(newReply)
             .catch(error => {
@@ -1973,7 +1973,7 @@ function addIncomeSource() {
         if (!getCompanyData().incomeSources.includes(source)) {
             getCompanyData().incomeSources.push(source);
             document.getElementById('new-income-source').value = '';
-            
+
             // Targeted write to incomeSources
             db.ref('companies/' + currentCompany + '/incomeSources').set(getCompanyData().incomeSources)
                 .catch(err => console.error("Error adding income source:", err));
@@ -1986,7 +1986,7 @@ function addIncomeSource() {
 function deleteIncomeSource(sourceName) {
     if (!confirm(`Delete the income source '${sourceName}'?`)) return;
     getCompanyData().incomeSources = getCompanyData().incomeSources.filter(s => s !== sourceName);
-    
+
     // Targeted write to incomeSources
     db.ref('companies/' + currentCompany + '/incomeSources').set(getCompanyData().incomeSources)
         .catch(err => console.error("Error deleting income source:", err));
@@ -2023,7 +2023,7 @@ function logSaleTransaction() {
     getCompanyData().salesLogs.unshift(newLog);
 
     amountInput.value = '';
-    
+
     // Targeted write for sales transactions
     db.ref('companies/' + currentCompany + '/salesLogs/' + newLog.id).set(newLog)
         .catch(error => {
@@ -2035,7 +2035,7 @@ function logSaleTransaction() {
 function deleteSaleTransaction(id) {
     if (!confirm("Delete this transaction record?")) return;
     getCompanyData().salesLogs = getCompanyData().salesLogs.filter(l => l.id !== id);
-    
+
     // Targeted removal for sales transactions
     db.ref('companies/' + currentCompany + '/salesLogs/' + id).remove()
         .catch(error => {
@@ -2052,7 +2052,7 @@ function toggleSalesMethod(methodName) {
         disabled.push(methodName);
     }
     getCompanyData().disabledSalesMethods = disabled;
-    
+
     // Targeted write to disabledSalesMethods
     db.ref('companies/' + currentCompany + '/disabledSalesMethods').set(disabled)
         .catch(err => console.error("Error toggling sales method:", err));
@@ -2108,7 +2108,7 @@ function renderManaging() {
     else if (currentSalesTimeframe === 'week') {
         const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).getTime();
         filteredLogs = allLogs.filter(l => l.timestamp >= startOfWeek);
-        const days = currentAppLang === 'ar' ? 
+        const days = currentAppLang === 'ar' ?
             ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'] :
             ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         filteredLogs.forEach(l => {
@@ -2468,7 +2468,7 @@ function addCostCategory() {
     if (!getCompanyData().costCategories.includes(name)) {
         getCompanyData().costCategories.push(name);
         nameInput.value = '';
-        
+
         // Targeted write to costCategories
         db.ref('companies/' + currentCompany + '/costCategories').set(getCompanyData().costCategories)
             .catch(err => console.error("Error adding cost category:", err));
@@ -2481,7 +2481,7 @@ function addCostCategory() {
 function deleteCostCategory(name) {
     if (!confirm(`Delete cost category '${name}'?\n\n(This hides it from the dropdown but doesn't delete old logs).`)) return;
     getCompanyData().costCategories = getCompanyData().costCategories.filter(c => c !== name);
-    
+
     // Targeted write to costCategories
     db.ref('companies/' + currentCompany + '/costCategories').set(getCompanyData().costCategories)
         .catch(err => console.error("Error deleting cost category:", err));
@@ -2519,7 +2519,7 @@ function logCostTransaction() {
     getCompanyData().costLogs.unshift(newLog);
 
     amountInput.value = '';
-    
+
     // Targeted write to costLogs
     db.ref('companies/' + currentCompany + '/costLogs/' + newLog.id).set(newLog)
         .catch(error => {
@@ -2532,7 +2532,7 @@ function logCostTransaction() {
 function deleteCostTransaction(id) {
     if (!confirm("Delete this cost record?")) return;
     getCompanyData().costLogs = getCompanyData().costLogs.filter(l => l.id !== id);
-    
+
     // Targeted removal from costLogs
     db.ref('companies/' + currentCompany + '/costLogs/' + id).remove()
         .catch(error => {
@@ -2587,7 +2587,7 @@ function logPastCostTransaction() {
     document.getElementById('past-cost-amount').value = '';
     document.getElementById('past-cost-password').value = '';
     document.getElementById('past-cost-date').value = '';
-    
+
     // Targeted write to costLogs
     db.ref('companies/' + currentCompany + '/costLogs/' + newLog.id).set(newLog)
         .catch(error => {
@@ -2942,8 +2942,8 @@ function exportCostsPDF() {
     const colLoggedBy = isAr ? 'بواسطة' : 'Logged By';
     const noCostRecordsMsg = t('msg-no-costs');
     const noTxMsg = t('msg-no-transactions');
-    const footerMsg = isAr ? 
-        `بوابة عمليات ${companyLabel} — سري للغاية | تقرير التكاليف لـ ${labelText}` : 
+    const footerMsg = isAr ?
+        `بوابة عمليات ${companyLabel} — سري للغاية | تقرير التكاليف لـ ${labelText}` :
         `${companyLabel} Operations Portal — Confidential | Costs Report for ${labelText}`;
 
     const printHTML = `<!DOCTYPE html><html><head><meta charset="UTF-8">
@@ -3022,7 +3022,7 @@ function addWhFolder() {
     if (!getCompanyData().whCategories.includes(folderName)) {
         getCompanyData().whCategories.push(folderName);
         document.getElementById('new-wh-folder').value = '';
-        
+
         // Targeted write to categories list
         db.ref('companies/' + currentCompany + '/whCategories').set(getCompanyData().whCategories)
             .catch(err => console.error("Error adding warehouse category:", err));
@@ -3044,7 +3044,7 @@ function deleteWhFolder(folderName) {
     getCompanyData().warehouse.forEach(item => {
         if (item.category === folderName || !item.category) item.category = 'Uncategorized';
     });
-    
+
     // Targeted write to categories and warehouse list
     db.ref('companies/' + currentCompany + '/whCategories').set(getCompanyData().whCategories)
         .catch(err => console.error("Error deleting category list:", err));
@@ -3120,9 +3120,9 @@ function addWarehouseItem() {
     if (!getCompanyData().warehouse) getCompanyData().warehouse = [];
     getCompanyData().warehouse.push(newItem);
     const itemIndex = getCompanyData().warehouse.length - 1;
-    
+
     document.getElementById('wh-name').value = ''; document.getElementById('wh-stock').value = ''; document.getElementById('wh-risk').value = '';
-    
+
     // Targeted write to item index in warehouse
     db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex).set(newItem)
         .catch(err => console.error("Error adding warehouse item:", err));
@@ -3136,7 +3136,7 @@ function updateWarehouseStock(itemId) {
 
     const itemIndex = getCompanyData().warehouse.findIndex(i => i.id === itemId);
     if (itemIndex === -1) return;
-    
+
     const item = getCompanyData().warehouse[itemIndex];
     const diff = newStock - item.currentStock;
     if (diff === 0) { inputEl.value = ''; return; }
@@ -3154,9 +3154,9 @@ function updateWarehouseStock(itemId) {
 
     item.currentStock = newStock;
     item.logs.unshift({ date: formatTimestamp(), amount: newStock, difference: diff, note: diff > 0 ? 'Refill' : 'Consumption', workerId: workerId, workerName: workerName });
-    inputEl.value = ''; 
+    inputEl.value = '';
     item.workerId = workerId;
-    
+
     // Targeted write to item index in warehouse
     db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex).set(item)
         .catch(err => console.error("Error updating warehouse stock:", err));
@@ -3165,13 +3165,13 @@ function updateWarehouseStock(itemId) {
 function editMaxStock(itemId) {
     const itemIndex = getCompanyData().warehouse.findIndex(i => i.id === itemId);
     if (itemIndex === -1) return;
-    
+
     const item = getCompanyData().warehouse[itemIndex];
     const newMax = prompt(t('desc-edit-max') || `Enter new Max / Full Stock for ${item.name}:`, item.maxStock);
     const parsed = parseFloat(newMax);
     if (!isNaN(parsed) && parsed > 0) {
         item.maxStock = parsed;
-        
+
         let workerId = "";
         let workerName = "Admin";
         if (currentUser && currentUser.role === 'admin') {
@@ -3199,7 +3199,7 @@ function deleteWarehouseItem(itemId) {
     }
     if (!confirm(t('confirm-delete-product'))) return;
     getCompanyData().warehouse = getCompanyData().warehouse.filter(i => i.id !== itemId);
-    
+
     // Targeted write of modified list
     db.ref('companies/' + currentCompany + '/warehouse').set(getCompanyData().warehouse)
         .catch(err => console.error("Error deleting warehouse item:", err));
@@ -3231,7 +3231,7 @@ function executeMove(itemId, folderName) {
     if (itemIndex !== -1) {
         const item = getCompanyData().warehouse[itemIndex];
         item.category = folderName;
-        
+
         let workerId = "";
         if (currentUser && currentUser.role === 'admin') {
             workerId = "admin";
@@ -3335,7 +3335,7 @@ function renderWarehouse() {
                 const isOpen = contentDiv.style.display === 'flex';
                 contentDiv.style.display = isOpen ? 'none' : 'flex';
                 document.getElementById(`icon-${folderId}`).textContent = isOpen ? '📁' : '📂';
-                
+
                 window.expandedWhFolders = window.expandedWhFolders || {};
                 if (isOpen) {
                     delete window.expandedWhFolders[folderId];
@@ -3999,15 +3999,15 @@ function addViolationRule() {
     if (!name || isNaN(amount) || amount <= 0) { alert("Please provide a valid name and amount."); return; }
     getCompanyData().violationRules.push({ id: Date.now().toString(), name, amount });
     document.getElementById('new-vrule-name').value = ''; document.getElementById('new-vrule-amount').value = '';
-    
+
     // Targeted write to global violationRules list
     db.ref('companies/' + currentCompany + '/violationRules').set(getCompanyData().violationRules)
         .catch(err => console.error("Error adding violation rule:", err));
 }
 
-function deleteViolationRule(id) { 
-    getCompanyData().violationRules = getCompanyData().violationRules.filter(r => r.id !== id); 
-    
+function deleteViolationRule(id) {
+    getCompanyData().violationRules = getCompanyData().violationRules.filter(r => r.id !== id);
+
     // Targeted write to global violationRules list
     db.ref('companies/' + currentCompany + '/violationRules').set(getCompanyData().violationRules)
         .catch(err => console.error("Error deleting violation rule:", err));
@@ -4057,12 +4057,12 @@ function applyDetailedViolation() {
     };
 
     if (fileInput.files && fileInput.files[0]) {
-        compressImage(fileInput.files[0], (base64Img) => { 
-            newViolation.image = base64Img; 
-            saveViolationRecord(workerId, stats, newViolation); 
+        compressImage(fileInput.files[0], (base64Img) => {
+            newViolation.image = base64Img;
+            saveViolationRecord(workerId, stats, newViolation);
         });
-    } else { 
-        saveViolationRecord(workerId, stats, newViolation); 
+    } else {
+        saveViolationRecord(workerId, stats, newViolation);
     }
 }
 
@@ -4070,7 +4070,7 @@ function saveViolationRecord(workerId, stats, record) {
     stats.violationsList.unshift(record);
     document.getElementById('v-amount').value = ''; document.getElementById('v-reason').value = '';
     document.getElementById('v-rule-select').value = ''; document.getElementById('v-image').value = '';
-    
+
     const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
     if (workerIndex !== -1) {
         const worker = getCompanyData().workers[workerIndex];
@@ -4091,7 +4091,7 @@ function deleteDetailedViolation(workerId, violationId) {
         const worker = getCompanyData().workers[workerIndex];
         const stats = getMonthlyStats(worker, currentGlobalMonth);
         stats.violationsList = stats.violationsList.filter(v => v.id !== violationId);
-        
+
         db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/violationsList`).set(stats.violationsList)
             .then(() => {
                 if (typeof logActivity === 'function') {
@@ -4111,7 +4111,7 @@ function resolveViolation(workerId, violationId, action) {
         if (v) {
             if (action === 'waive') v.status = 'waived';
             if (action === 'apply') v.status = 'active';
-            
+
             db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/violationsList`).set(stats.violationsList)
                 .catch(err => console.error("Error resolving violation:", err));
         }
@@ -4127,7 +4127,7 @@ function manuallyUpdateRank(workerId, newRank) {
     const worker = getCompanyData().workers[workerIndex];
     worker.rank = newRank;
     worker.lastEvalDate = Date.now();
-    
+
     // Targeted update to worker rank and evaluation date attributes
     db.ref(`companies/${currentCompany}/workers/${workerIndex}`).update({
         rank: newRank,
@@ -4207,7 +4207,7 @@ function addTaskTemplate() {
     if (!getCompanyData().jobCatalog.includes(input)) {
         getCompanyData().jobCatalog.push(input);
         document.getElementById('task-template-input').value = '';
-        
+
         // Targeted write to task templates list
         db.ref('companies/' + currentCompany + '/jobCatalog').set(getCompanyData().jobCatalog)
             .catch(err => console.error("Error adding task template:", err));
@@ -4216,7 +4216,7 @@ function addTaskTemplate() {
 
 function deleteTaskTemplate(templateName) {
     getCompanyData().jobCatalog = getCompanyData().jobCatalog.filter(t => t !== templateName);
-    
+
     // Targeted write to task templates list
     db.ref('companies/' + currentCompany + '/jobCatalog').set(getCompanyData().jobCatalog)
         .catch(err => console.error("Error deleting task template:", err));
@@ -4274,7 +4274,7 @@ function assignTask() {
     document.getElementById('task-assign-input').value = '';
     if (document.getElementById('task-deadline')) document.getElementById('task-deadline').value = '';
     if (document.getElementById('task-urgency')) document.getElementById('task-urgency').value = 'normal';
-    
+
     // Targeted write to worker jobs path
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
         .catch(err => console.error("Error assigning task:", err));
@@ -4288,7 +4288,7 @@ function seeTask(workerId, taskId) {
     if (t) {
         t.status = 'seen';
         t.seenAt = Date.now();
-        
+
         // Targeted write to worker jobs path
         db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
             .catch(err => console.error("Error seeing task:", err));
@@ -4304,7 +4304,7 @@ function completeTask(workerId, taskId) {
         t.status = 'completed';
         t.done = true;
         t.completedAt = Date.now();
-        
+
         // Targeted write to worker jobs path
         db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
             .catch(err => console.error("Error completing task:", err));
@@ -4324,7 +4324,7 @@ function toggleTaskDone(workerId, taskId) {
             t.status = 'completed';
             t.completedAt = Date.now();
         }
-        
+
         // Targeted write to worker jobs path
         db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
             .catch(err => console.error("Error toggling task done:", err));
@@ -4337,7 +4337,7 @@ function deleteTask(workerId, taskId) {
     if (workerIndex === -1) return;
     const worker = getCompanyData().workers[workerIndex];
     worker.jobs = worker.jobs.filter(j => j.id !== taskId);
-    
+
     // Targeted write to worker jobs path
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
         .catch(err => console.error("Error deleting task:", err));
@@ -4390,13 +4390,13 @@ function renderTasks() {
         genCard.style.marginBottom = "16px";
         genCard.style.border = "2px dashed var(--warning)";
         genCard.style.background = "var(--warning-bg)";
-        
+
         let genHtml = `<h3 style="margin-top:0; color:var(--warning); display:flex; align-items:center; gap:8px; font-size:1.15rem;">🌍 ${t('title-available-general-tasks')}</h3>`;
-        
+
         pendingGeneralTasks.forEach(gt => {
             const urgencyBadge = gt.urgency === 'urgent' ? `<span class="badge" style="background:var(--danger); margin-left:8px;">🔴 ${t('opt-urgency-high').replace('🔴 ', '')}</span>` : '';
             const deadlineText = gt.deadlineMins > 0 ? `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">⏱️ ${t('status-time-remaining').replace('⏳ ', '')} ${gt.deadlineMins} mins</div>` : '';
-            
+
             const isWorker = currentUser && currentUser.role === 'worker';
             let actionBtn = '';
             if (isWorker) {
@@ -4408,7 +4408,7 @@ function renderTasks() {
                         <button onclick="deleteGeneralTask('${gt.id}')" style="background:none; border:none; color: var(--danger); cursor:pointer; font-size:1.2rem; padding:0 6px;" title="${t('btn-remove')}">✖</button>
                     </div>`;
             }
-            
+
             genHtml += `
                 <div style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
                     <div>
@@ -4422,7 +4422,7 @@ function renderTasks() {
                 </div>
             `;
         });
-        
+
         genCard.innerHTML = genHtml;
         board.appendChild(genCard);
     }
@@ -4527,7 +4527,7 @@ function renderTasks() {
 
 function acceptGeneralTask(taskId) {
     if (!currentUser || currentUser.role !== 'worker') return;
-    
+
     // Check if task is already taken/accepted by fetching it fresh from database
     db.ref(`companies/${currentCompany}/generalTasks/${taskId}`).once('value')
         .then(snapshot => {
@@ -4537,7 +4537,7 @@ function acceptGeneralTask(taskId) {
                 alert(`This task was already accepted by ${task.acceptedBy || 'another worker'}.`);
                 return;
             }
-            
+
             // Find current worker
             const workers = getCompanyData().workers || [];
             const myIndex = workers.findIndex(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
@@ -4545,10 +4545,10 @@ function acceptGeneralTask(taskId) {
                 alert("Worker profile not found.");
                 return;
             }
-            
+
             const myWorker = workers[myIndex];
             if (!myWorker.jobs) myWorker.jobs = [];
-            
+
             // Construct new job
             const newJob = {
                 id: task.id,
@@ -4562,9 +4562,9 @@ function acceptGeneralTask(taskId) {
                 seenAt: Date.now(),
                 done: false
             };
-            
+
             myWorker.jobs.push(newJob);
-            
+
             const updates = {};
             updates[`companies/${currentCompany}/workers/${myIndex}/jobs`] = myWorker.jobs;
             updates[`companies/${currentCompany}/generalTasks/${taskId}`] = {
@@ -4574,7 +4574,7 @@ function acceptGeneralTask(taskId) {
                 acceptedById: myWorker.id,
                 acceptedAt: Date.now()
             };
-            
+
             return db.ref().update(updates)
                 .then(() => {
                     alert(`Success! You have accepted: "${task.title}"`);
@@ -4638,7 +4638,7 @@ function startDriverOrder() {
     if (document.getElementById('driver-prep-time')) document.getElementById('driver-prep-time').value = '';
     document.getElementById('driver-order-status').value = 'ready';
     toggleDriverPrepTime();
-    
+
     // Targeted write to activeOrder
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/activeOrder`).set(worker.activeOrder)
         .catch(err => console.error("Error starting driver order:", err));
@@ -4656,7 +4656,7 @@ function pickupDriverOrder(workerId) {
         }
         worker.activeOrder.status = 'picked_up';
         worker.activeOrder.startTime = Date.now(); // Restart timer exactly when picked up
-        
+
         // Targeted write to activeOrder
         db.ref(`companies/${currentCompany}/workers/${workerIndex}/activeOrder`).set(worker.activeOrder)
             .catch(err => console.error("Error picking up order:", err));
@@ -4673,7 +4673,7 @@ function forceOrderReady(workerId) {
     if (worker && worker.activeOrder && worker.activeOrder.status === 'preparing') {
         worker.activeOrder.status = 'ready';
         worker.activeOrder.prepEndTime = Date.now(); // Log exactly when kitchen finished
-        
+
         // Targeted write to activeOrder
         db.ref(`companies/${currentCompany}/workers/${workerIndex}/activeOrder`).set(worker.activeOrder)
             .catch(err => console.error("Error forcing order ready:", err));
@@ -4711,7 +4711,7 @@ function finishDriverOrder(isSuccess, workerId) {
             prepTimeMs: worker.activeOrder.prepTimeMs || 0,
             prepEndTime: prepEnd || null
         });
-        
+
         // Write the deliveriesList
         db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/deliveriesList`).set(stats.deliveriesList)
             .catch(err => console.error("Error logging delivery record:", err));
@@ -4722,7 +4722,7 @@ function finishDriverOrder(isSuccess, workerId) {
         }
     }
     worker.activeOrder = null;
-    
+
     // Clear active order
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/activeOrder`).set(null)
         .catch(err => console.error("Error clearing active order:", err));
@@ -4735,7 +4735,7 @@ function deleteDeliveryRecord(workerId, deliveryId) {
     const worker = getCompanyData().workers[workerIndex];
     const stats = getMonthlyStats(worker, currentGlobalMonth);
     stats.deliveriesList = stats.deliveriesList.filter(d => d.id !== deliveryId);
-    
+
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/deliveriesList`).set(stats.deliveriesList)
         .catch(err => console.error("Error deleting delivery record:", err));
 }
@@ -4748,7 +4748,7 @@ function deleteLegacyDelivery(workerId) {
     const stats = getMonthlyStats(worker, currentGlobalMonth);
     if (stats.legacyDeliveries > 0) {
         stats.legacyDeliveries--;
-        
+
         db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/legacyDeliveries`).set(stats.legacyDeliveries)
             .catch(err => console.error("Error deleting legacy delivery:", err));
     }
@@ -4881,7 +4881,7 @@ function renderDriversList() {
     if (selectEl) {
         const prevVal = selectEl.value;
         selectEl.innerHTML = '<option value="">-- Choose Employee --</option>';
-        
+
         const nonDrivers = workers.filter(w => {
             const r = (w.role || "").toLowerCase();
             return !(r.includes('driver') || r.includes('سائق') || r.includes('delivery'));
@@ -4893,7 +4893,7 @@ function renderDriversList() {
             opt.textContent = `${w.name} (${w.role})`;
             selectEl.appendChild(opt);
         });
-        
+
         if (nonDrivers.some(w => w.id === prevVal)) {
             selectEl.value = prevVal;
         }
@@ -5063,7 +5063,7 @@ function addPaymentRecord() {
 
     stats.paymentsList.unshift({ id: Date.now().toString(), date: formatTimestamp(), amount: amount });
     document.getElementById('payment-amount').value = '';
-    
+
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/paymentsList`).set(stats.paymentsList)
         .catch(err => console.error("Error adding payment:", err));
 }
@@ -5075,7 +5075,7 @@ function deletePaymentRecord(workerId, paymentId) {
     const worker = getCompanyData().workers[workerIndex];
     const stats = getMonthlyStats(worker, currentGlobalMonth);
     stats.paymentsList = stats.paymentsList.filter(p => p.id !== paymentId);
-    
+
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/paymentsList`).set(stats.paymentsList)
         .catch(err => console.error("Error deleting payment:", err));
 }
@@ -5092,7 +5092,7 @@ function addRewardRecord() {
 
     stats.rewardsList.unshift({ id: Date.now().toString(), date: formatTimestamp(), amount: amount });
     document.getElementById('reward-amount').value = '';
-    
+
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/rewardsList`).set(stats.rewardsList)
         .catch(err => console.error("Error adding reward:", err));
 }
@@ -5104,7 +5104,7 @@ function deleteRewardRecord(workerId, rewardId) {
     const worker = getCompanyData().workers[workerIndex];
     const stats = getMonthlyStats(worker, currentGlobalMonth);
     stats.rewardsList = stats.rewardsList.filter(r => r.id !== rewardId);
-    
+
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/rewardsList`).set(stats.rewardsList)
         .catch(err => console.error("Error deleting reward:", err));
 }
@@ -5121,7 +5121,7 @@ function addCustodyRecord(type) {
 
     stats.custodyList.unshift({ id: Date.now().toString(), date: formatTimestamp(), amount: amount, type: type });
     document.getElementById('custody-amount').value = '';
-    
+
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/custodyList`).set(stats.custodyList)
         .catch(err => console.error("Error adding custody:", err));
 }
@@ -5133,27 +5133,27 @@ function deleteCustodyRecord(workerId, custodyId) {
     const worker = getCompanyData().workers[workerIndex];
     const stats = getMonthlyStats(worker, currentGlobalMonth);
     stats.custodyList = stats.custodyList.filter(c => c.id !== custodyId);
-    
+
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/custodyList`).set(stats.custodyList)
         .catch(err => console.error("Error deleting custody:", err));
 }
 
 function addBranch() {
     const nameInput = document.getElementById('new-branch-name'); const name = nameInput.value.trim();
-    if (name && !getCompanyData().branches.includes(name)) { 
-        getCompanyData().branches.push(name); 
-        nameInput.value = ''; 
+    if (name && !getCompanyData().branches.includes(name)) {
+        getCompanyData().branches.push(name);
+        nameInput.value = '';
         db.ref('companies/' + currentCompany + '/branches').set(getCompanyData().branches)
             .catch(err => console.error("Error adding branch:", err));
     }
     else { alert("Invalid or existing branch."); }
 }
-function deleteBranch(branchName) { 
-    if (confirm(`Remove branch: ${branchName}?`)) { 
-        getCompanyData().branches = getCompanyData().branches.filter(b => b !== branchName); 
+function deleteBranch(branchName) {
+    if (confirm(`Remove branch: ${branchName}?`)) {
+        getCompanyData().branches = getCompanyData().branches.filter(b => b !== branchName);
         db.ref('companies/' + currentCompany + '/branches').set(getCompanyData().branches)
             .catch(err => console.error("Error deleting branch:", err));
-    } 
+    }
 }
 
 function addWorker() {
@@ -5179,7 +5179,7 @@ function addWorker() {
     getCompanyData().workers.push(newWorker);
 
     ['w-name', 'w-email', 'w-role', 'w-start-time', 'w-end-time', 'w-income'].forEach(id => document.getElementById(id).value = '');
-    
+
     // Targeted write to workers list
     db.ref('companies/' + currentCompany + '/workers').set(getCompanyData().workers)
         .then(() => {
@@ -5196,13 +5196,13 @@ function addWorker() {
 
 function deleteWorker(workerId) {
     const worker = getCompanyData().workers.find(w => w.id === workerId);
-    if (confirm('Permanently delete this employee?')) { 
-        getCompanyData().workers = getCompanyData().workers.filter(w => w.id !== workerId); 
-        document.getElementById('ops-worker-select').value = ""; 
-        document.getElementById('fin-worker-select').value = ""; 
-        document.getElementById('task-worker-select').value = ""; 
-        activeDriverId = null; 
-        
+    if (confirm('Permanently delete this employee?')) {
+        getCompanyData().workers = getCompanyData().workers.filter(w => w.id !== workerId);
+        document.getElementById('ops-worker-select').value = "";
+        document.getElementById('fin-worker-select').value = "";
+        document.getElementById('task-worker-select').value = "";
+        activeDriverId = null;
+
         // Targeted write to workers list
         db.ref('companies/' + currentCompany + '/workers').set(getCompanyData().workers)
             .then(() => {
@@ -5221,16 +5221,16 @@ function deleteWorker(workerId) {
 function setInitialBalance() {
     const workerId = document.getElementById('fin-worker-select').value;
     if (!workerId) { alert("Select an employee first."); return; }
-    
+
     const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
     if (workerIndex === -1) return;
     const worker = getCompanyData().workers[workerIndex];
     let amountText = document.getElementById('initial-balance-amount').value;
     const amount = parseFloat(amountText);
     if (isNaN(amount)) return;
-    
+
     worker.initialBalance = amount;
-    
+
     // Targeted write to initialBalance
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/initialBalance`).set(amount)
         .catch(err => console.error("Error setting initial balance:", err));
@@ -5246,7 +5246,7 @@ function getAveragePerfection(logs) {
 function updateFinancialRecord(type, action) {
     const workerId = document.getElementById('fin-worker-select').value;
     if (!workerId) return;
-    
+
     const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
     if (workerIndex === -1) return;
     const worker = getCompanyData().workers[workerIndex];
@@ -5262,7 +5262,7 @@ function updateFinancialRecord(type, action) {
         else { stats[type] -= amount; if (stats[type] < 0) stats[type] = 0; }
         inputEl.value = '';
     } else if (action === 'clear' && confirm(`Clear all ${type} for ${worker.name}?`)) { stats[type] = 0; }
-    
+
     // Targeted write to worker's specific monthly finance record
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/${type}`).set(stats[type])
         .catch(err => console.error(`Error updating financial record ${type}:`, err));
@@ -5309,7 +5309,7 @@ function addDailyLog() {
     worker.logs.sort((a, b) => new Date(b.date) - new Date(a.date));
     document.getElementById('log-note').value = '';
     document.getElementById('vacation-days').value = '1';
-    
+
     // Targeted write to worker's logs
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/logs`).set(worker.logs)
         .catch(err => console.error("Error saving daily log:", err));
@@ -5404,7 +5404,7 @@ function saveMapItem() {
     document.getElementById('map-item-modal').style.display = 'none';
     pendingMapItem = null;
     setAdvertTool('pin'); // Reset back to default
-    
+
     // Targeted write to adverts
     db.ref('companies/' + currentCompany + '/adverts/' + newItem.id).set(newItem)
         .catch(err => console.error("Error saving map item:", err));
@@ -5452,7 +5452,7 @@ function initPromoMap() {
 function deleteAdvertPin(id) {
     if (!confirm("Delete this item from the map?")) return;
     getCompanyData().adverts = getCompanyData().adverts.filter(p => p.id !== id);
-    
+
     // Targeted delete from adverts
     db.ref('companies/' + currentCompany + '/adverts/' + id).remove()
         .catch(err => console.error("Error deleting map item:", err));
@@ -5586,9 +5586,9 @@ function renderAll() {
     renderManagersList();
     renderWorkerViolationPanel();
 
-    if (currentTab === 'ops') { 
-        renderOpsWorkersTable(); 
-        renderOpsDetails(); 
+    if (currentTab === 'ops') {
+        renderOpsWorkersTable();
+        renderOpsDetails();
         if (typeof renderSelectedWorkerSysViolations === 'function') {
             renderSelectedWorkerSysViolations();
         }
@@ -6987,7 +6987,7 @@ function renderLeaderboard() {
     // 1. Calculate general leaderboard (All non-driver/regular tasks & perfection score)
     const generalRanked = workers.map(worker => {
         const avg = parseFloat(getAveragePerfection(getLogsForMonth(worker, currentGlobalMonth)) || 0);
-        
+
         let taskPoints = 0;
         let taskHigh = 0;
         let taskNormal = 0;
@@ -7056,7 +7056,7 @@ function renderLeaderboard() {
         genListDiv.innerHTML = '';
         generalRanked.forEach((worker, idx) => {
             const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
-            
+
             let breakdownStr = '';
             if (isAr) {
                 breakdownStr = `الأداء: ${worker.avg}% | نقاط المهام: ${worker.taskPoints} (عاجل: ${worker.taskHigh}، عادي: ${worker.taskNormal})`;
@@ -7339,7 +7339,7 @@ function renderPaymentRequests() {
                 const dateStr = new Date(req.timestamp).toLocaleString();
                 let statusBadge = '';
                 let codeDisplay = '';
-                
+
                 if (req.status === 'pending') {
                     statusBadge = `<span class="badge" style="background:#d97706;">${isAr ? 'قيد الانتظار' : 'Pending'}</span>`;
                 } else if (req.status === 'accepted') {
@@ -7594,7 +7594,7 @@ function renderAttendance() {
 function logActivity(type, workerId, workerName, details) {
     if (!currentCompany) return;
     const activityId = 'act-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
-    
+
     let actorName = 'System';
     let actorId = 'system';
     if (currentUser) {
@@ -7660,7 +7660,7 @@ function renderActivityLog() {
 
     filtered.forEach(log => {
         const dateStr = new Date(log.timestamp).toLocaleString(isAr ? 'ar-EG' : 'en-US');
-        
+
         let typeBadge = '';
         if (log.type === 'delivery') {
             typeBadge = `<span class="badge" style="background:#3b82f6; color:white; font-weight:700;">🚚 ${isAr ? 'توصيل' : 'Delivery'}</span>`;
@@ -7794,12 +7794,12 @@ function checkWorkerSystemViolationAlerts(worker) {
             worker.id
         );
     } else if (count >= 6 && !worker.unlockedClose) {
-        const listStr = (worker.systemViolations || []).map((v, i) => `${i+1}. ${v.reason}`).join('<br>');
+        const listStr = (worker.systemViolations || []).map((v, i) => `${i + 1}. ${v.reason}`).join('<br>');
         showWorkerAlertOverlay(
             "Your Account has been Terminated",
             "تم فصلك عن العمل نهائياً",
             `Your employment has been permanently terminated due to system violations. Details:<br>${listStr}`,
-            `تم فصلك عن العمل نهائيا للاسباب التالية :<br>${listStr}<br><br>لن يتم احتساب اي دوام لك بعد هذه الرسالة يرجى مراجعة الادارة لتصفية حساباتك وسيتم اتخاذ اللازم.`,
+            `تم فصلك عن العمل نهائيا للاسباب التالية :<br>${listStr}<br><br>لن يتم احتساب اي ساعة عمل لك بعد هذه الرسالة يرجى مراجعة الادارة لتصفية حساباتك وسيتم اتخاذ اللازم.`,
             "block",
             worker.id
         );
@@ -7962,7 +7962,7 @@ function addSystemViolation() {
 
     const worker = workers[idx];
     const list = worker.systemViolations || [];
-    
+
     const newViol = {
         id: 'sv-' + Date.now(),
         reason: reason,
@@ -7975,7 +7975,7 @@ function addSystemViolation() {
     let alertsAck = worker.alertsAcknowledged || {};
     if (count === 1) alertsAck.warning1 = false;
     if (count === 2) alertsAck.warning2 = false;
-    
+
     const updates = {
         systemViolations: list,
         alertsAcknowledged: alertsAck
