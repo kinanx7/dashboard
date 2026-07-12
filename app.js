@@ -1,7 +1,159 @@
 // =============================================
-// FEATURE 1: IN-APP NOTIFICATION SYSTEM
+// AUTO TRANSLATE ALERTS & DYNAMIC TERMS
 // =============================================
+function translateDynamicTerm(term) {
+    if (!term) return '';
+    const lang = (typeof currentAppLang !== 'undefined' ? currentAppLang : localStorage.getItem("burgeroov_lang")) || 'en';
+    if (lang !== 'ar') return term;
 
+    const dict = {
+        'Cash': 'نقدي',
+        'Credit Card': 'بطاقة ائتمان',
+        'Electric Bill': 'فاتورة الكهرباء',
+        'Meat Supplier': 'مورد اللحوم',
+        'Packaging': 'التعبئة والتغليف',
+        'Uncategorized': 'غير مصنف',
+        'Unpaid': 'غير مدفوع',
+        'Paid': 'مدفوع',
+        'Pending': 'معلق',
+        'Accepted': 'مقبول',
+        'Rejected': 'مرفوض',
+        'Released': 'تم الصرف',
+        'present': 'حاضر',
+        'absent': 'غائب',
+        'day-off': 'إجازة',
+        'sick-leave': 'إجازة مرضية',
+        'public': 'عام',
+        'private': 'خاص',
+        'normal': 'عادي',
+        'urgent': 'عاجل',
+        'active': 'نشط',
+        'completed': 'مكتمل',
+        'cancelled': 'ملغى',
+        'ready': 'جاهز',
+        'preparing': 'قيد التحضير',
+        'delivered': 'تم التوصيل',
+        'Database connection error. Ensure your Firebase Rules are set to true.': 'خطأ في الاتصال بقاعدة البيانات. تأكد من ضبط قواعد Firebase على true.',
+        'Failed to save. You may not have Admin permissions.': 'فشل الحفظ. قد لا تمتلك صلاحيات مسؤول.',
+        'Only the ultimate admin can demote managers.': 'يمكن للمسؤول الرئيسي فقط إلغاء صلاحيات المديرين.',
+        'Cannot demote master admin.': 'لا يمكن إلغاء صلاحيات المسؤول الرئيسي.',
+        'Select a worker first.': 'يرجى اختيار موظف أولاً.',
+        'Permissions updated!': 'تم تحديث الصلاحيات بنجاح!',
+        'Microphone recording is not supported in this browser or environment.': 'تسجيل الصوت غير مدعوم في هذا المتصفح أو البيئة.',
+        'Write a note or add a media attachment first.': 'يرجى كتابة ملاحظة أو إضافة مرفق أولاً.',
+        'Failed to save note.': 'فشل حفظ الملاحظة.',
+        'Failed to delete note.': 'فشل حذف الملاحظة.',
+        'Failed to save reply.': 'فشل حفظ الرد.',
+        'You don\'t have permission to delete this reply.': 'لا تملك الصلاحية لحذف هذا الرد.',
+        'Failed to delete reply.': 'فشل حذف الرد.',
+        'This income source already exists.': 'مصدر الدخل هذا موجود بالفعل.',
+        'Please enter a valid amount and select a payment method.': 'يرجى إدخال مبلغ صالح واختيار طريقة الدفع.',
+        'Failed to save transaction.': 'فشل حفظ المعاملة.',
+        'Failed to delete transaction.': 'فشل حذف المعاملة.',
+        'This cost category already exists.': 'فئة التكاليف هذه موجودة بالفعل.',
+        'Please enter a valid amount and select a cost category.': 'يرجى إدخال مبلغ صالح واختيار فئة التكاليف.',
+        'Failed to save cost transaction.': 'فشل حفظ معاملة التكاليف.',
+        'Failed to delete cost transaction.': 'فشل حذف معاملة التكاليف.',
+        'Please enter a valid amount.': 'يرجى إدخال مبلغ صالح.',
+        'Please select a category.': 'يرجى اختيار الفئة.',
+        'Please select a past date.': 'يرجى اختيار تاريخ سابق.',
+        '❌ Incorrect password. Access denied.': '❌ كلمة المرور غير صحيحة. تم رفض الوصول.',
+        'Please select a date in the past (not today or future).': 'يرجى اختيار تاريخ في الماضي (ليس اليوم أو في المستقبل).',
+        'Failed to save past cost transaction.': 'فشل حفظ معاملة التكاليف السابقة.',
+        'Folder already exists.': 'المجلد موجود بالفعل.',
+        'You do not have permission to delete folders.': 'لا تملك الصلاحية لحذف المجلدات.',
+        'Please fill out all product details correctly.': 'يرجى ملء جميع تفاصيل المنتج بشكل صحيح.',
+        'You do not have permission to delete products.': 'لا تملك الصلاحية لحذف المنتجات.',
+        'Warehouse is empty.': 'المستودع فارغ.',
+        'Backup restored and synced to cloud successfully!': 'تم استعادة النسخة الاحتياطية ومزامنتها بنجاح!',
+        'Invalid backup file.': 'ملف نسخة احتياطية غير صالح.',
+        'Could not read file.': 'تعذر قراءة الملف.',
+        'No records to export.': 'لا توجد سجلات لتصديرها.',
+        'No records to export': 'لا توجد سجلات لتصديرها',
+        'No worker profile found to export.': 'لم يتم العثور على ملف تعريف الموظف لتصديره.',
+        'Please provide a valid name and amount.': 'يرجى تقديم اسم ومبلغ صالحين.',
+        'Select an employee first.': 'يرجى اختيار موظف أولاً.',
+        'Please enter a valid violation amount.': 'يرجى إدخال مبلغ مخالفة صالح.',
+        'Please provide a reason or note for this violation.': 'يرجى تقديم سبب أو ملاحظة لهذه المخالفة.',
+        'Enter a task template name.': 'أدخل اسم قالب المهمة.',
+        'Select an employee and describe a task.': 'اختر موظفاً واكتب تفاصيل المهمة.',
+        'General task created successfully!': 'تم إنشاء المهمة العامة بنجاح!',
+        'Task not found.': 'المهمة غير موجودة.',
+        'Worker profile not found.': 'ملف تعريف الموظف غير موجود.',
+        'Failed to accept task. It may have been taken already.': 'فشل قبول المهمة. ربما تم أخذها بالفعل.',
+        'General task deleted.': 'تم حذف المهمة العامة.',
+        'Enter valid delivery time in minutes.': 'أدخل وقت توصيل صالح بالدقائق.',
+        'Please enter the order details/items.': 'يرجى إدخال تفاصيل أو عناصر الطلب.',
+        'Enter valid prep time in minutes.': 'أدخل وقت تحضير صالح بالدقائق.',
+        'Invalid or existing branch.': 'فرع غير صالح أو موجود بالفعل.',
+        'Complete all required fields, including email.': 'يرجى إكمال جميع الحقول المطلوبة، بما في ذلك البريد الإلكتروني.',
+        'Initial Carryover Balance Updated.': 'تم تحديث الرصيد المرحل الأولي.',
+        'Select an employee and date.': 'اختر الموظف والتاريخ.',
+        'Only administrators can edit the map.': 'يسمح فقط للمسؤولين بتعديل الخريطة.',
+        'Location not found.': 'العنوان غير موجود.',
+        'Search failed.': 'فشل البحث.',
+        'Only registered workers can request payments.': 'يسمح فقط للموظفين المسجلين بطلب سلف مالية.',
+        'Please enter a valid amount greater than 0.': 'يرجى إدخال مبلغ صالح أكبر من 0.',
+        'Please enter a reason for the request.': 'يرجى إدخال سبب الطلب.',
+        'Request submitted successfully and is pending review.': 'تم تقديم الطلب بنجاح وهو قيد المراجعة.',
+        'Incorrect verification code!': 'رمز التحقق غير صحيح!',
+        'Worker not found in database.': 'المظف غير موجود في قاعدة البيانات.',
+        'Payment logged and released successfully!': 'تم تسجيل وصرف السلفة بنجاح!',
+        'Please select a worker first.': 'يرجى اختيار موظف أولاً.',
+        'Please enter a reason for the system violation.': 'يرجى إدخال سبب المخالفة النظامية.',
+        'System violation added successfully!': 'تم إضافة المخالفة النظامية بنجاح!',
+        'System violation removed successfully!': 'تم إزالة المخالفة النظامية بنجاح!',
+        'Worker account unlocked successfully!': 'تم إلغاء قفل حساب الموظف بنجاح!',
+        'Worker account locked successfully!': 'تم قفل حساب الموظف بنجاح!'
+    };
+
+    if (dict[term]) return dict[term];
+
+    // Dynamic partial matches
+    if (term.includes('Sales successfully saved for')) {
+        const month = term.replace('Sales successfully saved for ', '').replace(' 💰', '');
+        return `تم حفظ المبيعات بنجاح لشهر ${month} 💰`;
+    }
+    if (term.includes('Unable to access microphone')) {
+        return 'تعذر الوصول إلى الميكروفون. يرجى التأكد من تمكين صلاحيات الميكروفون لمتصفحك أو لتطبيق برجروف في إعدادات الهاتف 🎙️';
+    }
+    if (term.includes('This task was already accepted by')) {
+        const by = term.replace('This task was already accepted by ', '');
+        return `تم قبول هذه المهمة بالفعل من قبل ${by}.`;
+    }
+    if (term.includes('Success! You have accepted:')) {
+        const title = term.replace('Success! You have accepted: ', '');
+        return `نجاح! لقد قبلت المهمة: ${title}`;
+    }
+    if (term.includes('is now assigned as a Driver!')) {
+        const name = term.replace(' is now assigned as a Driver!', '');
+        return `تم تعيين ${name} كسائق بنجاح!`;
+    }
+    if (term.includes('is now assigned as General Staff!')) {
+        const name = term.replace(' is now assigned as General Staff!', '');
+        return `تم تعيين ${name} كموظف عام بنجاح!`;
+    }
+    if (term.includes('Past cost of SAR') && term.includes('has been logged!')) {
+        return term.replace('Past cost of SAR', 'تم تسجيل تكلفة سابقة بقيمة')
+                   .replace('for', 'لفئة')
+                   .replace('on', 'في تاريخ')
+                   .replace('has been logged!', '!');
+    }
+
+    return term;
+}
+
+const originalAlert = window.alert;
+window.alert = function(msg) {
+    return originalAlert(translateDynamicTerm(msg));
+};
+
+const originalConfirm = window.confirm;
+window.confirm = function(msg) {
+    return originalConfirm(translateDynamicTerm(msg));
+};
+
+// FEATURE 1: IN-APP NOTIFICATION SYSTEM
 let notifTimeout = null;
 
 /**
@@ -186,7 +338,8 @@ function getCompanyData() {
     return appData[currentCompany];
 }
 
-function showCompanySelectionHUD() {
+function showCompanySelectionHUD(event) {
+    if (event) event.stopPropagation();
     document.getElementById('company-selection-overlay').style.display = 'flex';
     document.getElementById('app-wrapper').style.display = 'none';
 }
@@ -440,12 +593,13 @@ function applyUserRoles() {
     let isAdmin = isKinan || admins[email.replace(/\./g, ',')] === true;
 
     const swapBtn = document.getElementById('company-swap-btn');
+    const swapBtnMob = document.getElementById('company-swap-btn-mob');
+    const showSwap = isKinan || window.isMultiCompany;
     if (swapBtn) {
-        if (isKinan || window.isMultiCompany) {
-            swapBtn.style.display = 'inline-block';
-        } else {
-            swapBtn.style.display = 'none';
-        }
+        swapBtn.style.display = showSwap ? 'inline-block' : 'none';
+    }
+    if (swapBtnMob) {
+        swapBtnMob.style.display = showSwap ? 'block' : 'none';
     }
 
     let wPerms = { warehouse: false, drivers: false, finance: false, sales: false, costs: false, adverts: false, attendance: false };
@@ -2420,7 +2574,7 @@ function renderManaging() {
                                 <div>
                                     <div style="font-weight: 800; font-size: 1.25rem; color: var(--text-main); text-decoration: ${strike};">SAR ${l.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                                     <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px; display:flex; gap:8px; align-items:center;">
-                                        <span class="badge" style="background: ${isCounted ? 'var(--primary)' : 'var(--text-muted)'}; color: white; padding:2px 8px;">${l.method}</span> 
+                                        <span class="badge" style="background: ${isCounted ? 'var(--primary)' : 'var(--text-muted)'}; color: white; padding:2px 8px;">${translateDynamicTerm(l.method)}</span> 
                                         <span>🕒 ${l.date}</span>
                                         <span style="font-style:italic; opacity:0.7;">by ${l.cashier.split('@')[0]}</span>
                                     </div>
@@ -2841,7 +2995,7 @@ function renderCosts() {
                                 <div>
                                     <div style="font-weight: 800; font-size: 1.15rem; color: var(--danger);">SAR ${l.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                                     <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px; display:flex; gap:8px; align-items:center;">
-                                        <span class="badge" style="background: var(--danger); color: white; padding:2px 8px;">${l.method}</span> 
+                                        <span class="badge" style="background: var(--danger); color: white; padding:2px 8px;">${translateDynamicTerm(l.method)}</span> 
                                         <span>🕒 ${l.date}</span>
                                         <span style="font-style:italic; opacity:0.7;">by ${l.cashier ? l.cashier.split('@')[0] : 'System'}</span>
                                     </div>
@@ -6252,6 +6406,8 @@ const uiTranslations = {
         "opt-violations": "Violations",
         "opt-perf-notes": "Performance Notes",
         "desc-activity-log": "Monitor all real-time events, operations, payouts, and violations logged in the system.",
+        "label-date-from": "From:",
+        "label-date-to": "To:",
 
         // Operations Section
         "title-manager-access": "Manager Access Control",
@@ -6562,7 +6718,37 @@ const uiTranslations = {
         "label-total": "Total",
         "label-avg": "Average",
         "label-peak": "Peak",
-        "label-by": "By"
+        "label-by": "By",
+        "title-system-violations": "⚠️ System Violations System",
+        "desc-system-violations": "Manage escalation levels for worker system violations (not normal infractions).",
+        "label-select-worker": "Select Worker:",
+        "opt-choose-worker": "-- Choose Worker --",
+        "label-violation-reason": "Reason for Violation:",
+        "placeholder-enter-reason": "Enter reason...",
+        "btn-add-system-violation": "Add System Violation",
+        "label-termination-status": "Account Termination Status:",
+        "placeholder-worker-email-dots": "Worker email...",
+        "desc-manager-promotion": "Promote workers to administrators (Managers) by entering their emails. Admins have access to all departments and access controls.",
+        "placeholder-payment-req-amount": "e.g. 500",
+        "placeholder-payment-req-reason": "e.g. Emergency medical expense",
+        "title-manage-folders": "📂 Manage Folders",
+        "placeholder-new-wh-folder": "e.g. Drinks, Meats...",
+        "placeholder-driver-order-details": "e.g. 2x Beef Burger, 1x Pepsi...",
+        "label-prep-time-needed": "Prep Time Needed (Mins)",
+        "placeholder-driver-prep-time": "e.g. 10",
+        "placeholder-map-search-input": "Search location...",
+        "placeholder-manage-note-text": "Write your announcement or private note here...",
+        "title-post-new-note": "Post a New Note",
+        "label-public-note": "📢 Public (Allows Replies)",
+        "label-private-note": "🔒 Private",
+        "label-private-note-targets": "Select who can read this (Leave empty for Manager-Only note):",
+        "label-add-attachment": "Add Attachment (Optional):",
+        "btn-camera": "📷 Camera",
+        "btn-gallery": "🖼️ Gallery",
+        "btn-record-voice": "🎤 Record Voice Note",
+        "btn-done": "Done",
+        "btn-cancel": "Cancel",
+        "btn-post-note": "Post Note"
     },
     ar: {
         // شاشة الدخول
@@ -6618,6 +6804,8 @@ const uiTranslations = {
         "opt-violations": "المخالفات والغرامات",
         "opt-perf-notes": "تقييمات وملاحظات الموظفين",
         "desc-activity-log": "مراقبة ومتابعة جميع عمليات التوصيل، المدفوعات المالية، والمخالفات في الوقت الفعلي.",
+        "label-date-from": "من:",
+        "label-date-to": "إلى:",
 
         // قسم العمليات
         "title-manager-access": "التحكم في وصول المديرين",
@@ -6906,7 +7094,39 @@ const uiTranslations = {
         "label-total": "الإجمالي",
         "label-avg": "المتوسط",
         "label-peak": "الأعلى",
-        "label-by": "بواسطة"
+        "label-by": "بواسطة",
+        "title-system-violations": "⚠️ نظام المخالفات النظامية",
+        "desc-system-violations": "إدارة مستويات التصعيد للمخالفات النظامية للموظفين (وليس المخالفات العادية).",
+        "label-select-worker": "اختر الموظف:",
+        "opt-choose-worker": "-- اختر الموظف --",
+        "label-violation-reason": "سبب المخالفة:",
+        "placeholder-enter-reason": "أدخل السبب...",
+        "btn-add-system-violation": "إضافة مخالفة نظامية",
+        "label-termination-status": "حالة إنهاء الحساب:",
+        "placeholder-worker-email-dots": "البريد الإلكتروني للموظف...",
+        "desc-manager-promotion": "ترقية الموظفين إلى مسؤولين (مديرين) عن طريق إدخال بريدهم الإلكتروني. يمتلك المسؤولون حق الوصول إلى جميع الأقسام وعناصر التحكم في الوصول.",
+        "placeholder-payment-req-amount": "مثال: 500",
+        "placeholder-payment-req-reason": "مثال: مصاريف طبية طارئة",
+        "title-manage-folders": "📂 إدارة المجلدات",
+        "placeholder-new-wh-folder": "مثال: المشروبات، اللحوم...",
+        "placeholder-driver-order-details": "مثال: ٢ بيفر برجر، ١ بيبسي...",
+        "label-prep-time-needed": "وقت التحضير المطلوب (بالدقائق)",
+        "placeholder-driver-prep-time": "مثال: ١٠",
+        "placeholder-map-search-input": "البحث عن موقع...",
+        "placeholder-manage-note-text": "اكتب إعلانك أو ملاحظتك الخاصة هنا...",
+        "title-post-new-note": "نشر ملاحظة جديدة",
+        "label-public-note": "📢 عام (يسمح بالردود)",
+        "label-private-note": "🔒 خاص",
+        "label-private-note-targets": "اختر من يمكنه قراءة هذا (اتركه فارغاً لملاحظة المدير فقط):",
+        "label-add-attachment": "إضافة مرفق (اختياري):",
+        "btn-camera": "📷 الكاميرا",
+        "btn-gallery": "🖼️ المعرض",
+        "btn-record-voice": "🎤 تسجيل ملاحظة صوتية",
+        "btn-done": "تم",
+        "btn-cancel": "إلغاء",
+        "btn-post-note": "نشر الملاحظة",
+        "opt-urgency-normal": "🔵 أولوية عادية",
+        "opt-choose-emp": "-- اختر الموظف --"
     }
 };
 
@@ -7629,6 +7849,95 @@ function logActivity(type, workerId, workerName, details) {
         .catch(err => console.error("Error writing activity log:", err));
 }
 
+function translateActivityLogDetails(details) {
+    if (!details) return '';
+    const lang = (typeof currentAppLang !== 'undefined' ? currentAppLang : localStorage.getItem("burgeroov_lang")) || 'en';
+    if (lang !== 'ar') return details;
+
+    // 1. Posted a performance note: "${text}" (${detailsStr})
+    if (details.startsWith('Posted a performance note:')) {
+        const quoteStart = details.indexOf('"');
+        const quoteEnd = details.lastIndexOf('"');
+        const text = details.slice(quoteStart + 1, quoteEnd);
+        const detailsStr = details.includes('(Public)') ? 'عام' : 'خاص';
+        return `قام بنشر ملاحظة تقييم: "${text}" (${detailsStr})`;
+    }
+
+    // 2. Deleted performance note (ID: ${id})
+    if (details.startsWith('Deleted performance note')) {
+        const id = details.replace('Deleted performance note (ID: ', '').replace(')', '');
+        return `تم حذف ملاحظة التقييم (رقم التعريف: ${id})`;
+    }
+
+    // 3. Added violation to ${worker.name}: "${record.reason}" (SAR ${record.amount})
+    if (details.startsWith('Added violation to')) {
+        const parts = details.replace('Added violation to ', '').split(': "');
+        const workerName = parts[0];
+        const rest = parts[1] || '';
+        const reason = rest.slice(0, rest.lastIndexOf('"'));
+        const amount = rest.slice(rest.lastIndexOf('SAR ') + 4, rest.lastIndexOf(')'));
+        return `تم إضافة مخالفة للموظف ${workerName}: "${reason}" (SAR ${amount})`;
+    }
+
+    // 4. Deleted violation record from ${worker.name}
+    if (details.startsWith('Deleted violation record from')) {
+        const workerName = details.replace('Deleted violation record from ', '');
+        return `تم حذف سجل المخالفة للموظف ${workerName}`;
+    }
+
+    // 5. ${worker.name} delivered: "${details}"
+    if (details.includes(' delivered: "')) {
+        const workerName = details.split(' delivered: "')[0];
+        const orderDetails = details.split(' delivered: "')[1].slice(0, -1);
+        return `قام الموظف ${workerName} بتسليم: "${orderDetails}"`;
+    }
+
+    // 6. Accepted payment request of SAR ${approvedAmount} for ${req.workerName}
+    if (details.startsWith('Accepted payment request of SAR')) {
+        const rest = details.replace('Accepted payment request of SAR ', '');
+        const amount = rest.split(' for ')[0];
+        const workerName = rest.split(' for ')[1];
+        return `تم قبول طلب سلفة بقيمة SAR ${amount} للموظف ${workerName}`;
+    }
+
+    // 7. Rejected payment request of SAR ${req.amount} for ${req.workerName}
+    if (details.startsWith('Rejected payment request of SAR')) {
+        const rest = details.replace('Rejected payment request of SAR ', '');
+        const amount = rest.split(' for ')[0];
+        const workerName = rest.split(' for ')[1];
+        return `تم رفض طلب سلفة بقيمة SAR ${amount} للموظف ${workerName}`;
+    }
+
+    // 8. Released payment request of SAR ${req.amount} to ${req.workerName}
+    if (details.startsWith('Released payment request of SAR')) {
+        const rest = details.replace('Released payment request of SAR ', '');
+        const amount = rest.split(' to ')[0];
+        const workerName = rest.split(' to ')[1];
+        return `تم صرف سلفة بقيمة SAR ${amount} للموظف ${workerName}`;
+    }
+
+    // 9. Added system violation to ${worker.name}: "${reason}" (Violation Count: ${count}/6)
+    if (details.startsWith('Added system violation to')) {
+        const rest = details.replace('Added system violation to ', '');
+        const workerName = rest.split(': "')[0];
+        const reasonPart = rest.split(': "')[1] || '';
+        const reason = reasonPart.slice(0, reasonPart.lastIndexOf('"'));
+        const count = reasonPart.slice(reasonPart.lastIndexOf('Violation Count: ') + 17, reasonPart.lastIndexOf(')'));
+        return `تم إضافة مخالفة نظامية للموظف ${workerName}: "${reason}" (عدد المخالفات: ${count})`;
+    }
+
+    // 10. Removed system violation from ${worker.name}: "${reason}"
+    if (details.startsWith('Removed system violation from')) {
+        const rest = details.replace('Removed system violation from ', '');
+        const workerName = rest.split(': "')[0];
+        const reasonPart = rest.split(': "')[1] || '';
+        const reason = reasonPart.slice(0, -1);
+        return `تم إزالة مخالفة نظامية من الموظف ${workerName}: "${reason}"`;
+    }
+
+    return details;
+}
+
 function renderActivityLog() {
     const isAr = currentAppLang === 'ar';
     const listDiv = document.getElementById('activity-log-list');
@@ -7647,14 +7956,25 @@ function renderActivityLog() {
     logsList.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
     const filterVal = document.getElementById('activity-filter')?.value || 'all';
+    const dateFromVal = document.getElementById('activity-date-from')?.value;
+    const dateToVal = document.getElementById('activity-date-to')?.value;
+
+    const startOfDayMs = dateFromVal ? new Date(dateFromVal + 'T00:00:00').getTime() : null;
+    const endOfDayMs = dateToVal ? new Date(dateToVal + 'T23:59:59.999').getTime() : null;
 
     let filtered = logsList;
     if (filterVal !== 'all') {
-        filtered = logsList.filter(log => log.type === filterVal);
+        filtered = filtered.filter(log => log.type === filterVal);
+    }
+    if (startOfDayMs) {
+        filtered = filtered.filter(log => log.timestamp >= startOfDayMs);
+    }
+    if (endOfDayMs) {
+        filtered = filtered.filter(log => log.timestamp <= endOfDayMs);
     }
 
     if (filtered.length === 0) {
-        listDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.9rem; padding: 20px 0;">${isAr ? 'لا توجد أنشطة تطابق هذا التصنيف.' : 'No activities matching this category.'}</p>`;
+        listDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.9rem; padding: 20px 0;">${isAr ? 'لا توجد أنشطة تطابق هذا التصنيف أو التواريخ المحددة.' : 'No activities matching this category or date range.'}</p>`;
         return;
     }
 
@@ -7695,7 +8015,7 @@ function renderActivityLog() {
                 </div>
             </div>
             <div style="font-size: 0.9rem; color: var(--text-main); font-weight: 500; line-height: 1.4;">
-                ${log.details}
+                ${translateActivityLogDetails(log.details)}
             </div>
         `;
         listDiv.appendChild(card);
@@ -7918,26 +8238,27 @@ function renderSelectedWorkerSysViolations() {
                 <strong style="color:var(--text-main);">${index + 1}. ${v.reason}</strong>
                 <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">📅 ${dateStr}</div>
             </div>
-            <button onclick="deleteSystemViolation('${workerId}', ${index})" class="btn-outline-danger" style="padding:4px 8px; font-size:0.75rem; border:none; text-decoration:underline;">Remove</button>
+            <button onclick="deleteSystemViolation('${workerId}', ${index})" class="btn-outline-danger" style="padding:4px 8px; font-size:0.75rem; border:none; text-decoration:underline;">${t('btn-remove')}</button>
         `;
         listUl.appendChild(li);
     });
 
     if (unlockedSection) {
         unlockedSection.style.display = 'block';
+        const isAr = currentAppLang === 'ar';
         if (count >= 6) {
             unlockBtn.style.display = 'block';
             if (worker.unlockedClose) {
-                statusLabel.innerHTML = `<span style="color:var(--success); font-weight:700;">🔓 Unlocked (Allowed App Access)</span>`;
-                unlockBtn.textContent = 'Lock Account';
+                statusLabel.innerHTML = `<span style="color:var(--success); font-weight:700;">🔓 ${isAr ? 'تم إلغاء القفل (مسموح بالدخول)' : 'Unlocked (Allowed App Access)'}</span>`;
+                unlockBtn.textContent = isAr ? 'قفل الحساب' : 'Lock Account';
                 unlockBtn.className = 'btn-danger';
             } else {
-                statusLabel.innerHTML = `<span style="color:var(--danger); font-weight:700;">🔒 Locked / Terminated (Blocked)</span>`;
-                unlockBtn.textContent = 'Unlock Account';
+                statusLabel.innerHTML = `<span style="color:var(--danger); font-weight:700;">🔒 ${isAr ? 'مقفل / مفصول (محظور)' : 'Locked / Terminated (Blocked)'}</span>`;
+                unlockBtn.textContent = isAr ? 'إلغاء قفل الحساب' : 'Unlock Account';
                 unlockBtn.className = 'btn-success';
             }
         } else {
-            statusLabel.innerHTML = `<span style="color:var(--text-muted);">Status: Active (Violations: ${count}/6)</span>`;
+            statusLabel.innerHTML = `<span style="color:var(--text-muted);">${isAr ? `الحالة: نشط (المخالفات: ${count}/6)` : `Status: Active (Violations: ${count}/6)`}</span>`;
             unlockBtn.style.display = 'none';
         }
     }

@@ -133,6 +133,7 @@ body {
     color: var(--text-main);
     padding-bottom: 80px;
     transition: background-color 0.4s ease, color 0.4s ease;
+    overflow-x: hidden;
 }
 
 /* Auth Overlay */
@@ -739,13 +740,22 @@ body:not(.role-admin) .view-section.active-view {
 body.perm-finance #view-finance.active-view {
     grid-template-columns: 320px 1fr !important;
 }
+body:not(.role-admin):not(.perm-finance) #view-finance.active-view {
+    grid-template-columns: 1fr !important;
+}
 
 body.perm-warehouse #view-warehouse.active-view {
     grid-template-columns: 320px 1fr !important;
 }
+body:not(.role-admin):not(.perm-warehouse) #view-warehouse.active-view {
+    grid-template-columns: 1fr !important;
+}
 
 body.perm-drivers #view-drivers.active-view {
     grid-template-columns: 320px 1fr !important;
+}
+body:not(.role-admin):not(.perm-drivers) #view-drivers.active-view {
+    grid-template-columns: 1fr !important;
 }
 
 /* Alert Banner */
@@ -2227,4 +2237,18 @@ body:not(.role-admin) .task-grid {
     justify-content: center;
     margin: 0 auto 24px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+/* RTL spacing overrides for PC/Tablet Header Buttons */
+[dir="rtl"] header .btn-outline,
+[dir="rtl"] #company-swap-btn {
+    margin-right: 0 !important;
+    margin-left: 8px !important;
+}
+[dir="rtl"] header .user-profile > .btn-outline:last-of-type {
+    margin-left: 0 !important;
+}
+[dir="rtl"] .user-dropdown {
+    right: auto !important;
+    left: 0 !important;
 }
