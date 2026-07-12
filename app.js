@@ -3877,7 +3877,8 @@ function getCumulativeBalance(worker, maxMonthStr) {
         const viol = calculateViolationsTotal(stats.violationsList);
 
         const sysViolDeduction = typeof getSystemViolationDeductionsForMonth === 'function' ? getSystemViolationDeductionsForMonth(worker, m) : 0;
-        const netThisMonth = base + rew - viol - sysViolDeduction;
+        const lateDeduction = typeof getLateDeductionsForMonth === 'function' ? getLateDeductionsForMonth(worker, m) : 0;
+        const netThisMonth = base + rew - viol - sysViolDeduction - lateDeduction;
         const paidThisMonth = calculatePaymentsTotal(stats.paymentsList);
         balance += (netThisMonth - paidThisMonth);
         if (m === maxMonthStr) break;
@@ -3923,7 +3924,8 @@ function getExportData(lang) {
         const paid = calculatePaymentsTotal(stats.paymentsList);
 
         const sysViolDeduction = typeof getSystemViolationDeductionsForMonth === 'function' ? getSystemViolationDeductionsForMonth(w, currentGlobalMonth) : 0;
-        const netIncome = baseIncome + rewards - violations - sysViolDeduction - paid;
+        const lateDeduction = typeof getLateDeductionsForMonth === 'function' ? getLateDeductionsForMonth(w, currentGlobalMonth) : 0;
+        const netIncome = baseIncome + rewards - violations - sysViolDeduction - lateDeduction - paid;
         const remaining = getCumulativeBalance(w, currentGlobalMonth);
         const custodyTotal = calculateCustodyTotal(stats.custodyList);
 
@@ -5986,17 +5988,23 @@ function renderFinanceTable() {
         const viol = calculateViolationsTotal(stats.violationsList);
         const paidThisMonth = calculatePaymentsTotal(stats.paymentsList);
 
-        // UI display for Net reflects the subtraction of the advance payment and system violations
+        // UI display for Net reflects the subtraction of the advance payment, system violations, and late deductions
         const sysViolDeduction = typeof getSystemViolationDeductionsForMonth === 'function' ? getSystemViolationDeductionsForMonth(worker, currentGlobalMonth) : 0;
-        const net = base + rew - viol - paidThisMonth - sysViolDeduction;
+        const lateDeduction = typeof getLateDeductionsForMonth === 'function' ? getLateDeductionsForMonth(worker, currentGlobalMonth) : 0;
+        const net = base + rew - viol - paidThisMonth - sysViolDeduction - lateDeduction;
 
         const remainingAllTime = getCumulativeBalance(worker, currentGlobalMonth);
         const detailsId = `net-details-${worker.id}`;
 
         const tr = document.createElement('tr');
+        const isAr = currentAppLang === 'ar';
         let sysViolHtml = '';
         if (sysViolDeduction > 0) {
-            sysViolHtml = `<div class="breakdown-row" style="color:var(--danger);"><span>System Violations:</span> <span>- SAR ${sysViolDeduction.toLocaleString()}</span></div>`;
+            sysViolHtml = `<div class="breakdown-row" style="color:var(--danger);"><span>${isAr ? 'المخالفات النظامية:' : 'System Violations:'}</span> <span>- SAR ${sysViolDeduction.toLocaleString()}</span></div>`;
+        }
+        let lateHtml = '';
+        if (lateDeduction > 0) {
+            lateHtml = `<div class="breakdown-row" style="color:var(--danger);"><span>${isAr ? 'خصومات التأخير:' : 'Late Penalties:'}</span> <span>- SAR ${lateDeduction.toLocaleString()}</span></div>`;
         }
         tr.innerHTML = `
                     <td><strong style="color:var(--text-main);">${worker.name}</strong><br><span class="text-muted-heavy">${worker.branch}</span></td>
@@ -6007,11 +6015,12 @@ function renderFinanceTable() {
                             <span style="font-size:0.7rem; color:var(--primary);">▼</span>
                         </div>
                         <div class="breakdown-details" id="${detailsId}">
-                            <div class="breakdown-row" style="color:var(--text-main);"><span>Base:</span> <span>SAR ${base.toLocaleString()}</span></div>
-                            <div class="breakdown-row" style="color:var(--success);"><span>Rewards:</span> <span>+ SAR ${rew.toLocaleString()}</span></div>
-                            <div class="breakdown-row" style="color:var(--danger);"><span>Violations:</span> <span>- SAR ${viol.toLocaleString()}</span></div>
+                            <div class="breakdown-row" style="color:var(--text-main);"><span>${isAr ? 'الأساسي:' : 'Base:'}</span> <span>SAR ${base.toLocaleString()}</span></div>
+                            <div class="breakdown-row" style="color:var(--success);"><span>${isAr ? 'المكافآت:' : 'Rewards:'}</span> <span>+ SAR ${rew.toLocaleString()}</span></div>
+                            <div class="breakdown-row" style="color:var(--danger);"><span>${isAr ? 'المخالفات:' : 'Violations:'}</span> <span>- SAR ${viol.toLocaleString()}</span></div>
                             ${sysViolHtml}
-                            <div class="breakdown-row" style="color:var(--info);"><span>Paid Advance:</span> <span>- SAR ${paidThisMonth.toLocaleString()}</span></div>
+                            ${lateHtml}
+                            <div class="breakdown-row" style="color:var(--info);"><span>${isAr ? 'سلف مدفوعة:' : 'Paid Advance:'}</span> <span>- SAR ${paidThisMonth.toLocaleString()}</span></div>
                         </div>
                     </td>
                     <td class="text-info">SAR ${paidThisMonth.toLocaleString()}</td>
@@ -6047,8 +6056,10 @@ function renderFinDetails() {
     const totalCustody = calculateCustodyTotal(stats.custodyList);
     const paidThisMonth = calculatePaymentsTotal(stats.paymentsList);
 
-    // UI display for Net reflects the subtraction of the advance payment
-    const net = base + totalRewards - totalViolations - paidThisMonth;
+    // UI display for Net reflects the subtraction of the advance payment, system violations, and late penalties
+    const sysViolDeduction = typeof getSystemViolationDeductionsForMonth === 'function' ? getSystemViolationDeductionsForMonth(worker, currentGlobalMonth) : 0;
+    const lateDeduction = typeof getLateDeductionsForMonth === 'function' ? getLateDeductionsForMonth(worker, currentGlobalMonth) : 0;
+    const net = base + totalRewards - totalViolations - paidThisMonth - sysViolDeduction - lateDeduction;
 
     const allTimeRemaining = getCumulativeBalance(worker, currentGlobalMonth);
 
@@ -6127,13 +6138,59 @@ function renderFinDetails() {
     }
 
     // Render Detailed Violations
-    if (!stats.violationsList || stats.violationsList.length === 0) {
-        if (vHistList) vHistList.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted); text-align:center;">No violations recorded this month.</p>`;
-    } else {
-        stats.violationsList.forEach(v => {
+    const isAr = currentAppLang === 'ar';
+    const noViolations = (!stats.violationsList || stats.violationsList.length === 0);
+
+    if (vHistList) {
+        vHistList.innerHTML = '';
+
+        // 1. Auto Late Penalties
+        if (lateDeduction > 0) {
             const vDiv = document.createElement('div');
             vDiv.className = 'ledger-card';
             vDiv.style.borderLeft = '4px solid var(--danger)';
+            vDiv.style.marginBottom = '8px';
+            vDiv.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <strong class="text-danger">${isAr ? 'خصم تأخير تلقائي' : 'Auto Late Penalties'}</strong><br>
+                        <span style="font-size:0.75rem; color:var(--text-muted);">${isAr ? 'مستقطع من سجلات حضور هذا الشهر' : 'Deducted from attendance records of this month'}</span>
+                    </div>
+                    <strong style="color:var(--danger); font-size:1rem;">- SAR ${lateDeduction.toLocaleString()}</strong>
+                </div>
+            `;
+            vHistList.appendChild(vDiv);
+        }
+
+        // 2. System Violations Deduction
+        if (sysViolDeduction > 0) {
+            const vDiv = document.createElement('div');
+            vDiv.className = 'ledger-card';
+            vDiv.style.borderLeft = '4px solid var(--danger)';
+            vDiv.style.marginBottom = '8px';
+            vDiv.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <strong class="text-danger">${isAr ? 'خصم المخالفات النظامية' : 'System Violations Deduction'}</strong><br>
+                        <span style="font-size:0.75rem; color:var(--text-muted);">${isAr ? 'خصم تلقائي حسب مستوى المخالفة' : 'Deducted automatically based on violation level'}</span>
+                    </div>
+                    <strong style="color:var(--danger); font-size:1rem;">- SAR ${sysViolDeduction.toLocaleString()}</strong>
+                </div>
+            `;
+            vHistList.appendChild(vDiv);
+        }
+
+        // 3. Regular Violations
+        if (noViolations) {
+            if (lateDeduction === 0 && sysViolDeduction === 0) {
+                vHistList.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted); text-align:center;">No violations recorded this month.</p>`;
+            }
+        } else {
+            stats.violationsList.forEach(v => {
+                const vDiv = document.createElement('div');
+                vDiv.className = 'ledger-card';
+                vDiv.style.borderLeft = '4px solid var(--danger)';
+                vDiv.style.marginBottom = '8px';
 
             let imgHtml = v.image ? `<img src="${v.image}" onclick="showImage('${v.image}')" class="proof-img" style="max-height: 80px; display: block; margin-top: 10px;">` : '';
             let statusHtml = ''; let actionBtns = ''; let isApplied = false;
@@ -6172,10 +6229,12 @@ function renderFinDetails() {
             if (vHistList) vHistList.appendChild(vDiv);
         });
     }
+  }
 }
 
 // SUMMARY TAB RENDERING
 function renderSummaryTable() {
+    const isAr = currentAppLang === 'ar';
     const container = document.getElementById('summary-cards-container');
     if (!container) return;
     container.innerHTML = '';
@@ -6197,6 +6256,41 @@ function renderSummaryTable() {
         const stats = getMonthlyStats(worker, currentGlobalMonth);
         const deliveries = (stats.deliveriesList ? stats.deliveriesList.length : 0) + (stats.legacyDeliveries || 0);
         const costs = parseFloat(stats.costs || 0);
+
+        // Calculate Monthly Attendance Stats
+        const companyData = getCompanyData();
+        const attendance = companyData.attendance || {};
+        const graceMins = parseInt(companyData.lateGraceMinutes || 0);
+        
+        let presentCount = 0;
+        let absentCount = 0;
+        let lateCount = 0;
+
+        Object.keys(attendance).forEach(dateStr => {
+            if (dateStr.startsWith(currentGlobalMonth)) {
+                const dayMap = attendance[dateStr] || {};
+                const att = dayMap[worker.id];
+                if (att) {
+                    if (att.status === 'present') {
+                        presentCount++;
+                        if (att.time && worker.startTime) {
+                            const [sH, sM] = worker.startTime.split(':').map(Number);
+                            const [cH, cM] = att.time.split(':').map(Number);
+                            if (!isNaN(sH) && !isNaN(cH)) {
+                                const startMins = sH * 60 + (sM || 0);
+                                const checkMins = cH * 60 + (cM || 0);
+                                const diff = checkMins - startMins;
+                                if (diff > graceMins) {
+                                    lateCount++;
+                                }
+                            }
+                        }
+                    } else if (att.status === 'absent') {
+                        absentCount++;
+                    }
+                }
+            }
+        });
 
         // Count Tasks Done in Current Month
         const monthAbbr = new Date(currentGlobalMonth + '-01').toLocaleString('en-US', { month: 'short' });
@@ -6325,6 +6419,23 @@ function renderSummaryTable() {
                         <div style="background:var(--input-bg); padding:16px 12px; border-radius:8px; text-align:center; border:1px solid var(--border-color);">
                             <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:500;">${t('label-avg-perf')}</div>
                             <div style="font-size:1.4rem; font-weight:700; color:var(--text-main); line-height:1;">${avg}</div>
+                        </div>
+                        <div style="background:var(--input-bg); padding:12px 12px; border-radius:8px; text-align:center; border:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center;">
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px; font-weight:700;">${isAr ? 'الحضور والغياب' : 'Attendance Stats'}</div>
+                            <div style="font-size:0.85rem; font-weight:700; color:var(--text-main); display:flex; flex-direction:column; gap:2px; text-align:inherit; padding:0 4px;">
+                                <div style="color:var(--success); display:flex; justify-content:space-between; gap:6px;">
+                                    <span>${isAr ? 'حاضر' : 'Present'}:</span>
+                                    <span>${presentCount}</span>
+                                </div>
+                                <div style="color:var(--danger); display:flex; justify-content:space-between; gap:6px;">
+                                    <span>${isAr ? 'غائب' : 'Absent'}:</span>
+                                    <span>${absentCount}</span>
+                                </div>
+                                <div style="color:var(--warning); display:flex; justify-content:space-between; gap:6px;">
+                                    <span>${isAr ? 'متأخر' : 'Late'}:</span>
+                                    <span>${lateCount}</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -6601,6 +6712,9 @@ const uiTranslations = {
         "th-total-remaining": "Total Remaining (All Time)",
         "title-export-fin": "📄 Export Financial Report",
         "desc-export-fin": "Download a PDF copy of this financial record.",
+        "label-late-grace": "Late Consideration Threshold (Minutes)",
+        "label-late-penalty": "Late Penalty Amount (SAR)",
+        "btn-save-settings": "Save Settings",
 
         // Summary Extra
         "title-my-violations": "⚠️ My Violations & Fix Deadlines",
@@ -7126,7 +7240,10 @@ const uiTranslations = {
         "btn-cancel": "إلغاء",
         "btn-post-note": "نشر الملاحظة",
         "opt-urgency-normal": "🔵 أولوية عادية",
-        "opt-choose-emp": "-- اختر الموظف --"
+        "opt-choose-emp": "-- اختر الموظف --",
+        "label-late-grace": "حد احتساب التأخير (بالدقائق)",
+        "label-late-penalty": "قيمة غرامة التأخير (ريال)",
+        "btn-save-settings": "حفظ الإعدادات"
     }
 };
 
@@ -7662,6 +7779,48 @@ window.renderPaymentRequests = renderPaymentRequests;
 
 // --- ATTENDANCE SYSTEM ---
 
+function saveLateSettings() {
+    const grace = parseInt(document.getElementById('late-grace-input').value) || 0;
+    const penalty = parseFloat(document.getElementById('late-penalty-input').value) || 0;
+
+    db.ref(`companies/${currentCompany}/lateGraceMinutes`).set(grace);
+    db.ref(`companies/${currentCompany}/latePenaltySAR`).set(penalty)
+        .then(() => {
+            alert(currentAppLang === 'ar' ? 'تم حفظ إعدادات التأخير بنجاح!' : 'Late settings saved successfully!');
+            renderAll();
+        })
+        .catch(err => console.error("Error saving late settings:", err));
+}
+
+function getLateDeductionsForMonth(worker, monthStr) {
+    const companyData = getCompanyData();
+    const attendance = companyData.attendance || {};
+    const graceMins = parseInt(companyData.lateGraceMinutes || 0);
+    const penalty = parseFloat(companyData.latePenaltySAR || 0);
+    if (penalty <= 0) return 0;
+
+    let totalDeduction = 0;
+    Object.keys(attendance).forEach(dateStr => {
+        if (dateStr.startsWith(monthStr)) {
+            const dayMap = attendance[dateStr] || {};
+            const att = dayMap[worker.id];
+            if (att && att.status === 'present' && att.time && worker.startTime) {
+                const [sH, sM] = worker.startTime.split(':').map(Number);
+                const [cH, cM] = att.time.split(':').map(Number);
+                if (!isNaN(sH) && !isNaN(cH)) {
+                    const startMins = sH * 60 + (sM || 0);
+                    const checkMins = cH * 60 + (cM || 0);
+                    const diff = checkMins - startMins;
+                    if (diff > graceMins) {
+                        totalDeduction += penalty;
+                    }
+                }
+            }
+        }
+    });
+    return totalDeduction;
+}
+
 function calculateLateness(startTimeStr, checkTimeStr) {
     if (!startTimeStr || !checkTimeStr) return null;
     const [sH, sM] = startTimeStr.split(':').map(Number);
@@ -7759,6 +7918,17 @@ function renderAttendance() {
     tbody.innerHTML = '';
 
     const companyData = getCompanyData();
+
+    // Populate Late Config Inputs
+    const graceInput = document.getElementById('late-grace-input');
+    const penaltyInput = document.getElementById('late-penalty-input');
+    if (graceInput && !graceInput.matches(':focus')) {
+        graceInput.value = companyData.lateGraceMinutes !== undefined ? companyData.lateGraceMinutes : '';
+    }
+    if (penaltyInput && !penaltyInput.matches(':focus')) {
+        penaltyInput.value = companyData.latePenaltySAR !== undefined ? companyData.latePenaltySAR : '';
+    }
+
     const workers = companyData.workers || [];
     const attendanceMap = (companyData.attendance || {})[dateStr] || {};
 
@@ -8367,6 +8537,8 @@ window.renderSelectedWorkerSysViolations = renderSelectedWorkerSysViolations;
 window.addSystemViolation = addSystemViolation;
 window.deleteSystemViolation = deleteSystemViolation;
 window.toggleWorkerCloseStatus = toggleWorkerCloseStatus;
+window.saveLateSettings = saveLateSettings;
+window.getLateDeductionsForMonth = getLateDeductionsForMonth;
 
 // Initial run
 applyTranslations();
