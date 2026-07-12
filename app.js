@@ -135,21 +135,21 @@ function translateDynamicTerm(term) {
     }
     if (term.includes('Past cost of SAR') && term.includes('has been logged!')) {
         return term.replace('Past cost of SAR', 'تم تسجيل تكلفة سابقة بقيمة')
-                   .replace('for', 'لفئة')
-                   .replace('on', 'في تاريخ')
-                   .replace('has been logged!', '!');
+            .replace('for', 'لفئة')
+            .replace('on', 'في تاريخ')
+            .replace('has been logged!', '!');
     }
 
     return term;
 }
 
 const originalAlert = window.alert;
-window.alert = function(msg) {
+window.alert = function (msg) {
     return originalAlert(translateDynamicTerm(msg));
 };
 
 const originalConfirm = window.confirm;
-window.confirm = function(msg) {
+window.confirm = function (msg) {
     return originalConfirm(translateDynamicTerm(msg));
 };
 
@@ -326,10 +326,7 @@ let isInitialLoad = true;
 // FEATURE 1: Task tracking state — tracks previously seen task IDs for the current worker
 let previousTaskIds = [];
 
-const translations = {
-    en: { empName: "Employee Name", role: "Role", branch: "Branch", shift: "Shift Schedule", baseIncome: "Base Salary (SAR)", rewards: "Rewards (+)", violations: "Violations (-)", netPay: "Net Payable (SAR)", paid: "Paid This Month (SAR)", remaining: "Remaining To Pay (SAR)", costs: "Company Costs", custody: "Custody (SAR)", avgPerf: "Avg Perf (%)", goodNotes: "Good Notes", badNotes: "Bad Notes", deliveries: "Deliveries", initialBalance: "Initial Debt Carryover", unassigned: "Unassigned", na: "N/A", generatedOn: "Generated on:", reportTitle: "Financial & Payroll Report" },
-    ar: { empName: "اسم الموظف", role: "المسمى الوظيفي", branch: "الفرع", shift: "أوقات العمل", baseIncome: "الراتب الأساسي (ريال)", rewards: "المكافآت (+)", violations: "الخصومات (-)", netPay: "صافي الراتب المستحق (ريال)", paid: "المدفوع هذا الشهر (ريال)", remaining: "المتبقي للدفع (ريال)", custody: "رصيد العهدة (ريال)", avgPerf: "متوسط الأداء (%)", goodNotes: "ملاحظات جيدة", badNotes: "ملاحظات سيئة", deliveries: "التوصيلات", initialBalance: "رصيد متبقي سابق", unassigned: "غير محدد", na: "غير متوفر", generatedOn: "تاريخ إنشاء التقرير:", reportTitle: "تقرير مسير الرواتب والمالية" }
-};
+
 
 function getCompanyData() {
     if (!appData[currentCompany]) {
@@ -782,6 +779,7 @@ function ensureArraysExist(data) {
     if (!data.paymentRequests) data.paymentRequests = {};
     if (!data.attendance) data.attendance = {};
     if (!data.activityLogs) data.activityLogs = {};
+    if (!data.generalDeliveries) data.generalDeliveries = {};
     if (!data.incomeSources) data.incomeSources = ['Cash', 'Credit Card'];
     if (!data.disabledSalesMethods) data.disabledSalesMethods = [];
 
@@ -3878,7 +3876,8 @@ function getCumulativeBalance(worker, maxMonthStr) {
 
         const sysViolDeduction = typeof getSystemViolationDeductionsForMonth === 'function' ? getSystemViolationDeductionsForMonth(worker, m) : 0;
         const lateDeduction = typeof getLateDeductionsForMonth === 'function' ? getLateDeductionsForMonth(worker, m) : 0;
-        const netThisMonth = base + rew - viol - sysViolDeduction - lateDeduction;
+        const volumeReward = typeof getDriverVolumeRewardsForMonth === 'function' ? getDriverVolumeRewardsForMonth(worker, m) : 0;
+        const netThisMonth = base + rew + volumeReward - viol - sysViolDeduction - lateDeduction;
         const paidThisMonth = calculatePaymentsTotal(stats.paymentsList);
         balance += (netThisMonth - paidThisMonth);
         if (m === maxMonthStr) break;
@@ -3919,7 +3918,8 @@ function getExportData(lang) {
         const stats = getMonthlyStats(w, currentGlobalMonth);
         const monthlyLogs = getLogsForMonth(w, currentGlobalMonth);
         const baseIncome = parseFloat(w.income || 0);
-        const rewards = calculateRewardsTotal(stats.rewardsList);
+        const volumeReward = typeof getDriverVolumeRewardsForMonth === 'function' ? getDriverVolumeRewardsForMonth(w, currentGlobalMonth) : 0;
+        const rewards = calculateRewardsTotal(stats.rewardsList) + volumeReward;
         const violations = calculateViolationsTotal(stats.violationsList);
         const paid = calculatePaymentsTotal(stats.paymentsList);
 
@@ -4777,17 +4777,43 @@ function startDriverOrder() {
         if (isNaN(prepMins) || prepMins <= 0) { alert("Enter valid prep time in minutes."); return; }
     }
 
-    const workerIndex = getCompanyData().workers.findIndex(w => w.id === activeDriverId);
-    if (workerIndex === -1) return;
-    const worker = getCompanyData().workers[workerIndex];
-    worker.activeOrder = {
+    const orderData = {
         startTime: Date.now(),
         allocatedMs: mins * 60 * 1000,
         details: details,
         status: status,
         prepStartTime: Date.now(),
-        prepTimeMs: prepMins * 60 * 1000
+        prepTimeMs: prepMins * 60 * 1000,
+        isGeneralPool: activeDriverId === 'general'
     };
+
+    if (activeDriverId === 'general') {
+        const poolRef = db.ref(`companies/${currentCompany}/generalDeliveries`).push();
+        orderData.id = poolRef.key;
+
+        const companyData = getCompanyData();
+        const existingCount = companyData.generalDeliveries ? Object.keys(companyData.generalDeliveries).length : 0;
+        orderData.orderNum = existingCount + 1;
+
+        poolRef.set(orderData)
+            .then(() => {
+                document.getElementById('driver-order-time').value = '';
+                document.getElementById('driver-order-details').value = '';
+                if (document.getElementById('driver-prep-time')) document.getElementById('driver-prep-time').value = '';
+                document.getElementById('driver-order-status').value = 'ready';
+                toggleDriverPrepTime();
+
+                logActivity('delivery', 'general', 'General Pool', `Added order #${orderData.orderNum} to the general deliveries pool.`);
+            })
+            .catch(err => console.error("Error creating general pool order:", err));
+        return;
+    }
+
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === activeDriverId);
+    if (workerIndex === -1) return;
+    const worker = getCompanyData().workers[workerIndex];
+    orderData.id = `direct_${Date.now()}`;
+    worker.activeOrder = orderData;
 
     document.getElementById('driver-order-time').value = '';
     document.getElementById('driver-order-details').value = '';
@@ -4841,13 +4867,18 @@ function finishDriverOrder(isSuccess, workerId) {
     if (!workerId) return;
 
     // Ask for confirmation before cancelling an order
-    if (!isSuccess && !confirm("Are you sure you want to completely cancel this order?")) {
+    const isAr = currentAppLang === 'ar';
+    const confirmMsg = isAr
+        ? "هل أنت متأكد من إلغاء/إرجاع هذا الطلب؟"
+        : "Are you sure you want to cancel/return this order?";
+    if (!isSuccess && !confirm(confirmMsg)) {
         return;
     }
 
     const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
     if (workerIndex === -1) return;
     const worker = getCompanyData().workers[workerIndex];
+
     if (isSuccess && worker.activeOrder) {
         const stats = getMonthlyStats(worker, currentGlobalMonth);
 
@@ -4865,7 +4896,8 @@ function finishDriverOrder(isSuccess, workerId) {
             allocatedMs: worker.activeOrder.allocatedMs,
             prepStartTime: worker.activeOrder.prepStartTime || null,
             prepTimeMs: worker.activeOrder.prepTimeMs || 0,
-            prepEndTime: prepEnd || null
+            prepEndTime: prepEnd || null,
+            orderNum: worker.activeOrder.orderNum || null
         });
 
         // Write the deliveriesList
@@ -4876,7 +4908,21 @@ function finishDriverOrder(isSuccess, workerId) {
         if (typeof logActivity === 'function') {
             logActivity('delivery', worker.id, worker.name, `${worker.name} delivered: "${worker.activeOrder.details || 'No details'}"`);
         }
+    } else if (!isSuccess && worker.activeOrder && worker.activeOrder.isGeneralPool) {
+        // Return it to the general pool!
+        const returnedOrder = {
+            ...worker.activeOrder,
+            assignedToWorkerId: null,
+            assignedToWorkerName: null
+        };
+        const orderId = returnedOrder.id || `gen_${Date.now()}`;
+        db.ref(`companies/${currentCompany}/generalDeliveries/${orderId}`).set(returnedOrder)
+            .then(() => {
+                logActivity('delivery', worker.id, worker.name, `${worker.name} returned order #${returnedOrder.orderNum || ''} to the general pool`);
+            })
+            .catch(err => console.error("Error returning order to general pool:", err));
     }
+
     worker.activeOrder = null;
 
     // Clear active order
@@ -4927,12 +4973,12 @@ function updateActiveDriverTimer() {
             const m = Math.floor((absDiff % 3600000) / 60000).toString().padStart(2, '0');
             const s = Math.floor((absDiff % 60000) / 1000).toString().padStart(2, '0');
             displayTime = isLate ? `-${h !== '00' ? h + ':' : ''}${m}:${s}` : `${h !== '00' ? h + ':' : ''}${m}:${s}`;
-            statusText = isLate ? '🚨 Late (Kitchen Prep)' : '🟡 Kitchen is Preparing...';
+            statusText = isLate ? '🚨 ' + t('status-late-prep') : '🟡 ' + t('status-preparing');
             boxColor = isLate ? 'var(--danger)' : 'var(--warning)';
         } else if (order.status === 'not_ready') {
-            statusText = '🔴 Kitchen Not Ready';
+            statusText = '🔴 ' + t('status-kitchen-not-ready');
         } else if (order.status === 'ready') {
-            statusText = '🟢 Ready for Pickup!';
+            statusText = '🟢 ' + t('status-ready-pickup');
             boxColor = 'var(--success)';
         } else if (order.status === 'picked_up') {
             const diff = (order.startTime + order.allocatedMs) - now;
@@ -4942,7 +4988,7 @@ function updateActiveDriverTimer() {
             const m = Math.floor((absDiff % 3600000) / 60000).toString().padStart(2, '0');
             const s = Math.floor((absDiff % 60000) / 1000).toString().padStart(2, '0');
             displayTime = isLate ? `-${h !== '00' ? h + ':' : ''}${m}:${s}` : `${h !== '00' ? h + ':' : ''}${m}:${s}`;
-            statusText = isLate ? '🚨 LATE (Delivering)' : '🛵 Delivering to Customer...';
+            statusText = isLate ? '🚨 ' + t('status-late-delivering') : '🛵 ' + t('status-delivering');
             boxColor = isLate ? 'var(--danger)' : 'var(--info)';
         }
         return { displayTime, statusText, boxColor, isLate };
@@ -4950,14 +4996,30 @@ function updateActiveDriverTimer() {
 
     // 1. Update Manager Panel
     if (activeDriverId) {
-        const worker = getCompanyData().workers.find(w => w.id === activeDriverId);
-        if (worker && worker.activeOrder) {
-            const res = calcTime(worker.activeOrder);
-            document.getElementById('driver-timer-display').textContent = res.displayTime;
-            document.getElementById('driver-timer-status').textContent = res.statusText;
-            document.getElementById('driver-timer-status').style.color = res.boxColor;
-            document.getElementById('driver-timer-box').style.borderColor = res.boxColor;
-            document.getElementById('driver-timer-display').style.color = res.boxColor;
+        if (activeDriverId === 'general') {
+            const timers = document.querySelectorAll('.general-pool-timer');
+            timers.forEach(el => {
+                const startTime = parseInt(el.getAttribute('data-start'));
+                const timeMs = parseInt(el.getAttribute('data-time'));
+                const diff = (startTime + timeMs) - now;
+                const isLate = diff <= 0;
+                const absDiff = Math.abs(diff);
+                const h = Math.floor(absDiff / 3600000).toString().padStart(2, '0');
+                const m = Math.floor((absDiff % 3600000) / 60000).toString().padStart(2, '0');
+                const s = Math.floor((absDiff % 60000) / 1000).toString().padStart(2, '0');
+                el.textContent = isLate ? `-${h !== '00' ? h + ':' : ''}${m}:${s}` : `${h !== '00' ? h + ':' : ''}${m}:${s}`;
+                el.style.color = isLate ? 'var(--danger)' : 'var(--warning)';
+            });
+        } else {
+            const worker = getCompanyData().workers.find(w => w.id === activeDriverId);
+            if (worker && worker.activeOrder) {
+                const res = calcTime(worker.activeOrder);
+                document.getElementById('driver-timer-display').textContent = res.displayTime;
+                document.getElementById('driver-timer-status').textContent = res.statusText;
+                document.getElementById('driver-timer-status').style.color = res.boxColor;
+                document.getElementById('driver-timer-box').style.borderColor = res.boxColor;
+                document.getElementById('driver-timer-display').style.color = res.boxColor;
+            }
         }
     }
 
@@ -4981,9 +5043,9 @@ function updateActiveDriverTimer() {
             // Inject Action Buttons into the Banner based on state
             const actionDiv = document.getElementById('driver-banner-actions');
             if (order.status !== 'picked_up') {
-                actionDiv.innerHTML = `<button onclick="pickupDriverOrder('${myWorker.id}')" class="btn-warning" style="padding:10px 16px; font-size:0.9rem; border-radius:8px;">📦 Receive Order</button>`;
+                actionDiv.innerHTML = `<button onclick="pickupDriverOrder('${myWorker.id}')" class="btn-warning" style="padding:10px 16px; font-size:0.9rem; border-radius:8px;">${t('btn-receive-order')}</button>`;
             } else {
-                actionDiv.innerHTML = `<button onclick="finishDriverOrder(true, '${myWorker.id}')" class="btn-success" style="padding:10px 16px; font-size:0.9rem; border-radius:8px;">✅ Delivered</button>`;
+                actionDiv.innerHTML = `<button onclick="finishDriverOrder(true, '${myWorker.id}')" class="btn-success" style="padding:10px 16px; font-size:0.9rem; border-radius:8px;">${t('btn-delivered')}</button>`;
             }
             driverBanner.style.display = 'block';
         } else {
@@ -5010,7 +5072,43 @@ function renderDriversList() {
         return r.includes('driver') || r.includes('سائق') || r.includes('delivery');
     });
 
-    if (drivers.length === 0) {
+    if (!isDriversAdmin && drivers.length > 0 && !activeDriverId) {
+        activeDriverId = drivers[0].id;
+    }
+
+    // Prepend General Pool Card for Admin
+    if (isDriversAdmin) {
+        const pool = getCompanyData().generalDeliveries || {};
+        const poolCount = Object.keys(pool).length;
+        const poolDiv = document.createElement('div');
+        const isPoolSelected = activeDriverId === 'general';
+        poolDiv.className = 'driver-card general-pool-card';
+        poolDiv.style.cursor = 'pointer';
+        poolDiv.style.borderColor = isPoolSelected ? 'var(--primary)' : 'var(--border-color)';
+        poolDiv.style.borderWidth = isPoolSelected ? '2px' : '1px';
+        poolDiv.style.marginBottom = '12px';
+        poolDiv.style.background = isPoolSelected ? 'rgba(var(--primary-rgb), 0.1)' : 'rgba(255,255,255,0.02)';
+
+        const isAr = currentAppLang === 'ar';
+        const badgeHtml = poolCount > 0
+            ? `<span class="driver-status-badge status-busy" style="background:var(--warning-bg); color:var(--warning);"><span class="pulse-dot" style="background-color:var(--warning);"></span>${poolCount} ${isAr ? 'معلق' : 'Pending'}</span>`
+            : `<span class="driver-status-badge status-available" style="background:var(--success-bg); color:var(--success);"><span class="pulse-dot" style="background-color:var(--success);"></span>${isAr ? 'فارغ' : 'Empty'}</span>`;
+
+        poolDiv.innerHTML = `
+            <div class="driver-card-header">
+                <div class="driver-info">
+                    <strong class="driver-name" style="color: var(--secondary); font-size:0.95rem;">📦 ${isAr ? 'خانة الطلبات العامة' : 'General Deliveries Pool'}</strong>
+                </div>
+                <div class="driver-actions">
+                    ${badgeHtml}
+                </div>
+            </div>
+        `;
+        poolDiv.onclick = () => selectDriver('general');
+        list.appendChild(poolDiv);
+    }
+
+    if (drivers.length === 0 && !isDriversAdmin) {
         list.innerHTML = `<p style="color:var(--text-muted); font-size:0.85rem;">No drivers found.</p>`;
     } else {
         drivers.forEach(d => {
@@ -5023,10 +5121,31 @@ function renderDriversList() {
             div.style.borderColor = isSelected ? 'var(--primary)' : 'var(--border-color)';
             div.style.borderWidth = isSelected ? '2px' : '1px';
 
-            let statusBadge = isBusy ? `<span class="badge" style="background:var(--warning);">${t('status-in-transit')}</span>` : `<span class="badge" style="background:var(--success);">${t('status-available')}</span>`;
+            let statusBadge = isBusy
+                ? `<span class="driver-status-badge status-busy"><span class="pulse-dot"></span>${t('status-in-transit')}</span>`
+                : `<span class="driver-status-badge status-available"><span class="pulse-dot"></span>${t('status-available')}</span>`;
+
             let removeBtn = isDriversAdmin ? `<button onclick="demoteFromDriver(event, '${d.id}')" style="background:var(--danger-bg); color:var(--danger); border:1px solid var(--danger-border); border-radius:6px; padding:2px 8px; font-size:0.75rem; cursor:pointer;" title="${t('btn-remove')}">${t('btn-remove')}</button>` : '';
 
-            div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><strong style="color:var(--text-main);">${d.name}</strong><div style="display:flex; gap:6px; align-items:center;">${statusBadge}${removeBtn}</div></div>`;
+            let provisionsHtml = '';
+            const isAr = currentAppLang === 'ar';
+            if (d.companyCar) provisionsHtml += `<span class="driver-prov-icon" title="${isAr ? 'سيارة من الشركة' : 'Company Car'}">🚗</span>`;
+            if (d.companyFuel) provisionsHtml += `<span class="driver-prov-icon" title="${isAr ? 'بنزين من الشركة' : 'Company Fuel'}">⛽</span>`;
+
+            let provWrapper = provisionsHtml ? `<div class="driver-prov-wrapper">${provisionsHtml}</div>` : '';
+
+            div.innerHTML = `
+                <div class="driver-card-header">
+                    <div class="driver-info">
+                        <strong class="driver-name">${d.name}</strong>
+                        ${provWrapper}
+                    </div>
+                    <div class="driver-actions">
+                        ${statusBadge}
+                        ${removeBtn}
+                    </div>
+                </div>
+            `;
             div.onclick = () => selectDriver(d.id);
             list.appendChild(div);
         });
@@ -5065,13 +5184,24 @@ function promoteToDriver() {
     const worker = getCompanyData().workers[workerIndex];
     worker.role = "Driver";
 
-    // Targeted write to update worker role
-    db.ref(`companies/${currentCompany}/workers/${workerIndex}/role`).set(worker.role)
-        .then(() => {
-            alert(`${worker.name} is now assigned as a Driver!`);
-            document.getElementById('assign-driver-select').value = "";
-        })
-        .catch(err => console.error("Error promoting to driver:", err));
+    const carVal = document.getElementById('assign-driver-car')?.checked || false;
+    const fuelVal = document.getElementById('assign-driver-fuel')?.checked || false;
+
+    worker.companyCar = carVal;
+    worker.companyFuel = fuelVal;
+
+    // Save updated role and provision details to Firebase
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}`).update({
+        role: worker.role,
+        companyCar: carVal,
+        companyFuel: fuelVal
+    }).then(() => {
+        alert(`${worker.name} is now assigned as a Driver!`);
+        document.getElementById('assign-driver-select').value = "";
+        if (document.getElementById('assign-driver-car')) document.getElementById('assign-driver-car').checked = false;
+        if (document.getElementById('assign-driver-fuel')) document.getElementById('assign-driver-fuel').checked = false;
+        renderAll();
+    }).catch(err => console.error("Error promoting to driver:", err));
 }
 
 function demoteFromDriver(event, dId) {
@@ -5094,12 +5224,208 @@ function demoteFromDriver(event, dId) {
         .catch(err => console.error("Error demoting driver:", err));
 }
 
+function updateSelectedDriverProvisions() {
+    if (!activeDriverId) return;
+    const companyData = getCompanyData();
+    const workerIndex = companyData.workers.findIndex(w => w.id === activeDriverId);
+    if (workerIndex === -1) return;
+
+    const carCheck = document.getElementById('edit-driver-car');
+    const fuelCheck = document.getElementById('edit-driver-fuel');
+    if (!carCheck || !fuelCheck) return;
+
+    const carVal = carCheck.checked;
+    const fuelVal = fuelCheck.checked;
+
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}`).update({
+        companyCar: carVal,
+        companyFuel: fuelVal
+    }).then(() => {
+        // Silently update cache and refresh views
+        companyData.workers[workerIndex].companyCar = carVal;
+        companyData.workers[workerIndex].companyFuel = fuelVal;
+        renderDriversList();
+    }).catch(err => console.error("Error updating driver provisions:", err));
+}
+
+function renderDriverVolumeRewards() {
+    const listDiv = document.getElementById('driver-rewards-rules-list');
+    if (!listDiv) return;
+    listDiv.innerHTML = '';
+    const isAr = currentAppLang === 'ar';
+    const companyData = getCompanyData();
+    const rewards = companyData.driverVolumeRewards || [];
+    if (rewards.length === 0) {
+        listDiv.innerHTML = `<p style="font-size:0.8rem; color:var(--text-muted); text-align:center;">${isAr ? 'لا توجد قواعد مكافآت معينة.' : 'No reward rules configured yet.'}</p>`;
+        return;
+    }
+    rewards.forEach((r, idx) => {
+        const row = document.createElement('div');
+        row.className = 'flex-between';
+        row.style.background = 'var(--input-bg)';
+        row.style.padding = '8px 12px';
+        row.style.borderRadius = '6px';
+        row.style.fontSize = '0.85rem';
+        row.style.border = '1px solid var(--border-color)';
+        row.innerHTML = `
+            <span>🎯 <strong>${r.ordersCount}</strong> ${isAr ? 'طلب' : 'orders'} ➔ <strong style="color:var(--success);">SAR ${parseFloat(r.rewardAmount).toLocaleString()}</strong></span>
+            <button onclick="deleteDriverVolumeReward(${idx})" class="btn-outline-danger" style="padding:2px 6px; font-size:0.7rem; line-height:1; border:none; background:transparent; cursor:pointer;" title="${isAr ? 'حذف القاعدة' : 'Delete Rule'}">🗑️</button>
+        `;
+        listDiv.appendChild(row);
+    });
+}
+
+function addDriverVolumeReward() {
+    const ordersInput = document.getElementById('reward-orders-input');
+    const sarInput = document.getElementById('reward-sar-input');
+    if (!ordersInput || !sarInput) return;
+
+    const ordersCount = parseInt(ordersInput.value);
+    const rewardAmount = parseFloat(sarInput.value);
+
+    if (isNaN(ordersCount) || ordersCount <= 0) {
+        alert("Enter valid daily orders count.");
+        return;
+    }
+    if (isNaN(rewardAmount) || rewardAmount <= 0) {
+        alert("Enter valid reward amount.");
+        return;
+    }
+
+    const companyData = getCompanyData();
+    if (!companyData.driverVolumeRewards) companyData.driverVolumeRewards = [];
+
+    // Check if a rule for this ordersCount already exists
+    const existingIdx = companyData.driverVolumeRewards.findIndex(r => r.ordersCount === ordersCount);
+    if (existingIdx !== -1) {
+        if (!confirm("A rule for this number of orders already exists. Overwrite it?")) return;
+        companyData.driverVolumeRewards[existingIdx].rewardAmount = rewardAmount;
+    } else {
+        companyData.driverVolumeRewards.push({ ordersCount, rewardAmount });
+    }
+
+    // Sort by ordersCount ascending
+    companyData.driverVolumeRewards.sort((a, b) => a.ordersCount - b.ordersCount);
+
+    db.ref(`companies/${currentCompany}/driverVolumeRewards`).set(companyData.driverVolumeRewards)
+        .then(() => {
+            ordersInput.value = '';
+            sarInput.value = '';
+            renderDriverVolumeRewards();
+            renderAll(); // Refresh finance table calculations
+        })
+        .catch(err => console.error("Error saving driver rewards rule:", err));
+}
+
+function deleteDriverVolumeReward(idx) {
+    const companyData = getCompanyData();
+    const rewards = companyData.driverVolumeRewards || [];
+    if (!rewards[idx]) return;
+
+    if (!confirm("Are you sure you want to delete this reward rule?")) return;
+
+    rewards.splice(idx, 1);
+    db.ref(`companies/${currentCompany}/driverVolumeRewards`).set(rewards)
+        .then(() => {
+            renderDriverVolumeRewards();
+            renderAll(); // Refresh finance table calculations
+        })
+        .catch(err => console.error("Error deleting driver rewards rule:", err));
+}
+
 function renderDriverPanel() {
     const mngArea = document.getElementById('driver-management-area');
     if (!activeDriverId) { mngArea.style.display = 'none'; document.getElementById('active-driver-name').textContent = t('span-select-driver'); return; }
 
     mngArea.style.display = 'block';
-    const worker = getCompanyData().workers.find(w => w.id === activeDriverId);
+    const isAr = currentAppLang === 'ar';
+    const companyData = getCompanyData();
+
+    // Show provisions configuration, timer, and action elements by default (might be hidden for General Pool)
+    const provSection = document.getElementById('driver-provisions-section');
+    if (provSection) provSection.style.display = 'block';
+    document.getElementById('driver-timer-box').style.display = 'flex';
+    document.getElementById('driver-timer-status').style.display = 'block';
+    document.getElementById('panel-driver-actions').style.display = 'flex';
+
+    if (activeDriverId === 'general') {
+        document.getElementById('active-driver-name').textContent = isAr ? 'مسبح التوصيلات العامة' : 'General Deliveries Pool';
+
+        if (provSection) provSection.style.display = 'none';
+
+        const totalHud = document.getElementById('driver-total-orders');
+        if (totalHud) totalHud.textContent = 'N/A';
+
+        const formArea = document.querySelector('#view-drivers .management-form-area');
+        const activeArea = document.getElementById('driver-active-order');
+
+        formArea.style.display = 'block';
+        activeArea.style.display = 'block';
+
+        document.getElementById('driver-timer-box').style.display = 'none';
+        document.getElementById('driver-timer-status').style.display = 'none';
+        document.getElementById('panel-driver-actions').style.display = 'none';
+
+        const pool = companyData.generalDeliveries || {};
+        const poolKeys = Object.keys(pool);
+        let detailsHtml = '';
+        if (poolKeys.length === 0) {
+            detailsHtml = `<p style="color:var(--text-muted); text-align:center; padding: 20px;">${isAr ? 'لا توجد طلبات معلقة في التوصيل العام.' : 'No pending orders in the general pool.'}</p>`;
+        } else {
+            detailsHtml = `<div style="display:flex; flex-direction:column; gap:16px; text-align:left; width: 100%;">`;
+            const now = Date.now();
+            poolKeys.forEach(orderId => {
+                const order = pool[orderId];
+                let timeText = '--:--';
+                let orderStatusText = '';
+                let statusColor = 'var(--text-muted)';
+                let isLate = false;
+
+                if (order.status === 'preparing') {
+                    const diff = (order.prepStartTime + order.prepTimeMs) - now;
+                    isLate = diff <= 0;
+                    const absDiff = Math.abs(diff);
+                    const h = Math.floor(absDiff / 3600000).toString().padStart(2, '0');
+                    const m = Math.floor((absDiff % 3600000) / 60000).toString().padStart(2, '0');
+                    const s = Math.floor((absDiff % 60000) / 1000).toString().padStart(2, '0');
+                    timeText = isLate ? `-${h !== '00' ? h + ':' : ''}${m}:${s}` : `${h !== '00' ? h + ':' : ''}${m}:${s}`;
+                    orderStatusText = isLate ? t('status-late-prep') : t('status-preparing');
+                    statusColor = isLate ? 'var(--danger)' : 'var(--warning)';
+                } else if (order.status === 'not_ready') {
+                    orderStatusText = t('status-kitchen-not-ready');
+                    statusColor = 'var(--danger)';
+                } else if (order.status === 'ready') {
+                    orderStatusText = t('status-ready-pickup');
+                    statusColor = 'var(--success)';
+                }
+
+                const cancelBtn = `<button onclick="cancelGeneralPoolOrder('${orderId}')" class="btn-danger" style="padding: 6px 12px; font-size: 0.8rem; border-radius: 6px; cursor: pointer; border: none;">${isAr ? '❌ إلغاء الطلب' : '❌ Cancel'}</button>`;
+
+                detailsHtml += `
+                    <div class="ledger-card" style="border-left: 4px solid ${statusColor}; padding: 16px; display: flex; flex-direction: column; gap: 8px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+                        <div class="flex-between">
+                            <strong style="color:var(--secondary); font-size:1.05rem;">${isAr ? 'طلب' : 'Order'} #${order.orderNum || ''}</strong>
+                            ${cancelBtn}
+                        </div>
+                        <div style="font-size:0.95rem; color:var(--text-main); font-family:var(--font-mono); margin: 6px 0; background: rgba(0,0,0,0.15); padding: 8px 12px; border-radius: 6px; white-space: pre-wrap;">${order.details}</div>
+                        <div class="flex-between" style="font-size:0.85rem; color:var(--text-muted);">
+                            <div>${isAr ? 'حالة المطبخ' : 'Kitchen Status'}: <span style="color:${statusColor}; font-weight:600;">${orderStatusText}</span></div>
+                            ${order.status === 'preparing' ? `<div class="general-pool-timer" data-start="${order.prepStartTime}" data-time="${order.prepTimeMs}" style="font-family:var(--font-mono); font-weight:700; color:${statusColor};">${timeText}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            detailsHtml += `</div>`;
+        }
+        document.getElementById('panel-order-details').innerHTML = detailsHtml;
+        document.getElementById('driver-orders-list').innerHTML = `<p style="color:var(--text-muted); text-align:center; padding:20px;">${isAr ? 'مسبح التوصيل العام لا يحتوي على سجل مالي أو تاريخ توصيل خاص به.' : 'The general pool does not have individual history logs.'}</p>`;
+
+        const driverPoolContainer = document.getElementById('driver-general-pool-container');
+        if (driverPoolContainer) driverPoolContainer.style.display = 'none';
+        return;
+    }
+
+    const worker = companyData.workers.find(w => w.id === activeDriverId);
     if (!worker) {
         activeDriverId = null;
         mngArea.style.display = 'none';
@@ -5107,6 +5433,12 @@ function renderDriverPanel() {
         return;
     }
     document.getElementById('active-driver-name').textContent = `${t('label-managing') || 'Managing: '}${worker.name}`;
+
+    // Set Driver provisions checkbox states
+    const carCheck = document.getElementById('edit-driver-car');
+    const fuelCheck = document.getElementById('edit-driver-fuel');
+    if (carCheck) carCheck.checked = !!worker.companyCar;
+    if (fuelCheck) fuelCheck.checked = !!worker.companyFuel;
 
     const stats = getMonthlyStats(worker, currentGlobalMonth);
     const totalDels = (stats.deliveriesList ? stats.deliveriesList.length : 0) + (stats.legacyDeliveries || 0);
@@ -5119,6 +5451,10 @@ function renderDriverPanel() {
         formArea.style.display = 'none';
         activeArea.style.display = 'block';
         document.getElementById('panel-order-details').textContent = worker.activeOrder.details;
+
+        // Hide general pool container for this driver while they have an active order
+        const driverPoolContainer = document.getElementById('driver-general-pool-container');
+        if (driverPoolContainer) driverPoolContainer.style.display = 'none';
 
         // Inject Panel Action Buttons
         const panelActions = document.getElementById('panel-driver-actions');
@@ -5141,16 +5477,75 @@ function renderDriverPanel() {
             html += `<button onclick="finishDriverOrder(true, '${worker.id}')" class="btn-success" style="padding: 12px 24px;">✅ Order Delivered</button>`;
         }
 
-        // 3. Cancel Button (Managers Only, ALWAYS available at any stage)
-        if (isManager) {
-            html += `<button onclick="finishDriverOrder(false, '${worker.id}')" class="btn-danger" style="padding: 12px 24px;">❌ Cancel Order</button>`;
+        // 3. Cancel Button (Managers can always cancel, Driver can cancel if it's a general pool order)
+        if (isManager || worker.activeOrder.isGeneralPool) {
+            const btnText = worker.activeOrder.isGeneralPool
+                ? t('btn-return-pool')
+                : (isAr ? '❌ إلغاء الطلب' : '❌ Cancel Order');
+            html += `<button onclick="finishDriverOrder(false, '${worker.id}')" class="btn-danger" style="padding: 12px 24px;">${btnText}</button>`;
         }
 
         panelActions.innerHTML = html;
 
         updateActiveDriverTimer();
     }
-    else { formArea.style.display = 'block'; activeArea.style.display = 'none'; }
+    else {
+        formArea.style.display = 'block';
+        activeArea.style.display = 'none';
+
+        // If the logged in user is a driver (worker) and is managing themselves
+        const isSelfDriver = currentUser && currentUser.email && worker.email && (currentUser.email.toLowerCase() === worker.email.toLowerCase());
+        const isDriverRole = (worker.role || "").toLowerCase().includes('driver') || (worker.role || "").toLowerCase().includes('سائق') || (worker.role || "").toLowerCase().includes('delivery');
+
+        if (isSelfDriver && isDriverRole) {
+            // Render the Available General Deliveries Pool for this driver to claim!
+            const pool = companyData.generalDeliveries || {};
+            const poolKeys = Object.keys(pool);
+            const driverPoolContainer = document.getElementById('driver-general-pool-container');
+            const driverPoolList = document.getElementById('driver-general-pool-list');
+
+            if (driverPoolContainer && driverPoolList) {
+                if (poolKeys.length === 0) {
+                    driverPoolContainer.style.display = 'none';
+                } else {
+                    driverPoolContainer.style.display = 'block';
+                    let poolHtml = '';
+                    poolKeys.forEach(orderId => {
+                        const order = pool[orderId];
+                        let statusText = '';
+                        let statusColor = 'var(--text-muted)';
+                        if (order.status === 'preparing') {
+                            statusText = t('status-preparing');
+                            statusColor = 'var(--warning)';
+                        } else if (order.status === 'not_ready') {
+                            statusText = t('status-kitchen-not-ready');
+                            statusColor = 'var(--danger)';
+                        } else if (order.status === 'ready') {
+                            statusText = t('status-ready-pickup');
+                            statusColor = 'var(--success)';
+                        }
+
+                        poolHtml += `
+                            <div class="ledger-card" style="border-left: 4px solid ${statusColor}; padding: 16px; border-radius: 8px; display: flex; flex-direction: column; gap: 8px; background: rgba(255,255,255,0.02); text-align: left;">
+                                <div class="flex-between">
+                                    <strong style="color:var(--secondary); font-size:1.02rem;">${isAr ? 'طلب عام' : 'General Order'} #${order.orderNum || ''}</strong>
+                                    <button onclick="claimGeneralDelivery('${orderId}')" class="btn-success" style="padding: 6px 14px; font-size: 0.85rem; border-radius: 6px; cursor: pointer; border: none; font-weight:700;">${t('btn-accept-delivery')}</button>
+                                </div>
+                                <div style="font-size:0.92rem; color:var(--text-main); font-family:var(--font-mono); background: rgba(0,0,0,0.15); padding: 8px 12px; border-radius: 6px; white-space: pre-wrap;">${order.details}</div>
+                                <div style="font-size:0.82rem; color:var(--text-muted);">
+                                    ${isAr ? 'المطبخ' : 'Kitchen'}: <span style="color:${statusColor}; font-weight:600;">${statusText}</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    driverPoolList.innerHTML = poolHtml;
+                }
+            }
+        } else {
+            const driverPoolContainer = document.getElementById('driver-general-pool-container');
+            if (driverPoolContainer) driverPoolContainer.style.display = 'none';
+        }
+    }
 
     const isAdmin = currentUser && currentUser.role === 'admin';
 
@@ -5159,13 +5554,13 @@ function renderDriverPanel() {
     ordersList.innerHTML = '';
     if (stats.deliveriesList && stats.deliveriesList.length > 0) {
         stats.deliveriesList.forEach((order, index) => {
-            const actualOrderNum = totalDels - index;
+            const actualOrderNum = order.orderNum || (totalDels - index);
             const durationMs = order.endTime - order.startTime;
             const diff = durationMs - order.allocatedMs;
             const timeTaken = formatDuration(durationMs);
             let statusHtml = '';
-            if (diff > 0) statusHtml = `<span style="color:var(--danger)">Late by ${formatDuration(diff)} ❌</span>`;
-            else statusHtml = `<span style="color:var(--success)">On time ✅</span>`;
+            if (diff > 0) statusHtml = `<span style="color:var(--danger)">${t('late-by')} ${formatDuration(diff)} ❌</span>`;
+            else statusHtml = `<span style="color:var(--success)">${t('on-time')} ✅</span>`;
 
             let prepHtml = '';
             if (order.prepTimeMs > 0 && order.prepStartTime && order.prepEndTime) {
@@ -5174,35 +5569,36 @@ function renderDriverPanel() {
                 const prepTimeTaken = formatDuration(prepDuration);
 
                 if (prepDiff > 0) {
-                    prepHtml = `<div style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;">Kitchen Prep: <strong>${prepTimeTaken}</strong> <span style="color:var(--danger)">(Late by ${formatDuration(prepDiff)}) ❌</span></div>`;
+                    prepHtml = `<div style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;">${t('kitchen-prep-time')} <strong>${prepTimeTaken}</strong> <span style="color:var(--danger)">(${t('late-by')} ${formatDuration(prepDiff)}) ❌</span></div>`;
                 } else {
-                    prepHtml = `<div style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;">Kitchen Prep: <strong>${prepTimeTaken}</strong> <span style="color:var(--success)">(On time) ✅</span></div>`;
+                    prepHtml = `<div style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;">${t('kitchen-prep-time')} <strong>${prepTimeTaken}</strong> <span style="color:var(--success)">(${t('on-time')}) ✅</span></div>`;
                 }
             }
 
             let delBtn = isAdmin ? `<button onclick="deleteDeliveryRecord('${worker.id}', '${order.id}')" class="btn-outline-danger admin-only" style="padding: 2px 6px; font-size: 0.7rem; border:none; text-decoration:underline;">Undo/Delete</button>` : '';
 
             const div = document.createElement('div');
-            div.className = 'ledger-card';
+            const isLate = diff > 0;
+            div.className = `ledger-card driver-history-card ${isLate ? 'status-late' : 'status-ontime'}`;
             div.innerHTML = `
                         <div class="flex-between" style="margin-bottom: 4px;">
-                            <strong style="color:var(--primary);">Order #${actualOrderNum}</strong>
+                            <strong style="color:var(--primary);">${isAr ? 'طلب' : 'Order'} #${actualOrderNum}</strong>
                             <div style="display:flex; gap:8px; align-items:center;">
                                 <span style="font-size:0.75rem; color:var(--text-muted);">${order.date}</span>
                                 ${delBtn}
                             </div>
                         </div>
-                        <div style="font-size:0.95rem; color:var(--text-main);">Delivery Time: <strong>${timeTaken}</strong></div>
+                        <div style="font-size:0.95rem; color:var(--text-main);">${t('delivery-time')} <strong>${timeTaken}</strong></div>
                         ${prepHtml}
-                        <div style="font-size:0.85rem; margin-top:4px;">Delivery Status: ${statusHtml}</div>
+                        <div style="font-size:0.85rem; margin-top:4px;">${t('delivery-status')} ${statusHtml}</div>
                     `;
             ordersList.appendChild(div);
         });
     } else if (stats.legacyDeliveries > 0) {
         let delLegacyBtn = isAdmin ? `<button onclick="deleteLegacyDelivery('${worker.id}')" class="btn-outline-danger admin-only" style="margin-left: 10px; padding: 2px 6px; font-size: 0.7rem; border:none; text-decoration:underline;">-1 Undo</button>` : '';
-        ordersList.innerHTML = `<div class="ledger-card" style="text-align:center; color:var(--text-muted);">${stats.legacyDeliveries} legacy deliveries recorded (no timing data). ${delLegacyBtn}</div>`;
+        ordersList.innerHTML = `<div class="ledger-card" style="text-align:center; color:var(--text-muted);">${stats.legacyDeliveries} ${isAr ? 'توصيلة سابقة مسجلة (لا تتوفر بيانات توقيت).' : 'legacy deliveries recorded (no timing data).'} ${delLegacyBtn}</div>`;
     } else {
-        ordersList.innerHTML = `<div class="ledger-card" style="text-align:center; color:var(--text-muted);">No deliveries completed yet.</div>`;
+        ordersList.innerHTML = `<div class="ledger-card" style="text-align:center; color:var(--text-muted);">${isAr ? 'لم يتم إكمال أي عمليات توصيل بعد.' : 'No deliveries completed yet.'}</div>`;
     }
 }
 
@@ -5754,7 +6150,7 @@ function renderAll() {
     else if (currentTab === 'tasks') { renderTasks(); }
     else if (currentTab === 'finance') { renderFinanceTable(); renderFinDetails(); }
     else if (currentTab === 'summary') { renderSummaryTable(); renderLeaderboard(); }
-    else if (currentTab === 'drivers') { renderDriversList(); renderDriverPanel(); }
+    else if (currentTab === 'drivers') { renderDriversList(); renderDriverPanel(); renderDriverVolumeRewards(); }
     else if (currentTab === 'adverts') { renderAdverts(); }
     else if (currentTab === 'notes') { renderNotes(); }
     else if (currentTab === 'activity') { renderActivityLog(); }
@@ -5991,7 +6387,8 @@ function renderFinanceTable() {
         // UI display for Net reflects the subtraction of the advance payment, system violations, and late deductions
         const sysViolDeduction = typeof getSystemViolationDeductionsForMonth === 'function' ? getSystemViolationDeductionsForMonth(worker, currentGlobalMonth) : 0;
         const lateDeduction = typeof getLateDeductionsForMonth === 'function' ? getLateDeductionsForMonth(worker, currentGlobalMonth) : 0;
-        const net = base + rew - viol - paidThisMonth - sysViolDeduction - lateDeduction;
+        const volumeReward = typeof getDriverVolumeRewardsForMonth === 'function' ? getDriverVolumeRewardsForMonth(worker, currentGlobalMonth) : 0;
+        const net = base + rew + volumeReward - viol - paidThisMonth - sysViolDeduction - lateDeduction;
 
         const remainingAllTime = getCumulativeBalance(worker, currentGlobalMonth);
         const detailsId = `net-details-${worker.id}`;
@@ -6006,6 +6403,10 @@ function renderFinanceTable() {
         if (lateDeduction > 0) {
             lateHtml = `<div class="breakdown-row" style="color:var(--danger);"><span>${isAr ? 'خصومات التأخير:' : 'Late Penalties:'}</span> <span>- SAR ${lateDeduction.toLocaleString()}</span></div>`;
         }
+        let volumeRewardHtml = '';
+        if (volumeReward > 0) {
+            volumeRewardHtml = `<div class="breakdown-row" style="color:var(--success);"><span>${isAr ? 'مكافآت التوصيل:' : 'Volume Rewards:'}</span> <span>+ SAR ${volumeReward.toLocaleString()}</span></div>`;
+        }
         tr.innerHTML = `
                     <td><strong style="color:var(--text-main);">${worker.name}</strong><br><span class="text-muted-heavy">${worker.branch}</span></td>
                     <td>SAR ${base.toLocaleString()}</td>
@@ -6017,6 +6418,7 @@ function renderFinanceTable() {
                         <div class="breakdown-details" id="${detailsId}">
                             <div class="breakdown-row" style="color:var(--text-main);"><span>${isAr ? 'الأساسي:' : 'Base:'}</span> <span>SAR ${base.toLocaleString()}</span></div>
                             <div class="breakdown-row" style="color:var(--success);"><span>${isAr ? 'المكافآت:' : 'Rewards:'}</span> <span>+ SAR ${rew.toLocaleString()}</span></div>
+                            ${volumeRewardHtml}
                             <div class="breakdown-row" style="color:var(--danger);"><span>${isAr ? 'المخالفات:' : 'Violations:'}</span> <span>- SAR ${viol.toLocaleString()}</span></div>
                             ${sysViolHtml}
                             ${lateHtml}
@@ -6039,6 +6441,7 @@ function renderFinDetails() {
     const cHistList = document.getElementById('custody-history-list');
     const isAdmin = currentUser && currentUser.role === 'admin';
     const isFinAdmin = currentUser && (currentUser.role === 'admin' || document.body.classList.contains('perm-finance'));
+    const isAr = currentAppLang === 'ar';
 
     if (!workerId) { if (area) area.style.display = 'none'; return; }
     if (area) area.style.display = 'block';
@@ -6059,7 +6462,8 @@ function renderFinDetails() {
     // UI display for Net reflects the subtraction of the advance payment, system violations, and late penalties
     const sysViolDeduction = typeof getSystemViolationDeductionsForMonth === 'function' ? getSystemViolationDeductionsForMonth(worker, currentGlobalMonth) : 0;
     const lateDeduction = typeof getLateDeductionsForMonth === 'function' ? getLateDeductionsForMonth(worker, currentGlobalMonth) : 0;
-    const net = base + totalRewards - totalViolations - paidThisMonth - sysViolDeduction - lateDeduction;
+    const volumeReward = typeof getDriverVolumeRewardsForMonth === 'function' ? getDriverVolumeRewardsForMonth(worker, currentGlobalMonth) : 0;
+    const net = base + totalRewards + volumeReward - totalViolations - paidThisMonth - sysViolDeduction - lateDeduction;
 
     const allTimeRemaining = getCumulativeBalance(worker, currentGlobalMonth);
 
@@ -6092,22 +6496,39 @@ function renderFinDetails() {
     }
 
     // Render Reward History
-    if (!stats.rewardsList || stats.rewardsList.length === 0) {
+    const noRewards = (!stats.rewardsList || stats.rewardsList.length === 0);
+    const volumeRewardVal = typeof getDriverVolumeRewardsForMonth === 'function' ? getDriverVolumeRewardsForMonth(worker, currentGlobalMonth) : 0;
+    if (noRewards && volumeRewardVal === 0) {
         if (rHistList) rHistList.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted); text-align:center;">No rewards recorded this month.</p>`;
     } else {
-        stats.rewardsList.forEach(r => {
+        if (rHistList) rHistList.innerHTML = '';
+        if (volumeRewardVal > 0) {
             const rDiv = document.createElement('div');
             rDiv.className = 'ledger-card flex-between';
-            let delBtn = isFinAdmin ? `<button onclick="deleteRewardRecord('${worker.id}', '${r.id}')" class="btn-outline-danger" style="padding: 4px 10px; font-size: 0.75rem;">Undo</button>` : '';
+            rDiv.style.borderLeft = '4px solid var(--success)';
             rDiv.innerHTML = `
-                        <div>
-                            <strong class="text-success">+ SAR ${r.amount}</strong><br>
-                            <span style="font-size: 0.75rem; color: var(--text-muted);">🕒 ${r.date}</span>
-                        </div>
-                        ${delBtn}
-                    `;
+                <div>
+                    <strong class="text-success">+ SAR ${volumeRewardVal.toLocaleString()}</strong><br>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">${isAr ? 'مكافآت عدد التوصيلات اليومية' : 'Auto Daily Order Volume Rewards'}</span>
+                </div>
+            `;
             if (rHistList) rHistList.appendChild(rDiv);
-        });
+        }
+        if (!noRewards) {
+            stats.rewardsList.forEach(r => {
+                const rDiv = document.createElement('div');
+                rDiv.className = 'ledger-card flex-between';
+                let delBtn = isFinAdmin ? `<button onclick="deleteRewardRecord('${worker.id}', '${r.id}')" class="btn-outline-danger" style="padding: 4px 10px; font-size: 0.75rem;">Undo</button>` : '';
+                rDiv.innerHTML = `
+                            <div>
+                                <strong class="text-success">+ SAR ${r.amount}</strong><br>
+                                <span style="font-size: 0.75rem; color: var(--text-muted);">🕒 ${r.date}</span>
+                            </div>
+                            ${delBtn}
+                        `;
+                if (rHistList) rHistList.appendChild(rDiv);
+            });
+        }
     }
 
     // Render Custody History
@@ -6138,7 +6559,6 @@ function renderFinDetails() {
     }
 
     // Render Detailed Violations
-    const isAr = currentAppLang === 'ar';
     const noViolations = (!stats.violationsList || stats.violationsList.length === 0);
 
     if (vHistList) {
@@ -6192,44 +6612,44 @@ function renderFinDetails() {
                 vDiv.style.borderLeft = '4px solid var(--danger)';
                 vDiv.style.marginBottom = '8px';
 
-            let imgHtml = v.image ? `<img src="${v.image}" onclick="showImage('${v.image}')" class="proof-img" style="max-height: 80px; display: block; margin-top: 10px;">` : '';
-            let statusHtml = ''; let actionBtns = ''; let isApplied = false;
+                let imgHtml = v.image ? `<img src="${v.image}" onclick="showImage('${v.image}')" class="proof-img" style="max-height: 80px; display: block; margin-top: 10px;">` : '';
+                let statusHtml = ''; let actionBtns = ''; let isApplied = false;
 
-            if (v.status === 'waived') {
-                statusHtml = `<span class="text-success" style="font-size: 0.8rem;">${t('label-fixed-waived')}</span>`;
-            } else if (v.status === 'active' || !v.status) {
-                statusHtml = `<span class="text-danger" style="font-size: 0.8rem;">${t('label-penalty-applied')}${v.amount}</span>`;
-                isApplied = true;
-            } else if (v.status === 'pending') {
-                const deadline = v.timestamp + (v.graceDays * 86400000);
-                const timeLeft = deadline - Date.now();
-                if (timeLeft <= 0) {
-                    statusHtml = `<span class="text-danger" style="font-size: 0.8rem;">${t('label-time-expired')}${v.amount})</span>`;
+                if (v.status === 'waived') {
+                    statusHtml = `<span class="text-success" style="font-size: 0.8rem;">${t('label-fixed-waived')}</span>`;
+                } else if (v.status === 'active' || !v.status) {
+                    statusHtml = `<span class="text-danger" style="font-size: 0.8rem;">${t('label-penalty-applied')}${v.amount}</span>`;
                     isApplied = true;
-                } else {
-                    const h = Math.floor(timeLeft / 3600000).toString().padStart(2, '0');
-                    const m = Math.floor((timeLeft % 3600000) / 60000).toString().padStart(2, '0');
-                    const s = Math.floor((timeLeft % 60000) / 1000).toString().padStart(2, '0');
-                    statusHtml = `<span class="viol-timer text-warning" data-deadline="${deadline}" style="font-size: 0.8rem;">${t('label-fix-within')}${h}h ${m}m ${s}s</span>`;
-                    if (isFinAdmin) {
-                        actionBtns = `
+                } else if (v.status === 'pending') {
+                    const deadline = v.timestamp + (v.graceDays * 86400000);
+                    const timeLeft = deadline - Date.now();
+                    if (timeLeft <= 0) {
+                        statusHtml = `<span class="text-danger" style="font-size: 0.8rem;">${t('label-time-expired')}${v.amount})</span>`;
+                        isApplied = true;
+                    } else {
+                        const h = Math.floor(timeLeft / 3600000).toString().padStart(2, '0');
+                        const m = Math.floor((timeLeft % 3600000) / 60000).toString().padStart(2, '0');
+                        const s = Math.floor((timeLeft % 60000) / 1000).toString().padStart(2, '0');
+                        statusHtml = `<span class="viol-timer text-warning" data-deadline="${deadline}" style="font-size: 0.8rem;">${t('label-fix-within')}${h}h ${m}m ${s}s</span>`;
+                        if (isFinAdmin) {
+                            actionBtns = `
                                     <button onclick="resolveViolation('${worker.id}', '${v.id}', 'waive')" class="btn-success" style="padding: 6px 12px; font-size: 0.75rem; margin-right: 4px;">${t('btn-fixed-waive')}</button>
                                     <button onclick="resolveViolation('${worker.id}', '${v.id}', 'apply')" class="btn-danger" style="padding: 6px 12px; font-size: 0.75rem;">${t('btn-not-fixed-apply')}</button>
                                 `;
+                        }
                     }
                 }
-            }
 
-            let delBtn = isFinAdmin ? `<button onclick="deleteDetailedViolation('${worker.id}', '${v.id}')" class="btn-outline-danger" style="padding: 4px 8px; font-size: 0.75rem;">${t('btn-remove')}</button>` : '';
+                let delBtn = isFinAdmin ? `<button onclick="deleteDetailedViolation('${worker.id}', '${v.id}')" class="btn-outline-danger" style="padding: 4px 8px; font-size: 0.75rem;">${t('btn-remove')}</button>` : '';
 
-            vDiv.innerHTML = `
+                vDiv.innerHTML = `
                         <div class="flex-between" style="margin-bottom: 8px;"><span style="font-size: 0.8rem; color: var(--text-muted);">🕒 ${v.date}</span>${delBtn}</div>
                         <div style="font-weight: 600; color: var(--text-main); margin-bottom: 12px; font-size:1.05rem;">${v.reason} <span style="color: ${isApplied ? 'var(--danger)' : 'var(--text-muted)'}; float: right; text-decoration: ${v.status === 'waived' ? 'line-through' : 'none'};">- SAR ${v.amount}</span></div>
                         <div class="flex-between" style="align-items: center; border-top:1px solid var(--border-color); padding-top:8px; margin-top:8px;"><div>${statusHtml}</div><div>${actionBtns}</div></div>${imgHtml}`;
-            if (vHistList) vHistList.appendChild(vDiv);
-        });
+                if (vHistList) vHistList.appendChild(vDiv);
+            });
+        }
     }
-  }
 }
 
 // SUMMARY TAB RENDERING
@@ -6261,7 +6681,7 @@ function renderSummaryTable() {
         const companyData = getCompanyData();
         const attendance = companyData.attendance || {};
         const graceMins = parseInt(companyData.lateGraceMinutes || 0);
-        
+
         let presentCount = 0;
         let absentCount = 0;
         let lateCount = 0;
@@ -6459,793 +6879,6 @@ function renderSummaryTable() {
     });
 }
 
-// =============================================
-// نظام الترجمة الشامل (Comprehensive Translation System)
-// =============================================
-const uiTranslations = {
-    en: {
-        // Auth Screen
-        "auth-title-login": "Login to Dashboard",
-        "auth-title-signup": "Create Viewer Account",
-        "placeholder-email": "Email Address",
-        "placeholder-password": "Password",
-        "btn-signin": "Sign In",
-        "btn-signup": "Sign Up",
-        "link-signup": "Sign Up",
-        "link-login": "Sign In",
-        "link-forgot": "Forgot Password?",
-
-        // Header & Settings
-        "app-title": "Burgeroov Operations Portal",
-        "btn-dark-mode": "🌙 Dark Mode",
-        "btn-light-mode": "☀️ Light Mode",
-        "btn-logout": "Logout",
-        "operating-month": "📅 Operating Month",
-
-        // Main Tabs
-        "tab-ops": "⚙️ Operations",
-        "tab-ranks": "🏆 Ranks",
-        "tab-attendance": "📅 Attendance",
-        "tab-tasks": "📋 Tasks",
-        "tab-warehouse": "📦 Warehouse",
-        "tab-drivers": "🚚 Drivers",
-        "tab-finance": "💰 Financial",
-        "tab-summary": "📊 Summary",
-        "tab-ads": "📢 Ads",
-        "tab-notes": "📝 Notes",
-        "tab-activity": "📜 Activity Log",
-        "tab-sales": "💰 Sales",
-        "tab-costs": "📉 Costs",
-
-        // Attendance Log
-        "perm-attendance-label": "Attendance Admin",
-        "title-attendance-log": "📅 Daily Attendance Log",
-        "label-attendance-date": "Select Date:",
-        "desc-attendance-log": "Check the daily attendance of all workers. Green checkmarks indicate present workers, red X marks indicate absent workers. Shift start times and lateness are automatically calculated.",
-        "th-shift-schedule": "Shift Schedule",
-        "th-status": "Status",
-        "th-checkin-time": "Check-In Time",
-        "th-lateness": "Lateness",
-        "th-actions": "Actions",
-
-        // Activity Log
-        "title-activity-log": "📜 Daily Activity Log",
-        "label-filter-by": "Filter By:",
-        "opt-all-activities": "All Activities",
-        "opt-deliveries": "Deliveries",
-        "opt-finance-payouts": "Financial Payouts",
-        "opt-violations": "Violations",
-        "opt-perf-notes": "Performance Notes",
-        "desc-activity-log": "Monitor all real-time events, operations, payouts, and violations logged in the system.",
-        "label-date-from": "From:",
-        "label-date-to": "To:",
-
-        // Operations Section
-        "title-manager-access": "Manager Access Control",
-        "title-worker-access": "Worker Department Access",
-        "title-branches": "Facility / Branches",
-        "title-violation-rules": "Violation Rules System",
-        "title-register-emp": "Register Employee",
-        "title-ops-tracking": "Daily Operations Tracking",
-        "title-ops-directory": "Ops Directory",
-        "label-full-name": "Full Name",
-        "label-role": "Role / Position",
-        "label-assign-access": "Assign Restricted Access to Specific Worker",
-        "opt-choose-employee": "-- Choose Employee --",
-        "btn-save-worker-perms": "Save Worker Permissions",
-        "placeholder-enter-branch": "Enter branch name...",
-        "btn-add": "Add",
-        "title-shift-planner": "Weekly Shift Planner",
-        "desc-shift-planner": "Set the weekly schedule for each worker to validate check-in attendance.",
-        "btn-save-schedule": "Save Schedule",
-        "title-attendance-shift": "Daily Shift Attendance",
-        "btn-checkin": "Check In",
-        "btn-checkout": "Check Out",
-        "btn-pay-slip": "Pay Slip",
-        "label-delivery-stops": "Delivery Route & Stops (Click on Map to Add)",
-        "btn-clear-stops": "Clear Route Stops",
-        "btn-generate-po": "Auto PO",
-        "title-leaderboard": "Monthly Leaderboard Podium",
-        "desc-leaderboard": "Top performing employees based on perfection rates, completed tasks, and driver deliveries.",
-        "title-general-leaderboard": "🏆 Monthly Employee Leaderboard",
-        "desc-general-leaderboard": "Based on performance score and completed task points.",
-        "title-delivery-leaderboard": "🚚 Delivery Leaderboard",
-        "desc-delivery-leaderboard": "Driver rankings based strictly on the number of completed deliveries.",
-        "title-ask-payment": "💵 Ask for a Payment",
-        "desc-ask-payment": "Submit a request for an advance payment or salary release. It will be reviewed by the financial department.",
-        "label-request-amount": "Requested Amount (SAR)",
-        "label-request-reason": "Reason",
-        "btn-submit-request": "Submit Request",
-        "title-my-requests": "My Requests History",
-        "title-pending-requests": "Pending Payment Requests",
-        "desc-pending-requests": "Review worker requests for advance payments. Accepting generates a unique 6-digit code for the worker to provide at the sales checkout.",
-        "title-accepted-payments": "Accepted Payment Releases",
-        "desc-accepted-payments": "Verify the private code with the worker before releasing the salary, then click 'Payment Given Successfully'.",
-        "desc-violation-rules": "Define standard penalties to quickly apply them later.",
-        "placeholder-vrule-example": "e.g. Late 15 mins",
-        "placeholder-currency-sar": "SAR",
-        "placeholder-w-name-example": "e.g. Ahmed Ali",
-        "label-app-email": "App Account Email",
-        "placeholder-w-email-login": "Worker's Login Email",
-        "placeholder-w-role-example": "e.g. Head Chef, Manager, Driver...",
-        "label-start-time": "Start Time",
-        "label-end-time": "End Time",
-        "label-base-salary-sar": "Base Salary (SAR)",
-        "placeholder-zero-double": "0.00",
-        "label-branch": "Branch",
-        "btn-create-record": "Create Record",
-        "label-select-employee-record": "Select Employee Record",
-        "title-log-daily-perf": "Log Daily Performance / Vacation",
-        "label-start-date": "Start Date",
-        "label-note-type": "Note Type",
-        "opt-good-note": "Good Note ✅ (100% Score)",
-        "opt-bad-note": "Bad Note ❌ (2.5% Score)",
-        "opt-vacation": "Vacation 🌴 (No Score)",
-        "label-consec-vacation-days": "Number of Consecutive Vacation Days",
-        "placeholder-vacation-example": "e.g. 20",
-        "label-supervisor-notes": "Supervisor Notes",
-        "placeholder-log-note-obs": "Enter optional observations...",
-        "btn-submit-record": "Submit Record",
-        "title-perf-log": "Performance Log",
-        "th-employee-role": "Employee & Role",
-        "th-avg-perf": "Avg Perf",
-        "th-manage": "Manage",
-        "msg-account-not-linked": "Your account is not linked to any worker profile yet.",
-        "label-staff": "Staff",
-        "btn-delete-worker": "Delete Worker",
-        "msg-no-logs-month": "No logs found for this month.",
-        "badge-vacation": "Vacation 🌴",
-        "badge-good-note": "Good Note ✅",
-        "badge-bad-note": "Bad Note ❌",
-        "btn-delete": "Delete",
-        "msg-no-manual-notes": "No manual notes.",
-
-        // Financial Section
-        "title-fin-adj": "Financial Adjustments",
-        "title-payroll-ledger": "Payroll & Finance Ledger",
-        "stat-total-due": "Total Due (All-Time)",
-        "box-advances": "Paid This Month (Advances)",
-        "box-rewards": "Rewards & Bonuses",
-        "box-violations": "Violations (Deductions)",
-        "box-custody": "Custody Management",
-        "box-costs": "Company Costs (Tracking)",
-        "box-initial-bal": "Initial Carried Balance",
-        "btn-export-pdf": "📄 Download PDF",
-
-        // Warehouse & Drivers
-        "title-inventory": "Inventory Tracking",
-        "btn-restock-pdf": "📄 Restock PDF",
-        "placeholder-search": "🔍 Search items...",
-        "title-active-drivers": "Active Drivers",
-        "title-driver-ctrl": "Driver Delivery Control",
-
-        // Summary
-        "title-summary-main": "Monthly Summary & Continuous Balance",
-
-        // Ranks
-        "title-ranks-eval": "Employee Ranking & Evaluation (90-Day View)",
-        "desc-ranks-eval": "Click the arrow next to a worker's name to view their complete 3-month performance ledger. Based on their 90-Day average, you can manually promote or demote them. (Vacation days do not affect the average).",
-        "th-emp-branch": "Employee & Branch",
-        "th-current-rank": "Current Rank",
-        "th-90day-avg": "90-Day Average",
-        "th-action": "Action",
-
-        // Tasks
-        "title-task-shortcuts": "Task Shortcuts",
-        "desc-task-shortcuts": "Create quick task templates.",
-        "placeholder-task-shortcut": "e.g. Clean Fryers...",
-        "btn-save-shortcut": "Save Shortcut",
-        "title-assign-tasks": "Assign Tasks",
-        "label-assign-to": "Assign To",
-        "opt-choose-emp": "-- Choose Employee --",
-        "label-task-detail": "Task Detail (Or pick shortcut)",
-        "placeholder-desc-task": "Describe task...",
-        "label-urgency-level": "Urgency Level",
-        "opt-urgency-normal": "🔵 Normal Priority",
-        "opt-urgency-high": "🔴 Urgent / High Priority",
-        "label-time-to-complete": "Time to Complete (Minutes)",
-        "placeholder-task-mins": "e.g. 30 (Optional)",
-        "btn-assign-task": "Assign Task to Worker",
-        "title-tasks-board": "Tasks Board",
-
-        // Warehouse Extra
-        "title-add-product": "Add New Product",
-        "desc-add-product": "Register items to track their consumption.",
-        "label-product-name": "Product Name",
-        "placeholder-product-name": "e.g. Pepsi, Burger Patties...",
-        "label-max-stock": "Max / Full Stock",
-        "placeholder-stock-amt": "e.g. 40",
-        "label-risk-alert": "Risk Alert (Min)",
-        "placeholder-risk-amt": "e.g. 5",
-        "btn-add-warehouse": "Add to Warehouse",
-        "desc-inventory": "Type the exact number currently left in stock and press Update.",
-
-        // Drivers Extra
-        "desc-active-drivers": "Only employees with the role \"Driver\" or \"سائق\" appear here.",
-        "span-select-driver": "Select a driver to manage",
-        "title-assign-order": "Assign New Order Delivery",
-        "label-time-deliver": "Time to Deliver (Minutes)",
-        "placeholder-driver-mins": "e.g. 45",
-        "btn-start-delivery": "🚀 Start Delivery",
-        "title-current-order": "Currently Delivering Order",
-        "desc-time-remaining": "Time remaining",
-        "btn-order-success": "✅ Order Delivered Successfully",
-        "btn-order-cancel": "❌ Cancel Order",
-        "title-delivery-history": "Delivery History",
-        "span-total": "Total:",
-
-        // Finance Extra
-        "label-select-emp": "Select Employee",
-        "span-base": "Base:",
-        "span-net-month": "Net This Month:",
-        "span-custody": "Custody:",
-        "desc-advances": "Log cash or transfers handed to the worker this month (deducts from current Net Payable).",
-        "placeholder-amount": "Amount (SAR)",
-        "btn-log-payment": "Log Payment",
-        "btn-change-stock": "Change",
-        "desc-rewards": "Increases their net payable for this month.",
-        "btn-add-reward": "Add Reward",
-        "opt-select-rule": "-- Select Rule --",
-        "placeholder-reason": "Reason / Notes",
-        "label-fixing-time": "Fixing Time (Grace Period)",
-        "opt-grace-0": "No Fixing Time (Apply Immediately)",
-        "opt-grace-1": "1 Day to Fix",
-        "opt-grace-2": "2 Days to Fix",
-        "opt-grace-3": "3 Days to Fix",
-        "opt-grace-7": "7 Days to Fix",
-        "btn-apply-penalty": "Apply Penalty",
-        "span-outstanding": "Outstanding:",
-        "desc-custody": "Log equipment or cash advances given and returned.",
-        "btn-give-custody": "Give Custody",
-        "btn-return-custody": "Return",
-        "desc-costs": "Expenses paid by company (visas, uniforms). Does NOT affect Net Payable.",
-        "btn-add-cost": "Add Cost",
-        "btn-undo-action": "Undo",
-        "desc-initial-bal": "Set an old unpaid debt owed to this worker from before this system was used.",
-        "btn-set-balance": "Set Balance",
-        "btn-excel": "Excel",
-        "btn-pdf": "PDF",
-        "th-employee": "Employee",
-        "th-base-salary": "Base Salary",
-        "th-net-payable": "Net Payable (Current Month)",
-        "th-paid-this-month": "Paid This Month",
-        "th-total-remaining": "Total Remaining (All Time)",
-        "title-export-fin": "📄 Export Financial Report",
-        "desc-export-fin": "Download a PDF copy of this financial record.",
-        "label-late-grace": "Late Consideration Threshold (Minutes)",
-        "label-late-penalty": "Late Penalty Amount (SAR)",
-        "btn-save-settings": "Save Settings",
-
-        // Summary Extra
-        "title-my-violations": "⚠️ My Violations & Fix Deadlines",
-        "span-current-month": "Current Month:",
-        "desc-my-violations": "These are violations recorded against you by the manager this month. Violations marked <strong>⏳ Pending</strong> still have time to be fixed — fix them before the deadline to avoid the penalty.",
-        "desc-summary": "This report shows operations performance strictly for the selected month. <strong class=\"text-primary\">All-Time Continuous Remaining Balance</strong> carries over dynamically based on your logged payments. Ranks update automatically every 90 days.",
-
-        // Extra Translations
-        "status-late": "🚨 LATE! Time expired.",
-        "status-time-remaining": "⏳ Time remaining:",
-        "btn-mark-completed": "✅ Mark as Completed",
-        "btn-i-saw-this": "👁️ I Saw This Task",
-        "task-must-complete": "Must complete within mins of seeing it.",
-        "label-assigned": "Assigned:",
-        "label-finished": "Finished:",
-        "label-started": "Started:",
-        "no-active-tasks": "No active tasks.",
-        "not-linked-worker": "Your account is not linked to any worker profile yet.",
-        "msg-task-timer-worker": "Active Task Deadline",
-        "btn-remove": "Remove",
-        "label-base-sm": "Base:",
-        "label-rewards-sm": "Rewards:",
-        "label-violations-sm": "Violations:",
-        "label-paid-advance-sm": "Paid Advance:",
-        "label-good-notes": "Good Notes",
-        "label-bad-notes": "Bad Notes",
-        "label-deliveries-sm": "Deliveries",
-        "label-tasks-done": "Tasks Done",
-        "label-avg-perf": "Avg Perf",
-        "label-company-costs-sm": "Company Costs",
-        "label-fix-violation": "Manager gave you day(s) to fix this violation.",
-        "status-waived": "✅ Waived (Fixed)",
-        "status-penalty-applied": "🚨 Penalty Applied",
-        "status-pending-sm": "⏳ Pending",
-        "btn-fixed-waive": "Fixed (Waive)",
-        "btn-not-fixed-apply": "Not Fixed (Apply)",
-        "label-master": "Master",
-        "msg-critical-stock": "CRITICAL STOCK WARNING",
-        "label-currently-left": "Currently Left",
-        "label-amount-to-order": "Amount to Order",
-        "label-finished-at": "Finished: ",
-        "label-started-at": "Started: ",
-        "btn-delete-worker": "Delete Worker",
-        "label-promote-to-a": "Promote to A",
-        "label-set-to-b": "Set to B",
-        "label-set-to-c": "Set to C",
-        "label-demote-unranked": "Demote to Unranked",
-        "label-remaining-to-pay": "Remaining To Pay (All-Time)",
-        "label-no-violations": "✅ No violations recorded this month.",
-        "label-fixed-waived": "Fixed – Waived ✔",
-        "label-penalty-applied": "Penalty Applied – SAR ",
-        "label-time-expired": "Time Expired – Penalty Applied (SAR ",
-        "label-fix-within": "⏳ Fix within: ",
-        "label-penalty-not-fixed": "Penalty if not fixed: SAR ",
-        "btn-swap-company": "Swap Company",
-        "btn-swap-short": "Swap",
-        "title-promote-driver": "➕ Assign Driver Role",
-        "desc-promote-driver": "Promote an existing employee to Driver role.",
-        "btn-assign-driver": "Assign",
-        "opt-general-task": "[General Task for All Workers]",
-        "title-available-general-tasks": "Available General Tasks",
-        "btn-accept-task": "Accept Task",
-        "label-available-all-workers": "Available to all workers",
-        "status-in-transit": "In Transit",
-        "status-available": "Available",
-        "title-sales-analytics": "💰 Advanced Sales Analytics",
-        "btn-tf-day": "Daily",
-        "btn-tf-week": "Week",
-        "btn-tf-month": "Month",
-        "btn-tf-year": "Year",
-        "btn-tf-custom": "📅 Range",
-        "label-to": "to",
-        "label-tf-total": "Selected Timeframe Total",
-        "title-sales-trend": "📊 Sales Trend",
-        "btn-sct-bar": "Bar",
-        "btn-sct-line": "Line",
-        "btn-sct-method": "Method",
-        "title-log-sale": "Log a New Transaction",
-        "placeholder-amount-sar": "Amount (SAR)...",
-        "btn-log-sale": "✅ Log Sale",
-        "title-manage-income": "Admin: Manage Income Sources",
-        "placeholder-add-source": "Add new source...",
-        "btn-add-source": "Add Source",
-        "title-transaction-feed": "Transaction Feed",
-        "label-filtered-tf": "Filtered by Timeframe",
-        "title-costs-dashboard": "📉 Costs & P&L Dashboard",
-        "label-net-profit": "Net Profit",
-        "label-gross-sales": "Gross Sales",
-        "label-gross-costs": "Gross Costs",
-        "label-transactions": "Transactions",
-        "title-sales-vs-costs": "📊 Sales vs Costs — Trend Chart",
-        "label-sales": "Sales",
-        "label-costs": "Costs",
-        "title-log-cost": "Log a New Cost/Expense",
-        "btn-log-cost": "✅ Log Cost (Now)",
-        "title-past-cost": "Log Cost for a Past Day",
-        "placeholder-manager-password": "🔑 Manager Password",
-        "btn-submit-past-cost": "Submit Past Day Cost",
-        "title-manage-categories": "Admin: Manage Cost Categories",
-        "placeholder-add-category": "Add new category...",
-        "btn-add-category": "Add Category",
-        "title-costs-feed": "Costs Feed",
-        "title-export-cost": "📄 Export Cost Summary Report",
-        "desc-export-cost": "Download a full PDF of the current timeframe — HUD stats, source breakdown & all transactions.",
-        "btn-print-pdf": "🖨️ Print / Save PDF",
-        "status-healthy-profit": "📈 Healthy Profit Margin",
-        "status-operating-loss": "⚠️ Operating at a Loss",
-        "status-breaking-even": "➖ Breaking Even",
-        "label-past-7-days": "Past 7 Days",
-        "label-this-month": "This Month",
-        "label-this-year": "This Year",
-        "msg-no-transactions": "No transactions logged for this timeframe.",
-        "msg-no-costs": "No costs logged for this timeframe.",
-        "msg-no-data-timeframe": "No data for this timeframe.",
-        "label-total": "Total",
-        "label-avg": "Average",
-        "label-peak": "Peak",
-        "label-by": "By",
-        "title-system-violations": "⚠️ System Violations System",
-        "desc-system-violations": "Manage escalation levels for worker system violations (not normal infractions).",
-        "label-select-worker": "Select Worker:",
-        "opt-choose-worker": "-- Choose Worker --",
-        "label-violation-reason": "Reason for Violation:",
-        "placeholder-enter-reason": "Enter reason...",
-        "btn-add-system-violation": "Add System Violation",
-        "label-termination-status": "Account Termination Status:",
-        "placeholder-worker-email-dots": "Worker email...",
-        "desc-manager-promotion": "Promote workers to administrators (Managers) by entering their emails. Admins have access to all departments and access controls.",
-        "placeholder-payment-req-amount": "e.g. 500",
-        "placeholder-payment-req-reason": "e.g. Emergency medical expense",
-        "title-manage-folders": "📂 Manage Folders",
-        "placeholder-new-wh-folder": "e.g. Drinks, Meats...",
-        "placeholder-driver-order-details": "e.g. 2x Beef Burger, 1x Pepsi...",
-        "label-prep-time-needed": "Prep Time Needed (Mins)",
-        "placeholder-driver-prep-time": "e.g. 10",
-        "placeholder-map-search-input": "Search location...",
-        "placeholder-manage-note-text": "Write your announcement or private note here...",
-        "title-post-new-note": "Post a New Note",
-        "label-public-note": "📢 Public (Allows Replies)",
-        "label-private-note": "🔒 Private",
-        "label-private-note-targets": "Select who can read this (Leave empty for Manager-Only note):",
-        "label-add-attachment": "Add Attachment (Optional):",
-        "btn-camera": "📷 Camera",
-        "btn-gallery": "🖼️ Gallery",
-        "btn-record-voice": "🎤 Record Voice Note",
-        "btn-done": "Done",
-        "btn-cancel": "Cancel",
-        "btn-post-note": "Post Note"
-    },
-    ar: {
-        // شاشة الدخول
-        "auth-title-login": "تسجيل الدخول للوحة التحكم",
-        "auth-title-signup": "إنشاء حساب مشاهد",
-        "placeholder-email": "البريد الإلكتروني",
-        "placeholder-password": "كلمة المرور",
-        "btn-signin": "تسجيل الدخول",
-        "btn-signup": "إنشاء حساب",
-        "link-signup": "إنشاء حساب جديد",
-        "link-login": "تسجيل الدخول",
-        "link-forgot": "نسيت كلمة المرور؟",
-
-        // الرأس والإعدادات
-        "app-title": "بوابة عمليات برجروف",
-        "btn-dark-mode": "🌙 الوضع الليلي",
-        "btn-light-mode": "☀️ الوضع النهاري",
-        "btn-logout": "خروج",
-        "operating-month": "📅 شهر التشغيل",
-
-        // التبويبات الرئيسية
-        "tab-ops": "⚙️ العمليات",
-        "tab-ranks": "🏆 التقييمات",
-        "tab-attendance": "📅 الحضور",
-        "tab-tasks": "📋 المهام",
-        "tab-warehouse": "📦 المستودع",
-        "tab-drivers": "🚚 السائقين",
-        "tab-finance": "💰 المالية",
-        "tab-summary": "📊 الملخص",
-        "tab-ads": "📢 الإعلانات",
-        "tab-notes": "📝 الملاحظات",
-        "tab-activity": "📜 سجل الأنشطة",
-        "tab-sales": "💰 المبيعات",
-        "tab-costs": "📉 التكاليف",
-
-        // الحضور والغياب
-        "perm-attendance-label": "مسؤول الحضور",
-        "title-attendance-log": "📅 سجل الحضور اليومي",
-        "label-attendance-date": "اختر التاريخ:",
-        "desc-attendance-log": "تحقق من الحضور اليومي لجميع الموظفين. تشير علامات الصح الخضراء إلى الموظفين الحاضرين، وتفيد علامة X باللون الأحمر بالغياب. يتم احتساب وقت بدء المناوبة والتأخر تلقائياً.",
-        "th-shift-schedule": "مناوبة العمل",
-        "th-status": "الحالة",
-        "th-checkin-time": "وقت الحضور",
-        "th-lateness": "التأخر",
-        "th-actions": "الإجراءات",
-
-        // سجل الأنشطة
-        "title-activity-log": "📜 سجل الأنشطة اليومي",
-        "label-filter-by": "تصنيف حسب:",
-        "opt-all-activities": "جميع الأنشطة",
-        "opt-deliveries": "توصيل الطلبات",
-        "opt-finance-payouts": "المدفوعات والمالية",
-        "opt-violations": "المخالفات والغرامات",
-        "opt-perf-notes": "تقييمات وملاحظات الموظفين",
-        "desc-activity-log": "مراقبة ومتابعة جميع عمليات التوصيل، المدفوعات المالية، والمخالفات في الوقت الفعلي.",
-        "label-date-from": "من:",
-        "label-date-to": "إلى:",
-
-        // قسم العمليات
-        "title-manager-access": "التحكم في وصول المديرين",
-        "title-worker-access": "صلاحيات الوصول للأقسام",
-        "title-branches": "الفروع والمرافق",
-        "title-violation-rules": "نظام قواعد المخالفات",
-        "title-register-emp": "تسجيل موظف جديد",
-        "title-ops-tracking": "تتبع العمليات اليومية",
-        "title-ops-directory": "دليل الموظفين",
-        "label-full-name": "الاسم الكامل",
-        "label-role": "الوظيفة / المسمى الوظيفي",
-        "label-assign-access": "تعيين وصول محدود لموظف معين",
-        "opt-choose-employee": "-- اختر الموظف --",
-        "btn-save-worker-perms": "حفظ صلاحيات الموظف",
-        "placeholder-enter-branch": "أدخل اسم الفرع...",
-        "btn-add": "إضافة",
-        "title-shift-planner": "مخطط نوبات العمل الأسبوعية",
-        "desc-shift-planner": "قم بتعيين الجدول الأسبوعي لكل موظف للتحقق من حضورهم وانصرافهم.",
-        "btn-save-schedule": "حفظ الجدول الأسبوعي",
-        "title-attendance-shift": "حضور نوبة العمل اليومية",
-        "btn-checkin": "تسجيل حضور",
-        "btn-checkout": "تسجيل انصراف",
-        "btn-pay-slip": "قسيمة راتب",
-        "label-delivery-stops": "مسار وتوقفات التوصيل (اضغط على الخريطة للإضافة)",
-        "btn-clear-stops": "مسح مسار التوصيل",
-        "btn-generate-po": "طلب تلقائي",
-        "title-leaderboard": "لوحة الصدارة الشهرية",
-        "desc-leaderboard": "أفضل الموظفين أداءً بناءً على معدلات التقييم، المهام المنجزة، وتوصيلات السائقين.",
-        "title-general-leaderboard": "🏆 قائمة متصدري الموظفين الشهرية",
-        "desc-general-leaderboard": "بناءً على تقييم الأداء ونقاط المهام المكتملة.",
-        "title-delivery-leaderboard": "🚚 قائمة متصدري التوصيل",
-        "desc-delivery-leaderboard": "تصنيفات السائقين بناءً على عدد التوصيلات المكتملة.",
-        "title-ask-payment": "💵 طلب سلفة / دفعة مالية",
-        "desc-ask-payment": "قم بتقديم طلب للحصول على سلفة أو دفعة مقدمة من الراتب. سيتم مراجعة الطلب من قبل القسم المالي.",
-        "label-request-amount": "المبلغ المطلوب (ريال)",
-        "label-request-reason": "السبب",
-        "btn-submit-request": "إرسال الطلب",
-        "title-my-requests": "سجل طلباتي",
-        "title-pending-requests": "طلبات الدفع المعلقة",
-        "desc-pending-requests": "مراجعة طلبات السلفة المالية المقدمة من الموظفين. قبول الطلب يولد رمزًا خاصًا مكونًا من 6 أرقام يزود به الموظف مسؤول المبيعات لتسليم المبلغ.",
-        "title-accepted-payments": "عمليات دفع معتمدة للتسليم",
-        "desc-accepted-payments": "يرجى التحقق من الرمز الخاص مع الموظف قبل تسليمه المبلغ، ثم اضغط على 'تم تسليم الدفعة بنجاح'.",
-        "desc-violation-rules": "تعيين المخالفات والغرامات القياسية لتطبيقها بسرعة لاحقًا.",
-        "placeholder-vrule-example": "مثال: تأخير 15 دقيقة",
-        "placeholder-currency-sar": "ريال",
-        "placeholder-w-name-example": "مثال: أحمد علي",
-        "label-app-email": "البريد الإلكتروني لحساب التطبيق",
-        "placeholder-w-email-login": "البريد الإلكتروني لتسجيل دخول الموظف",
-        "placeholder-w-role-example": "مثال: رئيس طهاة، مدير، سائق...",
-        "label-start-time": "وقت البدء",
-        "label-end-time": "وقت الانتهاء",
-        "label-base-salary-sar": "الراتب الأساسي (ريال)",
-        "placeholder-zero-double": "0.00",
-        "label-branch": "الفرع",
-        "btn-create-record": "إنشاء السجل",
-        "label-select-employee-record": "اختر سجل الموظف",
-        "title-log-daily-perf": "تسجيل الأداء اليومي / الإجازات",
-        "label-start-date": "تاريخ البدء",
-        "label-note-type": "نوع الملاحظة",
-        "opt-good-note": "ملاحظة جيدة ✅ (درجة 100٪)",
-        "opt-bad-note": "ملاحظة سيئة ❌ (درجة 2.5٪)",
-        "opt-vacation": "إجازة 🌴 (بدون درجة)",
-        "label-consec-vacation-days": "عدد أيام الإجازة المتتالية",
-        "placeholder-vacation-example": "مثال: 20",
-        "label-supervisor-notes": "ملاحظات المشرف",
-        "placeholder-log-note-obs": "أدخل أي ملاحظات اختيارية...",
-        "btn-submit-record": "إرسال السجل",
-        "title-perf-log": "سجل الأداء",
-        "th-employee-role": "الموظف والوظيفة",
-        "th-avg-perf": "متوسط الأداء",
-        "th-manage": "إدارة",
-        "msg-account-not-linked": "حسابك غير مرتبط بملف موظف بعد.",
-        "label-staff": "موظف",
-        "btn-delete-worker": "حذف الموظف",
-        "msg-no-logs-month": "لا توجد سجلات لهذا الشهر.",
-        "badge-vacation": "إجازة 🌴",
-        "badge-good-note": "ملاحظة جيدة ✅",
-        "badge-bad-note": "ملاحظة سيئة ❌",
-        "btn-delete": "حذف",
-        "msg-no-manual-notes": "لا توجد ملاحظات يدوية.",
-
-        // القسم المالي
-        "title-fin-adj": "التسويات المالية",
-        "title-payroll-ledger": "دفتر الرواتب والمالية",
-        "stat-total-due": "إجمالي المستحق (كلي)",
-        "box-advances": "سلف مدفوعة هذا الشهر",
-        "box-rewards": "المكافآت والحوافز",
-        "box-violations": "الجزاءات والمخالفات",
-        "box-custody": "إدارة العهدة",
-        "box-costs": "تكاليف الشركة (تتبع)",
-        "box-initial-bal": "الرصيد المرحل الأولي",
-        "btn-export-pdf": "📄 تحميل تقرير PDF",
-
-        "title-inventory": "تتبع المخزون",
-        "btn-restock-pdf": "📄 طلب بضاعة PDF",
-        "placeholder-search": "🔍 ابحث عن صنف...",
-        "title-active-drivers": "السائقون النشطون",
-        "title-driver-ctrl": "التحكم في توصيلات السائق",
-        "title-summary-main": "الملخص الشهري والرصيد المستمر",
-        "title-ranks-eval": "تقييم وترتيب الموظفين (عرض 90 يوم)",
-        "desc-ranks-eval": "انقر على السهم بجوار اسم الموظف لعرض سجل أدائه الكامل لمدة 3 أشهر.",
-        "th-emp-branch": "الموظف والفرع",
-        "th-current-rank": "الرتبة الحالية",
-        "th-90day-avg": "متوسط 90 يوم",
-        "th-action": "إجراء",
-        "title-task-shortcuts": "اختصارات المهام",
-        "desc-task-shortcuts": "قم بإنشاء قوالب مهام سريعة.",
-        "placeholder-task-shortcut": "مثال: تنظيف المقالي...",
-        "btn-save-shortcut": "حفظ الاختصار",
-        "title-assign-tasks": "تعيين المهام",
-        "opt-urgency-high": "🔴 عاجل / أولوية عالية",
-        "label-time-to-complete": "وقت الإنجاز (بالدقائق)",
-        "placeholder-task-mins": "مثال: 30 (اختياري)",
-        "btn-assign-task": "تعيين المهمة للموظف",
-        "title-tasks-board": "لوحة المهام",
-        "title-add-product": "إضافة منتج جديد",
-        "desc-add-product": "سجل الأصناف لتتبع استهلاكها.",
-        "label-product-name": "اسم المنتج",
-        "placeholder-product-name": "مثال: بيبسي، برجر، لحم...",
-        "label-max-stock": "الحد الأقصى للمخزون",
-        "placeholder-stock-amt": "مثال: 40",
-        "label-risk-alert": "تنبيه الخطر (الحد الأدنى)",
-        "placeholder-risk-amt": "مثال: 5",
-        "btn-add-warehouse": "إضافة للمستودع",
-        "desc-inventory": "اكتب العدد الدقيق المتبقي حالياً في المخزون واضغط تحديث.",
-        "desc-active-drivers": "يظهر هنا فقط الموظفون الذين لديهم المسمى \"سائق\".",
-        "span-select-driver": "اختر سائق لإدارته",
-        "title-assign-order": "تعيين طلب توصيل جديد",
-        "label-time-deliver": "وقت التوصيل (بالدقائق)",
-        "placeholder-driver-mins": "مثال: 45",
-        "btn-start-delivery": "🚀 بدء التوصيل",
-        "title-current-order": "الطلب الحالي قيد التوصيل",
-        "desc-time-remaining": "الوقت المتبقي",
-        "btn-order-success": "✅ تم توصيل الطلب بنجاح",
-        "btn-order-cancel": "❌ إلغاء الطلب",
-        "title-delivery-history": "سجل التوصيلات",
-        "span-total": "الإجمالي:",
-        "label-select-emp": "اختر الموظف",
-        "span-base": "الأساسي:",
-        "span-net-month": "الصافي هذا الشهر:",
-        "span-custody": "العهدة:",
-        "desc-advances": "سجل المبالغ النقدية أو الحوالات المدفوعة للموظف هذا الشهر.",
-        "placeholder-amount": "المبلغ (ريال)",
-        "btn-log-payment": "تسجيل الدفعة",
-        "btn-change-stock": "تعديل",
-        "desc-rewards": "تزيد من صافي الراتب المستحق لهذا الشهر.",
-        "btn-add-reward": "إضافة مكافأة",
-        "opt-select-rule": "-- اختر المخالفة --",
-        "placeholder-reason": "السبب / ملاحظات",
-        "label-fixing-time": "وقت الإصلاح (فترة السماح)",
-        "opt-grace-0": "لا يوجد وقت للإصلاح",
-        "opt-grace-1": "1 يوم للإصلاح",
-        "opt-grace-2": "يومان للإصلاح",
-        "opt-grace-3": "3 أيام للإصلاح",
-        "opt-grace-7": "7 أيام للإصلاح",
-        "btn-apply-penalty": "تطبيق الخصم",
-        "span-outstanding": "العهدة المتبقية:",
-        "desc-custody": "سجل المعدات أو السلف النقدية المعطاة والمستردة.",
-        "btn-give-custody": "إعطاء عهدة",
-        "btn-return-custody": "استرجاع",
-        "desc-costs": "نفقات الشركة.",
-        "btn-add-cost": "إضافة تكلفة",
-        "btn-undo-action": "تراجع",
-        "desc-initial-bal": "ضع أي ديون قديمة مستحقة للموظف.",
-        "btn-set-balance": "تعيين الرصيد",
-        "btn-excel": "إكسيل",
-        "btn-pdf": "PDF",
-        "th-employee": "الموظف",
-        "th-base-salary": "الراتب الأساسي",
-        "th-net-payable": "صافي المستحق (هذا الشهر)",
-        "th-paid-this-month": "المدفوع هذا الشهر",
-        "th-total-remaining": "إجمالي المتبقي (كلي)",
-        "title-export-fin": "📄 تصدير التقرير المالي",
-        "desc-export-fin": "تنزيل نسخة PDF من هذا السجل المالي.",
-        "title-my-violations": "⚠️ مخالفاتي والمواعيد النهائية للإصلاح",
-        "span-current-month": "الشهر الحالي:",
-        "desc-my-violations": "هذه هي المخالفات المسجلة عليك.",
-        "desc-summary": "يعرض هذا التقرير أداء العمليات للشهر المحدد فقط.",
-        "status-late": "🚨 متأخر! انتهى الوقت.",
-        "status-time-remaining": "⏳ الوقت المتبقي:",
-        "btn-mark-completed": "✅ تم الإنجاز",
-        "btn-i-saw-this": "👁️ قرأت المهمة",
-        "task-must-complete": "يجب الإنجاز خلال دقائق من رؤيتها",
-        "label-assigned": "تم التكليف:",
-        "label-finished": "انتهى:",
-        "label-started": "بدأ:",
-        "no-active-tasks": "لا توجد مهام نشطة.",
-        "not-linked-worker": "هذا الحساب غير مرتبط بأي موظف حالياً.",
-        "msg-task-timer-worker": "الموعد النهائي للمهمة النشطة",
-        "btn-remove": "حذف",
-        "btn-undo-action": "تراجع",
-        "label-base-sm": "الأساسي:",
-        "label-rewards-sm": "المكافآت:",
-        "label-violations-sm": "المخالفات:",
-        "label-paid-advance-sm": "سلف مدفوعة:",
-        "label-good-notes": "ملاحظات إيجابية",
-        "label-bad-notes": "ملاحظات سلبية",
-        "label-deliveries-sm": "التوصيلات",
-        "label-tasks-done": "مهام منجزة",
-        "label-avg-perf": "متوسط الأداء",
-        "label-company-costs-sm": "تكاليف الشركة",
-        "label-fix-violation": "منحك المدير أياماً لإصلاح هذه المخالفة.",
-        "status-waived": "✅ تم الإعفاء (تم الإصلاح)",
-        "status-penalty-applied": "🚨 تم تطبيق الخصم",
-        "status-pending-sm": "⏳ قيد الانتظار",
-        "btn-fixed-waive": "تم الإصلاح (إعفاء)",
-        "btn-not-fixed-apply": "لم يتم الإصلاح (خصم)",
-        "label-master": "المسؤول الأول",
-        "msg-critical-stock": "تحذير: نقص حاد في المخزون",
-        "label-currently-left": "المتبقي حالياً",
-        "label-amount-to-order": "الكمية المطلوبة",
-        "label-finished-at": "انتهى: ",
-        "label-started-at": "بدأ: ",
-        "btn-delete-worker": "حذف الموظف",
-        "label-promote-to-a": "ترقية إلى A",
-        "label-set-to-b": "تعيين B",
-        "label-set-to-c": "تعيين C",
-        "label-demote-unranked": "تنزيل إلى غير مصنف",
-        "label-remaining-to-pay": "المتبقي للدفع (كلي)",
-        "label-no-violations": "✅ لا توجد مخالفات مسجلة هذا الشهر.",
-        "label-fixed-waived": "تم الإصلاح – إعفاء ✔",
-        "label-penalty-applied": "تم تطبيق الخصم – ريال ",
-        "label-time-expired": "انتهى الوقت – تم الخصم (ريال ",
-        "label-fix-within": "⏳ الإصلاح خلال: ",
-        "label-penalty-not-fixed": "الخصم في حال عدم الإصلاح: ريال ",
-        "btn-swap-company": "تغيير الشركة",
-        "btn-swap-short": "تغيير",
-        "title-promote-driver": "➕ تعيين دور سائق",
-        "desc-promote-driver": "ترقية موظف حالي إلى دور سائق.",
-        "btn-assign-driver": "تعيين",
-        "opt-general-task": "[مهمة عامة لجميع الموظفين]",
-        "title-available-general-tasks": "المهام العامة المتاحة",
-        "btn-accept-task": "قبول المهمة",
-        "label-available-all-workers": "متاحة لجميع الموظفين",
-        "status-in-transit": "في الطريق",
-        "status-available": "متاح",
-        "title-sales-analytics": "💰 تحليلات المبيعات المتقدمة",
-        "btn-tf-day": "يومي",
-        "btn-tf-week": "أسبوعي",
-        "btn-tf-month": "شهري",
-        "btn-tf-year": "سنوي",
-        "btn-tf-custom": "📅 نطاق مخصص",
-        "label-to": "إلى",
-        "label-tf-total": "إجمالي الفترة المحددة",
-        "title-sales-trend": "📊 اتجاه المبيعات",
-        "btn-sct-bar": "شريط",
-        "btn-sct-line": "خطي",
-        "btn-sct-method": "طريقة الدفع",
-        "title-log-sale": "تسجيل عملية مبيعات جديدة",
-        "placeholder-amount-sar": "المبلغ (ريال)...",
-        "btn-log-sale": "✅ تسجيل المبيعات",
-        "title-manage-income": "المدير: إدارة مصادر الدخل",
-        "placeholder-add-source": "إضافة مصدر جديد...",
-        "btn-add-source": "إضافة مصدر",
-        "title-transaction-feed": "سجل العمليات",
-        "label-filtered-tf": "مصفى حسب الفترة المحددة",
-        "title-costs-dashboard": "📉 لوحة الأرباح والخسائر والتكاليف",
-        "label-net-profit": "صافي الأرباح",
-        "label-gross-sales": "إجمالي المبيعات",
-        "label-gross-costs": "إجمالي التكاليف",
-        "label-transactions": "العمليات",
-        "title-sales-vs-costs": "📊 مقارنة المبيعات والتكاليف — مخطط الاتجاه",
-        "label-sales": "المبيعات",
-        "label-costs": "التكاليف",
-        "title-log-cost": "تسجيل تكلفة / مصروف جديد",
-        "btn-log-cost": "✅ تسجيل التكلفة (الآن)",
-        "title-past-cost": "تسجيل تكلفة ليوم سابق",
-        "placeholder-manager-password": "🔑 رمز مرور المدير",
-        "btn-submit-past-cost": "إرسال تكلفة اليوم السابق",
-        "title-manage-categories": "المدير: إدارة فئات التكاليف",
-        "placeholder-add-category": "إضافة فئة جديدة...",
-        "btn-add-category": "إضافة فئة",
-        "title-costs-feed": "سجل التكاليف",
-        "title-export-cost": "📄 تصدير تقرير ملخص التكاليف",
-        "desc-export-cost": "تنزيل تقرير PDF كامل للفترة المحددة — إحصائيات لوحة التحكم، تفصيل الفئات، والعمليات كافّة.",
-        "btn-print-pdf": "🖨️ طباعة / حفظ بصيغة PDF",
-        "status-healthy-profit": "📈 هامش ربح صحي",
-        "status-operating-loss": "⚠️ خسارة تشغيلية",
-        "status-breaking-even": "➖ تعادل مالي",
-        "label-past-7-days": "آخر 7 أيام",
-        "label-this-month": "هذا الشهر",
-        "label-this-year": "هذه السنة",
-        "msg-no-transactions": "لا توجد عمليات مسجلة خلال هذه الفترة.",
-        "msg-no-costs": "لا توجد تكاليف مسجلة خلال هذه الفترة.",
-        "msg-no-data-timeframe": "لا توجد بيانات لهذه الفترة.",
-        "label-total": "الإجمالي",
-        "label-avg": "المتوسط",
-        "label-peak": "الأعلى",
-        "label-by": "بواسطة",
-        "title-system-violations": "⚠️ نظام المخالفات النظامية",
-        "desc-system-violations": "إدارة مستويات التصعيد للمخالفات النظامية للموظفين (وليس المخالفات العادية).",
-        "label-select-worker": "اختر الموظف:",
-        "opt-choose-worker": "-- اختر الموظف --",
-        "label-violation-reason": "سبب المخالفة:",
-        "placeholder-enter-reason": "أدخل السبب...",
-        "btn-add-system-violation": "إضافة مخالفة نظامية",
-        "label-termination-status": "حالة إنهاء الحساب:",
-        "placeholder-worker-email-dots": "البريد الإلكتروني للموظف...",
-        "desc-manager-promotion": "ترقية الموظفين إلى مسؤولين (مديرين) عن طريق إدخال بريدهم الإلكتروني. يمتلك المسؤولون حق الوصول إلى جميع الأقسام وعناصر التحكم في الوصول.",
-        "placeholder-payment-req-amount": "مثال: 500",
-        "placeholder-payment-req-reason": "مثال: مصاريف طبية طارئة",
-        "title-manage-folders": "📂 إدارة المجلدات",
-        "placeholder-new-wh-folder": "مثال: المشروبات، اللحوم...",
-        "placeholder-driver-order-details": "مثال: ٢ بيفر برجر، ١ بيبسي...",
-        "label-prep-time-needed": "وقت التحضير المطلوب (بالدقائق)",
-        "placeholder-driver-prep-time": "مثال: ١٠",
-        "placeholder-map-search-input": "البحث عن موقع...",
-        "placeholder-manage-note-text": "اكتب إعلانك أو ملاحظتك الخاصة هنا...",
-        "title-post-new-note": "نشر ملاحظة جديدة",
-        "label-public-note": "📢 عام (يسمح بالردود)",
-        "label-private-note": "🔒 خاص",
-        "label-private-note-targets": "اختر من يمكنه قراءة هذا (اتركه فارغاً لملاحظة المدير فقط):",
-        "label-add-attachment": "إضافة مرفق (اختياري):",
-        "btn-camera": "📷 الكاميرا",
-        "btn-gallery": "🖼️ المعرض",
-        "btn-record-voice": "🎤 تسجيل ملاحظة صوتية",
-        "btn-done": "تم",
-        "btn-cancel": "إلغاء",
-        "btn-post-note": "نشر الملاحظة",
-        "opt-urgency-normal": "🔵 أولوية عادية",
-        "opt-choose-emp": "-- اختر الموظف --",
-        "label-late-grace": "حد احتساب التأخير (بالدقائق)",
-        "label-late-penalty": "قيمة غرامة التأخير (ريال)",
-        "btn-save-settings": "حفظ الإعدادات"
-    }
-};
 
 let currentAppLang = localStorage.getItem("burgeroov_lang") || "en";
 
@@ -7819,6 +7452,44 @@ function getLateDeductionsForMonth(worker, monthStr) {
         }
     });
     return totalDeduction;
+}
+
+function getDriverVolumeRewardsForMonth(worker, monthStr) {
+    const companyData = getCompanyData();
+    const rules = companyData.driverVolumeRewards || [];
+    if (rules.length === 0) return 0;
+
+    const stats = worker.monthlyStats && worker.monthlyStats[monthStr];
+    if (!stats || !stats.deliveriesList || stats.deliveriesList.length === 0) return 0;
+
+    // Group deliveries by local date string
+    const dailyCounts = {};
+    stats.deliveriesList.forEach(del => {
+        if (del.endTime) {
+            const dateObj = new Date(del.endTime);
+            const yyyy = dateObj.getFullYear();
+            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const dd = String(dateObj.getDate()).padStart(2, '0');
+            const dateKey = `${yyyy}-${mm}-${dd}`;
+            if (dateKey.startsWith(monthStr)) {
+                dailyCounts[dateKey] = (dailyCounts[dateKey] || 0) + 1;
+            }
+        }
+    });
+
+    // Sort rules by ordersCount descending to find the highest milestone hit
+    const sortedRules = [...rules].sort((a, b) => b.ordersCount - a.ordersCount);
+
+    let totalReward = 0;
+    Object.keys(dailyCounts).forEach(dateKey => {
+        const count = dailyCounts[dateKey];
+        const match = sortedRules.find(r => count >= r.ordersCount);
+        if (match) {
+            totalReward += parseFloat(match.rewardAmount || 0);
+        }
+    });
+
+    return totalReward;
 }
 
 function calculateLateness(startTimeStr, checkTimeStr) {
@@ -8529,6 +8200,70 @@ function toggleWorkerCloseStatus() {
         .catch(err => console.error("Error toggling close status:", err));
 }
 
+function claimGeneralDelivery(orderId) {
+    if (!currentUser) return;
+    const companyData = getCompanyData();
+    const email = currentUser.email.toLowerCase();
+    const workerIndex = companyData.workers.findIndex(w => w.email && w.email.toLowerCase() === email);
+    if (workerIndex === -1) {
+        alert(t('not-linked-worker') || "Your account is not linked to a worker profile.");
+        return;
+    }
+    const worker = companyData.workers[workerIndex];
+    if (worker.activeOrder) {
+        alert(t('msg-already-has-active-order') || "You already have an active order!");
+        return;
+    }
+
+    const pool = companyData.generalDeliveries || {};
+    const orderData = pool[orderId];
+    if (!orderData) {
+        alert(t('msg-order-not-found') || "This order is no longer available.");
+        return;
+    }
+
+    // Fire database transaction to prevent concurrent claims
+    db.ref(`companies/${currentCompany}/generalDeliveries/${orderId}`).transaction(currentData => {
+        if (currentData === null) {
+            return undefined; // Already deleted/claimed
+        }
+        return null; // Delete it
+    }, (error, committed, snapshot) => {
+        if (error) {
+            console.error("Transaction failed:", error);
+            alert("An error occurred while claiming the order.");
+        } else if (!committed) {
+            alert(t('msg-already-claimed') || "This order was already claimed by another driver.");
+        } else {
+            // Success! Set the order as the driver's activeOrder
+            orderData.assignedToWorkerId = worker.id;
+            orderData.assignedToWorkerName = worker.name;
+            db.ref(`companies/${currentCompany}/workers/${workerIndex}/activeOrder`).set(orderData)
+                .then(() => {
+                    logActivity('delivery', worker.id, worker.name, `${worker.name} accepted general delivery order #${orderData.orderNum || ''}`);
+                    alert(t('msg-claimed-success') || "Order claimed successfully!");
+                    renderAll();
+                })
+                .catch(err => console.error("Error setting driver active order:", err));
+        }
+    });
+}
+
+function cancelGeneralPoolOrder(orderId) {
+    const isAr = currentAppLang === 'ar';
+    if (!confirm(isAr ? "هل أنت متأكد من إلغاء هذا الطلب من التوصيل العام؟" : "Are you sure you want to cancel this order from the general pool?")) {
+        return;
+    }
+    db.ref(`companies/${currentCompany}/generalDeliveries/${orderId}`).remove()
+        .then(() => {
+            logActivity('delivery', 'general', 'General Pool', `Cancelled/Removed order from the general deliveries pool.`);
+            alert(isAr ? "تم إلغاء الطلب بنجاح." : "Order cancelled successfully.");
+        })
+        .catch(err => console.error("Error cancelling general pool order:", err));
+}
+
+window.claimGeneralDelivery = claimGeneralDelivery;
+window.cancelGeneralPoolOrder = cancelGeneralPoolOrder;
 window.getSystemViolationDeductionsForMonth = getSystemViolationDeductionsForMonth;
 window.getSystemViolationLogsForMonth = getSystemViolationLogsForMonth;
 window.checkWorkerSystemViolationAlerts = checkWorkerSystemViolationAlerts;
@@ -8539,6 +8274,11 @@ window.deleteSystemViolation = deleteSystemViolation;
 window.toggleWorkerCloseStatus = toggleWorkerCloseStatus;
 window.saveLateSettings = saveLateSettings;
 window.getLateDeductionsForMonth = getLateDeductionsForMonth;
+window.updateSelectedDriverProvisions = updateSelectedDriverProvisions;
+window.renderDriverVolumeRewards = renderDriverVolumeRewards;
+window.addDriverVolumeReward = addDriverVolumeReward;
+window.deleteDriverVolumeReward = deleteDriverVolumeReward;
+window.getDriverVolumeRewardsForMonth = getDriverVolumeRewardsForMonth;
 
 // Initial run
 applyTranslations();

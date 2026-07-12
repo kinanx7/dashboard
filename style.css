@@ -1314,41 +1314,233 @@ body:not(.role-admin) .task-grid {
     }
 }
 
-/* Driver specific */
+/* Custom Switch Toggle styling */
+.switch-container {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-main);
+    user-select: none;
+}
+.switch-control {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 22px;
+}
+.switch-control input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.switch-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: var(--border-color);
+    transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 34px;
+}
+.switch-slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background-color: var(--card-bg);
+    transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.switch-control input:checked + .switch-slider {
+    background-color: var(--success);
+}
+.switch-control input:checked + .switch-slider:before {
+    transform: translateX(22px);
+    background-color: #fff;
+}
+
+/* Advanced Driver Cards and Badge Styling */
 .driver-card {
-    background: var(--input-bg);
+    background: var(--card-bg);
     border: 1px solid var(--border-color);
     padding: 16px;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     margin-bottom: 12px;
-    transition: var(--transition);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
 }
-
-.timer-box {
-    background: var(--card-bg);
-    border: 2px solid var(--warning);
-    padding: 12px;
-    border-radius: var(--radius-md);
-    text-align: center;
-    margin-top: 10px;
-    transition: var(--transition);
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+.driver-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--primary);
+    box-shadow: var(--shadow-md), 0 0 0 1px rgba(217, 138, 54, 0.1);
 }
-
-.timer-text {
-    font-size: 1.8rem;
+.driver-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+.driver-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.driver-name {
+    font-size: 0.98rem;
     font-weight: 700;
+    color: var(--text-main);
+}
+.driver-prov-wrapper {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+.driver-prov-icon {
+    font-size: 0.85rem;
+    cursor: help;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.driver-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+}
+
+/* Pulsing Status Badges */
+.driver-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.status-available {
+    background-color: var(--success-bg);
+    color: var(--success);
+    border: 1px solid var(--success-border);
+}
+.status-busy {
+    background-color: var(--warning-bg);
     color: var(--warning);
-    font-family: monospace;
-    letter-spacing: 2px;
+    border: 1px solid var(--warning-border);
+}
+.pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    position: relative;
+}
+.status-available .pulse-dot {
+    background-color: var(--success);
+    animation: pulse-green 1.5s infinite;
+}
+.status-busy .pulse-dot {
+    background-color: var(--warning);
+    animation: pulse-orange 1.5s infinite;
 }
 
+@keyframes pulse-green {
+    0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+    70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+@keyframes pulse-orange {
+    0% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.4); }
+    70% { box-shadow: 0 0 0 6px rgba(234, 179, 8, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0); }
+}
+
+/* Premium Digital Timer Dashboard Widget */
+.timer-box {
+    background: linear-gradient(145deg, #18110b, #0c0805);
+    border: 2px solid var(--warning);
+    padding: 24px;
+    border-radius: var(--radius-lg);
+    text-align: center;
+    margin-top: 15px;
+    transition: all 0.3s ease;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25), inset 0 2px 4px rgba(255,255,255,0.05);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+.timer-box::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+}
+.timer-text {
+    font-size: 2.8rem;
+    font-weight: 800;
+    color: var(--warning);
+    font-family: 'Consolas', 'Courier New', monospace;
+    letter-spacing: 3px;
+    text-shadow: 0 0 12px rgba(234, 179, 8, 0.5);
+    line-height: 1.1;
+    margin: 8px 0;
+}
 .timer-late {
-    border-color: var(--danger);
+    border-color: var(--danger) !important;
+    box-shadow: 0 8px 24px rgba(239, 68, 68, 0.15), inset 0 2px 4px rgba(255,255,255,0.05) !important;
+}
+.timer-late .timer-text {
+    color: var(--danger) !important;
+    text-shadow: 0 0 12px rgba(239, 68, 68, 0.6) !important;
 }
 
-.timer-late .timer-text {
-    color: var(--danger);
+/* Timeline Accent History Cards */
+.driver-history-card {
+    border-left: 4px solid var(--border-color);
+    padding-left: 16px;
+    position: relative;
+}
+.driver-history-card.status-ontime {
+    border-left-color: var(--success);
+}
+.driver-history-card.status-late {
+    border-left-color: var(--danger);
+}
+
+.active-order-ticket {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--primary);
+    background: var(--input-bg);
+    border: 1px dashed var(--border-color);
+    padding: 14px;
+    border-radius: var(--radius-md);
+    margin: 16px 0;
+    text-align: left;
+    line-height: 1.6;
+    font-family: 'Consolas', 'Courier New', monospace;
+    white-space: pre-line;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
 }
 
 .proof-img {
