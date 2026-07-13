@@ -213,6 +213,220 @@ function hideInAppNotification() {
     }
 }
 
+let notificationListeners = {};
+
+function startGlobalNotificationListeners(email) {
+    if (!email) return;
+    const sanitizedEmail = email.toLowerCase().replace(/\./g, ',');
+    const isSuperAdmin = email.toLowerCase() === 'kinan.rahal@hotmail.com';
+
+    // Clear any existing listeners first
+    Object.keys(notificationListeners).forEach(companyId => {
+        if (notificationListeners[companyId]) {
+            notificationListeners[companyId].off();
+        }
+    });
+    notificationListeners = {};
+
+    const companiesToListen = ['burgeroov', 'mvc', 'mvcfresh'];
+
+    companiesToListen.forEach(companyId => {
+        const adminsRef = db.ref(`companies/${companyId}/admins`);
+        const workersRef = db.ref(`companies/${companyId}/workers`);
+
+        Promise.all([
+            adminsRef.once('value').catch(() => null),
+            workersRef.once('value').catch(() => null)
+        ]).then(([adminsSnap, workersSnap]) => {
+            let isAdmin = isSuperAdmin;
+            let myWorkerData = null;
+            let workerIndex = -1;
+
+            if (!isAdmin && adminsSnap && adminsSnap.exists()) {
+                let adminsVal = adminsSnap.val() || {};
+                if (Array.isArray(adminsVal)) {
+                    adminsVal.forEach(e => {
+                        if (e && e.toLowerCase().replace(/\./g, ',') === sanitizedEmail) isAdmin = true;
+                    });
+                } else {
+                    if (adminsVal[sanitizedEmail] === true) isAdmin = true;
+                }
+            }
+
+            if (workersSnap && workersSnap.exists()) {
+                const workersVal = workersSnap.val() || [];
+                workerIndex = workersVal.findIndex(w => w && w.email && w.email.toLowerCase() === email.toLowerCase());
+                if (workerIndex !== -1) {
+                    myWorkerData = workersVal[workerIndex];
+                }
+            }
+
+            // Only listen if user is admin or worker in this company
+            if (isAdmin || myWorkerData) {
+                let prevTaskIds = myWorkerData && myWorkerData.jobs ? myWorkerData.jobs.map(j => j.id) : [];
+                let prevOrderStartTime = myWorkerData && myWorkerData.activeOrder ? myWorkerData.activeOrder.startTime : null;
+                let prevViolationsCount = myWorkerData && myWorkerData.systemViolations ? myWorkerData.systemViolations.length : 0;
+                let prevPaymentReqStatuses = {};
+                let prevGeneralDeliveries = {};
+
+                // Get initial general deliveries
+                db.ref(`companies/${companyId}/generalDeliveries`).once('value').then(snap => {
+                    if (snap.exists()) {
+                        prevGeneralDeliveries = snap.val() || {};
+                    }
+                }).catch(() => { });
+
+                // Get initial payment requests
+                db.ref(`companies/${companyId}/paymentRequests`).once('value').then(snap => {
+                    if (snap.exists()) {
+                        const reqs = snap.val() || {};
+                        Object.keys(reqs).forEach(id => {
+                            prevPaymentReqStatuses[id] = reqs[id].status;
+                        });
+                    }
+                }).catch(() => { });
+
+                const listener = db.ref(`companies/${companyId}`);
+                notificationListeners[companyId] = listener;
+
+                let isFirstTrigger = true;
+
+                listener.on('value', snapshot => {
+                    if (!snapshot.exists()) return;
+                    const companyData = snapshot.val();
+                    const isAr = currentAppLang === 'ar';
+                    const compName = companyId === 'burgeroov' ? 'Burgeroov' : (companyId === 'mvc' ? 'MVC FRESH' : 'MVC Fresh');
+
+                    let updatedWorker = null;
+                    if (companyData.workers) {
+                        updatedWorker = companyData.workers.find(w => w && w.email && w.email.toLowerCase() === email.toLowerCase());
+                    }
+
+                    if (isFirstTrigger) {
+                        isFirstTrigger = false;
+                        if (updatedWorker) {
+                            prevTaskIds = updatedWorker.jobs ? updatedWorker.jobs.map(j => j.id) : [];
+                            prevOrderStartTime = updatedWorker.activeOrder ? updatedWorker.activeOrder.startTime : null;
+                            prevViolationsCount = updatedWorker.systemViolations ? updatedWorker.systemViolations.length : 0;
+                        }
+                        const pRequests = companyData.paymentRequests || {};
+                        Object.keys(pRequests).forEach(id => {
+                            prevPaymentReqStatuses[id] = pRequests[id].status;
+                        });
+                        prevGeneralDeliveries = companyData.generalDeliveries || {};
+                        return;
+                    }
+
+                    // --- WORKER NOTIFICATIONS ---
+                    if (updatedWorker) {
+                        // 1. Task Check
+                        if (updatedWorker.jobs) {
+                            const currentTaskIds = updatedWorker.jobs.map(j => j.id);
+                            const newTasks = currentTaskIds.filter(id => !prevTaskIds.includes(id));
+                            if (newTasks.length > 0) {
+                                const msg = isAr
+                                    ? `📋 مهمة جديدة مسندة إليك في ${compName}`
+                                    : `📋 New task assigned to you in ${compName}!`;
+                                showInAppNotification(msg);
+                            }
+                            prevTaskIds = currentTaskIds;
+                        }
+
+                        // 2. Direct Delivery Order Check
+                        const currentOrderStart = updatedWorker.activeOrder ? updatedWorker.activeOrder.startTime : null;
+                        if (currentOrderStart && currentOrderStart !== prevOrderStartTime) {
+                            const msg = isAr
+                                ? `🛵 طلب توصيل جديد مسند إليك في ${compName}`
+                                : `🛵 New delivery order assigned to you in ${compName}!`;
+                            showInAppNotification(msg);
+                        }
+                        prevOrderStartTime = currentOrderStart;
+
+                        // 3. System Violations Check
+                        const currentViolCount = updatedWorker.systemViolations ? updatedWorker.systemViolations.length : 0;
+                        if (currentViolCount > prevViolationsCount) {
+                            const latestViol = updatedWorker.systemViolations[updatedWorker.systemViolations.length - 1];
+                            const msg = isAr
+                                ? `⚠️ مخالفة جديدة مسجلة ضدك في ${compName}: ${latestViol.reason || ''}`
+                                : `⚠️ New violation recorded in ${compName}: ${latestViol.reason || ''}`;
+                            showInAppNotification(msg);
+                        }
+                        prevViolationsCount = currentViolCount;
+
+                        // 4. Payment Request Status Check for Worker
+                        const pRequests = companyData.paymentRequests || {};
+                        Object.values(pRequests).forEach(req => {
+                            if (req.workerId === updatedWorker.id) {
+                                const prevStatus = prevPaymentReqStatuses[req.id];
+                                if (prevStatus && req.status !== prevStatus) {
+                                    let msg = '';
+                                    if (req.status === 'accepted') {
+                                        msg = isAr
+                                            ? `✅ تم قبول طلب الدفع في ${compName}! الكود: ${req.code}`
+                                            : `✅ Payment request approved in ${compName}! Code: ${req.code}`;
+                                    } else if (req.status === 'rejected') {
+                                        msg = isAr
+                                            ? `❌ تم رفض طلب الدفع في ${compName}`
+                                            : `❌ Payment request rejected in ${compName}`;
+                                    } else if (req.status === 'given') {
+                                        msg = isAr
+                                            ? `💰 تم تسليم الدفعة بقيمة ${req.amount} ريال بنجاح في ${compName}`
+                                            : `💰 Payment of SAR ${req.amount} given successfully in ${compName}!`;
+                                    }
+                                    if (msg) showInAppNotification(msg);
+                                }
+                                prevPaymentReqStatuses[req.id] = req.status;
+                            }
+                        });
+                    }
+
+                    // --- DRIVER POOL NOTIFICATIONS (For any worker who is a Driver) ---
+                    const isDriver = updatedWorker && ((updatedWorker.role || '').toLowerCase().includes('driver') || (updatedWorker.role || '').toLowerCase().includes('سائق') || (updatedWorker.role || '').toLowerCase().includes('delivery'));
+                    if (isDriver) {
+                        const pool = companyData.generalDeliveries || {};
+                        Object.keys(pool).forEach(orderId => {
+                            const order = pool[orderId];
+                            if (!prevGeneralDeliveries[orderId]) {
+                                const msg = isAr
+                                    ? `📦 طلب عام جديد #${order.orderNum || ''} متاح في ${compName}!`
+                                    : `📦 New general order #${order.orderNum || ''} available in ${compName}!`;
+                                showInAppNotification(msg);
+                            } else {
+                                const prevOrder = prevGeneralDeliveries[orderId];
+                                if (order.status !== prevOrder.status) {
+                                    if (order.status === 'ready') {
+                                        const msg = isAr
+                                            ? `🟢 طلب عام #${order.orderNum || ''} جاهز للاستلام في ${compName}!`
+                                            : `🟢 General order #${order.orderNum || ''} is ready in ${compName}!`;
+                                        showInAppNotification(msg);
+                                    }
+                                }
+                            }
+                        });
+                        prevGeneralDeliveries = pool;
+                    }
+
+                    // --- ADMIN NOTIFICATIONS ---
+                    if (isAdmin) {
+                        const pRequests = companyData.paymentRequests || {};
+                        Object.values(pRequests).forEach(req => {
+                            const prevStatus = prevPaymentReqStatuses[req.id];
+                            if (!prevStatus && req.status === 'pending') {
+                                const wName = req.workerName || 'Employee';
+                                const msg = isAr
+                                    ? `💰 طلب دفع جديد معلق من ${wName} في ${compName}`
+                                    : `💰 New pending payment request from ${wName} in ${compName}!`;
+                                showInAppNotification(msg);
+                            }
+                            prevPaymentReqStatuses[req.id] = req.status;
+                        });
+                    }
+                });
+            }
+        });
+    });
+}
+
 // =============================================
 // END FEATURE 1 HELPERS
 // =============================================
@@ -313,7 +527,8 @@ applyDarkMode();
 let currentCompany = 'burgeroov';
 let appData = {
     burgeroov: { branches: ['Main Branch'], workers: [], violationRules: [], jobCatalog: [], warehouse: [], admins: { "kinan,rahal@hotmail,com": true } },
-    mvc: { branches: ['Main Branch'], workers: [], violationRules: [], jobCatalog: [], warehouse: [], admins: { "kinan,rahal@hotmail,com": true } }
+    mvc: { branches: ['Main Branch'], workers: [], violationRules: [], jobCatalog: [], warehouse: [], admins: { "kinan,rahal@hotmail,com": true } },
+    mvcfresh: { branches: ['Main Branch'], workers: [], violationRules: [], jobCatalog: [], warehouse: [], admins: { "kinan,rahal@hotmail,com": true } }
 };
 const today = new Date();
 let currentGlobalMonth = today.toISOString().slice(0, 7);
@@ -347,10 +562,13 @@ function selectCompany(companyId) {
 
     document.getElementById('company-selection-overlay').style.display = 'none';
 
-    document.body.classList.remove('theme-burgeroov', 'theme-mvc');
+    document.body.classList.remove('theme-burgeroov', 'theme-mvc', 'theme-mvcfresh');
     document.body.classList.add('theme-' + companyId);
 
-    const logoSrc = (companyId === 'mvc' ? 'mvc.png' : 'burgeroov.png');
+    let logoSrc = 'burgeroov.png';
+    if (companyId === 'mvc') logoSrc = 'mvc.png';
+    else if (companyId === 'mvcfresh') logoSrc = 'mvcfresh.png';
+
     const headerLogo = document.getElementById('header-logo');
     if (headerLogo) headerLogo.src = logoSrc;
     const authLogo = document.getElementById('auth-logo');
@@ -390,6 +608,7 @@ auth.onAuthStateChanged((user) => {
     if (user) {
         currentUser = { email: user.email, uid: user.uid };
         document.getElementById('display-user-email').textContent = currentUser.email;
+        startGlobalNotificationListeners(user.email);
 
         document.getElementById('auth-loader').style.display = 'block';
         document.getElementById('auth-btn').style.display = 'none';
@@ -401,11 +620,19 @@ auth.onAuthStateChanged((user) => {
             document.getElementById('auth-btn').style.display = 'block';
             overlay.style.display = 'none';
 
+            // Show all cards in selection overlay for super admin
+            const cardBurgeroov = document.querySelector('.burgeroov-card');
+            const cardMvc = document.querySelector('.mvc-card');
+            const cardMvcFresh = document.querySelector('.mvcfresh-card');
+            if (cardBurgeroov) cardBurgeroov.style.display = 'block';
+            if (cardMvc) cardMvc.style.display = 'block';
+            if (cardMvcFresh) cardMvcFresh.style.display = 'block';
+
             const urlParams = new URLSearchParams(window.location.search);
             const queryCompany = urlParams.get('companyId');
             const queryTab = urlParams.get('tab');
 
-            if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc')) {
+            if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc' || queryCompany === 'mvcfresh')) {
                 selectCompany(queryCompany);
                 if (queryTab) {
                     setTimeout(() => {
@@ -417,7 +644,7 @@ auth.onAuthStateChanged((user) => {
                 }
             } else {
                 const savedCompany = localStorage.getItem('selected_company');
-                if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc')) {
+                if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
                     selectCompany(savedCompany);
                 } else {
                     showCompanySelectionHUD();
@@ -429,17 +656,17 @@ auth.onAuthStateChanged((user) => {
                 db.ref('companies/burgeroov/admins').once('value').catch(() => null),
                 db.ref('companies/burgeroov/workers').once('value').catch(() => null),
                 db.ref('companies/mvc/admins').once('value').catch(() => null),
-                db.ref('companies/mvc/workers').once('value').catch(() => null)
-            ]).then(([bgAdmins, bgWorkers, mvcAdmins, mvcWorkers]) => {
+                db.ref('companies/mvc/workers').once('value').catch(() => null),
+                db.ref('companies/mvcfresh/admins').once('value').catch(() => null),
+                db.ref('companies/mvcfresh/workers').once('value').catch(() => null)
+            ]).then(([bgAdmins, bgWorkers, mvcAdmins, mvcWorkers, freshAdmins, freshWorkers]) => {
                 document.getElementById('auth-loader').style.display = 'none';
                 document.getElementById('auth-btn').style.display = 'block';
 
                 let burgeroovAdmins = (bgAdmins && typeof bgAdmins.val === 'function') ? (bgAdmins.val() || {}) : {};
                 if (Array.isArray(burgeroovAdmins)) {
                     const map = {};
-                    burgeroovAdmins.forEach(e => {
-                        if (e) map[e.toLowerCase().replace(/\./g, ',')] = true;
-                    });
+                    burgeroovAdmins.forEach(e => { if (e) map[e.toLowerCase().replace(/\./g, ',')] = true; });
                     burgeroovAdmins = map;
                 }
                 const burgeroovWorkers = (bgWorkers && typeof bgWorkers.val === 'function') ? (bgWorkers.val() || []) : [];
@@ -447,12 +674,18 @@ auth.onAuthStateChanged((user) => {
                 let mvcAdminsList = (mvcAdmins && typeof mvcAdmins.val === 'function') ? (mvcAdmins.val() || {}) : {};
                 if (Array.isArray(mvcAdminsList)) {
                     const map = {};
-                    mvcAdminsList.forEach(e => {
-                        if (e) map[e.toLowerCase().replace(/\./g, ',')] = true;
-                    });
+                    mvcAdminsList.forEach(e => { if (e) map[e.toLowerCase().replace(/\./g, ',')] = true; });
                     mvcAdminsList = map;
                 }
                 const mvcWorkersList = (mvcWorkers && typeof mvcWorkers.val === 'function') ? (mvcWorkers.val() || []) : [];
+
+                let mvcfreshAdminsList = (freshAdmins && typeof freshAdmins.val === 'function') ? (freshAdmins.val() || {}) : {};
+                if (Array.isArray(mvcfreshAdminsList)) {
+                    const map = {};
+                    mvcfreshAdminsList.forEach(e => { if (e) map[e.toLowerCase().replace(/\./g, ',')] = true; });
+                    mvcfreshAdminsList = map;
+                }
+                const mvcfreshWorkersList = (freshWorkers && typeof freshWorkers.val === 'function') ? (freshWorkers.val() || []) : [];
 
                 const sanitizedEmail = email.replace(/\./g, ',');
                 const inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
@@ -461,16 +694,36 @@ auth.onAuthStateChanged((user) => {
                 const inMvc = mvcAdminsList[sanitizedEmail] === true ||
                     mvcWorkersList.some(w => w.email && w.email.toLowerCase() === email);
 
+                const inMvcFresh = mvcfreshAdminsList[sanitizedEmail] === true ||
+                    mvcfreshWorkersList.some(w => w.email && w.email.toLowerCase() === email);
+
+                // Update selector cards display based on assigned status
+                const cardBurgeroov = document.querySelector('.burgeroov-card');
+                const cardMvc = document.querySelector('.mvc-card');
+                const cardMvcFresh = document.querySelector('.mvcfresh-card');
+
+                if (cardBurgeroov) cardBurgeroov.style.display = inBurgeroov ? 'block' : 'none';
+                if (cardMvc) cardMvc.style.display = inMvc ? 'block' : 'none';
+                if (cardMvcFresh) cardMvcFresh.style.display = inMvcFresh ? 'block' : 'none';
+
                 overlay.style.display = 'none';
-                window.isMultiCompany = inBurgeroov && inMvc;
+
+                const activeCompanies = [];
+                if (inBurgeroov) activeCompanies.push('burgeroov');
+                if (inMvc) activeCompanies.push('mvc');
+                if (inMvcFresh) activeCompanies.push('mvcfresh');
+
+                window.isMultiCompany = activeCompanies.length > 1;
 
                 const urlParams = new URLSearchParams(window.location.search);
                 const queryCompany = urlParams.get('companyId');
                 const queryTab = urlParams.get('tab');
 
                 let chosenCompany = null;
-                if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc')) {
-                    if ((queryCompany === 'mvc' && inMvc) || (queryCompany === 'burgeroov' && inBurgeroov)) {
+                if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc' || queryCompany === 'mvcfresh')) {
+                    if ((queryCompany === 'mvc' && inMvc) ||
+                        (queryCompany === 'burgeroov' && inBurgeroov) ||
+                        (queryCompany === 'mvcfresh' && inMvcFresh)) {
                         chosenCompany = queryCompany;
                     }
                 }
@@ -487,16 +740,18 @@ auth.onAuthStateChanged((user) => {
                     }
                 } else {
                     const savedCompany = localStorage.getItem('selected_company');
-                    if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc')) {
-                        if ((savedCompany === 'mvc' && inMvc) || (savedCompany === 'burgeroov' && inBurgeroov)) {
+                    if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
+                        if ((savedCompany === 'mvc' && inMvc) ||
+                            (savedCompany === 'burgeroov' && inBurgeroov) ||
+                            (savedCompany === 'mvcfresh' && inMvcFresh)) {
                             selectCompany(savedCompany);
                             return;
                         }
                     }
-                    if (inBurgeroov && inMvc) {
+                    if (activeCompanies.length > 1) {
                         showCompanySelectionHUD();
-                    } else if (inMvc) {
-                        selectCompany('mvc');
+                    } else if (activeCompanies.length === 1) {
+                        selectCompany(activeCompanies[0]);
                     } else {
                         selectCompany('burgeroov');
                     }
@@ -508,7 +763,7 @@ auth.onAuthStateChanged((user) => {
 
                 overlay.style.display = 'none';
                 const savedCompany = localStorage.getItem('selected_company');
-                if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc')) {
+                if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
                     selectCompany(savedCompany);
                 } else {
                     showCompanySelectionHUD();
@@ -517,6 +772,14 @@ auth.onAuthStateChanged((user) => {
         }
     } else {
         currentUser = null;
+        // Stop all notification listeners
+        Object.keys(notificationListeners).forEach(companyId => {
+            if (notificationListeners[companyId]) {
+                notificationListeners[companyId].off();
+            }
+        });
+        notificationListeners = {};
+
         document.getElementById('auth-loader').style.display = 'none';
         document.getElementById('auth-btn').style.display = 'block';
         overlay.style.display = 'flex';
@@ -873,46 +1136,7 @@ function listenToCloudData() {
             }
             isInitialLoad = false;
         } else {
-            if (currentUser && currentUser.role === 'worker') {
-                const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
-                if (myWorker) {
-                    // 1. Task Check
-                    if (myWorker.jobs) {
-                        const currentTaskIds = myWorker.jobs.map(j => j.id);
-                        const newTasks = currentTaskIds.filter(id => !previousTaskIds.includes(id));
-                        if (newTasks.length > 0) {
-                            showInAppNotification('📋 ' + (t('title-tasks-board') || 'You have a new task!'));
-                        }
-                        previousTaskIds = currentTaskIds;
-                    }
-
-                    // 2. Delivery Order Check
-                    const currentOrderStart = myWorker.activeOrder ? myWorker.activeOrder.startTime : null;
-                    if (currentOrderStart && currentOrderStart !== window.previousOrderStartTime) {
-                        showInAppNotification('🛵 ' + (t('title-current-order') || 'You have a new delivery order!'));
-                    }
-                    window.previousOrderStartTime = currentOrderStart;
-
-                    // 3. Payment Request Status Check
-                    const pRequests = getCompanyData().paymentRequests || {};
-                    Object.values(pRequests).forEach(req => {
-                        if (req.workerId === myWorker.id) {
-                            if (!window.prevPaymentReqStatuses) window.prevPaymentReqStatuses = {};
-                            const prevStatus = window.prevPaymentReqStatuses[req.id];
-                            if (prevStatus && req.status !== prevStatus) {
-                                if (req.status === 'accepted') {
-                                    showInAppNotification(`✅ Payment request approved! Code: ${req.code}`);
-                                } else if (req.status === 'rejected') {
-                                    showInAppNotification(`❌ Payment request rejected.`);
-                                } else if (req.status === 'given') {
-                                    showInAppNotification(`💰 Payment of SAR ${req.amount} given successfully!`);
-                                }
-                            }
-                            window.prevPaymentReqStatuses[req.id] = req.status;
-                        }
-                    });
-                }
-            }
+            renderAll();
         }
 
         renderAll();
@@ -1012,9 +1236,10 @@ function saveWorkerFCMToken(token) {
 
     const email = currentUser.email.toLowerCase();
 
-    // Save token to both companies if worker is registered in them
+    // Save token to all companies if worker is registered in them
     saveTokenForCompany('burgeroov', email, token);
     saveTokenForCompany('mvc', email, token);
+    saveTokenForCompany('mvcfresh', email, token);
 }
 
 function saveTokenForCompany(companyId, email, token) {
@@ -2178,6 +2403,9 @@ function logSaleTransaction() {
 
     // Targeted write for sales transactions
     db.ref('companies/' + currentCompany + '/salesLogs/' + newLog.id).set(newLog)
+        .then(() => {
+            logActivity('sales', workerId, myWorker ? myWorker.name : 'System', `Entered sale transaction of SAR ${amount} via ${method}`);
+        })
         .catch(error => {
             console.error("Error saving sale:", error);
             alert("Failed to save transaction.");
@@ -2186,10 +2414,16 @@ function logSaleTransaction() {
 
 function deleteSaleTransaction(id) {
     if (!confirm("Delete this transaction record?")) return;
+    const oldLog = getCompanyData().salesLogs.find(l => l.id === id);
     getCompanyData().salesLogs = getCompanyData().salesLogs.filter(l => l.id !== id);
 
     // Targeted removal for sales transactions
     db.ref('companies/' + currentCompany + '/salesLogs/' + id).remove()
+        .then(() => {
+            if (oldLog) {
+                logActivity('sales_delete', oldLog.workerId, oldLog.cashier, `Deleted/Undid sale transaction of SAR ${oldLog.amount} via ${oldLog.method}`);
+            }
+        })
         .catch(error => {
             console.error("Error deleting sale:", error);
             alert("Failed to delete transaction.");
@@ -2674,6 +2908,9 @@ function logCostTransaction() {
 
     // Targeted write to costLogs
     db.ref('companies/' + currentCompany + '/costLogs/' + newLog.id).set(newLog)
+        .then(() => {
+            logActivity('costs', workerId, myWorker ? myWorker.name : 'System', `Entered cost transaction of SAR ${amount} for category "${method}"`);
+        })
         .catch(error => {
             console.error("Error saving cost:", error);
             alert("Failed to save cost transaction.");
@@ -2683,10 +2920,16 @@ function logCostTransaction() {
 
 function deleteCostTransaction(id) {
     if (!confirm("Delete this cost record?")) return;
+    const oldLog = getCompanyData().costLogs.find(l => l.id === id);
     getCompanyData().costLogs = getCompanyData().costLogs.filter(l => l.id !== id);
 
     // Targeted removal from costLogs
     db.ref('companies/' + currentCompany + '/costLogs/' + id).remove()
+        .then(() => {
+            if (oldLog) {
+                logActivity('costs_delete', oldLog.workerId, oldLog.cashier, `Deleted/Undid cost transaction of SAR ${oldLog.amount} for category "${oldLog.method}"`);
+            }
+        })
         .catch(error => {
             console.error("Error deleting cost:", error);
             alert("Failed to delete cost transaction.");
@@ -2742,6 +2985,9 @@ function logPastCostTransaction() {
 
     // Targeted write to costLogs
     db.ref('companies/' + currentCompany + '/costLogs/' + newLog.id).set(newLog)
+        .then(() => {
+            logActivity('costs', workerId, myWorker ? myWorker.name : 'System', `Entered past cost transaction of SAR ${amount} for category "${category}" on date ${dateStr}`);
+        })
         .catch(error => {
             console.error("Error saving past cost:", error);
             alert("Failed to save past cost transaction.");
@@ -3075,7 +3321,9 @@ function exportCostsPDF() {
                 </tr>`).join('');
 
     const reportTitle = isAr ? 'تقرير التكاليف والأرباح والخسائر' : 'Cost & P&L Report';
-    const companyLabel = currentCompany === 'mvc' ? 'MVC Fresh' : 'Burgeroov';
+    let companyLabel = 'Burgeroov';
+    if (currentCompany === 'mvc') companyLabel = 'MVC FRESH';
+    else if (currentCompany === 'mvcfresh') companyLabel = 'MVC Fresh';
     const periodLabel = isAr ? 'الفترة' : 'Period';
     const generatedLabel = isAr ? 'تاريخ الإنشاء' : 'Generated';
     const netProfitLabel = t('label-net-profit');
@@ -3277,6 +3525,9 @@ function addWarehouseItem() {
 
     // Targeted write to item index in warehouse
     db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex).set(newItem)
+        .then(() => {
+            logActivity('warehouse', workerId, workerName, `Added new warehouse item "${name}" with initial stock ${stock}`);
+        })
         .catch(err => console.error("Error adding warehouse item:", err));
 }
 
@@ -3311,6 +3562,9 @@ function updateWarehouseStock(itemId) {
 
     // Targeted write to item index in warehouse
     db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex).set(item)
+        .then(() => {
+            logActivity('warehouse', workerId, workerName, `Updated stock of "${item.name}" to ${newStock} (Difference: ${diff > 0 ? '+' : ''}${diff})`);
+        })
         .catch(err => console.error("Error updating warehouse stock:", err));
 }
 
@@ -3340,6 +3594,9 @@ function editMaxStock(itemId) {
 
         // Targeted write to item index in warehouse using .set()
         db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex).set(item)
+            .then(() => {
+                logActivity('warehouse', workerId, workerName, `Changed Max/Full Stock of "${item.name}" to ${parsed}`);
+            })
             .catch(err => console.error("Error editing max stock:", err));
     }
 }
@@ -3350,10 +3607,26 @@ function deleteWarehouseItem(itemId) {
         return;
     }
     if (!confirm(t('confirm-delete-product'))) return;
+    const item = getCompanyData().warehouse.find(i => i.id === itemId);
+    const name = item ? item.name : 'Unknown';
     getCompanyData().warehouse = getCompanyData().warehouse.filter(i => i.id !== itemId);
+
+    let workerId = "";
+    let workerName = "Admin";
+    if (currentUser && currentUser.role === 'admin') {
+        workerId = "admin";
+        workerName = currentUser.email ? currentUser.email.split('@')[0] : "Admin";
+    } else {
+        const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+        workerId = myWorker ? myWorker.id : "";
+        workerName = myWorker ? myWorker.name : "Staff";
+    }
 
     // Targeted write of modified list
     db.ref('companies/' + currentCompany + '/warehouse').set(getCompanyData().warehouse)
+        .then(() => {
+            logActivity('warehouse_delete', workerId, workerName, `Deleted warehouse item "${name}"`);
+        })
         .catch(err => console.error("Error deleting warehouse item:", err));
 }
 
@@ -3382,19 +3655,26 @@ function executeMove(itemId, folderName) {
     const itemIndex = getCompanyData().warehouse.findIndex(i => i.id === itemId);
     if (itemIndex !== -1) {
         const item = getCompanyData().warehouse[itemIndex];
+        const oldCat = item.category || 'Uncategorized';
         item.category = folderName;
 
         let workerId = "";
+        let workerName = "Admin";
         if (currentUser && currentUser.role === 'admin') {
             workerId = "admin";
+            workerName = currentUser.email ? currentUser.email.split('@')[0] : "Admin";
         } else {
             const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
             workerId = myWorker ? myWorker.id : "";
+            workerName = myWorker ? myWorker.name : "Staff";
         }
         item.workerId = workerId;
 
         // Targeted write to item index in warehouse using .set()
         db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex).set(item)
+            .then(() => {
+                logActivity('warehouse', workerId, workerName, `Moved item "${item.name}" from category "${oldCat}" to "${folderName}"`);
+            })
             .catch(err => console.error("Error moving warehouse item:", err));
     }
 }
@@ -4402,6 +4682,7 @@ function assignTask() {
 
         db.ref(`companies/${currentCompany}/generalTasks/${newGeneralTask.id}`).set(newGeneralTask)
             .then(() => {
+                logActivity('task', 'general', 'General Pool', `Created general task: "${text}"`);
                 alert("General task created successfully!");
                 document.getElementById('task-assign-input').value = '';
                 if (document.getElementById('task-deadline')) document.getElementById('task-deadline').value = '';
@@ -4433,6 +4714,9 @@ function assignTask() {
 
     // Targeted write to worker jobs path
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
+        .then(() => {
+            logActivity('task', worker.id, worker.name, `Assigned task to ${worker.name}: "${text}"`);
+        })
         .catch(err => console.error("Error assigning task:", err));
 }
 
@@ -4463,6 +4747,9 @@ function completeTask(workerId, taskId) {
 
         // Targeted write to worker jobs path
         db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
+            .then(() => {
+                logActivity('task', worker.id, worker.name, `${worker.name} completed task: "${t.title}"`);
+            })
             .catch(err => console.error("Error completing task:", err));
     }
 }
@@ -4483,6 +4770,9 @@ function toggleTaskDone(workerId, taskId) {
 
         // Targeted write to worker jobs path
         db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
+            .then(() => {
+                logActivity('task', worker.id, worker.name, `${worker.name} toggled task: "${t.title}" (Status: ${t.status})`);
+            })
             .catch(err => console.error("Error toggling task done:", err));
     }
 }
@@ -4492,10 +4782,16 @@ function deleteTask(workerId, taskId) {
     const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
     if (workerIndex === -1) return;
     const worker = getCompanyData().workers[workerIndex];
+    const oldTask = worker.jobs.find(j => j.id === taskId);
     worker.jobs = worker.jobs.filter(j => j.id !== taskId);
 
     // Targeted write to worker jobs path
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
+        .then(() => {
+            if (oldTask) {
+                logActivity('task_delete', worker.id, worker.name, `Deleted task for ${worker.name}: "${oldTask.title}"`);
+            }
+        })
         .catch(err => console.error("Error deleting task:", err));
 }
 
@@ -4733,6 +5029,7 @@ function acceptGeneralTask(taskId) {
 
             return db.ref().update(updates)
                 .then(() => {
+                    logActivity('task', myWorker.id, myWorker.name, `${myWorker.name} accepted general task: "${task.title}"`);
                     alert(`Success! You have accepted: "${task.title}"`);
                 });
         })
@@ -4744,11 +5041,19 @@ function acceptGeneralTask(taskId) {
 
 function deleteGeneralTask(taskId) {
     if (!confirm("Delete this general task?")) return;
-    db.ref(`companies/${currentCompany}/generalTasks/${taskId}`).remove()
-        .then(() => {
-            alert("General task deleted.");
-        })
-        .catch(err => console.error("Error deleting general task:", err));
+    db.ref(`companies/${currentCompany}/generalTasks/${taskId}`).once('value').then(snap => {
+        const task = snap.val();
+        db.ref(`companies/${currentCompany}/generalTasks/${taskId}`).remove()
+            .then(() => {
+                if (task) {
+                    logActivity('task_delete', 'general', 'General Pool', `Deleted general task: "${task.title}"`);
+                }
+                alert("General task deleted.");
+            })
+            .catch(err => console.error("Error deleting general task:", err));
+    }).catch(() => {
+        db.ref(`companies/${currentCompany}/generalTasks/${taskId}`).remove();
+    });
 }
 
 // --- DRIVERS SYSTEM ---
@@ -5617,6 +5922,9 @@ function addPaymentRecord() {
     document.getElementById('payment-amount').value = '';
 
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/paymentsList`).set(stats.paymentsList)
+        .then(() => {
+            logActivity('finance', worker.id, worker.name, `Logged advance payment of SAR ${amount} for ${worker.name}`);
+        })
         .catch(err => console.error("Error adding payment:", err));
 }
 
@@ -5629,6 +5937,9 @@ function deletePaymentRecord(workerId, paymentId) {
     stats.paymentsList = stats.paymentsList.filter(p => p.id !== paymentId);
 
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/paymentsList`).set(stats.paymentsList)
+        .then(() => {
+            logActivity('finance_delete', workerId, worker.name, `Deleted advance payment record for ${worker.name}`);
+        })
         .catch(err => console.error("Error deleting payment:", err));
 }
 
@@ -5646,6 +5957,9 @@ function addRewardRecord() {
     document.getElementById('reward-amount').value = '';
 
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/rewardsList`).set(stats.rewardsList)
+        .then(() => {
+            logActivity('finance', worker.id, worker.name, `Logged reward/bonus of SAR ${amount} for ${worker.name}`);
+        })
         .catch(err => console.error("Error adding reward:", err));
 }
 
@@ -5658,6 +5972,9 @@ function deleteRewardRecord(workerId, rewardId) {
     stats.rewardsList = stats.rewardsList.filter(r => r.id !== rewardId);
 
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/rewardsList`).set(stats.rewardsList)
+        .then(() => {
+            logActivity('finance_delete', workerId, worker.name, `Deleted reward/bonus record for ${worker.name}`);
+        })
         .catch(err => console.error("Error deleting reward:", err));
 }
 
@@ -5675,6 +5992,9 @@ function addCustodyRecord(type) {
     document.getElementById('custody-amount').value = '';
 
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/custodyList`).set(stats.custodyList)
+        .then(() => {
+            logActivity('finance', worker.id, worker.name, `Logged custody item "${type}" (SAR ${amount}) for ${worker.name}`);
+        })
         .catch(err => console.error("Error adding custody:", err));
 }
 
@@ -5687,6 +6007,9 @@ function deleteCustodyRecord(workerId, custodyId) {
     stats.custodyList = stats.custodyList.filter(c => c.id !== custodyId);
 
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/custodyList`).set(stats.custodyList)
+        .then(() => {
+            logActivity('finance_delete', workerId, worker.name, `Deleted custody record for ${worker.name}`);
+        })
         .catch(err => console.error("Error deleting custody:", err));
 }
 
@@ -5785,6 +6108,9 @@ function setInitialBalance() {
 
     // Targeted write to initialBalance
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/initialBalance`).set(amount)
+        .then(() => {
+            logActivity('finance', worker.id, worker.name, `Set initial carryover balance of SAR ${amount} for ${worker.name}`);
+        })
         .catch(err => console.error("Error setting initial balance:", err));
     alert("Initial Carryover Balance Updated.");
 }
@@ -6908,6 +7234,10 @@ function applyTranslations() {
         langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات إم في سي فريش' : 'MVC Fresh Operations Portal';
         langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة تحكم إم في سي فريش' : 'Login to MVC Fresh Dashboard';
         document.title = 'MVC Fresh Management Portal';
+    } else if (currentCompany === 'mvcfresh') {
+        langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات إم في سي فريش' : 'MVC Fresh Operations Portal';
+        langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة تحكم إم في سي فريش' : 'Login to MVC Fresh Dashboard';
+        document.title = 'MVC Fresh Management Portal';
     } else {
         langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات برجروف' : 'Burgeroov Operations Portal';
         langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة التحكم' : 'Login to Dashboard';
@@ -7173,6 +7503,7 @@ function submitPaymentRequest() {
         workerId: worker.id,
         workerName: worker.name,
         amount: amountVal,
+        requestedAmount: amountVal,
         reason: reasonVal,
         status: 'pending',
         timestamp: Date.now()
@@ -7212,6 +7543,7 @@ function acceptPaymentRequest(reqId) {
     db.ref(`companies/${currentCompany}/paymentRequests/${reqId}`).update({
         status: 'accepted',
         amount: approvedAmount,
+        requestedAmount: req.requestedAmount !== undefined ? req.requestedAmount : req.amount,
         code: code,
         handledAt: Date.now()
     }).then(() => {
@@ -7219,6 +7551,25 @@ function acceptPaymentRequest(reqId) {
             logActivity('finance', req.workerId, req.workerName, `Accepted payment request of SAR ${approvedAmount} for ${req.workerName}`);
         }
     }).catch(err => console.error("Error accepting request:", err));
+}
+
+function undoAcceptPaymentRequest(reqId) {
+    const pRequests = getCompanyData().paymentRequests || {};
+    const req = pRequests[reqId];
+    if (!req) return;
+
+    const originalAmount = req.requestedAmount !== undefined ? req.requestedAmount : req.amount;
+
+    db.ref(`companies/${currentCompany}/paymentRequests/${reqId}`).update({
+        status: 'pending',
+        amount: originalAmount,
+        code: null,
+        handledAt: null
+    }).then(() => {
+        if (typeof logActivity === 'function') {
+            logActivity('finance_delete', req.workerId, req.workerName, `Undid acceptance of payment request of SAR ${req.amount} for ${req.workerName}`);
+        }
+    }).catch(err => console.error("Error undoing accepted request:", err));
 }
 
 // 3. Reject Request (Finance / Admin Manager)
@@ -7292,6 +7643,7 @@ function confirmPaymentGiven(reqId) {
 // 5. Render Worker requests lists
 function renderPaymentRequests() {
     const isAr = currentAppLang === 'ar';
+    const isFinAdmin = currentUser && (currentUser.role === 'admin' || document.body.classList.contains('perm-finance'));
     const companyData = getCompanyData();
     const pRequests = companyData.paymentRequests || {};
     const reqList = Object.values(pRequests).sort((a, b) => b.timestamp - a.timestamp);
@@ -7336,26 +7688,24 @@ function renderPaymentRequests() {
         }
     }
 
-    // Render for Finance Dept Manager (Pending Requests List)
+    // Render for Finance Dept Manager (All Requests Log / Dashboard)
     const pendingListDiv = document.getElementById('pending-requests-list');
     if (pendingListDiv) {
         pendingListDiv.innerHTML = '';
-        const pendingReqs = reqList.filter(r => r.status === 'pending');
-        if (pendingReqs.length === 0) {
-            pendingListDiv.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted); text-align:center;">${isAr ? 'لا توجد طلبات معلقة حالياً.' : 'No pending requests at the moment.'}</p>`;
+        const managerReqs = reqList.filter(r => r.status === 'pending' || r.status === 'accepted' || r.status === 'given' || r.status === 'rejected');
+        if (managerReqs.length === 0) {
+            pendingListDiv.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted); text-align:center;">${isAr ? 'لا توجد طلبات حالياً.' : 'No requests at the moment.'}</p>`;
         } else {
-            pendingReqs.forEach(req => {
+            managerReqs.forEach(req => {
                 const dateStr = new Date(req.timestamp).toLocaleString();
-                pendingListDiv.innerHTML += `
-                    <div class="ledger-card" style="border-left: 4px solid var(--warning);">
-                        <div class="flex-between">
-                            <div>
-                                <strong style="font-size:1.05rem;">${req.workerName}</strong>
-                                <span style="font-size:0.75rem; color:var(--text-muted); margin-left: 8px;">🕒 ${dateStr}</span>
-                            </div>
-                            <strong class="text-primary" style="font-size:1.1rem;">SAR ${req.amount}</strong>
-                        </div>
-                        <div style="font-size: 0.85rem; margin-top: 8px; color:var(--text-main);">${isAr ? 'السبب:' : 'Reason:'} <em>${req.reason}</em></div>
+                let cardStyle = '';
+                let statusHeader = '';
+                let actionArea = '';
+
+                if (req.status === 'pending') {
+                    cardStyle = 'border-left: 4px solid var(--warning);';
+                    statusHeader = `<span class="badge" style="background:#d97706; font-size:0.75rem; font-weight:700; padding:4px 8px; border-radius:4px; color:white;">${isAr ? 'قيد الانتظار' : 'Pending'}</span>`;
+                    actionArea = `
                         <div style="display:flex; gap:8px; margin-top: 12px; justify-content: flex-end; align-items:center; flex-wrap:wrap;">
                             <label style="margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">${isAr ? 'تعديل المبلغ (ريال):' : 'Adjust Amount (SAR):'}</label>
                             <input type="number" id="adjust-amount-${req.id}" value="${req.amount}" min="1" 
@@ -7363,6 +7713,50 @@ function renderPaymentRequests() {
                             <button onclick="rejectPaymentRequest('${req.id}')" class="btn-outline-danger" style="padding: 6px 14px; font-size: 0.8rem; height: 34px;">${isAr ? 'رفض' : 'Reject'}</button>
                             <button onclick="acceptPaymentRequest('${req.id}')" class="btn-success" style="padding: 6px 14px; font-size: 0.8rem; height: 34px;">${isAr ? 'قبول واعتماد' : 'Accept & Approve'}</button>
                         </div>
+                    `;
+                } else if (req.status === 'accepted') {
+                    cardStyle = 'border-left: 4px solid var(--success);';
+                    statusHeader = `
+                        <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
+                            <span class="badge" style="background:#16a34a; font-size:0.75rem; font-weight:700; padding:4px 8px; border-radius:4px; color:white;">
+                                ${isAr ? 'مقبول (بانتظار التسليم)' : 'Approved (Pending Disbursal)'}
+                            </span>
+                            <div style="font-size:0.8rem; color:var(--text-muted); font-weight:600; margin-top:4px;">
+                                ${isAr ? 'الرمز السري:' : 'Code:'} <span style="background:var(--input-bg); padding:2px 6px; border-radius:4px; border:1px dashed var(--success); font-weight:800; color:var(--success);">${req.code}</span>
+                            </div>
+                        </div>
+                    `;
+                    actionArea = `
+                        <div style="display:flex; gap:8px; margin-top: 12px; justify-content: flex-end; align-items:center;">
+                            <button onclick="undoAcceptPaymentRequest('${req.id}')" class="btn-outline-danger" style="padding: 6px 14px; font-size: 0.8rem; height: 34px; font-weight:700;">
+                                ${isAr ? 'تراجع عن القبول' : 'Undo Accept'}
+                            </button>
+                        </div>
+                    `;
+                } else if (req.status === 'rejected') {
+                    cardStyle = 'border-left: 4px solid #ef4444; opacity: 0.85;';
+                    statusHeader = `<span class="badge" style="background:#dc2626; font-size:0.75rem; font-weight:700; padding:4px 8px; border-radius:4px; color:white;">${isAr ? 'مرفوض' : 'Rejected'}</span>`;
+                    actionArea = '';
+                } else if (req.status === 'given') {
+                    cardStyle = 'border-left: 4px solid var(--primary);';
+                    statusHeader = `<span class="badge" style="background:#2563eb; font-size:0.75rem; font-weight:700; padding:4px 8px; border-radius:4px; color:white;">${isAr ? 'تم الاستلام ✅' : 'Given / Disbursed ✅'}</span>`;
+                    actionArea = '';
+                }
+
+                pendingListDiv.innerHTML += `
+                    <div class="ledger-card" style="${cardStyle}">
+                        <div class="flex-between">
+                            <div>
+                                <strong style="font-size:1.05rem;">${req.workerName}</strong>
+                                <span style="font-size:0.75rem; color:var(--text-muted); margin-left: 8px;">🕒 ${dateStr}</span>
+                            </div>
+                            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+                                <strong class="text-primary" style="font-size:1.1rem;">SAR ${req.amount}</strong>
+                                ${statusHeader}
+                            </div>
+                        </div>
+                        <div style="font-size: 0.85rem; margin-top: 8px; color:var(--text-main);">${isAr ? 'السبب:' : 'Reason:'} <em>${req.reason}</em></div>
+                        ${actionArea}
                     </div>
                 `;
             });
@@ -7384,6 +7778,7 @@ function renderPaymentRequests() {
                             <div>
                                 <strong style="font-size:1.05rem; display:block;">${req.workerName}</strong>
                                 <span style="font-size:0.85rem; color:var(--text-muted);">${isAr ? 'السبب:' : 'Reason:'} <em>${req.reason}</em></span>
+                                <div style="margin-top: 4px; font-size:0.8rem; color:var(--text-muted);">${isAr ? 'الرمز:' : 'Code:'} <span style="font-weight:700; color:var(--success);">${req.code}</span></div>
                             </div>
                             <div style="text-align: right;">
                                 <strong class="text-success" style="font-size:1.15rem; display:block;">SAR ${req.amount}</strong>
@@ -7401,14 +7796,73 @@ function renderPaymentRequests() {
             });
         }
     }
+
+    renderDailyPayouts();
+}
+
+function renderDailyPayouts() {
+    const isAr = currentAppLang === 'ar';
+    const isFinAdmin = currentUser && (currentUser.role === 'admin' || document.body.classList.contains('perm-finance'));
+    const companyData = getCompanyData();
+    const workers = companyData.workers || [];
+    let allPayouts = [];
+
+    // Gather manual and request-based payouts from monthlyStats paymentsList of all workers
+    workers.forEach(w => {
+        const stats = getMonthlyStats(w, currentGlobalMonth);
+        const list = stats.paymentsList || [];
+        list.forEach(p => {
+            allPayouts.push({
+                id: p.id,
+                workerName: w.name,
+                workerId: w.id,
+                amount: p.amount,
+                reason: p.reason || (isAr ? 'دفعة مقدمة / سلفة' : 'Advance Payment / Payout'),
+                date: p.date, // formatTimestamp() format: YYYY-MM-DD HH:MM:SS
+                timestamp: parseInt(p.id) || Date.now()
+            });
+        });
+    });
+
+    // Sort descending by timestamp
+    allPayouts.sort((a, b) => b.timestamp - a.timestamp);
+
+    const logListDiv = document.getElementById('daily-payouts-log-list');
+    if (logListDiv) {
+        logListDiv.innerHTML = '';
+        if (allPayouts.length === 0) {
+            logListDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.85rem; padding:15px 0;">${isAr ? 'لا توجد سلف مصروفة هذا الشهر.' : 'No payouts logged this month.'}</p>`;
+        } else {
+            allPayouts.forEach(p => {
+                const delBtn = isFinAdmin ? `<button onclick="deletePaymentRecord('${p.workerId}', '${p.id}')" class="btn-outline-danger" style="padding: 2px 6px; font-size: 0.7rem; line-height: 1; border: none; border-radius: 4px; margin-left: 8px; cursor:pointer;" title="${isAr ? 'حذف السجل' : 'Delete Log'}">🗑️</button>` : '';
+
+                logListDiv.innerHTML += `
+                    <div class="ledger-card" style="border-left: 4px solid var(--info); padding: 10px 14px; margin-bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                        <div>
+                            <strong style="font-size: 0.95rem; color: var(--text-main); display: block;">${p.workerName}</strong>
+                            <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 2px;">📝 ${p.reason}</span>
+                            <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 2px;">🕒 ${p.date}</span>
+                        </div>
+                        <div style="text-align: right; display: flex; align-items: center; gap: 6px;">
+                            <strong style="color: var(--info); font-size: 1.05rem;">SAR ${p.amount}</strong>
+                            ${delBtn}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+    }
 }
 
 // Bind to window
 window.submitPaymentRequest = submitPaymentRequest;
 window.acceptPaymentRequest = acceptPaymentRequest;
 window.rejectPaymentRequest = rejectPaymentRequest;
+window.undoAcceptPaymentRequest = undoAcceptPaymentRequest;
 window.confirmPaymentGiven = confirmPaymentGiven;
+window.deletePaymentRecord = deletePaymentRecord;
 window.renderPaymentRequests = renderPaymentRequests;
+window.renderDailyPayouts = renderDailyPayouts;
 
 // --- ATTENDANCE SYSTEM ---
 
@@ -7548,23 +8002,36 @@ function markWorkerAttendance(workerId, status) {
             time: checkTime,
             lateness: lateness || '',
             timestamp: Date.now()
-        }).catch(err => console.error("Error setting attendance present:", err));
+        })
+            .then(() => {
+                logActivity('attendance', workerId, worker.name, `Marked attendance as PRESENT for ${worker.name} on ${dateStr} (Check-in: ${checkTime}, Lateness: ${lateness || 'None'})`);
+            })
+            .catch(err => console.error("Error setting attendance present:", err));
     } else if (status === 'absent') {
         db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}`).set({
             status: 'absent',
             time: '',
             lateness: '',
             timestamp: Date.now()
-        }).catch(err => console.error("Error setting attendance absent:", err));
+        })
+            .then(() => {
+                logActivity('attendance', workerId, worker.name, `Marked attendance as ABSENT for ${worker.name} on ${dateStr}`);
+            })
+            .catch(err => console.error("Error setting attendance absent:", err));
     }
 }
 
 function clearWorkerAttendance(workerId) {
     let dateStr = document.getElementById('attendance-date-picker')?.value;
     if (!dateStr) return;
+    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    const wName = worker ? worker.name : 'Unknown';
 
     if (confirm(currentAppLang === 'ar' ? 'هل تريد مسح سجل الحضور لهذا اليوم؟' : 'Do you want to clear the attendance record for this day?')) {
         db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}`).remove()
+            .then(() => {
+                logActivity('attendance_clear', workerId, wName, `Cleared attendance record for ${wName} on ${dateStr}`);
+            })
             .catch(err => console.error("Error clearing attendance:", err));
     }
 }
@@ -7636,8 +8103,8 @@ function renderAttendance() {
                 <strong style="color:var(--text-main); display:block;">${w.name}</strong>
                 <span style="font-size:0.75rem; color:var(--text-muted);">${w.role || ''}</span>
             </td>
-            <td style="font-weight: 500;">${scheduled}</td>
             <td>${statusHtml}</td>
+            <td style="font-weight: 500;">${scheduled}</td>
             <td style="font-family: monospace; font-weight: 600;">${checkinTimeHtml}</td>
             <td>${latenessHtml}</td>
             <td class="attendance-admin-only">
@@ -7695,6 +8162,139 @@ function translateActivityLogDetails(details) {
     const lang = (typeof currentAppLang !== 'undefined' ? currentAppLang : localStorage.getItem("burgeroov_lang")) || 'en';
     if (lang !== 'ar') return details;
 
+    // Warehouse Operations
+    if (details.startsWith('Added new warehouse item "')) {
+        const rest = details.replace('Added new warehouse item "', '');
+        const name = rest.split('" with initial stock ')[0];
+        const stock = rest.split('" with initial stock ')[1];
+        return `تم إضافة صنف مستودع جديد "${name}" بمخزون أولي ${stock}`;
+    }
+    if (details.startsWith('Updated stock of "')) {
+        const rest = details.replace('Updated stock of "', '');
+        const name = rest.split('" to ')[0];
+        const rest2 = rest.split('" to ')[1];
+        const newStock = rest2.split(' (Difference: ')[0];
+        const diff = rest2.split(' (Difference: ')[1].slice(0, -1);
+        return `تم تحديث مخزون "${name}" إلى ${newStock} (الفرق: ${diff})`;
+    }
+    if (details.startsWith('Changed Max/Full Stock of "')) {
+        const rest = details.replace('Changed Max/Full Stock of "', '');
+        const name = rest.split('" to ')[0];
+        const parsed = rest.split('" to ')[1];
+        return `تم تغيير الحد الأقصى لمخزون "${name}" إلى ${parsed}`;
+    }
+    if (details.startsWith('Deleted warehouse item "')) {
+        const name = details.replace('Deleted warehouse item "', '').slice(0, -1);
+        return `تم حذف صنف المستودع "${name}"`;
+    }
+    if (details.startsWith('Moved item "')) {
+        const rest = details.replace('Moved item "', '');
+        const name = rest.split('" from category "')[0];
+        const rest2 = rest.split('" from category "')[1];
+        const oldCat = rest2.split('" to "')[0];
+        const folderName = rest2.split('" to "')[1].slice(0, -1);
+        return `تم نقل الصنف "${name}" من الفئة "${oldCat}" إلى "${folderName}"`;
+    }
+
+    // Financial Operations
+    if (details.startsWith('Logged advance payment of SAR')) {
+        const rest = details.replace('Logged advance payment of SAR ', '');
+        const amount = rest.split(' for ')[0];
+        const wName = rest.split(' for ')[1];
+        return `تم تسجيل دفعة مقدمة (سلفة) بقيمة ${amount} ريال للموظف ${wName}`;
+    }
+    if (details.startsWith('Deleted advance payment record for')) {
+        const wName = details.replace('Deleted advance payment record for ', '');
+        return `تم حذف سجل الدفعة المقدمة (السلفة) للموظف ${wName}`;
+    }
+    if (details.startsWith('Logged reward/bonus of SAR')) {
+        const rest = details.replace('Logged reward/bonus of SAR ', '');
+        const amount = rest.split(' for ')[0];
+        const wName = rest.split(' for ')[1];
+        return `تم تسجيل مكافأة بقيمة ${amount} ريال للموظف ${wName}`;
+    }
+    if (details.startsWith('Deleted reward/bonus record for')) {
+        const wName = details.replace('Deleted reward/bonus record for ', '');
+        return `تم حذف سجل المكافأة للموظف ${wName}`;
+    }
+    if (details.startsWith('Logged custody item "')) {
+        const rest = details.replace('Logged custody item "', '');
+        const type = rest.split('" (SAR ')[0];
+        const rest2 = rest.split('" (SAR ')[1];
+        const amount = rest2.split(') for ')[0];
+        const wName = rest2.split(') for ')[1];
+        return `تم تسجيل عهدة "${type}" (بقيمة ${amount} ريال) للموظف ${wName}`;
+    }
+    if (details.startsWith('Deleted custody record for')) {
+        const wName = details.replace('Deleted custody record for ', '');
+        return `تم حذف سجل العهدة للموظف ${wName}`;
+    }
+    if (details.startsWith('Set initial carryover balance of SAR')) {
+        const rest = details.replace('Set initial carryover balance of SAR ', '');
+        const amount = rest.split(' for ')[0];
+        const wName = rest.split(' for ')[1];
+        return `تم تعيين الرصيد الافتتاحي المرحل بقيمة ${amount} ريال للموظف ${wName}`;
+    }
+
+    // Sales and Costs Entries/Undos
+    if (details.startsWith('Entered sale transaction of SAR')) {
+        const rest = details.replace('Entered sale transaction of SAR ', '');
+        const amount = rest.split(' via ')[0];
+        const method = rest.split(' via ')[1];
+        return `تم تسجيل عملية مبيعات بقيمة ${amount} ريال عبر ${method}`;
+    }
+    if (details.startsWith('Deleted/Undid sale transaction of SAR')) {
+        const rest = details.replace('Deleted/Undid sale transaction of SAR ', '');
+        const amount = rest.split(' via ')[0];
+        const method = rest.split(' via ')[1];
+        return `تم التراجع عن/حذف عملية مبيعات بقيمة ${amount} ريال عبر ${method}`;
+    }
+    if (details.startsWith('Entered cost transaction of SAR')) {
+        const rest = details.replace('Entered cost transaction of SAR ', '');
+        const amount = rest.split(' for category "')[0];
+        const cat = rest.split(' for category "')[1].slice(0, -1);
+        return `تم تسجيل مصاريف بقيمة ${amount} ريال للفئة "${cat}"`;
+    }
+    if (details.startsWith('Deleted/Undid cost transaction of SAR')) {
+        const rest = details.replace('Deleted/Undid cost transaction of SAR ', '');
+        const amount = rest.split(' for category "')[0];
+        const cat = rest.split(' for category "')[1].slice(0, -1);
+        return `تم التراجع عن/حذف مصاريف بقيمة ${amount} ريال للفئة "${cat}"`;
+    }
+    if (details.startsWith('Entered past cost transaction of SAR')) {
+        const rest = details.replace('Entered past cost transaction of SAR ', '');
+        const amount = rest.split(' for category "')[0];
+        const rest2 = rest.split(' for category "')[1];
+        const cat = rest2.split('" on date ')[0];
+        const dateStr = rest2.split('" on date ')[1];
+        return `تم تسجيل مصاريف سابقة بقيمة ${amount} ريال للفئة "${cat}" بتاريخ ${dateStr}`;
+    }
+
+    // Attendance
+    if (details.startsWith('Marked attendance as PRESENT for')) {
+        const rest = details.replace('Marked attendance as PRESENT for ', '');
+        const wName = rest.split(' on ')[0];
+        const rest2 = rest.split(' on ')[1];
+        const dateStr = rest2.split(' (Check-in: ')[0];
+        const checkinParts = rest2.split(' (Check-in: ')[1].slice(0, -1);
+        const checkTime = checkinParts.split(', Lateness: ')[0];
+        const lateness = checkinParts.split(', Lateness: ')[1];
+        const latenessTranslated = lateness === 'None' ? 'لا يوجد' : lateness;
+        return `تم تسجيل حضور الموظف ${wName} بتاريخ ${dateStr} (وقت الدخول: ${checkTime}، التأخير: ${latenessTranslated})`;
+    }
+    if (details.startsWith('Marked attendance as ABSENT for')) {
+        const rest = details.replace('Marked attendance as ABSENT for ', '');
+        const wName = rest.split(' on ')[0];
+        const dateStr = rest.split(' on ')[1];
+        return `تم تسجيل غياب الموظف ${wName} بتاريخ ${dateStr}`;
+    }
+    if (details.startsWith('Cleared attendance record for')) {
+        const rest = details.replace('Cleared attendance record for ', '');
+        const wName = rest.split(' on ')[0];
+        const dateStr = rest.split(' on ')[1];
+        return `تم مسح سجل حضور الموظف ${wName} بتاريخ ${dateStr}`;
+    }
+
     // 1. Posted a performance note: "${text}" (${detailsStr})
     if (details.startsWith('Posted a performance note:')) {
         const quoteStart = details.indexOf('"');
@@ -7733,29 +8333,33 @@ function translateActivityLogDetails(details) {
         return `قام الموظف ${workerName} بتسليم: "${orderDetails}"`;
     }
 
-    // 6. Accepted payment request of SAR ${approvedAmount} for ${req.workerName}
+    // Payment Requests Lifecycle
     if (details.startsWith('Accepted payment request of SAR')) {
         const rest = details.replace('Accepted payment request of SAR ', '');
         const amount = rest.split(' for ')[0];
         const workerName = rest.split(' for ')[1];
         return `تم قبول طلب سلفة بقيمة SAR ${amount} للموظف ${workerName}`;
     }
-
-    // 7. Rejected payment request of SAR ${req.amount} for ${req.workerName}
+    if (details.startsWith('Undid acceptance of payment request of SAR')) {
+        const rest = details.replace('Undid acceptance of payment request of SAR ', '');
+        const amount = rest.split(' for ')[0];
+        const workerName = rest.split(' for ')[1];
+        return `تم التراجع عن قبول طلب سلفة بقيمة SAR ${amount} للموظف ${workerName}`;
+    }
     if (details.startsWith('Rejected payment request of SAR')) {
         const rest = details.replace('Rejected payment request of SAR ', '');
         const amount = rest.split(' for ')[0];
         const workerName = rest.split(' for ')[1];
         return `تم رفض طلب سلفة بقيمة SAR ${amount} للموظف ${workerName}`;
     }
-
-    // 8. Released payment request of SAR ${req.amount} to ${req.workerName}
     if (details.startsWith('Released payment request of SAR')) {
         const rest = details.replace('Released payment request of SAR ', '');
         const amount = rest.split(' to ')[0];
         const workerName = rest.split(' to ')[1];
-        return `تم صرف سلفة بقيمة SAR ${amount} للموظف ${workerName}`;
+        return `تم تسليم سلفة بقيمة SAR ${amount} للموظف ${workerName}`;
     }
+
+
 
     // 9. Added system violation to ${worker.name}: "${reason}" (Violation Count: ${count}/6)
     if (details.startsWith('Added system violation to')) {
@@ -7805,7 +8409,36 @@ function renderActivityLog() {
 
     let filtered = logsList;
     if (filterVal !== 'all') {
-        filtered = filtered.filter(log => log.type === filterVal);
+        filtered = filtered.filter(log => {
+            if (filterVal === 'sales') {
+                return log.type === 'sales' || log.type === 'sales_delete';
+            }
+            if (filterVal === 'costs') {
+                return log.type === 'costs' || log.type === 'costs_delete';
+            }
+            if (filterVal === 'finance') {
+                return log.type === 'finance' || log.type === 'finance_delete';
+            }
+            if (filterVal === 'task') {
+                return log.type === 'task' || log.type === 'task_delete';
+            }
+            if (filterVal === 'violation') {
+                return log.type === 'violation';
+            }
+            if (filterVal === 'perf_note') {
+                return log.type === 'perf_note';
+            }
+            if (filterVal === 'attendance') {
+                return log.type === 'attendance' || log.type === 'attendance_clear';
+            }
+            if (filterVal === 'delivery') {
+                return log.type === 'delivery';
+            }
+            if (filterVal === 'warehouse') {
+                return log.type === 'warehouse' || log.type === 'warehouse_delete';
+            }
+            return log.type === filterVal;
+        });
     }
     if (startOfDayMs) {
         filtered = filtered.filter(log => log.timestamp >= startOfDayMs);
@@ -7825,12 +8458,22 @@ function renderActivityLog() {
         let typeBadge = '';
         if (log.type === 'delivery') {
             typeBadge = `<span class="badge" style="background:#3b82f6; color:white; font-weight:700;">🚚 ${isAr ? 'توصيل' : 'Delivery'}</span>`;
-        } else if (log.type === 'finance') {
+        } else if (log.type === 'finance' || log.type === 'finance_delete') {
             typeBadge = `<span class="badge" style="background:#10b981; color:white; font-weight:700;">💰 ${isAr ? 'مالية' : 'Finance'}</span>`;
         } else if (log.type === 'violation') {
             typeBadge = `<span class="badge" style="background:#ef4444; color:white; font-weight:700;">⚠️ ${isAr ? 'مخالفة' : 'Violation'}</span>`;
         } else if (log.type === 'perf_note') {
             typeBadge = `<span class="badge" style="background:#f59e0b; color:white; font-weight:700;">📝 ${isAr ? 'ملاحظة تقييم' : 'Performance Note'}</span>`;
+        } else if (log.type === 'sales' || log.type === 'sales_delete') {
+            typeBadge = `<span class="badge" style="background:#ec4899; color:white; font-weight:700;">📈 ${isAr ? 'مبيعات' : 'Sales'}</span>`;
+        } else if (log.type === 'costs' || log.type === 'costs_delete') {
+            typeBadge = `<span class="badge" style="background:#f43f5e; color:white; font-weight:700;">📉 ${isAr ? 'مصاريف' : 'Costs'}</span>`;
+        } else if (log.type === 'task' || log.type === 'task_delete') {
+            typeBadge = `<span class="badge" style="background:#8b5cf6; color:white; font-weight:700;">📋 ${isAr ? 'مهام' : 'Tasks'}</span>`;
+        } else if (log.type === 'attendance' || log.type === 'attendance_clear') {
+            typeBadge = `<span class="badge" style="background:#06b6d4; color:white; font-weight:700;">📅 ${isAr ? 'حضور وغياب' : 'Attendance'}</span>`;
+        } else if (log.type === 'warehouse' || log.type === 'warehouse_delete') {
+            typeBadge = `<span class="badge" style="background:#0f766e; color:white; font-weight:700;">📦 ${isAr ? 'مستودع' : 'Warehouse'}</span>`;
         }
 
         const card = document.createElement('div');

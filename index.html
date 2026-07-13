@@ -91,7 +91,7 @@
         style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #2d1b11; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;">
         <div
             style="background: #ffffff; padding: 14px 20px; border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(0,0,0,0.25);">
-            <img id="launch-loader-logo" src="burgeroov.png" alt="Burgeroov Logo"
+            <img id="launch-loader-logo" src="mvc.png" alt="MVC Fresh Logo"
                 style="max-width: 130px; height: auto; display: block; animation: notePulse 2.0s infinite ease-in-out;"
                 onerror="this.parentNode.style.display = 'none'">
         </div>
@@ -103,7 +103,7 @@
     <!-- Authentication Overlay -->
     <div id="auth-overlay" style="display: none;">
         <div class="auth-card">
-            <img id="auth-logo" src="burgeroov.png" alt="Logo" onerror="this.style.display = 'none'" />
+            <img id="auth-logo" src="mvc.png" alt="Logo" onerror="this.style.display = 'none'" />
             <h2 id="auth-title" data-i18n="auth-title-login">Login to Dashboard</h2>
 
             <div class="form-group">
@@ -168,6 +168,18 @@
                     <h3 style="color: #ffffff; font-size: 1.3rem; font-weight: 800; margin: 0;">MVC FRESH</h3>
                     <span
                         style="display: inline-block; margin-top: 14px; background: rgba(34, 197, 94, 0.15); color: #22c55e; font-size: 0.8rem; font-weight: 700; padding: 6px 16px; border-radius: 100px;">Enter
+                        Portal</span>
+                </div>
+
+                <!-- MVC FRESH NEW Card -->
+                <div onclick="selectCompany('mvcfresh')" class="company-card mvcfresh-card">
+                    <div class="company-logo-wrap">
+                        <img src="mvcfresh.png" alt="MVC Fresh Logo"
+                            style="max-width: 90px; max-height: 90px; object-fit: contain;">
+                    </div>
+                    <h3 style="color: #ffffff; font-size: 1.3rem; font-weight: 800; margin: 0;">MVC Fresh</h3>
+                    <span
+                        style="display: inline-block; margin-top: 14px; background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 0.8rem; font-weight: 700; padding: 6px 16px; border-radius: 100px;">Enter
                         Portal</span>
                 </div>
 
@@ -613,8 +625,8 @@
                         <thead>
                             <tr>
                                 <th data-i18n="th-employee-role">Employee & Role</th>
-                                <th data-i18n="th-shift-schedule">Shift Schedule</th>
                                 <th data-i18n="th-status">Status</th>
+                                <th data-i18n="th-shift-schedule">Shift Schedule</th>
                                 <th data-i18n="th-checkin-time">Check-In Time</th>
                                 <th data-i18n="th-lateness">Lateness</th>
                                 <th class="attendance-admin-only" data-i18n="th-actions">Actions</th>
@@ -1026,7 +1038,8 @@
                             <h3 style="margin: 0 0 10px 0; color: var(--info);" data-i18n="box-advances">Paid This Month
                                 (Advances)</h3>
                             <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;"
-                                data-i18n="d                            <form onsubmit="event.preventDefault(); addPaymentRecord();" class="form-group flex-between" style="margin-bottom: 0; display: flex; border: none; background: transparent; box-shadow: none;">
+                                data-i18n="desc-advances">Log cash or transfers handed to the worker this month (deducts from current Net Payable).</p>
+                            <form onsubmit="event.preventDefault(); addPaymentRecord();" class="form-group flex-between" style="margin-bottom: 0; display: flex; border: none; background: transparent; box-shadow: none;">
                                 <input type="number" id="payment-amount" data-i18n="placeholder-amount"
                                     placeholder="Amount (SAR)" min="1" style="flex-grow: 1;">
                                 <button type="submit" class="btn-info" data-i18n="btn-log-payment">Log
@@ -1167,12 +1180,26 @@
             <!-- Main Content: Financial Table & Export -->
             <div>
                 <!-- Pending Payment Requests Card -->
-                <div class="card" style="border-top: 4px solid var(--warning); margin-bottom: 24px;">
+                <div class="card finance-admin" style="border-top: 4px solid var(--warning); margin-bottom: 24px;">
                     <h2 class="card-title" data-i18n="title-pending-requests">Pending Payment Requests</h2>
                     <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;" data-i18n="desc-pending-requests">
                         Review worker requests for advance payments. Accepting generates a unique 6-digit code for the worker to provide at the sales checkout.
                     </p>
                     <div id="pending-requests-list" style="display:flex; flex-direction:column; gap:12px;">
+                        <!-- Rendered dynamically -->
+                    </div>
+                </div>
+
+                <!-- Daily Advances & Payouts Log Card -->
+                <div class="card finance-admin" style="border-top: 4px solid var(--info); margin-bottom: 24px;">
+                    <div class="flex-between" style="margin-bottom: 12px; align-items: center; flex-wrap: wrap; gap: 8px;">
+                        <h2 class="card-title" style="margin:0; border:none; padding:0;" data-i18n="title-daily-payouts">Daily Advances & Payouts Log</h2>
+                        <span style="font-size:0.8rem; color:var(--text-muted); font-weight:700;" data-i18n="label-payouts-log-subtitle">Advances Disbursed</span>
+                    </div>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;" data-i18n="desc-daily-payouts">
+                        Track all advance payments received by workers (both manual advances and approved request disbursals).
+                    </p>
+                    <div id="daily-payouts-log-list" style="display:flex; flex-direction:column; gap:10px; max-height: 350px; overflow-y: auto;">
                         <!-- Rendered dynamically -->
                     </div>
                 </div>
@@ -1426,10 +1453,15 @@
                         <select id="activity-filter" onchange="renderActivityLog()" 
                             style="padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border-color); font-size: 0.9rem; background: var(--input-bg); color: var(--text-main); min-width: 155px; height: 36px;">
                             <option value="all" data-i18n="opt-all-activities">All Activities</option>
+                            <option value="sales" data-i18n="opt-sales-filter">Sales</option>
+                            <option value="costs" data-i18n="opt-costs-filter">Costs</option>
+                            <option value="finance" data-i18n="opt-finance-filter">Financials (Custody, Rewards, Payouts)</option>
+                            <option value="task" data-i18n="opt-tasks-filter">Tasks</option>
                             <option value="delivery" data-i18n="opt-deliveries">Deliveries</option>
-                            <option value="finance" data-i18n="opt-finance-payouts">Financial Payouts</option>
                             <option value="violation" data-i18n="opt-violations">Violations</option>
-                            <option value="perf_notes" data-i18n="opt-perf-notes">Performance Notes</option>
+                            <option value="perf_note" data-i18n="opt-perf-notes-filter">Performance Notes</option>
+                            <option value="attendance" data-i18n="opt-attendance-filter">Attendance</option>
+                            <option value="warehouse" data-i18n="opt-warehouse-filter">Warehouse / Storage</option>
                         </select>
                         <div style="display: flex; gap: 6px; align-items: center; margin: 0 4px;">
                             <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;" data-i18n="label-date-from">From:</span>

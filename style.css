@@ -121,6 +121,43 @@ body.theme-mvc.dark-mode {
     --warning-border: #78350f;
 }
 
+/* MVC FRESH NEW THEME Overrides */
+body.theme-mvcfresh {
+    --primary: #10b981;
+    --primary-hover: #059669;
+    --secondary: #f59e0b;
+    --secondary-hover: #d97706;
+
+    --bg-color: #f0fdf4;
+    --card-bg: #ffffff;
+    --input-bg: #f6fdf9;
+
+    --text-main: #064e3b;
+    --text-muted: #374151;
+    --text-light: #ffffff;
+    --border-color: #a7f3d0;
+
+    --success: #10b981;
+    --success-bg: #ecfdf5;
+    --success-border: #6ee7b7;
+}
+
+body.theme-mvcfresh.dark-mode {
+    --primary: #34d399;
+    --primary-hover: #059669;
+    --secondary: #fbbf24;
+    --secondary-hover: #f59e0b;
+
+    --bg-color: #061f14;
+    --card-bg: #0c2b1d;
+    --input-bg: #03140c;
+
+    --text-main: #ecfdf5;
+    --text-muted: #a7f3d0;
+    --text-light: #ffffff;
+    --border-color: #104c32;
+}
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -1806,6 +1843,9 @@ body:not(.role-admin) .task-grid {
     body.theme-mvc:not(.dark-mode) #mob-active-label {
         color: #c2410c;
     }
+    body.theme-mvcfresh:not(.dark-mode) #mob-active-label {
+        color: #047857;
+    }
 
     body.dark-mode #mob-active-label {
         color: var(--primary);
@@ -2091,6 +2131,8 @@ body:not(.role-admin) .task-grid {
         margin-bottom: 12px;
         width: 100%;
         box-sizing: border-box;
+        min-width: 0;
+        overflow: hidden;
     }
 
     /* --- Inputs / Selects / Textareas --- */
