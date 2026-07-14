@@ -460,7 +460,7 @@
                     <form onsubmit="event.preventDefault(); addViolationRule();" class="form-group flex-between" style="margin: 0; padding: 0; display: flex; border: none; background: transparent; box-shadow: none;">
                         <input type="text" id="new-vrule-name" placeholder="e.g. Late 15 mins" data-i18n="[placeholder]placeholder-vrule-example"
                             style="flex-grow: 1; margin-right: 8px;">
-                        <input type="number" id="new-vrule-amount" placeholder="SAR" data-i18n="[placeholder]placeholder-currency-sar"
+                        <input type="number" step="any" id="new-vrule-amount" placeholder="SAR" data-i18n="[placeholder]placeholder-currency-sar"
                             style="width: 90px; margin-right: 8px;">
                         <button type="submit" data-i18n="btn-add">Add</button>
                     </form>
@@ -482,17 +482,40 @@
                             <div class="form-group"><label data-i18n="label-end-time">End Time</label><input type="time" id="w-end-time"></div>
                         </div>
                         <div class="grid-2-col">
-                            <div class="form-group"><label data-i18n="label-base-salary-sar">Base Salary (SAR)</label><input type="number" id="w-income"
+                            <div class="form-group"><label data-i18n="label-base-salary-sar">Base Salary (SAR)</label><input type="number" step="any" id="w-income"
                                     placeholder="0.00" data-i18n="[placeholder]placeholder-zero-double"></div>
                             <div class="form-group"><label data-i18n="label-branch">Branch</label><select id="w-branch"></select></div>
                         </div>
                         <button type="submit" style="width: 100%; padding: 12px; margin-top: 8px;" data-i18n="btn-create-record">Create Record</button>
                     </form>
                 </div>
+
+                <!-- High Money Request Threshold Card -->
+                <div class="card">
+                    <h2 class="card-title" data-i18n="title-high-money-request">💰 High Money Request Threshold</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;" data-i18n="desc-high-money-threshold">
+                        Define the threshold amount. Any worker request equal to or exceeding this amount will require final manager approval in the Operations page before generating a disbursal code.
+                    </p>
+                    <form onsubmit="event.preventDefault(); saveHighMoneyThreshold();" style="display:flex; gap:8px; margin-bottom:0; align-items:stretch; border:none; background:transparent; box-shadow:none; padding:0;">
+                        <input type="number" step="any" id="high-money-threshold-input" placeholder="Amount (SAR)" min="0" style="flex:1; padding:10px;">
+                        <button type="submit" class="btn-success" data-i18n="btn-save">Save</button>
+                    </form>
+                </div>
             </div>
 
             <!-- Main Content: Daily Ops -->
             <div>
+                <!-- High Money Requests Approval Card -->
+                <div class="card admin-only" id="high-money-approvals-card" style="border-top: 4px solid var(--secondary); margin-bottom: 24px;">
+                    <h2 class="card-title" data-i18n="title-high-money-approvals">💰 High Money Requests Approval</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;" data-i18n="desc-high-money-approvals">
+                        Review high-value payment requests that have been accepted by the financial department and require final manager/admin approval.
+                    </p>
+                    <div id="high-money-approvals-list" style="display:flex; flex-direction:column; gap:12px;">
+                        <!-- Rendered dynamically -->
+                    </div>
+                </div>
+
                 <!-- Daily Notes & Management Card -->
                 <div class="card admin-only">
                     <h2 class="card-title" data-i18n="title-ops-tracking">Daily Operations Tracking</h2>
@@ -570,7 +593,7 @@
                     <div class="grid-2-col" style="margin-bottom: 16px;">
                         <div class="form-group" style="margin-bottom: 0;">
                             <label data-i18n="label-request-amount">Requested Amount (SAR)</label>
-                            <input type="number" id="payment-req-amount" placeholder="e.g. 500" min="1" data-i18n="[placeholder]placeholder-payment-req-amount">
+                            <input type="number" step="any" id="payment-req-amount" placeholder="e.g. 500" min="0.01" data-i18n="[placeholder]placeholder-payment-req-amount">
                         </div>
                         <div class="form-group" style="margin-bottom: 0;">
                             <label data-i18n="label-request-reason">Reason</label>
@@ -615,7 +638,7 @@
                     </div>
                     <div style="flex: 1; min-width: 200px; margin-bottom: 0;">
                         <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); margin-bottom: 6px; display: block;" data-i18n="label-late-penalty">Late Penalty Amount (SAR)</label>
-                        <input type="number" id="late-penalty-input" placeholder="e.g. 10" min="0" step="0.01" style="width: 100%; height: 38px;" required>
+                        <input type="number" id="late-penalty-input" placeholder="e.g. 10" min="0" step="any" style="width: 100%; height: 38px;" required>
                     </div>
                     <button type="submit" class="btn-success" style="height: 38px; padding: 0 20px;" data-i18n="btn-save-settings">Save Settings</button>
                 </form>
@@ -776,12 +799,12 @@
                         <div class="grid-2-col">
                             <div class="form-group">
                                 <label data-i18n="label-max-stock">Max / Full Stock</label>
-                                <input type="number" id="wh-stock" data-i18n="placeholder-stock-amt" placeholder="e.g. 40"
+                                <input type="number" step="any" id="wh-stock" data-i18n="placeholder-stock-amt" placeholder="e.g. 40"
                                     min="0">
                             </div>
                             <div class="form-group">
                                 <label data-i18n="label-risk-alert">Risk Alert (Min)</label>
-                                <input type="number" id="wh-risk" data-i18n="placeholder-risk-amt" placeholder="e.g. 5"
+                                <input type="number" step="any" id="wh-risk" data-i18n="placeholder-risk-amt" placeholder="e.g. 5"
                                     min="0">
                             </div>
                         </div>
@@ -866,7 +889,7 @@
                         </div>
                         <div style="flex:1; margin-bottom:0;">
                             <label style="font-size:0.75rem; display:block; margin-bottom:4px;" data-i18n="label-reward-sar">Reward (SAR)</label>
-                            <input type="number" id="reward-sar-input" placeholder="e.g. 15" min="0.01" step="0.01" required style="width:100%; height:36px; padding:6px;">
+                            <input type="number" id="reward-sar-input" placeholder="e.g. 15" min="0.01" step="any" required style="width:100%; height:36px; padding:6px;">
                         </div>
                         <button type="submit" class="btn-success" style="height:36px; padding:0 12px; white-space:nowrap;" data-i18n="btn-add-reward-rule">Add</button>
                     </form>
@@ -1040,8 +1063,8 @@
                             <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;"
                                 data-i18n="desc-advances">Log cash or transfers handed to the worker this month (deducts from current Net Payable).</p>
                             <form onsubmit="event.preventDefault(); addPaymentRecord();" class="form-group flex-between" style="margin-bottom: 0; display: flex; border: none; background: transparent; box-shadow: none;">
-                                <input type="number" id="payment-amount" data-i18n="placeholder-amount"
-                                    placeholder="Amount (SAR)" min="1" style="flex-grow: 1;">
+                                <input type="number" step="any" id="payment-amount" data-i18n="placeholder-amount"
+                                    placeholder="Amount (SAR)" min="0.01" style="flex-grow: 1;">
                                 <button type="submit" class="btn-info" data-i18n="btn-log-payment">Log
                                     Payment</button>
                             </form>
@@ -1057,8 +1080,8 @@
                             <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;"
                                 data-i18n="desc-rewards">Increases their net payable for this month.</p>
                             <form onsubmit="event.preventDefault(); addRewardRecord();" class="form-group flex-between" style="margin-bottom: 0; display: flex; border: none; background: transparent; box-shadow: none;">
-                                <input type="number" id="reward-amount" data-i18n="placeholder-amount"
-                                    placeholder="Amount (SAR)" min="1" style="flex-grow: 1;">
+                                <input type="number" step="any" id="reward-amount" data-i18n="placeholder-amount"
+                                    placeholder="Amount (SAR)" min="0.01" style="flex-grow: 1;">
                                 <button type="submit" class="btn-success" data-i18n="btn-add-reward">Add
                                     Reward</button>
                             </form>
@@ -1081,8 +1104,8 @@
                                     <select id="v-rule-select" onchange="autoFillViolation()">
                                         <option value="" data-i18n="opt-select-rule">-- Select Rule --</option>
                                     </select>
-                                    <input type="number" id="v-amount" data-i18n="placeholder-amount"
-                                        placeholder="Amount (SAR)" min="1">
+                                    <input type="number" step="any" id="v-amount" data-i18n="placeholder-amount"
+                                        placeholder="Amount (SAR)" min="0.01">
                                 </div>
                                 <div class="form-group" style="margin-bottom: 10px;">
                                     <input type="text" id="v-reason" data-i18n="placeholder-reason"
@@ -1124,8 +1147,8 @@
                             <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;"
                                 data-i18n="desc-custody">Log equipment or cash advances given and returned.</p>
                             <form onsubmit="event.preventDefault(); addCustodyRecord('given');" class="form-group" style="margin-bottom: 0; border: none; background: transparent; box-shadow: none;">
-                                <input type="number" id="custody-amount" data-i18n="placeholder-amount"
-                                    placeholder="Amount (SAR)" min="1" style="width: 100%; margin-bottom: 8px;">
+                                <input type="number" step="any" id="custody-amount" data-i18n="placeholder-amount"
+                                    placeholder="Amount (SAR)" min="0.01" style="width: 100%; margin-bottom: 8px;">
                                 <div class="flex-between">
                                     <button type="submit" class="btn-warning" style="flex:1;"
                                         data-i18n="btn-give-custody">Give Custody</button>
@@ -1146,8 +1169,8 @@
                                 data-i18n="desc-costs">Expenses paid by company (visas, uniforms). Does NOT affect Net
                                 Payable.</p>
                             <form onsubmit="event.preventDefault(); updateFinancialRecord('costs', 'add');" class="form-group" style="margin-bottom: 0; border: none; background: transparent; box-shadow: none;">
-                                <input type="number" id="cost-amount" data-i18n="placeholder-amount"
-                                    placeholder="Amount (SAR)" min="1" style="width: 100%; margin-bottom: 8px;">
+                                <input type="number" step="any" id="cost-amount" data-i18n="placeholder-amount"
+                                    placeholder="Amount (SAR)" min="0.01" style="width: 100%; margin-bottom: 8px;">
                                 <div class="flex-between">
                                     <button type="submit"
                                         style="background-color: var(--text-main); color: var(--card-bg); flex:1;"
@@ -1166,7 +1189,7 @@
                                 data-i18n="desc-initial-bal">Set an old unpaid debt owed to this worker from before this
                                 system was used.</p>
                             <form onsubmit="event.preventDefault(); setInitialBalance();" class="form-group flex-between" style="margin-bottom: 0; display: flex; border: none; background: transparent; box-shadow: none;">
-                                <input type="number" id="initial-balance-amount" data-i18n="placeholder-amount"
+                                <input type="number" step="any" id="initial-balance-amount" data-i18n="placeholder-amount"
                                     placeholder="Amount (SAR)" style="flex-grow: 1;">
                                 <button type="submit" style="background-color: var(--primary);"
                                     data-i18n="btn-set-balance">Set Balance</button>
@@ -1663,7 +1686,7 @@
                             style="background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
                             <div style="display: flex; gap: 12px; align-items: stretch; flex-wrap: wrap;">
                                 <div style="flex: 2; min-width: 150px;">
-                                    <input type="number" id="new-sale-amount" placeholder="Amount (SAR)..." data-i18n="[placeholder]placeholder-amount-sar"
+                                    <input type="number" step="any" id="new-sale-amount" placeholder="Amount (SAR)..." data-i18n="[placeholder]placeholder-amount-sar"
                                         style="font-size: 1.25rem; font-weight: 700; padding: 14px; color: var(--primary); height: 100%;">
                                 </div>
                                 <div style="flex: 1; min-width: 120px;">
@@ -1814,7 +1837,7 @@
                             style="background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
                             <div style="display: flex; gap: 12px; align-items: stretch; flex-wrap: wrap;">
                                 <div style="flex: 2; min-width: 150px;">
-                                    <input type="number" id="new-cost-amount" placeholder="Amount (SAR)..." data-i18n="[placeholder]placeholder-amount-sar"
+                                    <input type="number" step="any" id="new-cost-amount" placeholder="Amount (SAR)..." data-i18n="[placeholder]placeholder-amount-sar"
                                         style="font-size: 1.25rem; font-weight: 700; padding: 14px; color: var(--danger); height: 100%;">
                                 </div>
                                 <div style="flex: 1; min-width: 120px;">
@@ -1837,7 +1860,7 @@
                             </div>
                             <div
                                 style="display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; margin-bottom:10px;">
-                                <input type="number" id="past-cost-amount" placeholder="Amount (SAR)" data-i18n="[placeholder]placeholder-amount"
+                                <input type="number" step="any" id="past-cost-amount" placeholder="Amount (SAR)" data-i18n="[placeholder]placeholder-amount"
                                     style="flex:2; min-width:110px; font-size:1rem; font-weight:700; padding:12px; color:var(--danger);">
                                 <select id="past-cost-category"
                                     style="flex:1; min-width:110px; font-size:0.95rem; font-weight:600; padding:12px;"></select>

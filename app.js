@@ -3825,7 +3825,7 @@ function renderWarehouse() {
                             
                             <div class="flex-between" style="margin-top: 20px; flex-wrap:wrap; gap:10px;">
                                 <div style="display:flex; gap:8px; flex:1; min-width: 200px;">
-                                    <input type="number" id="wh-update-${item.id}" placeholder="${t('placeholder-product-name')}" style="flex:1;" min="0">
+                                    <input type="number" step="any" id="wh-update-${item.id}" placeholder="${t('placeholder-product-name')}" style="flex:1;" min="0">
                                     <button onclick="updateWarehouseStock('${item.id}')" class="btn-success">${t('btn-change-stock') || 'Change'}</button>
                                 </div>
                                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -7537,20 +7537,37 @@ function acceptPaymentRequest(reqId) {
         }
     }
 
-    // Generate random 6 digit code
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const threshold = parseFloat(getCompanyData().highMoneyThreshold) || 0;
+    const isHighRequest = threshold > 0 && approvedAmount >= threshold;
 
-    db.ref(`companies/${currentCompany}/paymentRequests/${reqId}`).update({
-        status: 'accepted',
-        amount: approvedAmount,
-        requestedAmount: req.requestedAmount !== undefined ? req.requestedAmount : req.amount,
-        code: code,
-        handledAt: Date.now()
-    }).then(() => {
-        if (typeof logActivity === 'function') {
-            logActivity('finance', req.workerId, req.workerName, `Accepted payment request of SAR ${approvedAmount} for ${req.workerName}`);
-        }
-    }).catch(err => console.error("Error accepting request:", err));
+    if (isHighRequest) {
+        db.ref(`companies/${currentCompany}/paymentRequests/${reqId}`).update({
+            status: 'waiting_manager_approval',
+            amount: approvedAmount,
+            requestedAmount: req.requestedAmount !== undefined ? req.requestedAmount : req.amount,
+            code: null,
+            handledAt: Date.now()
+        }).then(() => {
+            if (typeof logActivity === 'function') {
+                logActivity('finance', req.workerId, req.workerName, `Financial department accepted high payment request of SAR ${approvedAmount} for ${req.workerName} (Awaiting Manager final approval)`);
+            }
+        }).catch(err => console.error("Error accepting request (high request):", err));
+    } else {
+        // Generate random 6 digit code
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+        db.ref(`companies/${currentCompany}/paymentRequests/${reqId}`).update({
+            status: 'accepted',
+            amount: approvedAmount,
+            requestedAmount: req.requestedAmount !== undefined ? req.requestedAmount : req.amount,
+            code: code,
+            handledAt: Date.now()
+        }).then(() => {
+            if (typeof logActivity === 'function') {
+                logActivity('finance', req.workerId, req.workerName, `Accepted payment request of SAR ${approvedAmount} for ${req.workerName}`);
+            }
+        }).catch(err => console.error("Error accepting request:", err));
+    }
 }
 
 function undoAcceptPaymentRequest(reqId) {
@@ -7648,6 +7665,17 @@ function renderPaymentRequests() {
     const pRequests = companyData.paymentRequests || {};
     const reqList = Object.values(pRequests).sort((a, b) => b.timestamp - a.timestamp);
 
+    const thresholdInput = document.getElementById('high-money-threshold-input');
+    if (thresholdInput) {
+        const threshold = companyData.highMoneyThreshold;
+        // Pre-fill input value from DB
+        if (document.activeElement !== thresholdInput) {
+            thresholdInput.value = threshold !== undefined ? threshold : '';
+        }
+    }
+
+    renderHighMoneyApprovals();
+
     // Render for Worker (Self Request History)
     const worker = getActiveWorker();
     const workerRequestsDiv = document.getElementById('worker-requests-list');
@@ -7664,6 +7692,8 @@ function renderPaymentRequests() {
 
                 if (req.status === 'pending') {
                     statusBadge = `<span class="badge" style="background:#d97706;">${isAr ? 'قيد الانتظار' : 'Pending'}</span>`;
+                } else if (req.status === 'waiting_manager_approval') {
+                    statusBadge = `<span class="badge" style="background:#f59e0b;">${isAr ? 'موافق مالياً (بانتظار موافقة المدير)' : 'Financial Approved (Waiting for Manager Approval)'}</span>`;
                 } else if (req.status === 'accepted') {
                     statusBadge = `<span class="badge" style="background:#16a34a;">${isAr ? 'مقبول للتسليم' : 'Approved for Disbursal'}</span>`;
                     codeDisplay = `<div style="margin-top: 5px; font-weight: 800; font-size: 1rem; color: var(--success);">${isAr ? 'الرمز السري:' : 'Verification Code:'} <span style="background:var(--input-bg); padding: 2px 6px; border-radius: 4px; border: 1px dashed var(--success);">${req.code}</span></div>`;
@@ -7692,7 +7722,7 @@ function renderPaymentRequests() {
     const pendingListDiv = document.getElementById('pending-requests-list');
     if (pendingListDiv) {
         pendingListDiv.innerHTML = '';
-        const managerReqs = reqList.filter(r => r.status === 'pending' || r.status === 'accepted' || r.status === 'given' || r.status === 'rejected');
+        const managerReqs = reqList.filter(r => r.status === 'pending' || r.status === 'waiting_manager_approval' || r.status === 'accepted' || r.status === 'given' || r.status === 'rejected');
         if (managerReqs.length === 0) {
             pendingListDiv.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted); text-align:center;">${isAr ? 'لا توجد طلبات حالياً.' : 'No requests at the moment.'}</p>`;
         } else {
@@ -7708,10 +7738,20 @@ function renderPaymentRequests() {
                     actionArea = `
                         <div style="display:flex; gap:8px; margin-top: 12px; justify-content: flex-end; align-items:center; flex-wrap:wrap;">
                             <label style="margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">${isAr ? 'تعديل المبلغ (ريال):' : 'Adjust Amount (SAR):'}</label>
-                            <input type="number" id="adjust-amount-${req.id}" value="${req.amount}" min="1" 
+                            <input type="number" step="any" id="adjust-amount-${req.id}" value="${req.amount}" min="0.01" 
                                 style="max-width: 90px; padding: 6px 10px; font-size: 0.85rem; height: 34px;">
                             <button onclick="rejectPaymentRequest('${req.id}')" class="btn-outline-danger" style="padding: 6px 14px; font-size: 0.8rem; height: 34px;">${isAr ? 'رفض' : 'Reject'}</button>
                             <button onclick="acceptPaymentRequest('${req.id}')" class="btn-success" style="padding: 6px 14px; font-size: 0.8rem; height: 34px;">${isAr ? 'قبول واعتماد' : 'Accept & Approve'}</button>
+                        </div>
+                    `;
+                } else if (req.status === 'waiting_manager_approval') {
+                    cardStyle = 'border-left: 4px solid var(--secondary);';
+                    statusHeader = `<span class="badge" style="background:#f59e0b; font-size:0.75rem; font-weight:700; padding:4px 8px; border-radius:4px; color:white;">${isAr ? 'موافق مالياً (بانتظار موافقة المدير)' : 'Financial Approved (Awaiting Manager Approval)'}</span>`;
+                    actionArea = `
+                        <div style="display:flex; gap:8px; margin-top: 12px; justify-content: flex-end; align-items:center;">
+                            <button onclick="undoAcceptPaymentRequest('${req.id}')" class="btn-outline-danger" style="padding: 6px 14px; font-size: 0.8rem; height: 34px; font-weight:700;">
+                                ${isAr ? 'تراجع عن القبول' : 'Undo Accept'}
+                            </button>
                         </div>
                     `;
                 } else if (req.status === 'accepted') {
@@ -7854,6 +7894,111 @@ function renderDailyPayouts() {
     }
 }
 
+function saveHighMoneyThreshold() {
+    const isAr = currentAppLang === 'ar';
+    const inputVal = parseFloat(document.getElementById('high-money-threshold-input').value);
+    if (isNaN(inputVal) || inputVal < 0) {
+        alert(isAr ? 'الرجاء إدخال مبلغ صحيح.' : 'Please enter a valid amount.');
+        return;
+    }
+    db.ref(`companies/${currentCompany}/highMoneyThreshold`).set(inputVal)
+        .then(() => {
+            alert(isAr ? 'تم حفظ الحد المالي بنجاح!' : 'High money threshold saved successfully!');
+        })
+        .catch(err => {
+            console.error("Error saving high money threshold:", err);
+            alert("Error: " + err.message);
+        });
+}
+
+function renderHighMoneyApprovals() {
+    const isAr = currentAppLang === 'ar';
+    const companyData = getCompanyData();
+    const pRequests = companyData.paymentRequests || {};
+    const reqList = Object.values(pRequests).sort((a, b) => b.timestamp - a.timestamp);
+    const approvalsListDiv = document.getElementById('high-money-approvals-list');
+    
+    if (approvalsListDiv) {
+        approvalsListDiv.innerHTML = '';
+        const highReqs = reqList.filter(r => r.status === 'waiting_manager_approval');
+        
+        if (highReqs.length === 0) {
+            approvalsListDiv.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted); text-align:center;">${isAr ? 'لا توجد طلبات سلف عالية بانتظار موافقة المدير حالياً.' : 'No high money requests awaiting manager approval.'}</p>`;
+        } else {
+            highReqs.forEach(req => {
+                const dateStr = new Date(req.timestamp).toLocaleString();
+                approvalsListDiv.innerHTML += `
+                    <div class="ledger-card" style="border-left: 4px solid var(--secondary); padding: 14px;">
+                        <div class="flex-between" style="align-items: flex-start; flex-wrap: wrap;">
+                            <div>
+                                <strong style="font-size:1.05rem; display:block;">${req.workerName}</strong>
+                                <span style="font-size:0.75rem; color:var(--text-muted); margin-left: 8px;">🕒 Requested: ${dateStr}</span>
+                                <div style="font-size: 0.85rem; margin-top: 8px; color:var(--text-main);">${isAr ? 'السبب:' : 'Reason:'} <em>${req.reason}</em></div>
+                            </div>
+                            <div style="text-align: right;">
+                                <span style="font-size:0.8rem; font-weight:700; color:var(--warning); display:block; margin-bottom:4px;">
+                                    ${isAr ? 'بانتظار موافقة المدير' : 'Awaiting Manager Approval'}
+                                </span>
+                                <strong class="text-primary" style="font-size:1.15rem;">SAR ${req.amount}</strong>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:8px; margin-top: 14px; justify-content: flex-end; align-items:center; flex-wrap:wrap;">
+                            <label style="margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">${isAr ? 'تعديل المبلغ (ريال):' : 'Adjust Amount (SAR):'}</label>
+                            <input type="number" step="any" id="manager-adjust-amount-${req.id}" value="${req.amount}" min="0.01" 
+                                style="max-width: 90px; padding: 6px 10px; font-size: 0.85rem; height: 34px;">
+                            <button onclick="managerRejectPaymentRequest('${req.id}')" class="btn-outline-danger" style="padding: 6px 14px; font-size: 0.8rem; height: 34px;">${isAr ? 'رفض' : 'Reject'}</button>
+                            <button onclick="managerAcceptPaymentRequest('${req.id}')" class="btn-success" style="padding: 6px 14px; font-size: 0.8rem; height: 34px;">${isAr ? 'قبول واعتماد نهائي' : 'Approve & Release Code'}</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+    }
+}
+
+function managerAcceptPaymentRequest(reqId) {
+    const pRequests = getCompanyData().paymentRequests || {};
+    const req = pRequests[reqId];
+    if (!req) return;
+
+    let approvedAmount = req.amount;
+    const adjustInput = document.getElementById(`manager-adjust-amount-${reqId}`);
+    if (adjustInput) {
+        const parsed = parseFloat(adjustInput.value);
+        if (!isNaN(parsed) && parsed > 0) {
+            approvedAmount = parsed;
+        }
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    db.ref(`companies/${currentCompany}/paymentRequests/${reqId}`).update({
+        status: 'accepted',
+        amount: approvedAmount,
+        code: code,
+        managerApprovedAt: Date.now()
+    }).then(() => {
+        if (typeof logActivity === 'function') {
+            logActivity('finance', req.workerId, req.workerName, `Manager final approved high payment request of SAR ${approvedAmount} for ${req.workerName}`);
+        }
+    }).catch(err => console.error("Error final approving request:", err));
+}
+
+function managerRejectPaymentRequest(reqId) {
+    const pRequests = getCompanyData().paymentRequests || {};
+    const req = pRequests[reqId];
+    if (!req) return;
+
+    db.ref(`companies/${currentCompany}/paymentRequests/${reqId}`).update({
+        status: 'rejected',
+        managerHandledAt: Date.now()
+    }).then(() => {
+        if (typeof logActivity === 'function') {
+            logActivity('finance', req.workerId, req.workerName, `Manager rejected high payment request of SAR ${req.amount} for ${req.workerName}`);
+        }
+    }).catch(err => console.error("Error final rejecting request:", err));
+}
+
 // Bind to window
 window.submitPaymentRequest = submitPaymentRequest;
 window.acceptPaymentRequest = acceptPaymentRequest;
@@ -7863,6 +8008,10 @@ window.confirmPaymentGiven = confirmPaymentGiven;
 window.deletePaymentRecord = deletePaymentRecord;
 window.renderPaymentRequests = renderPaymentRequests;
 window.renderDailyPayouts = renderDailyPayouts;
+window.saveHighMoneyThreshold = saveHighMoneyThreshold;
+window.renderHighMoneyApprovals = renderHighMoneyApprovals;
+window.managerAcceptPaymentRequest = managerAcceptPaymentRequest;
+window.managerRejectPaymentRequest = managerRejectPaymentRequest;
 
 // --- ATTENDANCE SYSTEM ---
 
