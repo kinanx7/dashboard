@@ -1158,6 +1158,20 @@ function ensureArraysExist(data) {
         else if (!Array.isArray(w.logs)) w.logs = Object.values(w.logs);
         w.logs = w.logs.filter(l => l);
 
+        if (!w.shifts) {
+            w.shifts = [];
+            if (w.startTime && w.endTime) {
+                w.shifts.push({
+                    id: 'shift_default',
+                    startTime: w.startTime,
+                    endTime: w.endTime,
+                    active: true
+                });
+            }
+        } else if (!Array.isArray(w.shifts)) {
+            w.shifts = Object.values(w.shifts);
+        }
+
         if (!w.email) w.email = "";
         if (!w.permissions) w.permissions = { warehouse: false, drivers: false, finance: false, sales: false, costs: false, adverts: false, attendance: false };
         if (!w.monthlyStats) w.monthlyStats = {};
@@ -1183,6 +1197,10 @@ function ensureArraysExist(data) {
                 if (!ms.deliveriesList) ms.deliveriesList = [];
                 else if (!Array.isArray(ms.deliveriesList)) ms.deliveriesList = Object.values(ms.deliveriesList);
                 ms.deliveriesList = ms.deliveriesList.filter(x => x);
+
+                if (!ms.overtimeList) ms.overtimeList = [];
+                else if (!Array.isArray(ms.overtimeList)) ms.overtimeList = Object.values(ms.overtimeList);
+                ms.overtimeList = ms.overtimeList.filter(x => x);
             }
         });
     });
@@ -4260,7 +4278,20 @@ document.addEventListener('keydown', function (e) {
 
 function getMonthlyStats(worker, monthStr) {
     if (!worker.monthlyStats) worker.monthlyStats = {};
-    if (!worker.monthlyStats[monthStr]) worker.monthlyStats[monthStr] = { custodyList: [], violationsList: [], rewardsList: [], costs: 0, paymentsList: [], deliveriesList: [], legacyDeliveries: 0 };
+    if (!worker.monthlyStats[monthStr]) {
+        worker.monthlyStats[monthStr] = { 
+            custodyList: [], 
+            violationsList: [], 
+            rewardsList: [], 
+            costs: 0, 
+            paymentsList: [], 
+            deliveriesList: [], 
+            legacyDeliveries: 0,
+            overtimeList: [] 
+        };
+    } else if (!worker.monthlyStats[monthStr].overtimeList) {
+        worker.monthlyStats[monthStr].overtimeList = [];
+    }
     return worker.monthlyStats[monthStr];
 }
 
@@ -4289,6 +4320,11 @@ function calculateRewardsTotal(rewardsList) {
     return rewardsList.reduce((sum, r) => sum + parseFloat(r.amount), 0);
 }
 
+function calculateOvertimeTotal(overtimeList) {
+    if (!overtimeList) return 0;
+    return overtimeList.reduce((sum, o) => sum + parseFloat(o.amount || 0), 0);
+}
+
 function calculateCustodyTotal(custodyList) {
     if (!custodyList) return 0;
     return custodyList.reduce((sum, c) => {
@@ -4310,7 +4346,8 @@ function getCumulativeBalance(worker, maxMonthStr) {
         const sysViolDeduction = typeof getSystemViolationDeductionsForMonth === 'function' ? getSystemViolationDeductionsForMonth(worker, m) : 0;
         const lateDeduction = typeof getLateDeductionsForMonth === 'function' ? getLateDeductionsForMonth(worker, m) : 0;
         const volumeReward = typeof getDriverVolumeRewardsForMonth === 'function' ? getDriverVolumeRewardsForMonth(worker, m) : 0;
-        const netThisMonth = base + rew + volumeReward - viol - sysViolDeduction - lateDeduction;
+        const ov = calculateOvertimeTotal(stats.overtimeList);
+        const netThisMonth = base + rew + volumeReward + ov - viol - sysViolDeduction - lateDeduction;
         const paidThisMonth = calculatePaymentsTotal(stats.paymentsList);
         balance += (netThisMonth - paidThisMonth);
         if (m === maxMonthStr) break;
@@ -4453,7 +4490,11 @@ function exportWorkerFinancePDF() {
     const rewards = calculateRewardsTotal(stats.rewardsList);
     const violations = calculateViolationsTotal(stats.violationsList);
     const paid = calculatePaymentsTotal(stats.paymentsList);
-    const net = base + rewards - violations - paid;
+    const sysViolDeduction = typeof getSystemViolationDeductionsForMonth === 'function' ? getSystemViolationDeductionsForMonth(worker, currentGlobalMonth) : 0;
+    const lateDeduction = typeof getLateDeductionsForMonth === 'function' ? getLateDeductionsForMonth(worker, currentGlobalMonth) : 0;
+    const volumeReward = typeof getDriverVolumeRewardsForMonth === 'function' ? getDriverVolumeRewardsForMonth(worker, currentGlobalMonth) : 0;
+    const overtime = calculateOvertimeTotal(stats.overtimeList);
+    const net = base + rewards + volumeReward + overtime - violations - paid - sysViolDeduction - lateDeduction;
     const allTimeRemaining = getCumulativeBalance(worker, currentGlobalMonth);
     const custodyTotal = calculateCustodyTotal(stats.custodyList);
 
@@ -4493,6 +4534,13 @@ function exportWorkerFinancePDF() {
         payRows += `<tr><td style="padding:8px 10px; border:1px solid #e2e8f0;">${p.date}</td><td style="padding:8px 10px; border:1px solid #e2e8f0; color:#0284c7; font-weight:600;">SAR ${parseFloat(p.amount).toLocaleString()}</td></tr>`;
     });
     if (!payRows) payRows = `<tr><td colspan="2" style="text-align:center; color:#64748b; padding:10px; border:1px solid #e2e8f0;">No payments recorded this month</td></tr>`;
+
+    // Build overtime rows
+    let overtimeRows = '';
+    (stats.overtimeList || []).forEach(o => {
+        overtimeRows += `<tr><td style="padding:8px 10px; border:1px solid #e2e8f0;">${o.date}</td><td style="padding:8px 10px; border:1px solid #e2e8f0;">x${o.multiplier || '1.00'} (${o.hours || '1'} hr)</td><td style="padding:8px 10px; border:1px solid #e2e8f0; color:#f59e0b; font-weight:600;">SAR ${parseFloat(o.amount || 0).toLocaleString()}</td></tr>`;
+    });
+    if (!overtimeRows) overtimeRows = `<tr><td colspan="3" style="text-align:center; color:#64748b; padding:10px; border:1px solid #e2e8f0;">No overtime recorded this month</td></tr>`;
 
     const headerColor = '#452b1b';
     const printHTML = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
@@ -4550,6 +4598,10 @@ function exportWorkerFinancePDF() {
                         <div class="label">Custody</div>
                         <div class="value" style="color:#d97706;">SAR ${custodyTotal.toLocaleString()}</div>
                     </div>
+                    <div class="summary-card">
+                        <div class="label">Overtime</div>
+                        <div class="value" style="color:#f59e0b;">+ SAR ${overtime.toLocaleString()}</div>
+                    </div>
                 </div>
 
                 <div class="section-title">⚠️ Violations & Fix Status</div>
@@ -4563,6 +4615,13 @@ function exportWorkerFinancePDF() {
                     <thead><tr><th>Date</th><th>Amount Paid</th></tr></thead>
                     <tbody>${payRows}</tbody>
                     <tfoot><tr class="highlight-row"><td style="padding:8px 10px; border:1px solid #e2e8f0;">Total Paid</td><td style="padding:8px 10px; border:1px solid #e2e8f0; color:#0284c7;">SAR ${paid.toLocaleString()}</td></tr></tfoot>
+                </table>
+
+                <div class="section-title">🕒 Overtime Logs This Month</div>
+                <table>
+                    <thead><tr><th>Date</th><th>Multiplier / Hours</th><th>Amount</th></tr></thead>
+                    <tbody>${overtimeRows}</tbody>
+                    <tfoot><tr class="highlight-row"><td style="padding:8px 10px; border:1px solid #e2e8f0;" colspan="2">Total Overtime</td><td style="padding:8px 10px; border:1px solid #e2e8f0; color:#f59e0b;">SAR ${overtime.toLocaleString()}</td></tr></tfoot>
                 </table>
 
                 <div class="footer">
@@ -6729,13 +6788,24 @@ function renderWorkerViolationPanel() {
 }
 
 function renderBranches() {
-    const list = document.getElementById('branches-list'); const select = document.getElementById('w-branch');
-    list.innerHTML = ''; select.innerHTML = '';
+    const list = document.getElementById('branches-list'); 
+    const select = document.getElementById('w-branch');
+    const editSelect = document.getElementById('ops-edit-branch');
+    list.innerHTML = ''; 
+    select.innerHTML = '';
+    if (editSelect) editSelect.innerHTML = '';
     getCompanyData().branches.forEach(branch => {
         const li = document.createElement('li'); li.className = 'flex-between list-item';
         li.innerHTML = `<span style="font-weight: 500; color: var(--text-main);">${branch}</span> <button class="btn-outline-danger admin-only" style="padding: 4px 10px; font-size: 0.75rem;" onclick="deleteBranch('${branch}')">Remove</button>`;
         list.appendChild(li);
         const option = document.createElement('option'); option.value = branch; option.textContent = branch; select.appendChild(option);
+        
+        if (editSelect) {
+            const editOption = document.createElement('option');
+            editOption.value = branch;
+            editOption.textContent = branch;
+            editSelect.appendChild(editOption);
+        }
     });
 }
 
@@ -6819,6 +6889,86 @@ function renderOpsDetails() {
 
     const worker = getCompanyData().workers.find(w => w.id === workerId);
     if (!worker) return;
+
+    // Populate profile inputs
+    const editName = document.getElementById('ops-edit-name');
+    const editRole = document.getElementById('ops-edit-role');
+    const editSalary = document.getElementById('ops-edit-salary');
+    const editBranch = document.getElementById('ops-edit-branch');
+    if (editName) editName.value = worker.name || '';
+    if (editRole) editRole.value = worker.role || '';
+    if (editSalary) editSalary.value = worker.income || 0;
+    if (editBranch) editBranch.value = worker.branch || '';
+
+    // Render shifts list
+    const shiftsList = document.getElementById('ops-worker-shifts-list');
+    if (shiftsList) {
+        shiftsList.innerHTML = '';
+        const shifts = worker.shifts || [];
+        if (shifts.length === 0) {
+            shiftsList.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted); text-align:center;">No shifts added. Add a shift below.</p>`;
+        } else {
+            shifts.forEach(s => {
+                const div = document.createElement('div');
+                div.className = 'flex-between list-item';
+                div.style.cssText = 'background:var(--input-bg); padding:10px; border-radius:8px; border:1px solid var(--border-color);';
+                
+                let statusText = s.active ? `<span class="badge badge-good" style="margin:0;">Active</span>` : `<button onclick="activateWorkerShift('${s.id}')" class="btn-outline-info" style="padding:4px 8px; font-size:0.75rem;">Activate</button>`;
+                let delBtn = `<button onclick="deleteWorkerShift('${s.id}')" class="btn-outline-danger" style="padding:4px 8px; font-size:0.75rem; border:none; text-decoration:underline;">Delete</button>`;
+                
+                div.innerHTML = `
+                    <div>
+                        <strong style="color:var(--text-main);">🕒 ${s.startTime} - ${s.endTime}</strong>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        ${statusText}
+                        ${delBtn}
+                    </div>
+                `;
+                shiftsList.appendChild(div);
+            });
+        }
+    }
+
+    // Calculate duration & hourly rate
+    const durationEl = document.getElementById('ops-ov-shift-duration');
+    const hourlyRateEl = document.getElementById('ops-ov-hourly-rate');
+    const duration = getShiftDurationHours(worker.startTime, worker.endTime);
+    const baseIncome = parseFloat(worker.income) || 0;
+    const hourlyRate = baseIncome / (30 * duration);
+    
+    if (durationEl) durationEl.textContent = `${duration.toFixed(1)} hrs`;
+    if (hourlyRateEl) hourlyRateEl.textContent = `SAR ${hourlyRate.toFixed(2)}/hr`;
+
+    // Render overtime log history
+    const overtimeHistList = document.getElementById('ops-worker-overtime-history');
+    if (overtimeHistList) {
+        overtimeHistList.innerHTML = '';
+        const stats = getMonthlyStats(worker, currentGlobalMonth);
+        const overtimeList = stats.overtimeList || [];
+        if (overtimeList.length === 0) {
+            overtimeHistList.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted); text-align:center;">No overtime hours logged this month.</p>`;
+        } else {
+            overtimeList.forEach(o => {
+                const div = document.createElement('div');
+                div.className = 'flex-between list-item';
+                div.style.cssText = 'background:var(--input-bg); padding:10px; border-radius:8px; border:1px solid var(--border-color);';
+                
+                div.innerHTML = `
+                    <div>
+                        <strong style="color:var(--text-main);">🕒 ${o.hours} hr (x${o.multiplier})</strong><br>
+                        <span style="font-size:0.75rem; color:var(--text-muted);">Rate: SAR ${o.rate}/hr • Date: ${o.date}</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-weight:700; color:#f59e0b;">+ SAR ${o.amount}</span>
+                        <button onclick="deleteOvertimeHour('${o.id}')" class="btn-outline-danger" style="padding:4px 8px; font-size:0.75rem; border:none; text-decoration:underline;">Undo</button>
+                    </div>
+                `;
+                overtimeHistList.appendChild(div);
+            });
+        }
+    }
+
     let displayLogs = getLogsForMonth(worker, currentGlobalMonth);
 
     if (displayLogs.length === 0) { if (hist) hist.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:24px;background:var(--input-bg);border-radius:var(--radius-md);">${t('msg-no-logs-month')}</p>`; return; }
@@ -6867,7 +7017,8 @@ function renderFinanceTable() {
         const sysViolDeduction = typeof getSystemViolationDeductionsForMonth === 'function' ? getSystemViolationDeductionsForMonth(worker, currentGlobalMonth) : 0;
         const lateDeduction = typeof getLateDeductionsForMonth === 'function' ? getLateDeductionsForMonth(worker, currentGlobalMonth) : 0;
         const volumeReward = typeof getDriverVolumeRewardsForMonth === 'function' ? getDriverVolumeRewardsForMonth(worker, currentGlobalMonth) : 0;
-        const net = base + rew + volumeReward - viol - paidThisMonth - sysViolDeduction - lateDeduction;
+        const ov = calculateOvertimeTotal(stats.overtimeList);
+        const net = base + rew + volumeReward + ov - viol - paidThisMonth - sysViolDeduction - lateDeduction;
 
         const remainingAllTime = getCumulativeBalance(worker, currentGlobalMonth);
         const detailsId = `net-details-${worker.id}`;
@@ -6886,6 +7037,10 @@ function renderFinanceTable() {
         if (volumeReward > 0) {
             volumeRewardHtml = `<div class="breakdown-row" style="color:var(--success);"><span>${isAr ? 'مكافآت التوصيل:' : 'Volume Rewards:'}</span> <span>+ SAR ${volumeReward.toLocaleString()}</span></div>`;
         }
+        let overtimeHtml = '';
+        if (ov > 0) {
+            overtimeHtml = `<div class="breakdown-row" style="color:#f59e0b;"><span>${isAr ? 'العمل الإضافي:' : 'Overtime:'}</span> <span>+ SAR ${ov.toLocaleString()}</span></div>`;
+        }
         tr.innerHTML = `
                     <td><strong style="color:var(--text-main);">${worker.name}</strong><br><span class="text-muted-heavy">${worker.branch}</span></td>
                     <td>SAR ${base.toLocaleString()}</td>
@@ -6898,6 +7053,7 @@ function renderFinanceTable() {
                             <div class="breakdown-row" style="color:var(--text-main);"><span>${isAr ? 'الأساسي:' : 'Base:'}</span> <span>SAR ${base.toLocaleString()}</span></div>
                             <div class="breakdown-row" style="color:var(--success);"><span>${isAr ? 'المكافآت:' : 'Rewards:'}</span> <span>+ SAR ${rew.toLocaleString()}</span></div>
                             ${volumeRewardHtml}
+                            ${overtimeHtml}
                             <div class="breakdown-row" style="color:var(--danger);"><span>${isAr ? 'المخالفات:' : 'Violations:'}</span> <span>- SAR ${viol.toLocaleString()}</span></div>
                             ${sysViolHtml}
                             ${lateHtml}
@@ -6937,12 +7093,13 @@ function renderFinDetails() {
     const totalViolations = calculateViolationsTotal(stats.violationsList);
     const totalCustody = calculateCustodyTotal(stats.custodyList);
     const paidThisMonth = calculatePaymentsTotal(stats.paymentsList);
+    const totalOvertime = calculateOvertimeTotal(stats.overtimeList);
 
     // UI display for Net reflects the subtraction of the advance payment, system violations, and late penalties
     const sysViolDeduction = typeof getSystemViolationDeductionsForMonth === 'function' ? getSystemViolationDeductionsForMonth(worker, currentGlobalMonth) : 0;
     const lateDeduction = typeof getLateDeductionsForMonth === 'function' ? getLateDeductionsForMonth(worker, currentGlobalMonth) : 0;
     const volumeReward = typeof getDriverVolumeRewardsForMonth === 'function' ? getDriverVolumeRewardsForMonth(worker, currentGlobalMonth) : 0;
-    const net = base + totalRewards + volumeReward - totalViolations - paidThisMonth - sysViolDeduction - lateDeduction;
+    const net = base + totalRewards + volumeReward + totalOvertime - totalViolations - paidThisMonth - sysViolDeduction - lateDeduction;
 
     const allTimeRemaining = getCumulativeBalance(worker, currentGlobalMonth);
 
@@ -6952,6 +7109,36 @@ function renderFinDetails() {
     document.getElementById('fin-display-summary-custody').textContent = totalCustody.toLocaleString();
     document.getElementById('fin-display-custody').textContent = totalCustody.toLocaleString();
     document.getElementById('fin-display-total-viol').textContent = totalViolations.toLocaleString();
+    
+    const displayOvertime = document.getElementById('fin-display-overtime');
+    if (displayOvertime) displayOvertime.textContent = totalOvertime.toLocaleString();
+
+    const displayOvertimeEarned = document.getElementById('fin-display-overtime-earned');
+    if (displayOvertimeEarned) displayOvertimeEarned.textContent = totalOvertime.toLocaleString();
+
+    // Render Overtime History list
+    const finOvertimeList = document.getElementById('fin-overtime-history-list');
+    if (finOvertimeList) {
+        finOvertimeList.innerHTML = '';
+        const overtimeList = stats.overtimeList || [];
+        if (overtimeList.length === 0) {
+            finOvertimeList.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted); text-align:center;">No overtime hours logged this month.</p>`;
+        } else {
+            overtimeList.forEach(o => {
+                const oDiv = document.createElement('div');
+                oDiv.className = 'ledger-card flex-between';
+                let delBtn = isFinAdmin ? `<button onclick="deleteOvertimeHourFromFin('${worker.id}', '${o.id}')" class="btn-outline-danger" style="padding: 4px 10px; font-size: 0.75rem;">Undo</button>` : '';
+                oDiv.innerHTML = `
+                            <div>
+                                <strong style="color:#f59e0b;">+ SAR ${o.amount}</strong><br>
+                                <span style="font-size: 0.75rem; color: var(--text-muted);">${o.hours} hr (x${o.multiplier}) • ${o.date}</span>
+                            </div>
+                            ${delBtn}
+                        `;
+                finOvertimeList.appendChild(oDiv);
+            });
+        }
+    }
 
     document.getElementById('initial-balance-amount').value = worker.initialBalance || 0;
 
@@ -8300,10 +8487,16 @@ function markWorkerAttendance(workerId, status) {
     if (!worker) return;
 
     if (status === 'present') {
-        const now = new Date();
-        const hh = String(now.getHours()).padStart(2, '0');
-        const mm = String(now.getMinutes()).padStart(2, '0');
-        const checkTime = `${hh}:${mm}`;
+        const timeInput = document.getElementById(`att-time-${workerId}`);
+        let checkTime = "";
+        if (timeInput && timeInput.value) {
+            checkTime = timeInput.value;
+        } else {
+            const now = new Date();
+            const hh = String(now.getHours()).padStart(2, '0');
+            const mm = String(now.getMinutes()).padStart(2, '0');
+            checkTime = `${hh}:${mm}`;
+        }
         const lateness = calculateLateness(worker.startTime, checkTime);
 
         db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}`).set({
@@ -8406,6 +8599,11 @@ function renderAttendance() {
             statusHtml = `<span class="badge badge-bad" style="display:inline-flex; align-items:center; gap:4px; font-weight:700;">❌ ${isAr ? 'غائب' : 'Absent'}</span>`;
         }
 
+        const todayNow = new Date();
+        const hhNow = String(todayNow.getHours()).padStart(2, '0');
+        const mmNow = String(todayNow.getMinutes()).padStart(2, '0');
+        const currentTimeString = (att && att.status === 'present' && att.time) ? att.time : `${hhNow}:${mmNow}`;
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>
@@ -8417,9 +8615,12 @@ function renderAttendance() {
             <td style="font-family: monospace; font-weight: 600;">${checkinTimeHtml}</td>
             <td>${latenessHtml}</td>
             <td class="attendance-admin-only">
-                <button onclick="markWorkerAttendance('${w.id}', 'present')" class="btn-success" style="padding: 4px 8px; font-size: 0.8rem; margin-right: 4px;" title="${isAr ? 'تسجيل حضور' : 'Mark Present'}">✔️</button>
-                <button onclick="markWorkerAttendance('${w.id}', 'absent')" class="btn-danger" style="padding: 4px 8px; font-size: 0.8rem; margin-right: 4px;" title="${isAr ? 'تسجيل غياب' : 'Mark Absent'}">❌</button>
-                <button onclick="clearWorkerAttendance('${w.id}')" class="btn-outline" style="padding: 4px 8px; font-size: 0.8rem;" title="${isAr ? 'إعادة تعيين' : 'Reset'}">🔄</button>
+                <div style="display:inline-flex; align-items:center; gap:4px;">
+                    <input type="time" id="att-time-${w.id}" value="${currentTimeString}" style="padding: 4px; font-size: 0.8rem; width: 85px; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-main);" />
+                    <button onclick="markWorkerAttendance('${w.id}', 'present')" class="btn-success" style="padding: 4px 8px; font-size: 0.8rem;" title="${isAr ? 'تسجيل حضور' : 'Mark Present'}">✔️</button>
+                    <button onclick="markWorkerAttendance('${w.id}', 'absent')" class="btn-danger" style="padding: 4px 8px; font-size: 0.8rem;" title="${isAr ? 'تسجيل غياب' : 'Mark Absent'}">❌</button>
+                    <button onclick="clearWorkerAttendance('${w.id}')" class="btn-outline" style="padding: 4px 8px; font-size: 0.8rem;" title="${isAr ? 'إعادة تعيين' : 'Reset'}">🔄</button>
+                </div>
             </td>
         `;
         tbody.appendChild(tr);
@@ -9231,6 +9432,279 @@ window.renderDriverVolumeRewards = renderDriverVolumeRewards;
 window.addDriverVolumeReward = addDriverVolumeReward;
 window.deleteDriverVolumeReward = deleteDriverVolumeReward;
 window.getDriverVolumeRewardsForMonth = getDriverVolumeRewardsForMonth;
+
+// ========================================================
+// FEATURE 7: WORKER PROFILE, SHIFTS AND OVERTIME FUNCTIONS
+// ========================================================
+
+function getShiftDurationHours(startTime, endTime) {
+    if (!startTime || !endTime) return 8; // default fallback
+    const [sh, sm] = startTime.split(':').map(Number);
+    const [eh, em] = endTime.split(':').map(Number);
+    let diffMins = (eh * 60 + em) - (sh * 60 + sm);
+    if (diffMins < 0) {
+        diffMins += 24 * 60; // shift crosses midnight
+    }
+    return diffMins / 60;
+}
+
+function saveWorkerProfileChanges() {
+    const workerId = document.getElementById('ops-worker-select').value;
+    if (!workerId) return;
+
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+
+    const newName = document.getElementById('ops-edit-name').value.trim();
+    const newRole = document.getElementById('ops-edit-role').value.trim();
+    const newSalary = parseFloat(document.getElementById('ops-edit-salary').value);
+    const newBranch = document.getElementById('ops-edit-branch').value;
+
+    if (!newName || !newRole || isNaN(newSalary) || newSalary <= 0 || !newBranch) {
+        alert("Please ensure all profile fields are valid.");
+        return;
+    }
+
+    const worker = getCompanyData().workers[workerIndex];
+
+    worker.name = newName;
+    worker.role = newRole;
+    worker.income = newSalary;
+    worker.branch = newBranch;
+
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}`).update({
+        name: newName,
+        role: newRole,
+        income: newSalary,
+        branch: newBranch
+    }).then(() => {
+        logActivity('ops', worker.id, worker.name, `Updated profile details for employee ${worker.name}`);
+        alert("Worker profile updated successfully!");
+        renderAll();
+    }).catch(err => {
+        console.error("Error updating worker profile:", err);
+        alert("Failed to save profile changes.");
+    });
+}
+
+function addNewWorkerShift() {
+    const workerId = document.getElementById('ops-worker-select').value;
+    if (!workerId) return;
+
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+
+    const startTime = document.getElementById('ops-new-shift-start').value;
+    const endTime = document.getElementById('ops-new-shift-end').value;
+
+    if (!startTime || !endTime) {
+        alert("Please specify start and end times for the shift.");
+        return;
+    }
+
+    const worker = getCompanyData().workers[workerIndex];
+    if (!worker.shifts) worker.shifts = [];
+
+    const newShift = {
+        id: Date.now().toString(),
+        startTime: startTime,
+        endTime: endTime,
+        active: worker.shifts.length === 0
+    };
+
+    worker.shifts.push(newShift);
+
+    if (newShift.active) {
+        worker.startTime = startTime;
+        worker.endTime = endTime;
+    }
+
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}`).update({
+        shifts: worker.shifts,
+        startTime: worker.startTime,
+        endTime: worker.endTime
+    }).then(() => {
+        document.getElementById('ops-new-shift-start').value = '';
+        document.getElementById('ops-new-shift-end').value = '';
+        logActivity('ops', worker.id, worker.name, `Added new shift (${startTime} - ${endTime}) for ${worker.name}`);
+        renderOpsDetails();
+        renderOpsWorkersTable();
+    }).catch(err => {
+        console.error("Error adding shift:", err);
+        alert("Failed to add shift.");
+    });
+}
+
+function activateWorkerShift(shiftId) {
+    const workerId = document.getElementById('ops-worker-select').value;
+    if (!workerId) return;
+
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+
+    const worker = getCompanyData().workers[workerIndex];
+    if (!worker.shifts) return;
+
+    worker.shifts.forEach(s => {
+        s.active = (s.id === shiftId);
+    });
+
+    const activeShift = worker.shifts.find(s => s.active);
+    if (activeShift) {
+        worker.startTime = activeShift.startTime;
+        worker.endTime = activeShift.endTime;
+    }
+
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}`).update({
+        shifts: worker.shifts,
+        startTime: worker.startTime,
+        endTime: worker.endTime
+    }).then(() => {
+        logActivity('ops', worker.id, worker.name, `Activated shift (${worker.startTime} - ${worker.endTime}) for ${worker.name}`);
+        renderOpsDetails();
+        renderOpsWorkersTable();
+    }).catch(err => {
+        console.error("Error activating shift:", err);
+        alert("Failed to activate shift.");
+    });
+}
+
+function deleteWorkerShift(shiftId) {
+    const workerId = document.getElementById('ops-worker-select').value;
+    if (!workerId) return;
+
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+
+    const worker = getCompanyData().workers[workerIndex];
+    if (!worker.shifts) return;
+
+    const deletedShift = worker.shifts.find(s => s.id === shiftId);
+    if (!deletedShift) return;
+
+    if (deletedShift.active && worker.shifts.length > 1) {
+        alert("Please activate a different shift before deleting the active one.");
+        return;
+    }
+
+    worker.shifts = worker.shifts.filter(s => s.id !== shiftId);
+
+    if (worker.shifts.length === 0) {
+        worker.startTime = "";
+        worker.endTime = "";
+    }
+
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}`).update({
+        shifts: worker.shifts,
+        startTime: worker.startTime,
+        endTime: worker.endTime
+    }).then(() => {
+        logActivity('ops', worker.id, worker.name, `Deleted shift (${deletedShift.startTime} - ${deletedShift.endTime}) for ${worker.name}`);
+        renderOpsDetails();
+        renderOpsWorkersTable();
+    }).catch(err => {
+        console.error("Error deleting shift:", err);
+        alert("Failed to delete shift.");
+    });
+}
+
+function addOvertimeHour() {
+    const workerId = document.getElementById('ops-worker-select').value;
+    if (!workerId) return;
+
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+
+    const worker = getCompanyData().workers[workerIndex];
+    const baseIncome = parseFloat(worker.income) || 0;
+    const duration = getShiftDurationHours(worker.startTime, worker.endTime);
+    const hourlyRate = baseIncome / (30 * duration);
+
+    const hours = parseFloat(document.getElementById('ops-ov-hours').value) || 1.0;
+    const mult = parseFloat(document.getElementById('ops-ov-multiplier').value) || 1.0;
+    const finalAmount = Math.round(hours * hourlyRate * mult * 100) / 100;
+
+    const stats = getMonthlyStats(worker, currentGlobalMonth);
+    if (!stats.overtimeList) stats.overtimeList = [];
+
+    const newLog = {
+        id: Date.now().toString(),
+        date: formatTimestamp(),
+        hours: hours,
+        rate: Math.round(hourlyRate * 100) / 100,
+        multiplier: mult,
+        amount: finalAmount
+    };
+
+    stats.overtimeList.unshift(newLog);
+
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/overtimeList`).set(stats.overtimeList)
+        .then(() => {
+            logActivity('ops', worker.id, worker.name, `Logged ${hours} hr(s) overtime (x${mult}) for ${worker.name} (SAR ${finalAmount})`);
+            renderOpsDetails();
+        }).catch(err => {
+            console.error("Error adding overtime:", err);
+            alert("Failed to log overtime.");
+        });
+}
+
+function deleteOvertimeHour(logId) {
+    const workerId = document.getElementById('ops-worker-select').value;
+    if (!workerId) return;
+
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+
+    const worker = getCompanyData().workers[workerIndex];
+    const stats = getMonthlyStats(worker, currentGlobalMonth);
+    if (!stats.overtimeList) return;
+
+    const targetLog = stats.overtimeList.find(o => o.id === logId);
+    if (!targetLog) return;
+
+    stats.overtimeList = stats.overtimeList.filter(o => o.id !== logId);
+
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/overtimeList`).set(stats.overtimeList)
+        .then(() => {
+            logActivity('ops', worker.id, worker.name, `Removed overtime entry of ${targetLog.hours} hr (x${targetLog.multiplier}) for ${worker.name}`);
+            renderOpsDetails();
+        }).catch(err => {
+            console.error("Error deleting overtime:", err);
+            alert("Failed to delete overtime entry.");
+        });
+}
+
+function deleteOvertimeHourFromFin(workerId, logId) {
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+
+    const worker = getCompanyData().workers[workerIndex];
+    const stats = getMonthlyStats(worker, currentGlobalMonth);
+    if (!stats.overtimeList) return;
+
+    const targetLog = stats.overtimeList.find(o => o.id === logId);
+    if (!targetLog) return;
+
+    stats.overtimeList = stats.overtimeList.filter(o => o.id !== logId);
+
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/overtimeList`).set(stats.overtimeList)
+        .then(() => {
+            logActivity('finance', worker.id, worker.name, `Removed overtime entry of ${targetLog.hours} hr (x${targetLog.multiplier}) for ${worker.name}`);
+            renderFinDetails();
+        }).catch(err => {
+            console.error("Error deleting overtime:", err);
+            alert("Failed to delete overtime entry.");
+        });
+}
+
+window.getShiftDurationHours = getShiftDurationHours;
+window.saveWorkerProfileChanges = saveWorkerProfileChanges;
+window.addNewWorkerShift = addNewWorkerShift;
+window.activateWorkerShift = activateWorkerShift;
+window.deleteWorkerShift = deleteWorkerShift;
+window.addOvertimeHour = addOvertimeHour;
+window.deleteOvertimeHour = deleteOvertimeHour;
+window.deleteOvertimeHourFromFin = deleteOvertimeHourFromFin;
 
 // Initial run
 applyTranslations();
