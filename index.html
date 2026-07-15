@@ -111,8 +111,13 @@
             </div>
 
             <div class="form-group password-wrapper">
-                <input type="password" id="auth-password" data-i18n="placeholder-password" placeholder="Password" />
-                <span class="password-toggle" onclick="togglePassword()">👁️</span>
+                <input type="password" id="auth-password" data-i18n="[placeholder]placeholder-password" placeholder="Password" />
+                <span class="password-toggle" id="auth-password-toggle" onclick="togglePassword()">👁️</span>
+            </div>
+
+            <div class="form-group password-wrapper" id="auth-confirm-password-wrapper" style="display: none;">
+                <input type="password" id="auth-confirm-password" data-i18n="[placeholder]placeholder-confirm-password" placeholder="Confirm Password" />
+                <span class="password-toggle" id="auth-confirm-password-toggle" onclick="toggleConfirmPassword()">👁️</span>
             </div>
 
             <button onclick="handleAuthSubmit()" style="width: 100%; margin-top: 10px; background-color: #c5832b"
@@ -122,8 +127,7 @@
             <div class="loader" id="auth-loader"></div>
 
             <div class="auth-links">
-                <span class="auth-link" onclick="toggleAuthMode()" id="auth-toggle-text" data-i18n="link-signup">Sign
-                    Up</span>
+                <span class="auth-link" onclick="toggleAuthMode()" id="auth-toggle-text" data-i18n="link-signup">Sign Up</span>
                 <span class="auth-link" onclick="resetPassword()" data-i18n="link-forgot">Forgot Password?</span>
             </div>
             <p id="auth-error-msg" style="

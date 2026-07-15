@@ -449,7 +449,19 @@ const db = firebase.database();
 // --- Auth UI Helpers ---
 function togglePassword() {
     const pwdInput = document.getElementById('auth-password');
-    const toggleBtn = document.querySelector('.password-toggle');
+    const toggleBtn = document.getElementById('auth-password-toggle');
+    if (pwdInput.type === 'password') {
+        pwdInput.type = 'text';
+        if (toggleBtn) toggleBtn.textContent = '🙈';
+    } else {
+        pwdInput.type = 'password';
+        if (toggleBtn) toggleBtn.textContent = '👁️';
+    }
+}
+
+function toggleConfirmPassword() {
+    const pwdInput = document.getElementById('auth-confirm-password');
+    const toggleBtn = document.getElementById('auth-confirm-password-toggle');
     if (pwdInput.type === 'password') {
         pwdInput.type = 'text';
         if (toggleBtn) toggleBtn.textContent = '🙈';
@@ -795,8 +807,24 @@ auth.onAuthStateChanged((user) => {
 
 function toggleAuthMode() {
     authMode = authMode === 'login' ? 'signup' : 'login';
-    document.getElementById('auth-title').textContent = authMode === 'login' ? 'Login to Dashboard' : 'Create Viewer Account';
-    document.getElementById('auth-btn').textContent = authMode === 'login' ? 'Sign In' : 'Sign Up';
+    const isAr = currentAppLang === 'ar';
+
+    document.getElementById('auth-title').textContent = authMode === 'login' 
+        ? (t('auth-title-login') || 'Login to Dashboard') 
+        : (t('auth-title-signup') || 'Create Viewer Account');
+        
+    document.getElementById('auth-btn').textContent = authMode === 'login' 
+        ? (t('btn-signin') || 'Sign In') 
+        : (t('btn-signup') || 'Sign Up');
+
+    document.getElementById('auth-toggle-text').textContent = authMode === 'login' 
+        ? (t('link-signup') || 'Sign Up') 
+        : (t('btn-signin') || 'Sign In');
+
+    const confirmWrapper = document.getElementById('auth-confirm-password-wrapper');
+    if (confirmWrapper) {
+        confirmWrapper.style.display = authMode === 'login' ? 'none' : 'block';
+    }
     document.getElementById('auth-error-msg').style.display = 'none';
 }
 
@@ -809,8 +837,18 @@ function handleAuthSubmit() {
 
     if (!email || !password) {
         errorMsg.style.color = "var(--danger)";
-        errorMsg.textContent = "Please enter email and password.";
+        errorMsg.textContent = currentAppLang === 'ar' ? "الرجاء إدخال البريد الإلكتروني وكلمة المرور." : "Please enter email and password.";
         errorMsg.style.display = 'block'; return;
+    }
+
+    if (authMode === 'signup') {
+        const confirmPassword = document.getElementById('auth-confirm-password').value.trim();
+        if (password !== confirmPassword) {
+            errorMsg.style.color = "var(--danger)";
+            errorMsg.textContent = currentAppLang === 'ar' ? "كلمتا المرور غير متطابقتين." : "Passwords do not match.";
+            errorMsg.style.display = 'block';
+            return;
+        }
     }
 
     btn.style.display = 'none';
@@ -8104,6 +8142,10 @@ window.managerRejectPaymentRequest = managerRejectPaymentRequest;
 window.showSwapSelect = showSwapSelect;
 window.cancelSwapSelect = cancelSwapSelect;
 window.swapSaleMethod = swapSaleMethod;
+window.togglePassword = togglePassword;
+window.toggleConfirmPassword = toggleConfirmPassword;
+window.toggleAuthMode = toggleAuthMode;
+window.handleAuthSubmit = handleAuthSubmit;
 
 // --- ATTENDANCE SYSTEM ---
 
