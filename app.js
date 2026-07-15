@@ -577,6 +577,12 @@ function selectCompany(companyId) {
     document.body.classList.remove('theme-burgeroov', 'theme-mvc', 'theme-mvcfresh');
     document.body.classList.add('theme-' + companyId);
 
+    // Lock all tabs by default initially until database connection verifies permissions
+    document.body.classList.remove('role-admin', 'role-worker', 'perm-warehouse', 'perm-drivers', 'perm-finance', 'perm-sales', 'perm-costs', 'perm-adverts', 'perm-attendance', 'is-driver');
+    if (typeof markLockedTabs === 'function') {
+        markLockedTabs();
+    }
+
     let logoSrc = 'burgeroov.png';
     if (companyId === 'mvc') logoSrc = 'mvc.png';
     else if (companyId === 'mvcfresh') logoSrc = 'mvcfresh.png';
@@ -634,6 +640,7 @@ function selectCompany(companyId) {
                         .then(() => {
                             return db.ref(`companies/${companyId}/users_by_uid/${currentUser.uid}`).set({
                                 email: email,
+                                email_key: sanitizedEmail,
                                 role: 'worker',
                                 workerId: worker.id,
                                 index: workerIndex,
