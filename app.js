@@ -2430,6 +2430,49 @@ function deleteSaleTransaction(id) {
         });
 }
 
+function showSwapSelect(id) {
+    const btn = document.getElementById(`swap-btn-${id}`);
+    const select = document.getElementById(`swap-select-${id}`);
+    if (btn && select) {
+        btn.style.display = 'none';
+        select.style.display = 'inline-block';
+        select.focus();
+    }
+}
+
+function cancelSwapSelect(id) {
+    const btn = document.getElementById(`swap-btn-${id}`);
+    const select = document.getElementById(`swap-select-${id}`);
+    if (btn && select) {
+        btn.style.display = 'inline-block';
+        select.style.display = 'none';
+    }
+}
+
+function swapSaleMethod(id, newMethod) {
+    if (!newMethod) return;
+    const companyData = getCompanyData();
+    const salesLogs = companyData.salesLogs || [];
+    const logVal = salesLogs.find(l => l.id === id);
+    if (!logVal) return;
+
+    const oldMethod = logVal.method;
+    if (oldMethod === newMethod) {
+        cancelSwapSelect(id);
+        return;
+    }
+
+    db.ref('companies/' + currentCompany + '/salesLogs/' + id).update({
+        method: newMethod
+    }).then(() => {
+        logActivity('sales', logVal.workerId, logVal.cashier, `Swapped payment method of sale transaction (SAR ${logVal.amount}) from ${oldMethod} to ${newMethod}`);
+    }).catch(error => {
+        console.error("Error swapping sale method:", error);
+        alert("Failed to swap method.");
+        cancelSwapSelect(id);
+    });
+}
+
 function toggleSalesMethod(methodName) {
     let disabled = getCompanyData().disabledSalesMethods || [];
     if (disabled.includes(methodName)) {
@@ -2447,6 +2490,7 @@ function toggleSalesMethod(methodName) {
 function renderManaging() {
     if (currentTab !== 'managing') return;
 
+    const isAr = currentAppLang === 'ar';
     const isAdmin = currentUser.role === 'admin';
     const sources = getCompanyData().incomeSources || ['Cash', 'Credit Card'];
     const allLogs = getCompanyData().salesLogs || [];
@@ -2794,12 +2838,28 @@ function renderManaging() {
         if (filteredLogs.length === 0) {
             logDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.95rem; padding: 20px;">${t('msg-no-transactions')}</p>`;
         } else {
+            const sources = getCompanyData().incomeSources || ['Cash', 'Credit Card'];
             filteredLogs.forEach(l => {
                 const isCounted = !disabledMethods.includes(l.method);
                 const opacity = isCounted ? '1' : '0.5';
                 const strike = isCounted ? 'none' : 'line-through';
                 let isSalesAdmin = isAdmin || document.body.classList.contains('perm-finance') || document.body.classList.contains('perm-sales');
-                let delBtn = isSalesAdmin ? `<button onclick="deleteSaleTransaction('${l.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="${t('btn-remove')}">${t('btn-undo-action')}</button>` : '';
+                
+                let actionArea = '';
+                if (isSalesAdmin) {
+                    actionArea = `
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <button id="swap-btn-${l.id}" onclick="showSwapSelect('${l.id}')" style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius:6px; color: var(--text-main); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="${isAr ? 'تبديل طريقة الدفع' : 'Swap payment method'}">
+                                🔄 ${t('btn-swap') || 'Swap'}
+                            </button>
+                            <select id="swap-select-${l.id}" onchange="swapSaleMethod('${l.id}', this.value)" onblur="cancelSwapSelect('${l.id}')" style="display:none; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.9rem; font-weight: bold; cursor: pointer;">
+                                <option value="">${isAr ? 'اختر...' : 'Choose...'}</option>
+                                ${sources.map(s => `<option value="${s}" ${s === l.method ? 'disabled selected' : ''}>${translateDynamicTerm(s)}</option>`).join('')}
+                            </select>
+                            <button onclick="deleteSaleTransaction('${l.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="${t('btn-remove')}">${t('btn-undo-action')}</button>
+                        </div>
+                    `;
+                }
 
                 logDiv.innerHTML += `
                             <div class="ledger-card" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; opacity: ${opacity}; margin-bottom: 0;">
@@ -2811,7 +2871,7 @@ function renderManaging() {
                                         <span style="font-style:italic; opacity:0.7;">by ${l.cashier.split('@')[0]}</span>
                                     </div>
                                 </div>
-                                <div>${delBtn}</div>
+                                <div>${actionArea}</div>
                             </div>
                         `;
             });
@@ -8012,6 +8072,9 @@ window.saveHighMoneyThreshold = saveHighMoneyThreshold;
 window.renderHighMoneyApprovals = renderHighMoneyApprovals;
 window.managerAcceptPaymentRequest = managerAcceptPaymentRequest;
 window.managerRejectPaymentRequest = managerRejectPaymentRequest;
+window.showSwapSelect = showSwapSelect;
+window.cancelSwapSelect = cancelSwapSelect;
+window.swapSaleMethod = swapSaleMethod;
 
 // --- ATTENDANCE SYSTEM ---
 
