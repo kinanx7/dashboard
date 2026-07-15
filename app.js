@@ -852,6 +852,35 @@ function applyUserRoles() {
     let isKinan = email === 'kinan.rahal@hotmail.com';
     let isAdmin = isKinan || admins[email.replace(/\./g, ',')] === true;
 
+    // Self-register user UID mapping in database for security rules
+    if (currentUser.uid) {
+        if (isKinan) {
+            db.ref(`companies/${currentCompany}/users_by_uid/${currentUser.uid}`).set({
+                email: email,
+                role: 'super_admin'
+            }).catch(() => {});
+        } else if (isAdmin) {
+            db.ref(`companies/${currentCompany}/users_by_uid/${currentUser.uid}`).set({
+                email: email,
+                role: 'admin'
+            }).catch(() => {});
+        } else {
+            const worker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === email);
+            if (worker) {
+                const workerIndex = getCompanyData().workers.findIndex(w => w.id === worker.id);
+                if (workerIndex !== -1 && getCompanyData().workers[workerIndex].uid !== currentUser.uid) {
+                    db.ref(`companies/${currentCompany}/workers/${workerIndex}/uid`).set(currentUser.uid).catch(() => {});
+                }
+                db.ref(`companies/${currentCompany}/users_by_uid/${currentUser.uid}`).set({
+                    email: email,
+                    role: 'worker',
+                    workerId: worker.id,
+                    permissions: worker.permissions || null
+                }).catch(() => {});
+            }
+        }
+    }
+
     const swapBtn = document.getElementById('company-swap-btn');
     const swapBtnMob = document.getElementById('company-swap-btn-mob');
     const showSwap = isKinan || window.isMultiCompany;
