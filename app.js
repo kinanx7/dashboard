@@ -598,10 +598,63 @@ function selectCompany(companyId) {
     document.getElementById('global-month').value = currentGlobalMonth;
     setDatePickerLimits();
 
-    listenToCloudData();
-    startGlobalTick();
-
-    initFCMToken();
+    // Fetch credentials to pre-register UID to prevent database connection error (permission denied)
+    if (currentUser && currentUser.uid) {
+        const email = currentUser.email.toLowerCase();
+        
+        Promise.all([
+            db.ref(`companies/${companyId}/admins`).once('value').catch(() => null),
+            db.ref(`companies/${companyId}/workers`).once('value').catch(() => null)
+        ]).then(([adminsSnap, workersSnap]) => {
+            const admins = adminsSnap ? (adminsSnap.val() || {}) : {};
+            const workers = workersSnap ? (workersSnap.val() || []) : [];
+            
+            const sanitizedEmail = email.replace(/\./g, ',');
+            const isCompanyAdmin = email === 'kinan.rahal@hotmail.com' || admins[sanitizedEmail] !== undefined;
+            const worker = workers.find(w => w.email && w.email.toLowerCase() === email);
+            
+            if (email === 'kinan.rahal@hotmail.com') {
+                return db.ref(`companies/${companyId}/users_by_uid/${currentUser.uid}`).set({
+                    email: email,
+                    role: 'super_admin'
+                });
+            } else if (isCompanyAdmin) {
+                return db.ref(`companies/${companyId}/admins/${sanitizedEmail}`).set(currentUser.uid)
+                    .then(() => {
+                        return db.ref(`companies/${companyId}/users_by_uid/${currentUser.uid}`).set({
+                            email: email,
+                            role: 'admin',
+                            email_key: sanitizedEmail
+                        });
+                    });
+            } else if (worker) {
+                const workerIndex = workers.findIndex(w => w.id === worker.id);
+                if (workerIndex !== -1) {
+                    return db.ref(`companies/${companyId}/workers/${workerIndex}/uid`).set(currentUser.uid)
+                        .then(() => {
+                            return db.ref(`companies/${companyId}/users_by_uid/${currentUser.uid}`).set({
+                                email: email,
+                                role: 'worker',
+                                workerId: worker.id,
+                                index: workerIndex,
+                                permissions: worker.permissions || null
+                            });
+                        });
+                }
+            }
+        }).catch(err => {
+            console.warn("UID pre-registration skipped or failed:", err);
+        }).then(() => {
+            // Once UID mapping is registered, we can safely attach listener without permission denied errors
+            listenToCloudData();
+            startGlobalTick();
+            initFCMToken();
+        });
+    } else {
+        listenToCloudData();
+        startGlobalTick();
+        initFCMToken();
+    }
 }
 
 window.selectCompany = selectCompany;
