@@ -625,28 +625,22 @@ function selectCompany(companyId) {
                     role: 'super_admin'
                 });
             } else if (isCompanyAdmin) {
-                return db.ref(`companies/${companyId}/admins/${sanitizedEmail}`).set(currentUser.uid)
-                    .then(() => {
-                        return db.ref(`companies/${companyId}/users_by_uid/${currentUser.uid}`).set({
-                            email: email,
-                            role: 'admin',
-                            email_key: sanitizedEmail
-                        });
-                    });
+                return db.ref(`companies/${companyId}/users_by_uid/${currentUser.uid}`).set({
+                    email: email,
+                    role: 'admin',
+                    email_key: sanitizedEmail
+                });
             } else if (worker) {
                 const workerIndex = workers.findIndex(w => w.id === worker.id);
                 if (workerIndex !== -1) {
-                    return db.ref(`companies/${companyId}/workers/${workerIndex}/uid`).set(currentUser.uid)
-                        .then(() => {
-                            return db.ref(`companies/${companyId}/users_by_uid/${currentUser.uid}`).set({
-                                email: email,
-                                email_key: sanitizedEmail,
-                                role: 'worker',
-                                workerId: worker.id,
-                                index: workerIndex,
-                                permissions: worker.permissions || null
-                            });
-                        });
+                    return db.ref(`companies/${companyId}/users_by_uid/${currentUser.uid}`).set({
+                        email: email,
+                        email_key: sanitizedEmail,
+                        role: 'worker',
+                        workerId: worker.id,
+                        index: workerIndex,
+                        permissions: worker.permissions || null
+                    });
                 }
             }
         }).catch(err => {
