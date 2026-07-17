@@ -493,7 +493,14 @@ const uiTranslations = {
         "desc-ask-exit": "Request temporary permission from the attendance manager to exit the work area.",
         "label-exit-time": "Exit Time",
         "label-exit-reason": "Reason",
-        "btn-request-exit": "Request Exit"
+        "btn-request-exit": "Request Exit",
+        "title-late-rules": "⏱️ Late Penalty Rules Configuration",
+        "desc-late-rules": "Define rules to automatically penalize workers based on their lateness. You can add multiple tiers (e.g., 5 min late = 10 SAR, 10 min late = 20 SAR).",
+        "label-rule-mins": "Late by (Minutes)",
+        "label-rule-penalty": "Penalty Amount (SAR)",
+        "btn-add-rule": "➕ Add Rule",
+        "th-rule-mins": "Lateness Threshold",
+        "th-rule-penalty": "Penalty Amount"
     },
     ar: {
         // شاشة الدخول
@@ -951,6 +958,13 @@ const uiTranslations = {
         "desc-ask-exit": "تقديم طلب إذن مؤقت من مسؤول الحضور للخروج من منطقة العمل.",
         "label-exit-time": "وقت الخروج",
         "label-exit-reason": "السبب",
-        "btn-request-exit": "طلب الخروج"
+        "btn-request-exit": "طلب الخروج",
+        "title-late-rules": "⏱️ إعداد قوانين عقوبات التأخير",
+        "desc-late-rules": "تحديد قوانين لخصم مبالغ محددة تلقائياً من الموظفين بناءً على مدة تأخرهم. يمكنك إضافة فئات متعددة (مثال: 5 دقائق تأخير = 10 ريال خصم، 10 دقائق تأخير = 20 ريال خصم).",
+        "label-rule-mins": "التأخر بـ (دقائق)",
+        "label-rule-penalty": "قيمة العقوبة (ريال)",
+        "btn-add-rule": "➕ إضافة قانون",
+        "th-rule-mins": "حد التأخير",
+        "th-rule-penalty": "قيمة الخصم"
     }
 };

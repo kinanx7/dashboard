@@ -7374,7 +7374,15 @@ function renderSummaryTable() {
                                 const startMins = sH * 60 + (sM || 0);
                                 const checkMins = cH * 60 + (cM || 0);
                                 const diff = checkMins - startMins;
-                                if (diff > graceMins) {
+                                const rules = companyData.lateRules || [];
+                                let isLate = false;
+                                if (rules.length === 0) {
+                                    if (diff > graceMins) isLate = true;
+                                } else {
+                                    const minMins = Math.min(...rules.map(r => r.mins));
+                                    if (diff >= minMins) isLate = true;
+                                }
+                                if (isLate) {
                                     lateCount++;
                                 }
                             }
@@ -8458,9 +8466,9 @@ function saveLateSettings() {
 function getLateDeductionsForMonth(worker, monthStr) {
     const companyData = getCompanyData();
     const attendance = companyData.attendance || {};
+    const rules = companyData.lateRules || [];
     const graceMins = parseInt(companyData.lateGraceMinutes || 0);
-    const penalty = parseFloat(companyData.latePenaltySAR || 0);
-    if (penalty <= 0) return 0;
+    const legacyPenalty = parseFloat(companyData.latePenaltySAR || 0);
 
     let totalDeduction = 0;
     Object.keys(attendance).forEach(dateStr => {
@@ -8474,8 +8482,19 @@ function getLateDeductionsForMonth(worker, monthStr) {
                     const startMins = sH * 60 + (sM || 0);
                     const checkMins = cH * 60 + (cM || 0);
                     const diff = checkMins - startMins;
-                    if (diff > graceMins) {
-                        totalDeduction += penalty;
+                    if (diff > 0) {
+                        if (rules.length === 0) {
+                            if (diff > graceMins && legacyPenalty > 0) {
+                                totalDeduction += legacyPenalty;
+                            }
+                        } else {
+                            // Find highest matching tier
+                            const sortedRules = [...rules].sort((a, b) => b.mins - a.mins);
+                            const matchedRule = sortedRules.find(r => diff >= r.mins);
+                            if (matchedRule) {
+                                totalDeduction += parseFloat(matchedRule.penalty || 0);
+                            }
+                        }
                     }
                 }
             }
@@ -8775,6 +8794,7 @@ function renderAttendance() {
             }
         }
     }
+    renderLateRules();
 }
 
 // --- ACTIVITY LOG SYSTEM ---
@@ -10298,6 +10318,83 @@ function deleteOvertimeHourFromAtt(workerId, logId) {
         });
 }
 
+// ========================================================
+// TIERED LATE PENALTY RULES FUNCTIONS
+// ========================================================
+
+function addLateRule() {
+    const minsInput = document.getElementById('late-rule-mins');
+    const penaltyInput = document.getElementById('late-rule-penalty');
+    if (!minsInput || !penaltyInput) return;
+
+    const mins = parseInt(minsInput.value);
+    const penalty = parseFloat(penaltyInput.value);
+
+    if (isNaN(mins) || mins <= 0 || isNaN(penalty) || penalty < 0) {
+        alert("Please enter valid minutes and penalty.");
+        return;
+    }
+
+    const companyData = getCompanyData();
+    const rules = companyData.lateRules || [];
+    
+    // Add rule and sort ascending by minutes
+    rules.push({ mins, penalty });
+    rules.sort((a, b) => a.mins - b.mins);
+
+    db.ref(`companies/${currentCompany}/lateRules`).set(rules)
+        .then(() => {
+            minsInput.value = '';
+            penaltyInput.value = '';
+            renderAttendance();
+        })
+        .catch(err => console.error("Error adding late rule:", err));
+}
+
+function deleteLateRule(idx) {
+    if (!confirm("Are you sure you want to delete this rule?")) return;
+    const companyData = getCompanyData();
+    const rules = companyData.lateRules || [];
+    rules.splice(idx, 1);
+
+    db.ref(`companies/${currentCompany}/lateRules`).set(rules)
+        .then(() => {
+            renderAttendance();
+        })
+        .catch(err => console.error("Error deleting late rule:", err));
+}
+
+function renderLateRules() {
+    const isAr = currentAppLang === 'ar';
+    const tbody = document.getElementById('late-rules-table-body');
+    if (!tbody) return;
+
+    const companyData = getCompanyData();
+    const rules = companyData.lateRules || [];
+
+    tbody.innerHTML = '';
+    if (rules.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--text-muted); font-size:0.85rem; padding:12px;">${isAr ? 'لا توجد قوانين مدخلة. سيتم تطبيق القانون الافتراضي.' : 'No tiered rules defined. Default or no penalties will apply.'}</td></tr>`;
+        return;
+    }
+
+    rules.forEach((rule, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="font-weight: 600; font-size: 0.9rem; padding: 10px;">
+                ${rule.mins} ${isAr ? 'دقائق تأخير' : 'mins late'}
+            </td>
+            <td style="font-weight: 700; color: var(--danger); font-size: 0.9rem; padding: 10px;">
+                SAR ${parseFloat(rule.penalty).toFixed(2)}
+            </td>
+            <td style="text-align: center; padding: 10px;">
+                <button onclick="deleteLateRule(${idx})" class="btn-outline-danger" style="padding: 4px 8px; font-size: 0.75rem;">${isAr ? 'حذف' : 'Delete'}</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
 window.getShiftDurationHours = getShiftDurationHours;
 window.saveWorkerProfileChanges = saveWorkerProfileChanges;
 window.addNewWorkerShift = addNewWorkerShift;
@@ -10318,6 +10415,9 @@ window.handleExitRequest = handleExitRequest;
 window.renderAttendanceOvertimeDetails = renderAttendanceOvertimeDetails;
 window.addOvertimeHourFromAtt = addOvertimeHourFromAtt;
 window.deleteOvertimeHourFromAtt = deleteOvertimeHourFromAtt;
+window.addLateRule = addLateRule;
+window.deleteLateRule = deleteLateRule;
+window.renderLateRules = renderLateRules;
 
 // Initial run
 applyTranslations();
