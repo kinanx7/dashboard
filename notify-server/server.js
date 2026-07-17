@@ -84,7 +84,7 @@ function startNotificationListeners(companyId) {
         if (!workers) return;
 
         const sends = [];
-        const companyLabel = companyId === 'mvc' ? 'MVC' : 'Burgeroov';
+        const companyLabel = companyId === 'mvcfresh' ? 'MVC Fresh' : (companyId === 'mvc' ? 'MVC' : 'Burgeroov');
 
         workers.forEach((after, index) => {
             if (!after) return;
@@ -224,7 +224,7 @@ function startNotificationListeners(companyId) {
         if (!tasksObj) return;
 
         const sends = [];
-        const companyLabel = companyId === 'mvc' ? 'MVC' : 'Burgeroov';
+        const companyLabel = companyId === 'mvcfresh' ? 'MVC Fresh' : (companyId === 'mvc' ? 'MVC' : 'Burgeroov');
 
         // Fetch workers to retrieve tokens
         const workersSnapshot = await db.ref(`companies/${companyId}/workers`).once('value');
@@ -262,6 +262,7 @@ function startNotificationListeners(companyId) {
     });
 }
 
-// Start notification listeners for both Burgeroov and MVC companies
+// Start notification listeners for Burgeroov, MVC, and MVC Fresh companies
 startNotificationListeners('burgeroov');
 startNotificationListeners('mvc');
+startNotificationListeners('mvcfresh');
