@@ -48,8 +48,9 @@ async function safeSend(message, label) {
 // ─────────────────────────────────────────────────────────────────────────────
 exports.notifyWorkerOnUpdate = functions
     .region('europe-west1')
-    .database.ref('companies/burgeroov/workers/{workerIndex}')
+    .database.ref('companies/{companyId}/workers/{workerIndex}')
     .onWrite(async (change, context) => {
+        const companyId = context.params.companyId;
 
         const before = change.before.val();
         const after  = change.after.val();

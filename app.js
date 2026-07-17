@@ -7351,6 +7351,16 @@ function renderSummaryTable() {
         const deliveries = (stats.deliveriesList ? stats.deliveriesList.length : 0) + (stats.legacyDeliveries || 0);
         const costs = parseFloat(stats.costs || 0);
 
+        const base = parseFloat(worker.income || 0);
+        const rew = calculateRewardsTotal(stats.rewardsList);
+        const viol = calculateViolationsTotal(stats.violationsList);
+        const sysViolDeduction = typeof getSystemViolationDeductionsForMonth === 'function' ? getSystemViolationDeductionsForMonth(worker, currentGlobalMonth) : 0;
+        const lateDeduction = typeof getLateDeductionsForMonth === 'function' ? getLateDeductionsForMonth(worker, currentGlobalMonth) : 0;
+        const volumeReward = typeof getDriverVolumeRewardsForMonth === 'function' ? getDriverVolumeRewardsForMonth(worker, currentGlobalMonth) : 0;
+        const ov = calculateOvertimeTotal(stats.overtimeList);
+        const netThisMonth = base + rew + volumeReward + ov - viol - sysViolDeduction - lateDeduction;
+        const paidThisMonth = calculatePaymentsTotal(stats.paymentsList);
+
         // Calculate Monthly Attendance Stats
         const companyData = getCompanyData();
         const attendance = companyData.attendance || {};
@@ -7590,6 +7600,57 @@ function renderSummaryTable() {
                     </div>
 
                     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-top:16px;">
+                        <!-- Salary Breakdown Panel -->
+                        <div style="background:var(--input-bg); padding:16px; border-radius:8px; border:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:space-between;">
+                            <div style="font-size:0.95rem; font-weight:600; color:var(--text-main); margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+                                📊 ${isAr ? 'تفاصيل الراتب والخصومات' : 'Salary & Balance Breakdown'}
+                            </div>
+                            <div style="font-size:0.85rem; display:flex; flex-direction:column; gap:8px; flex:1; justify-content:center;">
+                                <div class="flex-between" style="border-bottom: 1px dashed var(--border-color); padding-bottom: 4px; margin-bottom: 2px;">
+                                    <span style="color:var(--text-muted);">${isAr ? 'الراتب الأساسي:' : 'Base Salary:'}</span>
+                                    <strong style="color:var(--text-main);">SAR ${base.toLocaleString()}</strong>
+                                </div>
+                                ${ov > 0 ? `
+                                <div class="flex-between" style="border-bottom: 1px dashed var(--border-color); padding-bottom: 4px; margin-bottom: 2px;">
+                                    <span style="color:var(--text-muted);">${isAr ? 'ساعات إضافية:' : 'Overtime Earned:'}</span>
+                                    <strong style="color:var(--success);">+ SAR ${ov.toLocaleString()}</strong>
+                                </div>` : ''}
+                                ${(rew + volumeReward) > 0 ? `
+                                <div class="flex-between" style="border-bottom: 1px dashed var(--border-color); padding-bottom: 4px; margin-bottom: 2px;">
+                                    <span style="color:var(--text-muted);">${isAr ? 'المكافآت والحوافز:' : 'Rewards & Volume:'}</span>
+                                    <strong style="color:var(--success);">+ SAR ${(rew + volumeReward).toLocaleString()}</strong>
+                                </div>` : ''}
+                                ${viol > 0 ? `
+                                <div class="flex-between" style="border-bottom: 1px dashed var(--border-color); padding-bottom: 4px; margin-bottom: 2px;">
+                                    <span style="color:var(--text-muted);">${isAr ? 'المخالفات العادية:' : 'Normal Violations:'}</span>
+                                    <strong style="color:var(--danger);">- SAR ${viol.toLocaleString()}</strong>
+                                </div>` : ''}
+                                ${sysViolDeduction > 0 ? `
+                                <div class="flex-between" style="border-bottom: 1px dashed var(--border-color); padding-bottom: 4px; margin-bottom: 2px;">
+                                    <span style="color:var(--text-muted);">${isAr ? 'مخالفات النظام:' : 'System Violations:'}</span>
+                                    <strong style="color:var(--danger);">- SAR ${sysViolDeduction.toLocaleString()}</strong>
+                                </div>` : ''}
+                                ${lateDeduction > 0 ? `
+                                <div class="flex-between" style="border-bottom: 1px dashed var(--border-color); padding-bottom: 4px; margin-bottom: 2px;">
+                                    <span style="color:var(--text-muted);">${isAr ? 'خصم التأخير:' : 'Late Penalties:'}</span>
+                                    <strong style="color:var(--danger);">- SAR ${lateDeduction.toLocaleString()}</strong>
+                                </div>` : ''}
+                                <div class="flex-between" style="border-bottom: 1px dashed var(--border-color); padding-bottom: 4px; padding-top:4px; margin-top:2px;">
+                                    <strong style="color:var(--text-main); font-weight:700;">${isAr ? 'صافي راتب الشهر:' : 'Net Monthly Salary:'}</strong>
+                                    <strong style="color:var(--primary); font-weight:800;">SAR ${netThisMonth.toLocaleString()}</strong>
+                                </div>
+                                ${paidThisMonth > 0 ? `
+                                <div class="flex-between" style="border-bottom: 1px dashed var(--border-color); padding-bottom: 4px; margin-bottom: 2px;">
+                                    <span style="color:var(--text-muted);">${isAr ? 'المسحوبات والسلف:' : 'Draws/Payments:'}</span>
+                                    <strong style="color:var(--danger);">- SAR ${paidThisMonth.toLocaleString()}</strong>
+                                </div>` : ''}
+                                <div class="flex-between" style="padding-top:8px; margin-top:4px;">
+                                    <strong style="color:var(--text-main); font-weight:800;">${isAr ? 'الرصيد التراكمي المتبقي:' : 'Cumulative Balance:'}</strong>
+                                    <strong style="color:var(--success); font-size:1.05rem; font-weight:900;">SAR ${remainingAllTime.toLocaleString()}</strong>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Violations Panel -->
                         <div style="background:var(--input-bg); padding:16px; border-radius:8px; border:1px solid var(--border-color);">
                             <div style="font-size:0.95rem; font-weight:600; color:var(--text-main); margin-bottom:12px; display:flex; align-items:center; gap:8px;">
@@ -8657,6 +8718,9 @@ function renderAttendance() {
     tbody.innerHTML = '';
 
     const companyData = getCompanyData();
+    const isAttAdmin = currentUser && (currentUser.role === 'admin' || document.body.classList.contains('perm-attendance'));
+    const currentEmail = currentUser && currentUser.email ? currentUser.email.toLowerCase() : '';
+    const myWorker = companyData.workers.find(w => w.email && w.email.toLowerCase() === currentEmail);
 
     // Populate Late Config Inputs
     const graceInput = document.getElementById('late-grace-input');
@@ -8726,6 +8790,27 @@ function renderAttendance() {
         const mmNow = String(todayNow.getMinutes()).padStart(2, '0');
         const currentTimeString = (att && att.status === 'present' && att.time) ? att.time : `${hhNow}:${mmNow}`;
 
+        let actionsHtml = '';
+        if (isAttAdmin) {
+            actionsHtml = `
+                <div style="display:inline-flex; align-items:center; gap:4px;">
+                    ${exitActionBtn}
+                    <input type="time" id="att-time-${w.id}" value="${currentTimeString}" style="padding: 4px; font-size: 0.8rem; width: 85px; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-main);" />
+                    <button onclick="markWorkerAttendance('${w.id}', 'present')" class="btn-success" style="padding: 4px 8px; font-size: 0.8rem;" title="${isAr ? 'تسجيل حضور' : 'Mark Present'}">✔️</button>
+                    <button onclick="markWorkerAttendance('${w.id}', 'absent')" class="btn-danger" style="padding: 4px 8px; font-size: 0.8rem;" title="${isAr ? 'تسجيل غياب' : 'Mark Absent'}">❌</button>
+                    <button onclick="clearWorkerAttendance('${w.id}')" class="btn-outline" style="padding: 4px 8px; font-size: 0.8rem;" title="${isAr ? 'إعادة تعيين' : 'Reset'}">🔄</button>
+                </div>
+            `;
+        } else if (myWorker && w.id === myWorker.id) {
+            if (!att || att.status !== 'present') {
+                actionsHtml = `
+                    <button onclick="markWorkerSelfAttendance()" class="btn-success" style="padding: 6px 12px; font-size: 0.8rem; font-weight:700;" title="${isAr ? 'تسجيل حضور' : 'Check-In'}">✔️ ${isAr ? 'حضور' : 'Check-In'}</button>
+                `;
+            } else {
+                actionsHtml = `<span style="color:var(--success); font-weight:700; font-size:0.85rem;">✅ ${isAr ? 'تم تسجيل الحضور' : 'Checked In'}</span>`;
+            }
+        }
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>
@@ -8737,22 +8822,12 @@ function renderAttendance() {
             <td style="font-weight: 500;">${scheduled}</td>
             <td style="font-family: monospace; font-weight: 600;">${checkinTimeHtml}</td>
             <td>${latenessHtml}</td>
-            <td class="attendance-admin-only">
-                <div style="display:inline-flex; align-items:center; gap:4px;">
-                    ${exitActionBtn}
-                    <input type="time" id="att-time-${w.id}" value="${currentTimeString}" style="padding: 4px; font-size: 0.8rem; width: 85px; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-main);" />
-                    <button onclick="markWorkerAttendance('${w.id}', 'present')" class="btn-success" style="padding: 4px 8px; font-size: 0.8rem;" title="${isAr ? 'تسجيل حضور' : 'Mark Present'}">✔️</button>
-                    <button onclick="markWorkerAttendance('${w.id}', 'absent')" class="btn-danger" style="padding: 4px 8px; font-size: 0.8rem;" title="${isAr ? 'تسجيل غياب' : 'Mark Absent'}">❌</button>
-                    <button onclick="clearWorkerAttendance('${w.id}')" class="btn-outline" style="padding: 4px 8px; font-size: 0.8rem;" title="${isAr ? 'إعادة تعيين' : 'Reset'}">🔄</button>
-                </div>
-            </td>
+            <td>${actionsHtml}</td>
         `;
         tbody.appendChild(tr);
     });
 
     // Render worker self-view exit request status
-    const currentEmail = currentUser && currentUser.email ? currentUser.email.toLowerCase() : '';
-    const myWorker = companyData.workers.find(w => w.email && w.email.toLowerCase() === currentEmail);
     const workerExitRequestDiv = document.getElementById('worker-active-exit-request');
     if (workerExitRequestDiv) {
         workerExitRequestDiv.innerHTML = '';
@@ -10395,6 +10470,53 @@ function renderLateRules() {
     });
 }
 
+function markWorkerSelfAttendance() {
+    const worker = getActiveWorker();
+    if (!worker) {
+        alert(t('msg-account-not-linked') || "Your account is not linked to any worker profile.");
+        return;
+    }
+
+    const datePicker = document.getElementById('attendance-date-picker');
+    const dateStr = datePicker ? datePicker.value : '';
+    if (!dateStr) return;
+
+    // Get today's local date YYYY-MM-DD
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+
+    if (dateStr !== todayStr) {
+        alert(currentAppLang === 'ar' ? 'يمكنك تسجيل حضورك لليوم الحالي فقط!' : 'You can only check in for today\'s date!');
+        return;
+    }
+
+    // Time is current local time
+    const hh = String(today.getHours()).padStart(2, '0');
+    const mins = String(today.getMinutes()).padStart(2, '0');
+    const checkTime = `${hh}:${mins}`;
+
+    const lateness = calculateLateness(worker.startTime, checkTime);
+
+    db.ref(`companies/${currentCompany}/attendance/${dateStr}/${worker.id}`).set({
+        status: 'present',
+        time: checkTime,
+        lateness: lateness || '',
+        timestamp: Date.now()
+    })
+    .then(() => {
+        logActivity('attendance', worker.id, worker.name, `Worker Self Checked-In as PRESENT on ${dateStr} at ${checkTime} (Lateness: ${lateness || 'None'})`);
+        alert(currentAppLang === 'ar' ? 'تم تسجيل حضورك بنجاح!' : 'You have checked in successfully!');
+        renderAll();
+    })
+    .catch(err => {
+        console.error("Error during self check-in:", err);
+        alert("Error: " + err.message);
+    });
+}
+
 window.getShiftDurationHours = getShiftDurationHours;
 window.saveWorkerProfileChanges = saveWorkerProfileChanges;
 window.addNewWorkerShift = addNewWorkerShift;
@@ -10418,6 +10540,7 @@ window.deleteOvertimeHourFromAtt = deleteOvertimeHourFromAtt;
 window.addLateRule = addLateRule;
 window.deleteLateRule = deleteLateRule;
 window.renderLateRules = renderLateRules;
+window.markWorkerSelfAttendance = markWorkerSelfAttendance;
 
 // Initial run
 applyTranslations();
