@@ -580,60 +580,6 @@
                             </div>
                         </div>
 
-                        <!-- Overtime Management Area -->
-                        <div class="management-form-area" style="margin-bottom: 24px;">
-                            <h3 data-i18n="title-overtime-management"
-                                style="margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; color: #f59e0b;">
-                                Overtime Management</h3>
-                            
-                            <div class="grid-2-col" style="margin-bottom: 16px;">
-                                <div style="background:var(--input-bg); padding:12px; border-radius:8px; border:1px solid var(--border-color); text-align:center;">
-                                    <span style="font-size:0.85rem; color:var(--text-muted);" data-i18n="label-shift-duration">Active Shift Duration</span>
-                                    <h4 id="ops-ov-shift-duration" style="margin-top:6px; font-weight:800; color:var(--primary);">--</h4>
-                                </div>
-                                <div style="background:var(--input-bg); padding:12px; border-radius:8px; border:1px solid var(--border-color); text-align:center;">
-                                    <span style="font-size:0.85rem; color:var(--text-muted);" data-i18n="label-hourly-rate">Calculated Hourly Rate</span>
-                                    <h4 id="ops-ov-hourly-rate" style="margin-top:6px; font-weight:800; color:var(--secondary);">--</h4>
-                                </div>
-                            </div>
-                            
-                            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; align-items:end; margin-bottom: 16px;">
-                                <div class="form-group" style="margin-bottom:0;">
-                                    <label data-i18n="label-ov-hours">Overtime Hours</label>
-                                    <select id="ops-ov-hours" style="padding:10px; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);">
-                                        <option value="1">+1 Hour</option>
-                                        <option value="2">+2 Hours</option>
-                                        <option value="3">+3 Hours</option>
-                                        <option value="4">+4 Hours</option>
-                                        <option value="5">+5 Hours</option>
-                                        <option value="6">+6 Hours</option>
-                                        <option value="7">+7 Hours</option>
-                                    </select>
-                                </div>
-                                <div class="form-group" style="margin-bottom:0;">
-                                    <label data-i18n="label-ov-multiplier">Overtime Multiplier</label>
-                                    <select id="ops-ov-multiplier" style="padding:10px; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);">
-                                        <option value="1.0">x1.00 (Standard)</option>
-                                        <option value="1.25">x1.25 (Peak Day)</option>
-                                        <option value="1.5">x1.50 (Weekend/Holiday)</option>
-                                        <option value="1.75">x1.75</option>
-                                        <option value="2.0">x2.00 (Double Pay)</option>
-                                    </select>
-                                </div>
-                                <div style="text-align: right; display: flex; flex-direction: column; gap: 4px;">
-                                    <button onclick="addOvertimeHour()" class="btn-warning" style="width:100%; padding:10px; font-weight:bold;" data-i18n="btn-add-overtime">➕ Log Overtime</button>
-                                </div>
-                            </div>
-                            
-                            <!-- Overtime Log History -->
-                            <div>
-                                <h4 data-i18n="title-overtime-log" style="margin-bottom:10px; color: var(--text-main);">Overtime Logs (<span class="display-current-month"></span>)</h4>
-                                <div id="ops-worker-overtime-history" style="display:flex; flex-direction:column; gap:8px;">
-                                    <!-- Rendered dynamically -->
-                                </div>
-                            </div>
-                        </div>
-
                         <!-- Daily Log Form -->
                         <div class="management-form-area">
                             <h3 data-i18n="title-log-daily-perf"
@@ -712,6 +658,31 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Worker Self-View: Ask for Custody Card -->
+                <div class="card worker-only" style="border-top: 4px solid #f59e0b; margin-top: 30px;">
+                    <h2 class="card-title" data-i18n="title-ask-custody">📦 Ask for Custody</h2>
+                    <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:16px;" data-i18n="desc-ask-custody">Submit a request for custody cash/value. It will be reviewed by the financial department.</p>
+                    
+                    <div class="grid-2-col" style="margin-bottom: 16px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label data-i18n="label-custody-req-amount">Requested Custody Value (SAR)</label>
+                            <input type="number" step="any" id="custody-req-amount" placeholder="e.g. 200" min="0.01">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label data-i18n="label-request-reason">Reason</label>
+                            <input type="text" id="custody-req-reason" placeholder="e.g. Purchase cleaning supplies">
+                        </div>
+                    </div>
+                    <button onclick="submitCustodyRequest()" class="btn-warning" style="width:100%; font-weight:700; padding:12px; margin-top: 16px; background:#f59e0b; border-color:#d97706;" data-i18n="btn-submit-custody-request">Submit Custody Request</button>
+
+                    <div style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+                        <h3 data-i18n="title-my-custody-requests">My Custody Requests History</h3>
+                        <div id="worker-custody-requests-list" style="display:flex; flex-direction:column; gap:10px; margin-top:12px;">
+                            <!-- Rendered dynamically -->
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -762,6 +733,90 @@
                             <!-- Injected dynamically -->
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- Worker Self-View: Request temporary exit -->
+            <div class="attendance-worker-only card" style="border-top: 4px solid var(--warning); margin-top: 24px;">
+                <h2 class="card-title" data-i18n="title-ask-exit">🚪 Request Exit Work Area</h2>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;" data-i18n="desc-ask-exit">
+                    Request temporary permission from the attendance manager to exit the work area.
+                </p>
+                <div style="display:flex; gap:12px; align-items:end; flex-wrap:wrap;">
+                    <div class="form-group" style="margin-bottom:0; flex:1; min-width:150px;">
+                        <label data-i18n="label-exit-time">Exit Time</label>
+                        <input type="time" id="attendance-exit-time" style="padding:10px; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);" />
+                    </div>
+                    <div class="form-group" style="margin-bottom:0; flex:2; min-width:200px;">
+                        <label data-i18n="label-exit-reason">Reason</label>
+                        <input type="text" id="attendance-exit-reason" placeholder="e.g. Lunch break, personal chore" style="padding:10px; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);" />
+                    </div>
+                    <button onclick="submitExitRequest()" class="btn-warning" style="height:40px; padding:0 20px; font-weight:bold; background:var(--warning); border-color:var(--warning-border);" data-i18n="btn-request-exit">Request Exit</button>
+                </div>
+
+                <!-- Exit Request Status Display -->
+                <div id="worker-active-exit-request" style="margin-top: 15px; display:none;">
+                    <!-- JS injected status -->
+                </div>
+            </div>
+
+            <!-- Overtime Management Area (Moved here) -->
+            <div class="attendance-admin-only card" id="attendance-overtime-card" style="margin-top: 24px; border-top: 4px solid #f59e0b; width: 100%;">
+                <h3 data-i18n="title-overtime-management" style="margin: 0 0 16px 0; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; color: #f59e0b;">
+                    Overtime Management</h3>
+                
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label data-i18n="label-select-emp">Select Employee</label>
+                    <select id="attendance-overtime-worker-select" onchange="renderAttendanceOvertimeDetails()" style="padding: 10px; width: 100%; max-width: 300px; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);"></select>
+                </div>
+
+                <div id="attendance-overtime-details-area" style="display: none;">
+                    <div class="grid-2-col" style="margin-bottom: 16px;">
+                        <div style="background:var(--input-bg); padding:12px; border-radius:8px; border:1px solid var(--border-color); text-align:center;">
+                            <span style="font-size:0.85rem; color:var(--text-muted);" data-i18n="label-shift-duration">Active Shift Duration</span>
+                            <h4 id="att-ov-shift-duration" style="margin-top:6px; font-weight:800; color:var(--primary);">--</h4>
+                        </div>
+                        <div style="background:var(--input-bg); padding:12px; border-radius:8px; border:1px solid var(--border-color); text-align:center;">
+                            <span style="font-size:0.85rem; color:var(--text-muted);" data-i18n="label-hourly-rate">Calculated Hourly Rate</span>
+                            <h4 id="att-ov-hourly-rate" style="margin-top:6px; font-weight:800; color:var(--secondary);">--</h4>
+                        </div>
+                    </div>
+                    
+                    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; align-items:end; margin-bottom: 16px;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label data-i18n="label-ov-hours">Overtime Hours</label>
+                            <select id="att-ov-hours" style="padding:10px; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);">
+                                <option value="1">+1 Hour</option>
+                                <option value="2">+2 Hours</option>
+                                <option value="3">+3 Hours</option>
+                                <option value="4">+4 Hours</option>
+                                <option value="5">+5 Hours</option>
+                                <option value="6">+6 Hours</option>
+                                <option value="7">+7 Hours</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label data-i18n="label-ov-multiplier">Overtime Multiplier</label>
+                            <select id="att-ov-multiplier" style="padding:10px; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);">
+                                <option value="1.0">x1.00 (Standard)</option>
+                                <option value="1.25">x1.25 (Peak Day)</option>
+                                <option value="1.5">x1.50 (Weekend/Holiday)</option>
+                                <option value="1.75">x1.75</option>
+                                <option value="2.0">x2.00 (Double Pay)</option>
+                            </select>
+                        </div>
+                        <div style="text-align: right; display: flex; flex-direction: column; gap: 4px;">
+                            <button onclick="addOvertimeHourFromAtt()" class="btn-warning" style="width:100%; padding:10px; font-weight:bold;" data-i18n="btn-add-overtime">➕ Log Overtime</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Overtime Log History -->
+                    <div>
+                        <h4 data-i18n="title-overtime-log" style="margin-bottom:10px; color: var(--text-main);">Overtime Logs (<span class="display-current-month"></span>)</h4>
+                        <div id="att-worker-overtime-history" style="display:flex; flex-direction:column; gap:8px;">
+                            <!-- Rendered dynamically -->
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1330,6 +1385,17 @@
                     </div>
                 </div>
 
+                <!-- Pending Custody Requests Card -->
+                <div class="card finance-admin" style="border-top: 4px solid #f59e0b; margin-bottom: 24px;">
+                    <h2 class="card-title" data-i18n="title-pending-custody-requests">Pending Custody Requests</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;" data-i18n="desc-pending-custody-requests">
+                        Review worker requests for custody values. Accepting generates a unique 6-digit code for the worker to provide at the sales checkout.
+                    </p>
+                    <div id="pending-custody-requests-list" style="display:flex; flex-direction:column; gap:12px;">
+                        <!-- Rendered dynamically -->
+                    </div>
+                </div>
+
                 <!-- Daily Advances & Payouts Log Card -->
                 <div class="card finance-admin" style="border-top: 4px solid var(--info); margin-bottom: 24px;">
                     <div class="flex-between" style="margin-bottom: 12px; align-items: center; flex-wrap: wrap; gap: 8px;">
@@ -1848,6 +1914,17 @@
                         <!-- Rendered dynamically -->
                     </div>
                 </div>
+
+                <!-- Accepted Custody Releases Card -->
+                <div class="card" style="margin-top: 30px; border-top: 4px solid #f59e0b;">
+                    <h2 class="card-title" data-i18n="title-accepted-custodies">Accepted Custody Releases</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;" data-i18n="desc-accepted-custodies">
+                        Verify the private code with the worker before releasing the custody, then click "Custody Released Successfully".
+                    </p>
+                    <div id="accepted-custodies-list" style="display:flex; flex-direction:column; gap:12px;">
+                        <!-- Rendered dynamically -->
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -2198,7 +2275,7 @@
     </div>
 
     <script defer src="translations.js"></script>
-    <script defer src="app.js?v=22"></script>
+    <script defer src="app.js?v=23"></script>
 </body>
 
 

@@ -479,7 +479,21 @@ const uiTranslations = {
         "box-overtime": "Overtime Hours",
         "span-earned": "Earned:",
         "desc-overtime-fin": "Auditable list of overtime entries logged for this worker.",
-        "span-overtime": "Overtime:"
+        "span-overtime": "Overtime:",
+        "title-ask-custody": "📦 Ask for Custody",
+        "desc-ask-custody": "Submit a request for custody cash/value. It will be reviewed by the financial department.",
+        "label-custody-req-amount": "Requested Custody Value (SAR)",
+        "btn-submit-custody-request": "Submit Custody Request",
+        "title-my-custody-requests": "My Custody Requests History",
+        "title-pending-custody-requests": "Pending Custody Requests",
+        "desc-pending-custody-requests": "Review worker requests for custody values. Accepting generates a unique 6-digit code for the worker to provide at the sales checkout.",
+        "title-accepted-custodies": "Accepted Custody Releases",
+        "desc-accepted-custodies": "Verify the private code with the worker before releasing the custody, then click 'Custody Released Successfully'.",
+        "title-ask-exit": "🚪 Request Exit Work Area",
+        "desc-ask-exit": "Request temporary permission from the attendance manager to exit the work area.",
+        "label-exit-time": "Exit Time",
+        "label-exit-reason": "Reason",
+        "btn-request-exit": "Request Exit"
     },
     ar: {
         // شاشة الدخول
@@ -923,6 +937,20 @@ const uiTranslations = {
         "box-overtime": "ساعات العمل الإضافي",
         "span-earned": "المكتسب:",
         "desc-overtime-fin": "قائمة قابلة للتدقيق لساعات العمل الإضافي المسجلة للموظف.",
-        "span-overtime": "العمل الإضافي:"
+        "span-overtime": "العمل الإضافي:",
+        "title-ask-custody": "📦 طلب عهدة",
+        "desc-ask-custody": "تقديم طلب للحصول على عهدة نقدية أو عينية. سيتم مراجعة الطلب من قبل القسم المالي.",
+        "label-custody-req-amount": "قيمة العهدة المطلوبة (ريال)",
+        "btn-submit-custody-request": "إرسال طلب العهدة",
+        "title-my-custody-requests": "سجل طلبات العهدة الخاصة بي",
+        "title-pending-custody-requests": "طلبات العهدة المعلقة",
+        "desc-pending-custody-requests": "مراجعة طلبات العهدة المقدمة من الموظفين. قبول الطلب يولد رمزًا خاصًا مكونًا من 6 أرقام يزود به الموظف مسؤول المبيعات لتسليم العهدة.",
+        "title-accepted-custodies": "عمليات تسليم العهدة المعتمدة",
+        "desc-accepted-custodies": "يرجى التحقق من الرمز الخاص مع الموظف قبل تسليمه العهدة، ثم اضغط على 'تم تسليم العهدة بنجاح'.",
+        "title-ask-exit": "🚪 طلب خروج من منطقة العمل",
+        "desc-ask-exit": "تقديم طلب إذن مؤقت من مسؤول الحضور للخروج من منطقة العمل.",
+        "label-exit-time": "وقت الخروج",
+        "label-exit-reason": "السبب",
+        "btn-request-exit": "طلب الخروج"
     }
 };

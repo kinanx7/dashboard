@@ -1133,6 +1133,7 @@ function ensureArraysExist(data) {
     });
 
     if (!data.paymentRequests) data.paymentRequests = {};
+    if (!data.custodyRequests) data.custodyRequests = {};
     if (!data.attendance) data.attendance = {};
     if (!data.activityLogs) data.activityLogs = {};
     if (!data.generalDeliveries) data.generalDeliveries = {};
@@ -6696,6 +6697,9 @@ function renderAll() {
     else if (currentTab === 'costs') { renderCosts(); }
 
     renderPaymentRequests();
+    renderWorkerCustodyRequests();
+    renderPendingCustodyRequests();
+    renderAcceptedCustodyReleases();
 }
 
 function renderWorkerViolationPanel() {
@@ -6815,12 +6819,14 @@ function populateWorkerDropdowns() {
     const taskSelect = document.getElementById('task-worker-select'); const taskVal = taskSelect ? taskSelect.value : '';
     const permSelect = document.getElementById('perm-worker-select'); const permVal = permSelect ? permSelect.value : '';
     const sysSelect = document.getElementById('sys-viol-worker-select'); const sysVal = sysSelect ? sysSelect.value : '';
+    const attSelect = document.getElementById('attendance-overtime-worker-select'); const attVal = attSelect ? attSelect.value : '';
 
     if (opsSelect) opsSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
     if (finSelect) finSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
     if (taskSelect) taskSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
     if (permSelect) permSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
     if (sysSelect) sysSelect.innerHTML = `<option value="">-- Choose Worker --</option>`;
+    if (attSelect) attSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
 
     getCompanyData().workers.forEach(worker => {
         if (opsSelect) opsSelect.appendChild(new Option(worker.name, worker.id));
@@ -6828,6 +6834,7 @@ function populateWorkerDropdowns() {
         if (taskSelect) taskSelect.appendChild(new Option(worker.name, worker.id));
         if (permSelect) permSelect.appendChild(new Option(worker.name, worker.id));
         if (sysSelect) sysSelect.appendChild(new Option(worker.name, worker.id));
+        if (attSelect) attSelect.appendChild(new Option(worker.name, worker.id));
     });
 
     if (opsSelect) opsSelect.value = opsVal;
@@ -6835,6 +6842,7 @@ function populateWorkerDropdowns() {
     if (taskSelect) taskSelect.value = taskVal;
     if (permSelect) permSelect.value = permVal;
     if (sysSelect) sysSelect.value = sysVal;
+    if (attSelect) attSelect.value = attVal;
 }
 
 // OPERATIONS TAB RENDERING
@@ -7468,6 +7476,54 @@ function renderSummaryTable() {
             `;
         }
 
+        // 1. Calculate Rewards List for Summary card
+        const rewardsList = stats.rewardsList || [];
+        let rewardsLogHtml = '';
+        if (rewardsList.length === 0) {
+            rewardsLogHtml = `<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding:12px;">${isAr ? 'لا توجد مكافآت هذا الشهر.' : 'No rewards recorded this month.'}</div>`;
+        } else {
+            rewardsList.forEach(r => {
+                const amt = parseFloat(r.amount || 0);
+                rewardsLogHtml += `<div style="margin-bottom:8px; padding:10px 12px; background:var(--success-bg); border:1px solid var(--success-border); border-radius:8px; font-size:0.85rem;">
+                    <div style="font-weight:600; color:var(--text-main); display:flex; justify-content:space-between;">
+                        <span>🎁 ${r.reason || (isAr ? 'مكافأة' : 'Bonus')}</span>
+                        <span style="color:var(--success);">+ SAR ${amt.toLocaleString()}</span>
+                    </div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">📅 ${r.date}</div>
+                </div>`;
+            });
+        }
+
+        // 2. Calculate Custody Ledger for Summary card
+        let custodyTaken = 0;
+        let custodyReturned = 0;
+        let custodyLogHtml = '';
+        const custodyList = stats.custodyList || [];
+        if (custodyList.length === 0) {
+            custodyLogHtml = `<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding:12px;">${isAr ? 'لا توجد عمليات عهدة.' : 'No custody transactions.'}</div>`;
+        } else {
+            custodyList.forEach(c => {
+                const amt = parseFloat(c.amount || 0);
+                if (c.type === 'given') {
+                    custodyTaken += amt;
+                    custodyLogHtml += `<div class="flex-between" style="font-size:0.85rem; margin-bottom:6px; border-bottom:1px dashed var(--border-color); padding-bottom:4px;">
+                        <span>📥 ${isAr ? 'استلام عهدة:' : 'Taken:'} ${c.date}</span>
+                        <span style="color:#f59e0b; font-weight:700;">+ SAR ${amt.toLocaleString()}</span>
+                    </div>`;
+                } else {
+                    custodyReturned += amt;
+                    custodyLogHtml += `<div class="flex-between" style="font-size:0.85rem; margin-bottom:6px; border-bottom:1px dashed var(--border-color); padding-bottom:4px;">
+                        <span>📤 ${isAr ? 'إرجاع عهدة:' : 'Returned:'} ${c.date}</span>
+                        <span style="color:var(--success); font-weight:700;">- SAR ${amt.toLocaleString()}</span>
+                    </div>`;
+                }
+            });
+        }
+        const outstandingCustody = custodyTaken - custodyReturned;
+        const custodyStatusHtml = outstandingCustody > 0 
+            ? `<div style="color:#b45309; font-weight:700; font-size:0.85rem; text-align:center; background:#fffbeb; border:1px solid #fef3c7; padding:6px; border-radius:6px; margin-bottom:12px;">⏳ ${isAr ? 'مستحق الإرجاع:' : 'Outstanding to Return:'} SAR ${outstandingCustody.toLocaleString()}</div>`
+            : `<div style="color:var(--success); font-weight:700; font-size:0.85rem; text-align:center; background:var(--success-bg); border:1px solid var(--success-border); padding:6px; border-radius:6px; margin-bottom:12px;">✅ ${isAr ? 'تمت إعادة الجميع' : 'All Returned'}</div>`;
+
         const card = document.createElement('div');
         card.className = 'summary-worker-card';
         card.innerHTML = `
@@ -7525,16 +7581,40 @@ function renderSummaryTable() {
                         </div>
                     </div>
 
-                    <div style="display:flex; gap:16px; flex-wrap:wrap;">
-                        <div style="flex:2; min-width:300px; background:var(--input-bg); padding:16px; border-radius:8px; border:1px solid var(--border-color);">
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-top:16px;">
+                        <!-- Violations Panel -->
+                        <div style="background:var(--input-bg); padding:16px; border-radius:8px; border:1px solid var(--border-color);">
                             <div style="font-size:0.95rem; font-weight:600; color:var(--text-main); margin-bottom:12px; display:flex; align-items:center; gap:8px;">
-                                ${t('title-my-violations')}
+                                ⚠️ ${t('title-my-violations')}
                             </div>
                             <div style="max-height:200px; overflow-y:auto; padding-right:4px;">
                                 ${violCellHtml}
                             </div>
                         </div>
-                        <div style="flex:1; min-width:200px; background:var(--input-bg); padding:20px 16px; border-radius:8px; border:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; text-align:center;">
+
+                        <!-- Rewards Panel -->
+                        <div style="background:var(--input-bg); padding:16px; border-radius:8px; border:1px solid var(--border-color);">
+                            <div style="font-size:0.95rem; font-weight:600; color:var(--text-main); margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+                                🎁 ${isAr ? 'المكافآت والحوافز' : 'My Rewards & Bonuses'}
+                            </div>
+                            <div style="max-height:200px; overflow-y:auto; padding-right:4px;">
+                                ${rewardsLogHtml}
+                            </div>
+                        </div>
+
+                        <!-- Custody Statement Panel -->
+                        <div style="background:var(--input-bg); padding:16px; border-radius:8px; border:1px solid var(--border-color);">
+                            <div style="font-size:0.95rem; font-weight:600; color:var(--text-main); margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+                                💰 ${isAr ? 'كشف حساب العهدة' : 'My Custody Statement'}
+                            </div>
+                            ${custodyStatusHtml}
+                            <div style="max-height:140px; overflow-y:auto; padding-right:4px;">
+                                ${custodyLogHtml}
+                            </div>
+                        </div>
+
+                        <!-- Company Costs Panel -->
+                        <div style="background:var(--input-bg); padding:16px; border-radius:8px; border:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; text-align:center;">
                             <div style="font-size:0.9rem; font-weight:600; color:var(--text-main); margin-bottom:8px;">${t('label-company-costs-sm')}</div>
                             <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:16px; line-height:1.4;">${t('desc-costs')}</div>
                             <div style="font-size:1.4rem; font-weight:700; color:var(--danger); background:var(--danger-bg); padding:10px; border-radius:6px; border:1px solid var(--danger-border);">SAR ${costs.toLocaleString()}</div>
@@ -8599,6 +8679,29 @@ function renderAttendance() {
             statusHtml = `<span class="badge badge-bad" style="display:inline-flex; align-items:center; gap:4px; font-weight:700;">❌ ${isAr ? 'غائب' : 'Absent'}</span>`;
         }
 
+        let exitHtml = '';
+        let exitActionBtn = '';
+        if (att && att.exitRequest) {
+            const req = att.exitRequest;
+            if (req.status === 'pending') {
+                exitHtml = `<div style="font-size:0.75rem; color:#d97706; font-weight:600; margin-top:4px;">🚪 Exit Req: ${req.time} (${req.reason})</div>`;
+                exitActionBtn = `
+                    <button onclick="handleExitRequest('${w.id}', 'approve')" class="btn-success" style="padding: 4px 8px; font-size: 0.8rem; background:#16a34a; border-color:#16a34a;" title="${isAr ? 'موافقة خروج' : 'Approve Exit'}">🚪✔️</button>
+                    <button onclick="handleExitRequest('${w.id}', 'reject')" class="btn-danger" style="padding: 4px 8px; font-size: 0.8rem;" title="${isAr ? 'رفض خروج' : 'Reject Exit'}">🚪❌</button>
+                `;
+            } else if (req.status === 'approved') {
+                exitHtml = `<div style="font-size:0.75rem; color:#dc2626; font-weight:600; margin-top:4px;">🚪 OUT (since ${req.time})</div>`;
+                exitActionBtn = `
+                    <button onclick="handleExitRequest('${w.id}', 'returned')" class="btn-warning" style="padding: 4px 8px; font-size: 0.8rem; background:#d97706; border-color:#d97706;" title="${isAr ? 'تمت العودة' : 'Worker Returned'}">↩️ Returned</button>
+                `;
+            } else if (req.status === 'rejected') {
+                exitHtml = `<div style="font-size:0.75rem; color:#dc2626; font-weight:600; margin-top:4px;">🚪 Exit Rejected</div>`;
+            } else if (req.status === 'returned') {
+                const retTimeStr = new Date(req.returnedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                exitHtml = `<div style="font-size:0.75rem; color:var(--info); font-weight:600; margin-top:4px;">🚪 Out: ${req.time} - Back: ${retTimeStr}</div>`;
+            }
+        }
+
         const todayNow = new Date();
         const hhNow = String(todayNow.getHours()).padStart(2, '0');
         const mmNow = String(todayNow.getMinutes()).padStart(2, '0');
@@ -8609,6 +8712,7 @@ function renderAttendance() {
             <td>
                 <strong style="color:var(--text-main); display:block;">${w.name}</strong>
                 <span style="font-size:0.75rem; color:var(--text-muted);">${w.role || ''}</span>
+                ${exitHtml}
             </td>
             <td>${statusHtml}</td>
             <td style="font-weight: 500;">${scheduled}</td>
@@ -8616,6 +8720,7 @@ function renderAttendance() {
             <td>${latenessHtml}</td>
             <td class="attendance-admin-only">
                 <div style="display:inline-flex; align-items:center; gap:4px;">
+                    ${exitActionBtn}
                     <input type="time" id="att-time-${w.id}" value="${currentTimeString}" style="padding: 4px; font-size: 0.8rem; width: 85px; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-main);" />
                     <button onclick="markWorkerAttendance('${w.id}', 'present')" class="btn-success" style="padding: 4px 8px; font-size: 0.8rem;" title="${isAr ? 'تسجيل حضور' : 'Mark Present'}">✔️</button>
                     <button onclick="markWorkerAttendance('${w.id}', 'absent')" class="btn-danger" style="padding: 4px 8px; font-size: 0.8rem;" title="${isAr ? 'تسجيل غياب' : 'Mark Absent'}">❌</button>
@@ -8625,6 +8730,51 @@ function renderAttendance() {
         `;
         tbody.appendChild(tr);
     });
+
+    // Render worker self-view exit request status
+    const currentEmail = currentUser && currentUser.email ? currentUser.email.toLowerCase() : '';
+    const myWorker = companyData.workers.find(w => w.email && w.email.toLowerCase() === currentEmail);
+    const workerExitRequestDiv = document.getElementById('worker-active-exit-request');
+    if (workerExitRequestDiv) {
+        workerExitRequestDiv.innerHTML = '';
+        workerExitRequestDiv.style.display = 'none';
+        if (myWorker) {
+            const myAtt = attendanceMap[myWorker.id];
+            if (myAtt && myAtt.exitRequest) {
+                const req = myAtt.exitRequest;
+                workerExitRequestDiv.style.display = 'block';
+                let statusText = '';
+                let statusColor = '';
+                if (req.status === 'pending') {
+                    statusText = isAr 
+                        ? `⏳ قيد الانتظار: طلب الخروج في ${req.time} (السبب: ${req.reason})` 
+                        : `⏳ Pending: Exit requested for ${req.time} (Reason: ${req.reason})`;
+                    statusColor = '#d97706';
+                } else if (req.status === 'approved') {
+                    statusText = isAr 
+                        ? `🟢 تمت الموافقة: يمكنك الخروج الآن. وقت الخروج المعتمد: ${req.time}` 
+                        : `🟢 Approved: You may exit now. Out since ${req.time}`;
+                    statusColor = 'var(--success)';
+                } else if (req.status === 'rejected') {
+                    statusText = isAr 
+                        ? `❌ تم الرفض: تم رفض طلب الخروج` 
+                        : `❌ Rejected: Exit request was rejected`;
+                    statusColor = 'var(--danger)';
+                } else if (req.status === 'returned') {
+                    const retTimeStr = new Date(req.returnedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    statusText = isAr 
+                        ? `✅ تمت العودة: عدت إلى العمل في ${retTimeStr}` 
+                        : `✅ Returned: Checked back in at ${retTimeStr}`;
+                    statusColor = 'var(--info)';
+                }
+                workerExitRequestDiv.innerHTML = `
+                    <div style="padding: 12px; border-radius: var(--radius-md); background: var(--input-bg); border: 1px solid ${statusColor}; color: ${statusColor}; font-weight: 700; font-size: 0.9rem;">
+                        ${statusText}
+                    </div>
+                `;
+            }
+        }
+    }
 }
 
 // --- ACTIVITY LOG SYSTEM ---
@@ -9697,6 +9847,457 @@ function deleteOvertimeHourFromFin(workerId, logId) {
         });
 }
 
+// ========================================================
+// CUSTODY REQUEST FUNCTIONS
+// ========================================================
+
+function submitCustodyRequest() {
+    const worker = getActiveWorker();
+    if (!worker) {
+        alert(t('msg-account-not-linked') || "Your account is not linked to any worker profile.");
+        return;
+    }
+
+    const amountInput = document.getElementById('custody-req-amount');
+    const reasonInput = document.getElementById('custody-req-reason');
+    if (!amountInput || !reasonInput) return;
+
+    const amountVal = parseFloat(amountInput.value);
+    const reasonVal = reasonInput.value.trim();
+
+    if (isNaN(amountVal) || amountVal <= 0 || !reasonVal) {
+        alert(currentAppLang === 'ar' ? 'يرجى إدخال مبلغ صحيح وسبب.' : 'Please enter a valid amount and reason.');
+        return;
+    }
+
+    const reqId = 'custreq-' + Date.now();
+    const requestObj = {
+        id: reqId,
+        workerId: worker.id,
+        workerName: worker.name,
+        amount: amountVal,
+        reason: reasonVal,
+        status: 'pending',
+        timestamp: Date.now()
+    };
+
+    db.ref(`companies/${currentCompany}/custodyRequests/${reqId}`).set(requestObj)
+        .then(() => {
+            amountInput.value = '';
+            reasonInput.value = '';
+            alert(currentAppLang === 'ar' ? 'تم تقديم طلب العهدة بنجاح وهو قيد المراجعة.' : 'Custody request submitted successfully and is pending review.');
+        })
+        .catch(err => {
+            console.error("Error submitting custody request:", err);
+            alert("Error: " + err.message);
+        });
+}
+
+function acceptCustodyRequest(reqId) {
+    const custodyReqs = getCompanyData().custodyRequests || {};
+    const req = custodyReqs[reqId];
+    if (!req) return;
+
+    // Generate random 6-digit verification code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    db.ref(`companies/${currentCompany}/custodyRequests/${reqId}`).update({
+        status: 'accepted',
+        code: code,
+        handledAt: Date.now()
+    }).then(() => {
+        logActivity('finance', req.workerId, req.workerName, `Accepted custody request of SAR ${req.amount} for ${req.workerName}`);
+    }).catch(err => console.error("Error accepting custody request:", err));
+}
+
+function rejectCustodyRequest(reqId) {
+    const custodyReqs = getCompanyData().custodyRequests || {};
+    const req = custodyReqs[reqId];
+    if (!req) return;
+
+    db.ref(`companies/${currentCompany}/custodyRequests/${reqId}`).update({
+        status: 'rejected',
+        handledAt: Date.now()
+    }).then(() => {
+        logActivity('finance', req.workerId, req.workerName, `Rejected custody request of SAR ${req.amount} for ${req.workerName}`);
+    }).catch(err => console.error("Error rejecting custody request:", err));
+}
+
+function releaseCustodyRequest(reqId) {
+    const custodyReqs = getCompanyData().custodyRequests || {};
+    const req = custodyReqs[reqId];
+    if (!req) return;
+
+    const enteredCodeInput = document.getElementById(`verify-custody-code-${reqId}`);
+    if (!enteredCodeInput) return;
+    const enteredCode = enteredCodeInput.value.trim();
+
+    if (enteredCode !== req.code) {
+        alert(currentAppLang === 'ar' ? 'الرمز غير صحيح!' : 'Incorrect verification code!');
+        return;
+    }
+
+    // Move custody request status to 'given'
+    db.ref(`companies/${currentCompany}/custodyRequests/${reqId}`).update({
+        status: 'given',
+        givenAt: Date.now()
+    }).then(() => {
+        // Automatically insert a 'given' custody log entry in the worker's ledger
+        const workerIndex = getCompanyData().workers.findIndex(w => w.id === req.workerId);
+        if (workerIndex !== -1) {
+            const worker = getCompanyData().workers[workerIndex];
+            const stats = getMonthlyStats(worker, currentGlobalMonth);
+            if (!stats.custodyList) stats.custodyList = [];
+            
+            stats.custodyList.unshift({
+                id: 'cust-' + Date.now(),
+                date: formatTimestamp(),
+                amount: req.amount,
+                type: 'given'
+            });
+
+            return db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/custodyList`).set(stats.custodyList);
+        }
+    }).then(() => {
+        logActivity('finance', req.workerId, req.workerName, `Released custody of SAR ${req.amount} to ${req.workerName} via code verification`);
+        alert(currentAppLang === 'ar' ? 'تم تسليم العهدة بنجاح وتحديث الرصيد!' : 'Custody released successfully and ledger updated!');
+    }).catch(err => {
+        console.error("Error releasing custody:", err);
+        alert("Error: " + err.message);
+    });
+}
+
+function renderWorkerCustodyRequests() {
+    const isAr = currentAppLang === 'ar';
+    const worker = getActiveWorker();
+    const listDiv = document.getElementById('worker-custody-requests-list');
+    if (!worker || !listDiv) return;
+
+    const custodyReqs = getCompanyData().custodyRequests || {};
+    const myReqs = Object.values(custodyReqs)
+        .filter(r => r.workerId === worker.id)
+        .sort((a, b) => b.timestamp - a.timestamp);
+
+    listDiv.innerHTML = '';
+    if (myReqs.length === 0) {
+        listDiv.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted); text-align:center;">${isAr ? 'لا يوجد طلبات سابقة.' : 'No previous requests.'}</p>`;
+        return;
+    }
+
+    myReqs.forEach(req => {
+        const dateStr = new Date(req.timestamp).toLocaleString();
+        let statusBadge = '';
+        let codeDisplay = '';
+
+        if (req.status === 'pending') {
+            statusBadge = `<span class="badge" style="background:#d97706;">${isAr ? 'قيد الانتظار' : 'Pending'}</span>`;
+        } else if (req.status === 'accepted') {
+            statusBadge = `<span class="badge" style="background:#16a34a;">${isAr ? 'مقبول للتسليم' : 'Approved for Release'}</span>`;
+            codeDisplay = `<div style="margin-top: 5px; font-weight: 800; font-size: 1rem; color: var(--success);">${isAr ? 'الرمز السري:' : 'Verification Code:'} <span style="background:var(--input-bg); padding: 2px 6px; border-radius: 4px; border: 1px dashed var(--success);">${req.code}</span></div>`;
+        } else if (req.status === 'rejected') {
+            statusBadge = `<span class="badge" style="background:#dc2626;">${isAr ? 'مرفوض' : 'Rejected'}</span>`;
+        } else if (req.status === 'given') {
+            statusBadge = `<span class="badge" style="background:#2563eb;">${isAr ? 'تم الاستلام' : 'Given'}</span>`;
+        }
+
+        listDiv.innerHTML += `
+            <div class="ledger-card" style="border-left: 4px solid #f59e0b;">
+                <div class="flex-between">
+                    <strong>SAR ${req.amount}</strong>
+                    ${statusBadge}
+                </div>
+                <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
+                    ${isAr ? 'السبب:' : 'Reason:'} ${req.reason}<br>
+                    📅 ${dateStr}
+                </div>
+                ${codeDisplay}
+            </div>
+        `;
+    });
+}
+
+function renderPendingCustodyRequests() {
+    const isAr = currentAppLang === 'ar';
+    const listDiv = document.getElementById('pending-custody-requests-list');
+    if (!listDiv) return;
+
+    const custodyReqs = getCompanyData().custodyRequests || {};
+    const pendingReqs = Object.values(custodyReqs)
+        .filter(r => r.status === 'pending')
+        .sort((a, b) => b.timestamp - a.timestamp);
+
+    listDiv.innerHTML = '';
+    if (pendingReqs.length === 0) {
+        listDiv.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted); text-align:center; padding:12px;">${isAr ? 'لا توجد طلبات معلقة.' : 'No pending requests.'}</p>`;
+        return;
+    }
+
+    pendingReqs.forEach(req => {
+        const dateStr = new Date(req.timestamp).toLocaleString();
+        listDiv.innerHTML += `
+            <div class="ledger-card" style="border-left:4px solid #f59e0b;">
+                <div class="flex-between" style="align-items:start;">
+                    <div>
+                        <strong style="font-size:1.05rem; color:var(--text-main);">${req.workerName}</strong><br>
+                        <span style="font-size:0.8rem; color:var(--text-muted);">${isAr ? 'السبب:' : 'Reason:'} ${req.reason}</span>
+                    </div>
+                    <strong style="color:#f59e0b; font-size:1.1rem;">SAR ${req.amount}</strong>
+                </div>
+                <div style="font-size:0.75rem; color:var(--text-muted); margin-top:8px;">📅 ${dateStr}</div>
+                <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+                    <button onclick="rejectCustodyRequest('${req.id}')" class="btn-outline-danger" style="padding:6px 12px; font-size:0.75rem;">${isAr ? 'رفض' : 'Reject'}</button>
+                    <button onclick="acceptCustodyRequest('${req.id}')" class="btn-success" style="padding:6px 12px; font-size:0.75rem; background:#16a34a; border-color:#16a34a;">${isAr ? 'قبول' : 'Accept'}</button>
+                </div>
+            </div>
+        `;
+    });
+}
+
+function renderAcceptedCustodyReleases() {
+    const isAr = currentAppLang === 'ar';
+    const listDiv = document.getElementById('accepted-custodies-list');
+    if (!listDiv) return;
+
+    const custodyReqs = getCompanyData().custodyRequests || {};
+    const acceptedReqs = Object.values(custodyReqs)
+        .filter(r => r.status === 'accepted')
+        .sort((a, b) => b.timestamp - a.timestamp);
+
+    listDiv.innerHTML = '';
+    if (acceptedReqs.length === 0) {
+        listDiv.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted); text-align:center; padding:12px;">${isAr ? 'لا توجد طلبات جاهزة للتسليم.' : 'No custody releases pending verification.'}</p>`;
+        return;
+    }
+
+    acceptedReqs.forEach(req => {
+        listDiv.innerHTML += `
+            <div class="ledger-card" style="border-left: 4px solid var(--success);">
+                <div class="flex-between">
+                    <div>
+                        <strong>${req.workerName}</strong><br>
+                        <span style="font-size:0.85rem; color:var(--text-muted);">${req.reason}</span>
+                    </div>
+                    <strong style="color:var(--success); font-size:1.1rem;">SAR ${req.amount}</strong>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px; margin-top:12px; flex-wrap:wrap;">
+                    <input type="text" id="verify-custody-code-${req.id}" placeholder="${isAr ? 'رمز التحقق المكون من 6 أرقام' : '6-digit verification code'}" style="padding:8px; font-size:0.85rem; flex:1; min-width:180px; height:34px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:4px; color:var(--text-main);" />
+                    <button onclick="releaseCustodyRequest('${req.id}')" class="btn-success" style="padding:0 12px; height:34px; font-size:0.8rem; font-weight:700; background:#16a34a; border-color:#16a34a;">${isAr ? 'تم تسليم العهدة' : 'Release Custody'}</button>
+                </div>
+            </div>
+        `;
+    });
+}
+
+// ========================================================
+// EXIT REQUEST WORKFLOW FUNCTIONS
+// ========================================================
+
+function submitExitRequest() {
+    const worker = getActiveWorker();
+    if (!worker) {
+        alert(t('msg-account-not-linked') || "Your account is not linked to any worker profile.");
+        return;
+    }
+
+    const timeInput = document.getElementById('attendance-exit-time');
+    const reasonInput = document.getElementById('attendance-exit-reason');
+    if (!timeInput || !reasonInput) return;
+
+    const timeVal = timeInput.value;
+    const reasonVal = reasonInput.value.trim();
+
+    if (!timeVal || !reasonVal) {
+        alert(currentAppLang === 'ar' ? 'يرجى تحديد وقت الخروج والسبب.' : 'Please select exit time and enter a reason.');
+        return;
+    }
+
+    const datePicker = document.getElementById('attendance-date-picker');
+    const dateStr = datePicker ? datePicker.value : '';
+    if (!dateStr) {
+        alert("Please select a date first.");
+        return;
+    }
+
+    const exitRequestObj = {
+        time: timeVal,
+        reason: reasonVal,
+        status: 'pending',
+        timestamp: Date.now()
+    };
+
+    db.ref(`companies/${currentCompany}/attendance/${dateStr}/${worker.id}/exitRequest`).set(exitRequestObj)
+        .then(() => {
+            timeInput.value = '';
+            reasonInput.value = '';
+            alert(currentAppLang === 'ar' ? 'تم تقديم طلب الخروج بنجاح.' : 'Exit request submitted successfully.');
+        })
+        .catch(err => {
+            console.error("Error submitting exit request:", err);
+            alert("Error: " + err.message);
+        });
+}
+
+function handleExitRequest(workerId, action) {
+    const datePicker = document.getElementById('attendance-date-picker');
+    const dateStr = datePicker ? datePicker.value : '';
+    if (!dateStr) return;
+
+    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    const wName = worker ? worker.name : 'Worker';
+
+    const exitRef = db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}/exitRequest`);
+
+    if (action === 'approve') {
+        exitRef.update({
+            status: 'approved',
+            approvedAt: Date.now()
+        }).then(() => {
+            logActivity('attendance', workerId, wName, `Approved exit request for ${wName} on ${dateStr}`);
+        }).catch(err => console.error("Error approving exit request:", err));
+    } else if (action === 'reject') {
+        exitRef.update({
+            status: 'rejected',
+            rejectedAt: Date.now()
+        }).then(() => {
+            logActivity('attendance', workerId, wName, `Rejected exit request for ${wName} on ${dateStr}`);
+        }).catch(err => console.error("Error rejecting exit request:", err));
+    } else if (action === 'returned') {
+        exitRef.update({
+            status: 'returned',
+            returnedAt: Date.now()
+        }).then(() => {
+            logActivity('attendance', workerId, wName, `${wName} returned to work area on ${dateStr}`);
+        }).catch(err => console.error("Error logging worker return:", err));
+    }
+}
+
+// ========================================================
+// ATTENDANCE OVERTIME RELOCATION FUNCTIONS
+// ========================================================
+
+function renderAttendanceOvertimeDetails() {
+    const isAr = currentAppLang === 'ar';
+    const workerId = document.getElementById('attendance-overtime-worker-select').value;
+    const detailsArea = document.getElementById('attendance-overtime-details-area');
+    if (!detailsArea) return;
+
+    if (!workerId) {
+        detailsArea.style.display = 'none';
+        return;
+    }
+    detailsArea.style.display = 'block';
+
+    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    if (!worker) return;
+
+    const baseIncome = parseFloat(worker.income) || 0;
+    const duration = getShiftDurationHours(worker.startTime, worker.endTime);
+    
+    const durationEl = document.getElementById('att-ov-shift-duration');
+    const hourlyRateEl = document.getElementById('att-ov-hourly-rate');
+    
+    const hourlyRate = baseIncome / (30 * duration);
+
+    if (durationEl) durationEl.textContent = `${duration.toFixed(1)} hrs`;
+    if (hourlyRateEl) {
+        if (isNaN(hourlyRate) || !isFinite(hourlyRate)) {
+            hourlyRateEl.textContent = `SAR 0.00/hr`;
+        } else {
+            hourlyRateEl.textContent = `SAR ${hourlyRate.toFixed(2)}/hr`;
+        }
+    }
+
+    // Render Overtime logs inside attendance
+    const stats = getMonthlyStats(worker, currentGlobalMonth);
+    const ovHistory = document.getElementById('att-worker-overtime-history');
+    if (ovHistory) {
+        ovHistory.innerHTML = '';
+        const list = stats.overtimeList || [];
+        if (list.length === 0) {
+            ovHistory.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted); text-align:center;">No overtime logs for this month.</p>`;
+        } else {
+            list.forEach(log => {
+                const logCard = document.createElement('div');
+                logCard.className = 'ledger-card flex-between';
+                logCard.innerHTML = `
+                    <div>
+                        <strong>+ ${log.hours} hrs (x${log.multiplier})</strong>
+                        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">
+                            Rate: SAR ${log.rate}/hr • Earned: SAR ${log.amount}<br>
+                            📅 ${log.date}
+                        </div>
+                    </div>
+                    <button onclick="deleteOvertimeHourFromAtt('${worker.id}', '${log.id}')" class="btn-outline-danger" style="padding: 4px 10px; font-size: 0.75rem;">${isAr ? 'تراجع' : 'Undo'}</button>
+                `;
+                ovHistory.appendChild(logCard);
+            });
+        }
+    }
+}
+
+function addOvertimeHourFromAtt() {
+    const workerId = document.getElementById('attendance-overtime-worker-select').value;
+    if (!workerId) return;
+
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+
+    const worker = getCompanyData().workers[workerIndex];
+    const baseIncome = parseFloat(worker.income) || 0;
+    const duration = getShiftDurationHours(worker.startTime, worker.endTime);
+    const hourlyRate = baseIncome / (30 * duration);
+
+    const hours = parseFloat(document.getElementById('att-ov-hours').value) || 1.0;
+    const mult = parseFloat(document.getElementById('att-ov-multiplier').value) || 1.0;
+    const finalAmount = Math.round(hours * hourlyRate * mult * 100) / 100;
+
+    const stats = getMonthlyStats(worker, currentGlobalMonth);
+    if (!stats.overtimeList) stats.overtimeList = [];
+
+    const newLog = {
+        id: Date.now().toString(),
+        date: formatTimestamp(),
+        hours: hours,
+        rate: Math.round(hourlyRate * 100) / 100,
+        multiplier: mult,
+        amount: finalAmount
+    };
+
+    stats.overtimeList.unshift(newLog);
+
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/overtimeList`).set(stats.overtimeList)
+        .then(() => {
+            logActivity('attendance', worker.id, worker.name, `Logged ${hours} hr(s) overtime (x${mult}) for ${worker.name} (SAR ${finalAmount})`);
+            renderAttendanceOvertimeDetails();
+        }).catch(err => {
+            console.error("Error adding overtime:", err);
+            alert("Failed to add overtime.");
+        });
+}
+
+function deleteOvertimeHourFromAtt(workerId, logId) {
+    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
+
+    const worker = getCompanyData().workers[workerIndex];
+    const stats = getMonthlyStats(worker, currentGlobalMonth);
+    if (!stats.overtimeList) return;
+
+    const targetLog = stats.overtimeList.find(o => o.id === logId);
+    if (!targetLog) return;
+
+    stats.overtimeList = stats.overtimeList.filter(o => o.id !== logId);
+
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/overtimeList`).set(stats.overtimeList)
+        .then(() => {
+            logActivity('attendance', worker.id, worker.name, `Removed overtime entry of ${targetLog.hours} hr (x${targetLog.multiplier}) for ${worker.name}`);
+            renderAttendanceOvertimeDetails();
+        }).catch(err => {
+            console.error("Error deleting overtime:", err);
+            alert("Failed to delete overtime entry.");
+        });
+}
+
 window.getShiftDurationHours = getShiftDurationHours;
 window.saveWorkerProfileChanges = saveWorkerProfileChanges;
 window.addNewWorkerShift = addNewWorkerShift;
@@ -9705,6 +10306,18 @@ window.deleteWorkerShift = deleteWorkerShift;
 window.addOvertimeHour = addOvertimeHour;
 window.deleteOvertimeHour = deleteOvertimeHour;
 window.deleteOvertimeHourFromFin = deleteOvertimeHourFromFin;
+window.submitCustodyRequest = submitCustodyRequest;
+window.acceptCustodyRequest = acceptCustodyRequest;
+window.rejectCustodyRequest = rejectCustodyRequest;
+window.releaseCustodyRequest = releaseCustodyRequest;
+window.renderWorkerCustodyRequests = renderWorkerCustodyRequests;
+window.renderPendingCustodyRequests = renderPendingCustodyRequests;
+window.renderAcceptedCustodyReleases = renderAcceptedCustodyReleases;
+window.submitExitRequest = submitExitRequest;
+window.handleExitRequest = handleExitRequest;
+window.renderAttendanceOvertimeDetails = renderAttendanceOvertimeDetails;
+window.addOvertimeHourFromAtt = addOvertimeHourFromAtt;
+window.deleteOvertimeHourFromAtt = deleteOvertimeHourFromAtt;
 
 // Initial run
 applyTranslations();
