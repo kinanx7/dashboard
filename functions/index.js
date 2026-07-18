@@ -195,18 +195,32 @@ exports.notifyWorkersOnGeneralTask = functions
         const workers = companyData.workers || [];
 
         const sends = [];
+        const groups = companyData.taskGroups || [];
+        const group = task.targetGroupId ? groups.find(g => g.id === task.targetGroupId) : null;
+
         workers.forEach(w => {
             if (w && w.fcmToken) {
+                // If targeted to a group, only notify group members
+                if (group) {
+                    if (!group.members || !group.members.includes(w.id)) {
+                        return; // Skip
+                    }
+                }
+
+                const notifTitle = group 
+                    ? `👥 New Group Task Available [${group.name}]` 
+                    : '🌍 New General Task Available';
+
                 sends.push(safeSend({
                     token: w.fcmToken,
                     notification: {
-                        title: '🌍 New General Task Available',
+                        title: notifTitle,
                         body: `${title} — open your task board to accept it.`
                     },
                     data: { type: 'generalTask', tab: 'tasks' },
                     android: { priority: 'high', notification: { channelId: 'burgeroov_tasks' } },
                     apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
-                }, `GENERAL TASK → ${w.name}: "${title}"`));
+                }, `GROUP/GENERAL TASK → ${w.name}: "${title}"`));
             }
         });
 

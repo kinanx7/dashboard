@@ -893,7 +893,21 @@
                                 data-i18n="btn-save-shortcut">Save Shortcut</button>
                         </form>
 
-                        <div id="task-template-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+                    </div>
+
+                    <!-- Manage Groups Card (Admin Only) -->
+                    <div class="card" style="margin-top: 16px;">
+                        <h2 class="card-title" data-i18n="title-group-mgmt">👥 Manage Groups</h2>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;" data-i18n="desc-group-mgmt">Create groups and add/remove members.</p>
+                        <form onsubmit="event.preventDefault(); createTaskGroup();" style="margin: 0; padding: 0; border: none; background: transparent; box-shadow: none;">
+                            <div class="form-group flex-between" style="gap: 8px; margin-bottom: 0;">
+                                <input type="text" id="new-group-name-input" placeholder="e.g. Cashiers" required style="padding: 8px;">
+                                <button type="submit" class="btn-success" style="padding: 8px 16px; font-weight: bold;">➕</button>
+                            </div>
+                        </form>
+                        <div id="groups-list-container" style="display:flex; flex-direction:column; gap:12px; margin-top:16px;">
+                            <!-- Rendered dynamically -->
+                        </div>
                     </div>
                 </div>
 
@@ -2296,7 +2310,7 @@
     </div>
 
     <script defer src="translations.js"></script>
-    <script defer src="app.js?v=28"></script>
+    <script defer src="app.js?v=29"></script>
 </body>
 
 

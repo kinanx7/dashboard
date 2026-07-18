@@ -4879,6 +4879,42 @@ function assignTask() {
 
     if (!workerId || !text) { alert("Select an employee and describe a task."); return; }
 
+    if (workerId.startsWith('group_')) {
+        const groupId = workerId.replace('group_', '');
+        const companyData = getCompanyData();
+        const groups = companyData.taskGroups || [];
+        const group = groups.find(g => g.id === groupId);
+        if (!group) { alert("Selected group not found."); return; }
+
+        const newGroupTask = {
+            id: 'gt-' + Date.now().toString(),
+            title: text,
+            date: formatTimestamp(),
+            timestamp: Date.now(),
+            urgency: urgency,
+            deadlineMins: deadlineMins,
+            status: 'pending',
+            targetGroupId: groupId,
+            targetGroupName: group.name,
+            acceptedBy: null,
+            acceptedById: null,
+            acceptedAt: null
+        };
+
+        db.ref(`companies/${currentCompany}/generalTasks/${newGroupTask.id}`).set(newGroupTask)
+            .then(() => {
+                logActivity('task', `group_${groupId}`, group.name, `Created group task for "${group.name}": "${text}"`);
+                alert(currentAppLang === 'ar' ? `تم إسناد المهمة للمجموعة ${group.name} بنجاح!` : `Group task assigned to ${group.name} successfully!`);
+                document.getElementById('task-assign-input').value = '';
+                if (document.getElementById('task-deadline')) document.getElementById('task-deadline').value = '';
+                if (document.getElementById('task-urgency')) document.getElementById('task-urgency').value = 'normal';
+                document.getElementById('task-worker-select').value = '';
+                renderAll();
+            })
+            .catch(err => console.error("Error creating group task:", err));
+        return;
+    }
+
     if (workerId === 'general') {
         const newGeneralTask = {
             id: 'gt-' + Date.now().toString(),
@@ -5026,15 +5062,40 @@ function renderTasks() {
     const assignSel = document.getElementById('task-worker-select');
     if (assignSel) {
         const oldVal = assignSel.value;
+        const isAr = currentAppLang === 'ar';
+        const companyData = getCompanyData();
+
         assignSel.innerHTML = `
             <option value="">-- ${t('opt-choose-emp')} --</option>
             <option value="general">🌍 ${t('opt-general-task')}</option>
         `;
-        getCompanyData().workers.forEach(w => {
-            const opt = document.createElement('option'); opt.value = w.id; opt.textContent = w.name; assignSel.appendChild(opt);
+
+        const groups = companyData.taskGroups || [];
+        if (groups.length > 0) {
+            const groupOptGroup = document.createElement('optgroup');
+            groupOptGroup.label = isAr ? 'المجموعات' : 'Groups';
+            groups.forEach(g => {
+                const opt = document.createElement('option');
+                opt.value = `group_${g.id}`;
+                opt.textContent = `👥 ${g.name}`;
+                groupOptGroup.appendChild(opt);
+            });
+            assignSel.appendChild(groupOptGroup);
+        }
+
+        const workerOptGroup = document.createElement('optgroup');
+        workerOptGroup.label = isAr ? 'الموظفين' : 'Employees';
+        companyData.workers.forEach(w => {
+            const opt = document.createElement('option');
+            opt.value = w.id;
+            opt.textContent = w.name;
+            workerOptGroup.appendChild(opt);
         });
+        assignSel.appendChild(workerOptGroup);
         assignSel.value = oldVal;
     }
+
+    renderTaskGroups();
 
     // Render Board (Filtered for user)
     const board = document.getElementById('tasks-board-list');
@@ -5046,7 +5107,20 @@ function renderTasks() {
 
     // Render General Tasks at the top of the board
     const generalTasks = data.generalTasks || [];
-    const pendingGeneralTasks = generalTasks.filter(gt => gt.status === 'pending');
+    const activeWorker = getActiveWorker();
+    const pendingGeneralTasks = generalTasks.filter(gt => {
+        if (gt.status !== 'pending') return false;
+        if (isAdmin) return true; // Admin sees all
+        if (!gt.targetGroupId) return true; // Available to everyone
+
+        // Group task - check if the logged in worker is in the target group
+        const groups = data.taskGroups || [];
+        const group = groups.find(g => g.id === gt.targetGroupId);
+        if (group && group.members && activeWorker) {
+            return group.members.includes(activeWorker.id);
+        }
+        return false;
+    });
 
     if (pendingGeneralTasks.length > 0) {
         const genCard = document.createElement('div');
@@ -5060,6 +5134,7 @@ function renderTasks() {
 
         pendingGeneralTasks.forEach(gt => {
             const urgencyBadge = gt.urgency === 'urgent' ? `<span class="badge" style="background:var(--danger); margin-left:8px;">🔴 ${t('opt-urgency-high').replace('🔴 ', '')}</span>` : '';
+            const groupBadge = gt.targetGroupName ? `<span class="badge" style="background:var(--primary); margin-left:8px; color:white;">👥 ${gt.targetGroupName}</span>` : '';
             const deadlineText = gt.deadlineMins > 0 ? `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">⏱️ ${t('status-time-remaining').replace('⏳ ', '')} ${gt.deadlineMins} mins</div>` : '';
 
             const isWorker = currentUser && currentUser.role === 'worker';
@@ -5067,9 +5142,10 @@ function renderTasks() {
             if (isWorker) {
                 actionBtn = `<button onclick="acceptGeneralTask('${gt.id}')" class="btn-warning" style="padding:8px 16px; font-size:0.85rem; min-height: unset; height: auto;">📥 ${t('btn-accept-task')}</button>`;
             } else if (isAdmin) {
+                const labelText = gt.targetGroupName ? `${t('label-available-all-workers')} (${gt.targetGroupName})` : t('label-available-all-workers');
                 actionBtn = `
                     <div style="display:flex; gap:8px; align-items:center;">
-                        <span style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">${t('label-available-all-workers')}</span>
+                        <span style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">${labelText}</span>
                         <button onclick="deleteGeneralTask('${gt.id}')" style="background:none; border:none; color: var(--danger); cursor:pointer; font-size:1.2rem; padding:0 6px;" title="${t('btn-remove')}">✖</button>
                     </div>`;
             }
@@ -5078,7 +5154,7 @@ function renderTasks() {
                 <div style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
                     <div>
                         <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">Created: ${gt.date}</div>
-                        <div style="font-size:1.05rem; font-weight:700; color:var(--text-main);">${gt.title} ${urgencyBadge}</div>
+                        <div style="font-size:1.05rem; font-weight:700; color:var(--text-main);">${gt.title} ${urgencyBadge} ${groupBadge}</div>
                         ${deadlineText}
                     </div>
                     <div>
@@ -10517,6 +10593,154 @@ function markWorkerSelfAttendance() {
     });
 }
 
+function renderTaskGroups() {
+    const container = document.getElementById('groups-list-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const companyData = getCompanyData();
+    const groups = companyData.taskGroups || [];
+    const workers = companyData.workers || [];
+    const isAr = currentAppLang === 'ar';
+
+    if (groups.length === 0) {
+        container.innerHTML = `<div style="text-align:center; font-size:0.85rem; color:var(--text-muted); padding:10px;">${isAr ? 'لا توجد مجموعات مضافة.' : 'No groups created yet.'}</div>`;
+        return;
+    }
+
+    groups.forEach((group, idx) => {
+        // Find current members of this group
+        const groupMembers = (group.members || []).map(mId => workers.find(w => w.id === mId)).filter(Boolean);
+        
+        let membersHtml = '';
+        if (groupMembers.length === 0) {
+            membersHtml = `<div style="font-size:0.75rem; color:var(--text-muted); padding: 4px 0;">${isAr ? 'لا يوجد أعضاء' : 'No members'}</div>`;
+        } else {
+            groupMembers.forEach(m => {
+                membersHtml += `
+                    <div class="flex-between" style="font-size:0.8rem; background:var(--input-bg); padding:4px 8px; border-radius:4px; margin-bottom:4px; border:1px solid var(--border-color);">
+                        <span>👤 ${m.name}</span>
+                        <button onclick="removeMemberFromGroup('${group.id}', '${m.id}')" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:0.85rem; padding:0 2px;">❌</button>
+                    </div>
+                `;
+            });
+        }
+
+        // Options for workers NOT in this group
+        const nonMembers = workers.filter(w => !(group.members || []).includes(w.id));
+        let selectOptions = `<option value="">${isAr ? '-- إضافة عضو --' : '-- Add Member --'}</option>`;
+        nonMembers.forEach(w => {
+            selectOptions += `<option value="${w.id}">${w.name}</option>`;
+        });
+
+        const selectId = `add-member-select-${group.id}`;
+
+        const groupDiv = document.createElement('div');
+        groupDiv.style.border = '1px solid var(--border-color)';
+        groupDiv.style.borderRadius = '8px';
+        groupDiv.style.padding = '12px';
+        groupDiv.style.background = 'var(--input-bg)';
+        groupDiv.innerHTML = `
+            <div class="flex-between" style="border-bottom:1px solid var(--border-color); padding-bottom:6px; margin-bottom:8px;">
+                <strong style="color:var(--text-main); font-size:0.9rem;">👥 ${group.name}</strong>
+                <button onclick="deleteTaskGroup('${group.id}')" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:1.1rem; padding:0 4px;" title="Delete Group">🗑️</button>
+            </div>
+            <div style="margin-bottom:8px; max-height:120px; overflow-y:auto; padding-right:2px;">
+                ${membersHtml}
+            </div>
+            ${nonMembers.length > 0 ? `
+            <div class="flex-between" style="gap:6px; margin-top:8px;">
+                <select id="${selectId}" style="flex:1; padding:4px; font-size:0.8rem; background:var(--card-bg); border-color:var(--border-color); color:var(--text-main); border-radius:4px;">
+                    ${selectOptions}
+                </select>
+                <button onclick="addMemberToGroup('${group.id}', '${selectId}')" class="btn-success" style="padding:4px 8px; font-size:0.8rem; min-height:unset; height:auto;">＋</button>
+            </div>
+            ` : ''}
+        `;
+        container.appendChild(groupDiv);
+    });
+}
+
+function createTaskGroup() {
+    const input = document.getElementById('new-group-name-input');
+    if (!input) return;
+    const name = input.value.trim();
+    if (!name) return;
+
+    const companyData = getCompanyData();
+    const groups = companyData.taskGroups || [];
+    
+    // Check if group already exists
+    if (groups.some(g => g.name.toLowerCase() === name.toLowerCase())) {
+        alert(currentAppLang === 'ar' ? 'هذه المجموعة موجودة بالفعل!' : 'Group already exists!');
+        return;
+    }
+
+    const newGroup = {
+        id: 'g-' + Date.now().toString(),
+        name: name,
+        members: []
+    };
+
+    groups.push(newGroup);
+
+    db.ref(`companies/${currentCompany}/taskGroups`).set(groups)
+        .then(() => {
+            input.value = '';
+            renderAll();
+        })
+        .catch(err => console.error("Error creating group:", err));
+}
+
+function deleteTaskGroup(groupId) {
+    const isAr = currentAppLang === 'ar';
+    if (!confirm(isAr ? 'هل أنت متأكد من حذف هذه المجموعة؟' : 'Are you sure you want to delete this group?')) return;
+
+    const companyData = getCompanyData();
+    const groups = companyData.taskGroups || [];
+    const filtered = groups.filter(g => g.id !== groupId);
+
+    db.ref(`companies/${currentCompany}/taskGroups`).set(filtered)
+        .then(() => renderAll())
+        .catch(err => console.error("Error deleting group:", err));
+}
+
+function addMemberToGroup(groupId, selectId) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    const workerId = select.value;
+    if (!workerId) return alert("Please select a worker first.");
+
+    const companyData = getCompanyData();
+    const groups = companyData.taskGroups || [];
+    const group = groups.find(g => g.id === groupId);
+    if (!group) return;
+
+    if (!group.members) group.members = [];
+    if (!group.members.includes(workerId)) {
+        group.members.push(workerId);
+    }
+
+    db.ref(`companies/${currentCompany}/taskGroups`).set(groups)
+        .then(() => renderAll())
+        .catch(err => console.error("Error adding member:", err));
+}
+
+function removeMemberFromGroup(groupId, workerId) {
+    const companyData = getCompanyData();
+    const groups = companyData.taskGroups || [];
+    const group = groups.find(g => g.id === groupId);
+    if (!group) return;
+
+    if (group.members) {
+        group.members = group.members.filter(id => id !== workerId);
+    }
+
+    db.ref(`companies/${currentCompany}/taskGroups`).set(groups)
+        .then(() => renderAll())
+        .catch(err => console.error("Error removing member:", err));
+}
+
 window.getShiftDurationHours = getShiftDurationHours;
 window.saveWorkerProfileChanges = saveWorkerProfileChanges;
 window.addNewWorkerShift = addNewWorkerShift;
@@ -10541,6 +10765,11 @@ window.addLateRule = addLateRule;
 window.deleteLateRule = deleteLateRule;
 window.renderLateRules = renderLateRules;
 window.markWorkerSelfAttendance = markWorkerSelfAttendance;
+window.createTaskGroup = createTaskGroup;
+window.deleteTaskGroup = deleteTaskGroup;
+window.addMemberToGroup = addMemberToGroup;
+window.removeMemberFromGroup = removeMemberFromGroup;
+window.renderTaskGroups = renderTaskGroups;
 
 // Initial run
 applyTranslations();

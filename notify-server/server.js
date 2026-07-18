@@ -226,9 +226,13 @@ function startNotificationListeners(companyId) {
         const sends = [];
         const companyLabel = companyId === 'mvcfresh' ? 'MVC Fresh' : (companyId === 'mvc' ? 'MVC' : 'Burgeroov');
 
-        // Fetch workers to retrieve tokens
-        const workersSnapshot = await db.ref(`companies/${companyId}/workers`).once('value');
+        // Fetch workers and taskGroups to retrieve tokens and membership
+        const [workersSnapshot, groupsSnapshot] = await Promise.all([
+            db.ref(`companies/${companyId}/workers`).once('value'),
+            db.ref(`companies/${companyId}/taskGroups`).once('value')
+        ]);
         const workers = workersSnapshot.val() || [];
+        const groups = groupsSnapshot.val() || [];
 
         Object.keys(tasksObj).forEach(taskId => {
             const task = tasksObj[taskId];
@@ -237,18 +241,31 @@ function startNotificationListeners(companyId) {
                 notifiedGeneralTasks[cacheKey] = true;
 
                 const title = task.title || 'New General Task';
+                const group = task.targetGroupId ? (groups || []).find(g => g && g.id === task.targetGroupId) : null;
+
                 workers.forEach((w, index) => {
                     if (w && w.fcmToken) {
+                        // If targeted to a group, only notify group members
+                        if (group) {
+                            if (!group.members || !group.members.includes(w.id)) {
+                                return; // Skip
+                            }
+                        }
+
+                        const notifTitle = group 
+                            ? `👥 New Group Task Available [${group.name}]` 
+                            : `🌍 New General Task Available [${companyLabel}]`;
+
                         sends.push(safeSend({
                             token: w.fcmToken,
                             notification: {
-                                title: `🌍 New General Task Available [${companyLabel}]`,
+                                title: notifTitle,
                                 body: `${title} — open your task board to accept it.`
                             },
                             data: { type: 'generalTask', tab: 'tasks', workerName: w.name || `Worker #${index}`, companyId },
                             android: { priority: 'high', notification: { channelId: 'burgeroov_tasks' } },
                             apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
-                        }, `[${companyId}] GENERAL TASK → ${w.name || `Worker #${index}`}: "${title}"`));
+                        }, `[${companyId}] GROUP/GENERAL TASK → ${w.name || `Worker #${index}`}: "${title}"`));
                     }
                 });
             }
