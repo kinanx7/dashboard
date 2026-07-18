@@ -2491,3 +2491,92 @@ body:not(.role-admin) .task-grid {
     right: auto !important;
     left: 0 !important;
 }
+
+/* =============================================
+   MOBILE RESPONSIVE ATTENDANCE CARD HUD LAYOUT
+   ============================================= */
+@media (max-width: 768px) {
+    #view-attendance .table-container {
+        overflow-x: visible !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+    }
+
+    #attendance-table,
+    #attendance-table thead,
+    #attendance-table tbody,
+    #attendance-table th,
+    #attendance-table td,
+    #attendance-table tr {
+        display: block !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    #attendance-table thead {
+        display: none !important;
+    }
+
+    #attendance-table tr {
+        margin-bottom: 16px !important;
+        background: var(--card-bg) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: var(--radius-lg) !important;
+        padding: 16px !important;
+        box-shadow: var(--shadow-sm) !important;
+    }
+
+    #attendance-table td {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        padding: 8px 0 !important;
+        border: none !important;
+        border-bottom: 1px dashed rgba(255, 255, 255, 0.08) !important;
+        font-size: 0.85rem !important;
+        max-width: none !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+    }
+
+    body:not(.dark-mode) #attendance-table td {
+        border-bottom-color: rgba(0, 0, 0, 0.08) !important;
+    }
+
+    #attendance-table td:first-child {
+        display: block !important;
+        border-bottom: 1px solid var(--border-color) !important;
+        padding-bottom: 12px !important;
+        margin-bottom: 8px !important;
+        max-width: none !important;
+    }
+
+    #attendance-table td:last-child {
+        border-bottom: none !important;
+        padding-top: 12px !important;
+        margin-top: 4px !important;
+        justify-content: center !important;
+        max-width: none !important;
+    }
+
+    /* English Labels */
+    #attendance-table td:nth-child(2)::before { content: "Status:"; font-weight: bold; color: var(--text-muted); }
+    #attendance-table td:nth-child(3)::before { content: "Shift:"; font-weight: bold; color: var(--text-muted); }
+    #attendance-table td:nth-child(4)::before { content: "Check-In:"; font-weight: bold; color: var(--text-muted); }
+    #attendance-table td:nth-child(5)::before { content: "Lateness:"; font-weight: bold; color: var(--text-muted); }
+    #attendance-table td:nth-child(6)::before { content: "Actions:"; font-weight: bold; color: var(--text-muted); }
+
+    /* RTL Arabic Labels */
+    [dir="rtl"] #attendance-table td:nth-child(2)::before { content: "الحالة:"; }
+    [dir="rtl"] #attendance-table td:nth-child(3)::before { content: "الوردية:"; }
+    [dir="rtl"] #attendance-table td:nth-child(4)::before { content: "وقت الحضور:"; }
+    [dir="rtl"] #attendance-table td:nth-child(5)::before { content: "التأخير:"; }
+    [dir="rtl"] #attendance-table td:nth-child(6)::before { content: "الإجراءات:"; }
+
+    #attendance-table {
+        min-width: 100% !important;
+    }
+}
