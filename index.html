@@ -572,9 +572,24 @@
                                     <!-- Rendered dynamically -->
                                 </div>
                                 
-                                <div class="grid-2-col" style="background:var(--card-bg); padding:12px; border-radius:8px; border:1px solid var(--border-color);">
-                                    <div class="form-group" style="margin-bottom:0;"><label data-i18n="label-shift-start">Start Time</label><input type="time" id="ops-new-shift-start" style="padding:6px; background: var(--input-bg); border-color: var(--border-color);"></div>
-                                    <div class="form-group" style="margin-bottom:0;"><label data-i18n="label-shift-end">End Time</label><input type="time" id="ops-new-shift-end" style="padding:6px; background: var(--input-bg); border-color: var(--border-color);"></div>
+                                <div style="background:var(--card-bg); padding:12px; border-radius:8px; border:1px solid var(--border-color);">
+                                    <div class="grid-2-col">
+                                        <div class="form-group" style="margin-bottom:0;"><label data-i18n="label-shift-start">Start Time</label><input type="time" id="ops-new-shift-start" style="padding:6px; background: var(--input-bg); border-color: var(--border-color);"></div>
+                                        <div class="form-group" style="margin-bottom:0;"><label data-i18n="label-shift-end">End Time</label><input type="time" id="ops-new-shift-end" style="padding:6px; background: var(--input-bg); border-color: var(--border-color);"></div>
+                                    </div>
+                                    <div class="form-group" style="margin-top:10px; margin-bottom:0;">
+                                        <label data-i18n="label-shift-day-of-week">Day of the Week (Optional Override)</label>
+                                        <select id="ops-new-shift-day" style="padding:6px; background: var(--input-bg); border-color: var(--border-color); color:var(--text-main); font-size:0.9rem; border-radius:6px; width:100%;">
+                                            <option value="" data-i18n="opt-none">None (Default Shift)</option>
+                                            <option value="Monday" data-i18n="day-monday">Monday</option>
+                                            <option value="Tuesday" data-i18n="day-tuesday">Tuesday</option>
+                                            <option value="Wednesday" data-i18n="day-wednesday">Wednesday</option>
+                                            <option value="Thursday" data-i18n="day-thursday">Thursday</option>
+                                            <option value="Friday" data-i18n="day-friday">Friday</option>
+                                            <option value="Saturday" data-i18n="day-saturday">Saturday</option>
+                                            <option value="Sunday" data-i18n="day-sunday">Sunday</option>
+                                        </select>
+                                    </div>
                                 </div>
                                 <button onclick="addNewWorkerShift()" style="width: 100%; padding: 8px; margin-top: 8px; font-size:0.9rem;" class="btn-outline-info" data-i18n="btn-add-shift">➕ Add New Shift</button>
                             </div>
@@ -778,6 +793,29 @@
                 <!-- Exit Request Status Display -->
                 <div id="worker-active-exit-request" style="margin-top: 15px; display:none;">
                     <!-- JS injected status -->
+                </div>
+            </div>
+
+            <!-- Vacation Management Card -->
+            <div class="attendance-admin-only card" id="attendance-vacation-card" style="margin-top: 24px; border-top: 4px solid #0284c7; width: 100%;">
+                <h3 style="margin: 0 0 16px 0; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; color: #0284c7; display: flex; align-items: center; gap: 8px;">
+                    🌴 <span data-i18n="title-vacation-management">Vacation Management</span>
+                </h3>
+                
+                <div class="grid-2-col" style="margin-bottom: 16px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label data-i18n="label-select-emp">Select Employee</label>
+                        <select id="vacation-worker-select" style="padding: 10px; width: 100%; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);"></select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label data-i18n="label-vacation-date">Vacation Date</label>
+                        <input type="date" id="vacation-date-input" style="padding: 10px; width: 100%; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);" />
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                    <button onclick="setWorkerVacationStatus(true)" class="btn-warning" style="background: #0284c7; border-color: #0284c7; font-weight: bold; color: white;" data-i18n="btn-mark-vacation">🌴 Mark Vacation</button>
+                    <button onclick="setWorkerVacationStatus(false)" class="btn-outline" style="font-weight: bold;" data-i18n="btn-clear-vacation">🔄 Remove Vacation</button>
                 </div>
             </div>
 
@@ -1915,6 +1953,36 @@
                             <button onclick="logSaleTransaction()" class="btn-success"
                                 style="font-size: 1.1rem; padding: 14px; font-weight: 800; width:100%; margin-top: 12px;" data-i18n="btn-log-sale">✅ Log Sale</button>
                         </div>
+
+                        <!-- Past Day Sale Entry (password protected) -->
+                        <div class="admin-only"
+                            style="margin-top: 20px; background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px dashed var(--warning-border, #f59e0b);">
+                            <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+                                <span style="font-size:1.1rem;">🔒</span>
+                                <h4 style="font-size:0.95rem; font-weight:700; color:var(--warning, #f59e0b); margin:0;" data-i18n="title-past-sale">Log Sale for a Past Day</h4>
+                            </div>
+                            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; margin-bottom:10px;">
+                                <input type="number" step="any" id="past-sale-amount" placeholder="Amount (SAR)" style="flex:2; min-width:110px; font-size:1rem; font-weight:700; padding:12px; color:var(--primary);">
+                                <select id="past-sale-method" style="flex:1; min-width:110px; font-size:0.95rem; font-weight:600; padding:12px;"></select>
+                                <input type="date" id="past-sale-date" style="flex:1; min-width:130px; padding:12px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.9rem;">
+                            </div>
+                            <input type="password" id="past-sale-password" placeholder="🔑 Manager Password" style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.95rem;">
+                            <button onclick="logPastSaleTransaction()" style="width:100%; padding:12px; background:linear-gradient(135deg,#f59e0b,#d97706); color:white; border:none; border-radius:8px; font-size:1rem; font-weight:800; cursor:pointer;" data-i18n="btn-submit-past-sale">🔑 Submit Past Day Sale</button>
+                        </div>
+
+                        <!-- Cashier Box Deposit Entry (Admin Only) -->
+                        <div class="admin-only" style="margin-top: 20px; background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
+                            <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+                                <span style="font-size:1.1rem;">💰</span>
+                                <h4 style="font-size:0.95rem; font-weight:700; color:var(--text-main); margin:0;" data-i18n="title-log-deposit">Log Cashier Box Deposit</h4>
+                            </div>
+                            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; margin-bottom:10px;">
+                                <input type="number" step="any" id="new-deposit-amount" placeholder="Deposit Amount (SAR)" style="flex:2; min-width:110px; font-size:1.1rem; font-weight:700; padding:12px; color:#f59e0b;">
+                                <input type="date" id="new-deposit-date" style="flex:1; min-width:130px; padding:12px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.9rem;">
+                            </div>
+                            <button onclick="logDepositTransaction()" class="btn-warning" style="width:100%; padding:12px; font-weight:800; cursor:pointer;" data-i18n="btn-submit-deposit">Log Deposit Amount</button>
+                        </div>
+
                         <div class="admin-only" style="margin-top: 30px;">
                             <h3 style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 10px;" data-i18n="title-manage-income">Admin: Manage Income Sources</h3>
                             <div style="display: flex; gap: 8px;">
@@ -2310,7 +2378,7 @@
     </div>
 
     <script defer src="translations.js"></script>
-    <script defer src="app.js?v=29"></script>
+    <script defer src="app.js?v=36"></script>
 </body>
 
 

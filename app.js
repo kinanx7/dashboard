@@ -1081,6 +1081,13 @@ function ensureArraysExist(data) {
     data.costLogs = data.costLogs.filter(c => c && c.timestamp);
     data.costLogs.sort((a, b) => b.timestamp - a.timestamp);
 
+    if (data.depositLogs && !Array.isArray(data.depositLogs)) {
+        data.depositLogs = Object.values(data.depositLogs);
+    }
+    if (!data.depositLogs) data.depositLogs = [];
+    data.depositLogs = data.depositLogs.filter(d => d && d.timestamp);
+    data.depositLogs.sort((a, b) => b.timestamp - a.timestamp);
+
     if (data.managerNotes && !Array.isArray(data.managerNotes)) {
         data.managerNotes = Object.values(data.managerNotes);
     }
@@ -2542,6 +2549,149 @@ function deleteSaleTransaction(id) {
         });
 }
 
+function logPastSaleTransaction() {
+    const amount = parseFloat(document.getElementById('past-sale-amount').value);
+    const method = document.getElementById('past-sale-method').value;
+    const dateStr = document.getElementById('past-sale-date').value;
+    const password = document.getElementById('past-sale-password').value;
+
+    if (isNaN(amount) || amount <= 0) {
+        alert('Please enter a valid amount.'); return;
+    }
+    if (!method) { alert('Please select a payment method.'); return; }
+    if (!dateStr) { alert('Please select a past date.'); return; }
+    if (password !== 'N123456') {
+        alert('❌ Incorrect password. Access denied.');
+        document.getElementById('past-sale-password').value = '';
+        return;
+    }
+
+    const parts = dateStr.split('-');
+    const d = new Date(parts[0], parts[1] - 1, parts[2]);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    if (d >= today) { alert('Please select a date in the past (not today or future).'); return; }
+
+    const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+    const workerId = myWorker ? myWorker.id : "";
+
+    const targetMonthStr = `${parts[0]}-${parts[1]}`;
+
+    const newLog = {
+        id: Date.now().toString(),
+        amount: amount,
+        method: method,
+        date: dateStr + ' ' + '12:00:00',
+        timestamp: d.getTime(),
+        month: targetMonthStr,
+        cashier: currentUser.email,
+        isPastEntry: true,
+        workerId: workerId
+    };
+
+    if (!getCompanyData().salesLogs) getCompanyData().salesLogs = [];
+    getCompanyData().salesLogs.unshift(newLog);
+
+    document.getElementById('past-sale-amount').value = '';
+    document.getElementById('past-sale-password').value = '';
+    document.getElementById('past-sale-date').value = '';
+
+    db.ref('companies/' + currentCompany + '/salesLogs/' + newLog.id).set(newLog)
+        .then(() => {
+            logActivity('sales', workerId, myWorker ? myWorker.name : 'System', `Entered past sale transaction of SAR ${amount} via ${method} on date ${dateStr}`);
+            renderAll();
+        })
+        .catch(error => {
+            console.error("Error saving past sale:", error);
+            alert("Failed to save transaction.");
+        });
+}
+
+function logDepositTransaction() {
+    const amountInput = document.getElementById('new-deposit-amount');
+    const dateInput = document.getElementById('new-deposit-date');
+    if (!amountInput) return;
+
+    const amount = parseFloat(amountInput.value);
+    let dateStr = dateInput ? dateInput.value : '';
+
+    if (isNaN(amount) || amount <= 0) {
+        alert("Please enter a valid deposit amount.");
+        return;
+    }
+
+    const now = new Date();
+    let timestamp = now.getTime();
+    let dateLabel = "";
+
+    const tzOffset = now.getTimezoneOffset() * 60000;
+    const todayLocalStr = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 10);
+
+    if (dateStr && dateStr !== todayLocalStr) {
+        const parts = dateStr.split('-');
+        const d = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
+        timestamp = d.getTime();
+        dateLabel = dateStr + ' 12:00:00';
+    } else {
+        timestamp = Date.now();
+        dateStr = todayLocalStr;
+        dateLabel = formatTimestamp();
+    }
+
+    const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+    const workerId = myWorker ? myWorker.id : "";
+
+    const newDeposit = {
+        id: Date.now().toString(),
+        amount: amount,
+        date: dateLabel,
+        timestamp: timestamp,
+        month: currentGlobalMonth,
+        cashier: currentUser.email,
+        workerId: workerId
+    };
+
+    if (!getCompanyData().depositLogs) getCompanyData().depositLogs = [];
+    if (getCompanyData().depositLogs && typeof getCompanyData().depositLogs === 'object' && !Array.isArray(getCompanyData().depositLogs)) {
+        getCompanyData().depositLogs = Object.values(getCompanyData().depositLogs);
+    }
+    getCompanyData().depositLogs.unshift(newDeposit);
+
+    amountInput.value = '';
+    if (dateInput) dateInput.value = '';
+
+    db.ref('companies/' + currentCompany + '/depositLogs/' + newDeposit.id).set(newDeposit)
+        .then(() => {
+            logActivity('deposit', workerId, myWorker ? myWorker.name : 'System', `Logged cashier box deposit of SAR ${amount}`);
+            renderAll();
+        })
+        .catch(error => {
+            console.error("Error logging deposit:", error);
+            alert("Failed to save deposit.");
+        });
+}
+
+function deleteDepositTransaction(id) {
+    if (!confirm("Delete this deposit record?")) return;
+    let logs = getCompanyData().depositLogs || [];
+    if (logs && typeof logs === 'object' && !Array.isArray(logs)) {
+        logs = Object.values(logs);
+    }
+    const oldLog = logs.find(l => l.id === id);
+    getCompanyData().depositLogs = logs.filter(l => l.id !== id);
+
+    db.ref('companies/' + currentCompany + '/depositLogs/' + id).remove()
+        .then(() => {
+            if (oldLog) {
+                logActivity('deposit_delete', oldLog.workerId, oldLog.cashier, `Deleted deposit of SAR ${oldLog.amount}`);
+            }
+            renderAll();
+        })
+        .catch(error => {
+            console.error("Error deleting deposit:", error);
+            alert("Failed to delete deposit.");
+        });
+}
+
 function showSwapSelect(id) {
     const btn = document.getElementById(`swap-btn-${id}`);
     const select = document.getElementById(`swap-select-${id}`);
@@ -2602,6 +2752,19 @@ function toggleSalesMethod(methodName) {
 function renderManaging() {
     if (currentTab !== 'managing') return;
 
+    const now = new Date();
+    const tzOffset = now.getTimezoneOffset() * 60000;
+    const todayLocalStr = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 10);
+
+    const pastSaleDateInput = document.getElementById('past-sale-date');
+    if (pastSaleDateInput && !pastSaleDateInput.value) {
+        pastSaleDateInput.value = todayLocalStr;
+    }
+    const newDepositDateInput = document.getElementById('new-deposit-date');
+    if (newDepositDateInput && !newDepositDateInput.value) {
+        newDepositDateInput.value = todayLocalStr;
+    }
+
     const isAr = currentAppLang === 'ar';
     const isAdmin = currentUser.role === 'admin';
     const sources = getCompanyData().incomeSources || ['Cash', 'Credit Card'];
@@ -2615,6 +2778,12 @@ function renderManaging() {
         methodSelect.innerHTML = sources.map(s => `<option value="${s}">${s}</option>`).join('');
         if (sources.includes(prevVal)) methodSelect.value = prevVal;
     }
+    const pastMethodSelect = document.getElementById('past-sale-method');
+    if (pastMethodSelect) {
+        const prevVal = pastMethodSelect.value;
+        pastMethodSelect.innerHTML = sources.map(s => `<option value="${s}">${s}</option>`).join('');
+        if (sources.includes(prevVal)) pastMethodSelect.value = prevVal;
+    }
 
     // Update Admin Sources List
     const sourcesListDiv = document.getElementById('admin-income-sources-list');
@@ -2627,7 +2796,6 @@ function renderManaging() {
     }
 
     // --- FILTER LOGS BY TIMEFRAME ---
-    const now = new Date();
     let filteredLogs = [];
     let histoData = {}; // Key: Label (e.g., "10 AM", "Mon"), Value: Sum
 
@@ -2698,6 +2866,49 @@ function renderManaging() {
         }
     }
 
+    // Filter Deposits by Timeframe
+    let allDeposits = getCompanyData().depositLogs || [];
+    if (allDeposits && typeof allDeposits === 'object' && !Array.isArray(allDeposits)) {
+        allDeposits = Object.values(allDeposits);
+    }
+    let filteredDeposits = [];
+
+    if (currentSalesTimeframe === 'day') {
+        const datePicker = document.getElementById('sales-date-picker');
+        const parts = datePicker.value.split('-');
+        const startOfDay = new Date(parts[0], parts[1] - 1, parts[2]).getTime();
+        const endOfDay = startOfDay + 86400000;
+        filteredDeposits = allDeposits.filter(l => l.timestamp >= startOfDay && l.timestamp < endOfDay);
+    }
+    else if (currentSalesTimeframe === 'week') {
+        const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).getTime();
+        filteredDeposits = allDeposits.filter(l => l.timestamp >= startOfWeek);
+    }
+    else if (currentSalesTimeframe === 'month') {
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+        filteredDeposits = allDeposits.filter(l => l.timestamp >= startOfMonth);
+    }
+    else if (currentSalesTimeframe === 'year') {
+        const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
+        filteredDeposits = allDeposits.filter(l => l.timestamp >= startOfYear);
+    }
+    else if (currentSalesTimeframe === 'custom') {
+        const fromPicker = document.getElementById('sales-from-date');
+        const toPicker = document.getElementById('sales-to-date');
+        if (fromPicker.value && toPicker.value) {
+            const fParts = fromPicker.value.split('-');
+            const tParts = toPicker.value.split('-');
+            const startTs = new Date(fParts[0], fParts[1] - 1, fParts[2]).getTime();
+            const endTs = new Date(tParts[0], tParts[1] - 1, tParts[2]).getTime() + 86400000;
+            filteredDeposits = allDeposits.filter(l => l.timestamp >= startTs && l.timestamp < endTs);
+        }
+    }
+
+    let totalDeposits = 0;
+    filteredDeposits.forEach(d => {
+        totalDeposits += d.amount;
+    });
+
     // Calculate Totals for Toggles
     let grandTotal = 0;
     let methodTotals = {};
@@ -2709,8 +2920,19 @@ function renderManaging() {
         } else {
             methodTotals[l.method] = l.amount;
         }
-        if (!disabledMethods.includes(l.method)) {
-            grandTotal += l.amount;
+    });
+
+    const cashKey = Object.keys(methodTotals).find(k => k.toLowerCase() === 'cash' || k === 'نقدي' || k === 'كاش');
+    const rawCashSales = cashKey ? methodTotals[cashKey] : 0;
+
+    if (cashKey) {
+        methodTotals[cashKey] = rawCashSales - totalDeposits;
+    }
+
+    // Sum up active methods to get grand total
+    sources.forEach(s => {
+        if (!disabledMethods.includes(s) && methodTotals[s] !== undefined) {
+            grandTotal += methodTotals[s];
         }
     });
 
@@ -2728,10 +2950,23 @@ function renderManaging() {
             const color = isCounted ? 'var(--success)' : 'var(--danger)';
             const icon = isCounted ? '✅' : '❌';
 
+            const isCash = methodName.toLowerCase() === 'cash' || methodName === 'نقدي' || methodName === 'كاش';
+            let extraHtml = '';
+            if (isCash) {
+                extraHtml = `
+                    <div style="font-size: 0.78rem; border-top: 1px dashed rgba(255,255,255,0.25); margin-top: 8px; padding-top: 8px; display:flex; flex-direction:column; gap:4px; color:inherit;">
+                        <div class="flex-between"><span>${isAr ? 'المبيعات النقدية:' : 'Cash Sales:'}</span> <span>SAR ${rawCashSales.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                        <div class="flex-between"><span>${isAr ? 'الإيداعات:' : 'Deposited:'}</span> <span>SAR ${totalDeposits.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                        <div class="flex-between" style="font-weight:800; border-top: 1px solid rgba(255,255,255,0.15); margin-top:2px; padding-top:2px;"><span>${isAr ? 'المتبقي بالصندوق:' : 'Left in Box:'}</span> <span>SAR ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                    </div>
+                `;
+            }
+
             return `
-                        <div onclick="toggleSalesMethod('${methodName}')" style="cursor: pointer; background: ${bg}; border: 2px solid ${border}; color: ${color}; padding: 12px 20px; border-radius: 12px; text-align: left; min-width: 140px; transition: transform 0.1s; box-shadow: var(--shadow-sm);">
+                        <div onclick="toggleSalesMethod('${methodName}')" style="cursor: pointer; background: ${bg}; border: 2px solid ${border}; color: ${color}; padding: 12px 20px; border-radius: 12px; text-align: left; min-width: 180px; transition: transform 0.1s; box-shadow: var(--shadow-sm);">
                             <div style="font-size: 0.8rem; font-weight: 800; text-transform: uppercase; margin-bottom: 6px;">${icon} ${methodName}</div>
                             <div style="font-size: 1.25rem; font-weight: 800;">SAR ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                            ${extraHtml}
                         </div>
                     `;
         }).join('');
@@ -2947,45 +3182,74 @@ function renderManaging() {
     const logDiv = document.getElementById('sales-transaction-log');
     if (logDiv) {
         logDiv.innerHTML = '';
-        if (filteredLogs.length === 0) {
+        const combined = [
+            ...filteredLogs.map(l => ({ ...l, type: 'sale' })),
+            ...filteredDeposits.map(d => ({ ...d, type: 'deposit' }))
+        ].sort((a, b) => b.timestamp - a.timestamp);
+
+        if (combined.length === 0) {
             logDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.95rem; padding: 20px;">${t('msg-no-transactions')}</p>`;
         } else {
             const sources = getCompanyData().incomeSources || ['Cash', 'Credit Card'];
-            filteredLogs.forEach(l => {
-                const isCounted = !disabledMethods.includes(l.method);
-                const opacity = isCounted ? '1' : '0.5';
-                const strike = isCounted ? 'none' : 'line-through';
-                let isSalesAdmin = isAdmin || document.body.classList.contains('perm-finance') || document.body.classList.contains('perm-sales');
-                
+            combined.forEach(item => {
+                let isSalesAdmin = isAdmin || document.body.classList.contains('perm-finance') || document.body.classList.contains('perm-sales') || (currentUser && item.cashier && currentUser.email.toLowerCase() === item.cashier.toLowerCase());
                 let actionArea = '';
-                if (isSalesAdmin) {
-                    actionArea = `
-                        <div style="display:flex; gap:8px; align-items:center;">
-                            <button id="swap-btn-${l.id}" onclick="showSwapSelect('${l.id}')" style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius:6px; color: var(--text-main); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="${isAr ? 'تبديل طريقة الدفع' : 'Swap payment method'}">
-                                🔄 ${t('btn-swap') || 'Swap'}
-                            </button>
-                            <select id="swap-select-${l.id}" onchange="swapSaleMethod('${l.id}', this.value)" onblur="cancelSwapSelect('${l.id}')" style="display:none; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.9rem; font-weight: bold; cursor: pointer;">
-                                <option value="">${isAr ? 'اختر...' : 'Choose...'}</option>
-                                ${sources.map(s => `<option value="${s}" ${s === l.method ? 'disabled selected' : ''}>${translateDynamicTerm(s)}</option>`).join('')}
-                            </select>
-                            <button onclick="deleteSaleTransaction('${l.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="${t('btn-remove')}">${t('btn-undo-action')}</button>
+
+                if (item.type === 'sale') {
+                    const isCounted = !disabledMethods.includes(item.method);
+                    const opacity = isCounted ? '1' : '0.5';
+                    const strike = isCounted ? 'none' : 'line-through';
+
+                    if (isSalesAdmin) {
+                        actionArea = `
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <button id="swap-btn-${item.id}" onclick="showSwapSelect('${item.id}')" style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius:6px; color: var(--text-main); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="${isAr ? 'تبديل طريقة الدفع' : 'Swap payment method'}">
+                                    🔄 ${t('btn-swap') || 'Swap'}
+                                </button>
+                                <select id="swap-select-${item.id}" onchange="swapSaleMethod('${item.id}', this.value)" onblur="cancelSwapSelect('${item.id}')" style="display:none; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.9rem; font-weight: bold; cursor: pointer;">
+                                    <option value="">${isAr ? 'اختر...' : 'Choose...'}</option>
+                                    ${sources.map(s => `<option value="${s}" ${s === item.method ? 'disabled selected' : ''}>${translateDynamicTerm(s)}</option>`).join('')}
+                                </select>
+                                <button onclick="deleteSaleTransaction('${item.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="${t('btn-remove')}">${t('btn-undo-action')}</button>
+                            </div>
+                        `;
+                    }
+
+                    logDiv.innerHTML += `
+                        <div class="ledger-card" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; opacity: ${opacity}; margin-bottom: 0;">
+                            <div>
+                                <div style="font-weight: 800; font-size: 1.25rem; color: var(--text-main); text-decoration: ${strike};">SAR ${item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                                <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px; display:flex; gap:8px; align-items:center;">
+                                    <span class="badge" style="background: ${isCounted ? 'var(--primary)' : 'var(--text-muted)'}; color: white; padding:2px 8px;">${translateDynamicTerm(item.method)}</span> 
+                                    <span>🕒 ${item.date}</span>
+                                    <span style="font-style:italic; opacity:0.7;">by ${item.cashier ? item.cashier.split('@')[0] : 'System'}</span>
+                                    ${item.isPastEntry ? `<span class="badge" style="background:var(--warning); color:white; padding:2px 8px;">${isAr ? 'سابق' : 'Past'}</span>` : ''}
+                                </div>
+                            </div>
+                            <div>${actionArea}</div>
+                        </div>
+                    `;
+                } else if (item.type === 'deposit') {
+                    if (isSalesAdmin) {
+                        actionArea = `
+                            <button onclick="deleteDepositTransaction('${item.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="${t('btn-remove')}">${t('btn-undo-action')}</button>
+                        `;
+                    }
+
+                    logDiv.innerHTML += `
+                        <div class="ledger-card" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; margin-bottom: 0; border-left: 4px solid #f59e0b;">
+                            <div>
+                                <div style="font-weight: 800; font-size: 1.25rem; color: #f59e0b;">SAR -${item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                                <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px; display:flex; gap:8px; align-items:center;">
+                                    <span class="badge" style="background: #f59e0b; color: white; padding:2px 8px;">${isAr ? 'إيداع صندوق الكاش' : 'Cashier Deposit'}</span> 
+                                    <span>🕒 ${item.date}</span>
+                                    <span style="font-style:italic; opacity:0.7;">by ${item.cashier ? item.cashier.split('@')[0] : 'System'}</span>
+                                </div>
+                            </div>
+                            <div>${actionArea}</div>
                         </div>
                     `;
                 }
-
-                logDiv.innerHTML += `
-                            <div class="ledger-card" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; opacity: ${opacity}; margin-bottom: 0;">
-                                <div>
-                                    <div style="font-weight: 800; font-size: 1.25rem; color: var(--text-main); text-decoration: ${strike};">SAR ${l.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px; display:flex; gap:8px; align-items:center;">
-                                        <span class="badge" style="background: ${isCounted ? 'var(--primary)' : 'var(--text-muted)'}; color: white; padding:2px 8px;">${translateDynamicTerm(l.method)}</span> 
-                                        <span>🕒 ${l.date}</span>
-                                        <span style="font-style:italic; opacity:0.7;">by ${l.cashier.split('@')[0]}</span>
-                                    </div>
-                                </div>
-                                <div>${actionArea}</div>
-                            </div>
-                        `;
             });
         }
     }
@@ -3170,6 +3434,16 @@ function logPastCostTransaction() {
 
 function renderCosts() {
     if (currentTab !== 'costs') return;
+
+    const now = new Date();
+    const tzOffset = now.getTimezoneOffset() * 60000;
+    const todayLocalStr = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 10);
+
+    const pastCostDateInput = document.getElementById('past-cost-date');
+    if (pastCostDateInput && !pastCostDateInput.value) {
+        pastCostDateInput.value = todayLocalStr;
+    }
+
     const isAdmin = currentUser.role === 'admin';
 
     // Setup categories dropdowns (both current and past entry)
@@ -3202,7 +3476,6 @@ function renderCosts() {
     const allCosts = getCompanyData().costLogs || [];
     const disabledSalesMethods = getCompanyData().disabledSalesMethods || [];
 
-    const now = new Date();
     let filteredSales = [];
     let filteredCosts = [];
     let labelText = '';
@@ -6896,6 +7169,7 @@ function populateWorkerDropdowns() {
     const permSelect = document.getElementById('perm-worker-select'); const permVal = permSelect ? permSelect.value : '';
     const sysSelect = document.getElementById('sys-viol-worker-select'); const sysVal = sysSelect ? sysSelect.value : '';
     const attSelect = document.getElementById('attendance-overtime-worker-select'); const attVal = attSelect ? attSelect.value : '';
+    const vacSelect = document.getElementById('vacation-worker-select'); const vacVal = vacSelect ? vacSelect.value : '';
 
     if (opsSelect) opsSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
     if (finSelect) finSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
@@ -6903,6 +7177,7 @@ function populateWorkerDropdowns() {
     if (permSelect) permSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
     if (sysSelect) sysSelect.innerHTML = `<option value="">-- Choose Worker --</option>`;
     if (attSelect) attSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
+    if (vacSelect) vacSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
 
     getCompanyData().workers.forEach(worker => {
         if (opsSelect) opsSelect.appendChild(new Option(worker.name, worker.id));
@@ -6911,6 +7186,7 @@ function populateWorkerDropdowns() {
         if (permSelect) permSelect.appendChild(new Option(worker.name, worker.id));
         if (sysSelect) sysSelect.appendChild(new Option(worker.name, worker.id));
         if (attSelect) attSelect.appendChild(new Option(worker.name, worker.id));
+        if (vacSelect) vacSelect.appendChild(new Option(worker.name, worker.id));
     });
 
     if (opsSelect) opsSelect.value = opsVal;
@@ -6919,6 +7195,7 @@ function populateWorkerDropdowns() {
     if (permSelect) permSelect.value = permVal;
     if (sysSelect) sysSelect.value = sysVal;
     if (attSelect) attSelect.value = attVal;
+    if (vacSelect) vacSelect.value = vacVal;
 }
 
 // OPERATIONS TAB RENDERING
@@ -6963,6 +7240,7 @@ function renderOpsWorkersTable() {
 }
 
 function renderOpsDetails() {
+    const isAr = currentAppLang === 'ar';
     const workerId = document.getElementById('ops-worker-select').value;
     const area = document.getElementById('ops-management-area'); const hist = document.getElementById('worker-logs-history');
     const isAdmin = currentUser && currentUser.role === 'admin';
@@ -6997,7 +7275,14 @@ function renderOpsDetails() {
                 div.className = 'flex-between list-item';
                 div.style.cssText = 'background:var(--input-bg); padding:10px; border-radius:8px; border:1px solid var(--border-color);';
                 
-                let statusText = s.active ? `<span class="badge badge-good" style="margin:0;">Active</span>` : `<button onclick="activateWorkerShift('${s.id}')" class="btn-outline-info" style="padding:4px 8px; font-size:0.75rem;">Activate</button>`;
+                let statusText = '';
+                if (s.dayOfWeek) {
+                    statusText = `<span class="badge" style="background:#f59e0b; color:white; margin:0;">${isAr ? translateDynamicTerm(s.dayOfWeek) : 'Override: ' + s.dayOfWeek}</span>`;
+                } else if (s.specificDate) {
+                    statusText = `<span class="badge" style="background:#f59e0b; color:white; margin:0;">${isAr ? s.specificDate : 'Override: ' + s.specificDate}</span>`;
+                } else {
+                    statusText = s.active ? `<span class="badge badge-good" style="margin:0;">Active</span>` : `<button onclick="activateWorkerShift('${s.id}')" class="btn-outline-info" style="padding:4px 8px; font-size:0.75rem;">Activate</button>`;
+                }
                 let delBtn = `<button onclick="deleteWorkerShift('${s.id}')" class="btn-outline-danger" style="padding:4px 8px; font-size:0.75rem; border:none; text-decoration:underline;">Delete</button>`;
                 
                 div.innerHTML = `
@@ -7453,8 +7738,17 @@ function renderSummaryTable() {
                 if (att) {
                     if (att.status === 'present') {
                         presentCount++;
-                        if (att.time && worker.startTime) {
-                            const [sH, sM] = worker.startTime.split(':').map(Number);
+                        let shiftStart = worker.startTime;
+                        const dateParts = dateStr.split('-');
+                        const dateObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+                        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                        const dayOfWeekName = dayNames[dateObj.getDay()];
+                        const dateOverrideShift = (worker.shifts || []).find(s => s.dayOfWeek === dayOfWeekName || s.specificDate === dateStr);
+                        if (dateOverrideShift) {
+                            shiftStart = dateOverrideShift.startTime;
+                        }
+                        if (att.time && shiftStart) {
+                            const [sH, sM] = shiftStart.split(':').map(Number);
                             const [cH, cM] = att.time.split(':').map(Number);
                             if (!isNaN(sH) && !isNaN(cH)) {
                                 const startMins = sH * 60 + (sM || 0);
@@ -8612,8 +8906,17 @@ function getLateDeductionsForMonth(worker, monthStr) {
         if (dateStr.startsWith(monthStr)) {
             const dayMap = attendance[dateStr] || {};
             const att = dayMap[worker.id];
-            if (att && att.status === 'present' && att.time && worker.startTime) {
-                const [sH, sM] = worker.startTime.split(':').map(Number);
+            let shiftStart = worker.startTime;
+            const dateParts = dateStr.split('-');
+            const dateObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const dayOfWeekName = dayNames[dateObj.getDay()];
+            const dateOverrideShift = (worker.shifts || []).find(s => s.dayOfWeek === dayOfWeekName || s.specificDate === dateStr);
+            if (dateOverrideShift) {
+                shiftStart = dateOverrideShift.startTime;
+            }
+            if (att && att.status === 'present' && att.time && shiftStart) {
+                const [sH, sM] = shiftStart.split(':').map(Number);
                 const [cH, cM] = att.time.split(':').map(Number);
                 if (!isNaN(sH) && !isNaN(cH)) {
                     const startMins = sH * 60 + (sM || 0);
@@ -8733,7 +9036,16 @@ function markWorkerAttendance(workerId, status) {
             const mm = String(now.getMinutes()).padStart(2, '0');
             checkTime = `${hh}:${mm}`;
         }
-        const lateness = calculateLateness(worker.startTime, checkTime);
+        let shiftStart = worker.startTime;
+        const dateParts = dateStr.split('-');
+        const dateObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const dayOfWeekName = dayNames[dateObj.getDay()];
+        const dateOverrideShift = (worker.shifts || []).find(s => s.dayOfWeek === dayOfWeekName || s.specificDate === dateStr);
+        if (dateOverrideShift) {
+            shiftStart = dateOverrideShift.startTime;
+        }
+        const lateness = calculateLateness(shiftStart, checkTime);
 
         db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}`).set({
             status: 'present',
@@ -8756,6 +9068,17 @@ function markWorkerAttendance(workerId, status) {
                 logActivity('attendance', workerId, worker.name, `Marked attendance as ABSENT for ${worker.name} on ${dateStr}`);
             })
             .catch(err => console.error("Error setting attendance absent:", err));
+    } else if (status === 'vacation') {
+        db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}`).set({
+            status: 'vacation',
+            time: '',
+            lateness: '',
+            timestamp: Date.now()
+        })
+            .then(() => {
+                logActivity('attendance', workerId, worker.name, `Marked attendance as VACATION for ${worker.name} on ${dateStr}`);
+            })
+            .catch(err => console.error("Error setting attendance vacation:", err));
     }
 }
 
@@ -8774,6 +9097,50 @@ function clearWorkerAttendance(workerId) {
     }
 }
 
+function setWorkerVacationStatus(markActive) {
+    const workerId = document.getElementById('vacation-worker-select').value;
+    const dateStr = document.getElementById('vacation-date-input').value;
+
+    if (!workerId || !dateStr) {
+        alert(currentAppLang === 'ar' ? 'الرجاء اختيار الموظف والتاريخ.' : 'Please select employee and date.');
+        return;
+    }
+
+    const worker = getCompanyData().workers.find(w => w.id === workerId);
+    if (!worker) return;
+
+    if (markActive) {
+        db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}`).set({
+            status: 'vacation',
+            time: '',
+            lateness: '',
+            timestamp: Date.now()
+        })
+        .then(() => {
+            logActivity('attendance', workerId, worker.name, `Marked attendance as VACATION for ${worker.name} on ${dateStr}`);
+            const mainDatePicker = document.getElementById('attendance-date-picker');
+            if (mainDatePicker && mainDatePicker.value === dateStr) {
+                renderAttendance();
+            }
+            alert(currentAppLang === 'ar' ? `تم تسجيل ${worker.name} في إجازة بنجاح!` : `Successfully marked ${worker.name} as on vacation!`);
+        })
+        .catch(err => console.error("Error setting attendance vacation:", err));
+    } else {
+        if (confirm(currentAppLang === 'ar' ? `هل تريد إزالة حالة الإجازة لـ ${worker.name} في ${dateStr}؟` : `Do you want to remove vacation status for ${worker.name} on ${dateStr}?`)) {
+            db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}`).remove()
+            .then(() => {
+                logActivity('attendance_clear', workerId, worker.name, `Cleared attendance/vacation record for ${worker.name} on ${dateStr}`);
+                const mainDatePicker = document.getElementById('attendance-date-picker');
+                if (mainDatePicker && mainDatePicker.value === dateStr) {
+                    renderAttendance();
+                }
+                alert(currentAppLang === 'ar' ? 'تمت إزالة الإجازة بنجاح!' : 'Vacation status removed successfully!');
+            })
+            .catch(err => console.error("Error clearing attendance vacation:", err));
+        }
+    }
+}
+
 function renderAttendance() {
     const isAr = currentAppLang === 'ar';
     const datePicker = document.getElementById('attendance-date-picker');
@@ -8783,6 +9150,15 @@ function renderAttendance() {
         const mm = String(today.getMonth() + 1).padStart(2, '0');
         const dd = String(today.getDate()).padStart(2, '0');
         datePicker.value = `${yyyy}-${mm}-${dd}`;
+    }
+
+    const vacDatePicker = document.getElementById('vacation-date-input');
+    if (vacDatePicker && !vacDatePicker.value) {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        vacDatePicker.value = `${yyyy}-${mm}-${dd}`;
     }
 
     const dateStr = datePicker ? datePicker.value : '';
@@ -8817,7 +9193,18 @@ function renderAttendance() {
     }
 
     workers.forEach(w => {
-        const scheduled = (w.startTime && w.endTime) ? `${w.startTime} - ${w.endTime}` : (isAr ? 'لا يوجد' : 'None');
+        let shiftStart = w.startTime;
+        let shiftEnd = w.endTime;
+        const dateParts = dateStr.split('-');
+        const dateObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const dayOfWeekName = dayNames[dateObj.getDay()];
+        const dateOverrideShift = (w.shifts || []).find(s => s.dayOfWeek === dayOfWeekName || s.specificDate === dateStr);
+        if (dateOverrideShift) {
+            shiftStart = dateOverrideShift.startTime;
+            shiftEnd = dateOverrideShift.endTime;
+        }
+        const scheduled = (shiftStart && shiftEnd) ? `${shiftStart} - ${shiftEnd}` : (isAr ? 'لا يوجد' : 'None');
         const att = attendanceMap[w.id];
 
         let statusHtml = '';
@@ -8836,6 +9223,8 @@ function renderAttendance() {
             }
         } else if (att.status === 'absent') {
             statusHtml = `<span class="badge badge-bad" style="display:inline-flex; align-items:center; gap:4px; font-weight:700;">❌ ${isAr ? 'غائب' : 'Absent'}</span>`;
+        } else if (att.status === 'vacation') {
+            statusHtml = `<span class="badge" style="display:inline-flex; align-items:center; gap:4px; font-weight:700; background:#0284c7; color:white;">🌴 ${isAr ? 'إجازة' : 'Vacation'}</span>`;
         }
 
         let exitHtml = '';
@@ -8878,7 +9267,9 @@ function renderAttendance() {
                 </div>
             `;
         } else if (myWorker && w.id === myWorker.id) {
-            if (!att || att.status !== 'present') {
+            if (att && att.status === 'vacation') {
+                actionsHtml = `<span style="color:#0284c7; font-weight:700; font-size:0.85rem;">🌴 ${isAr ? 'إجازة' : 'Vacation'}</span>`;
+            } else if (!att || att.status !== 'present') {
                 actionsHtml = `
                     <button onclick="markWorkerSelfAttendance()" class="btn-success" style="padding: 6px 12px; font-size: 0.8rem; font-weight:700;" title="${isAr ? 'تسجيل حضور' : 'Check-In'}">✔️ ${isAr ? 'حضور' : 'Check-In'}</button>
                 `;
@@ -9825,12 +10216,14 @@ function addNewWorkerShift() {
 
     const worker = getCompanyData().workers[workerIndex];
     if (!worker.shifts) worker.shifts = [];
+    const dayOfWeek = document.getElementById('ops-new-shift-day') ? document.getElementById('ops-new-shift-day').value : '';
 
     const newShift = {
         id: Date.now().toString(),
         startTime: startTime,
         endTime: endTime,
-        active: worker.shifts.length === 0
+        dayOfWeek: dayOfWeek || "",
+        active: !dayOfWeek && worker.shifts.length === 0
     };
 
     worker.shifts.push(newShift);
@@ -9847,7 +10240,11 @@ function addNewWorkerShift() {
     }).then(() => {
         document.getElementById('ops-new-shift-start').value = '';
         document.getElementById('ops-new-shift-end').value = '';
-        logActivity('ops', worker.id, worker.name, `Added new shift (${startTime} - ${endTime}) for ${worker.name}`);
+        if (document.getElementById('ops-new-shift-day')) document.getElementById('ops-new-shift-day').value = '';
+        const activityMsg = dayOfWeek 
+            ? `Added new override shift for ${dayOfWeek} (${startTime} - ${endTime}) for ${worker.name}`
+            : `Added new shift (${startTime} - ${endTime}) for ${worker.name}`;
+        logActivity('ops', worker.id, worker.name, activityMsg);
         renderOpsDetails();
         renderOpsWorkersTable();
     }).catch(err => {
@@ -10574,7 +10971,16 @@ function markWorkerSelfAttendance() {
     const mins = String(today.getMinutes()).padStart(2, '0');
     const checkTime = `${hh}:${mins}`;
 
-    const lateness = calculateLateness(worker.startTime, checkTime);
+    let shiftStart = worker.startTime;
+    const dateParts = dateStr.split('-');
+    const dateObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayOfWeekName = dayNames[dateObj.getDay()];
+    const dateOverrideShift = (worker.shifts || []).find(s => s.dayOfWeek === dayOfWeekName || s.specificDate === dateStr);
+    if (dateOverrideShift) {
+        shiftStart = dateOverrideShift.startTime;
+    }
+    const lateness = calculateLateness(shiftStart, checkTime);
 
     db.ref(`companies/${currentCompany}/attendance/${dateStr}/${worker.id}`).set({
         status: 'present',
