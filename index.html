@@ -1955,7 +1955,7 @@
                         </div>
 
                         <!-- Past Day Sale Entry (password protected) -->
-                        <div class="admin-only"
+                        <div class="sales-admin"
                             style="margin-top: 20px; background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px dashed var(--warning-border, #f59e0b);">
                             <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
                                 <span style="font-size:1.1rem;">🔒</span>
@@ -1970,8 +1970,8 @@
                             <button onclick="logPastSaleTransaction()" style="width:100%; padding:12px; background:linear-gradient(135deg,#f59e0b,#d97706); color:white; border:none; border-radius:8px; font-size:1rem; font-weight:800; cursor:pointer;" data-i18n="btn-submit-past-sale">🔑 Submit Past Day Sale</button>
                         </div>
 
-                        <!-- Cashier Box Deposit Entry (Admin Only) -->
-                        <div class="admin-only" style="margin-top: 20px; background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
+                        <!-- Cashier Box Deposit Entry (Sales Access) -->
+                        <div class="sales-admin" style="margin-top: 20px; background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
                             <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
                                 <span style="font-size:1.1rem;">💰</span>
                                 <h4 style="font-size:0.95rem; font-weight:700; color:var(--text-main); margin:0;" data-i18n="title-log-deposit">Log Cashier Box Deposit</h4>
@@ -2378,7 +2378,7 @@
     </div>
 
     <script defer src="translations.js"></script>
-    <script defer src="app.js?v=36"></script>
+    <script defer src="app.js?v=37"></script>
 </body>
 
 
