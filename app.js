@@ -1088,6 +1088,18 @@ function ensureArraysExist(data) {
     data.depositLogs = data.depositLogs.filter(d => d && d.timestamp);
     data.depositLogs.sort((a, b) => b.timestamp - a.timestamp);
 
+    if (data.spendLogs && !Array.isArray(data.spendLogs)) {
+        data.spendLogs = Object.values(data.spendLogs);
+    }
+    if (!data.spendLogs) data.spendLogs = [];
+    data.spendLogs = data.spendLogs.filter(s => s && s.timestamp);
+    data.spendLogs.sort((a, b) => b.timestamp - a.timestamp);
+
+    if (data.spendOrders && !Array.isArray(data.spendOrders)) {
+        data.spendOrders = Object.values(data.spendOrders);
+    }
+    if (!data.spendOrders) data.spendOrders = [];
+
     if (data.managerNotes && !Array.isArray(data.managerNotes)) {
         data.managerNotes = Object.values(data.managerNotes);
     }
@@ -2784,6 +2796,12 @@ function renderManaging() {
         pastMethodSelect.innerHTML = sources.map(s => `<option value="${s}">${s}</option>`).join('');
         if (sources.includes(prevVal)) pastMethodSelect.value = prevVal;
     }
+    const salesSpendMethodSelect = document.getElementById('sales-spend-method');
+    if (salesSpendMethodSelect) {
+        const prevVal = salesSpendMethodSelect.value;
+        salesSpendMethodSelect.innerHTML = sources.map(s => `<option value="${s}">${s}</option>`).join('');
+        if (sources.includes(prevVal)) salesSpendMethodSelect.value = prevVal;
+    }
 
     // Update Admin Sources List
     const sourcesListDiv = document.getElementById('admin-income-sources-list');
@@ -2909,6 +2927,47 @@ function renderManaging() {
         totalDeposits += d.amount;
     });
 
+    // Filter Spend Logs by Timeframe
+    let allSpendLogs = getCompanyData().spendLogs || [];
+    let filteredSpends = [];
+    if (currentSalesTimeframe === 'day') {
+        const datePicker = document.getElementById('sales-date-picker');
+        const parts = datePicker.value.split('-');
+        const startOfDay = new Date(parts[0], parts[1] - 1, parts[2]).getTime();
+        const endOfDay = startOfDay + 86400000;
+        filteredSpends = allSpendLogs.filter(l => l && l.timestamp >= startOfDay && l.timestamp < endOfDay);
+    }
+    else if (currentSalesTimeframe === 'week') {
+        const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).getTime();
+        filteredSpends = allSpendLogs.filter(l => l && l.timestamp >= startOfWeek);
+    }
+    else if (currentSalesTimeframe === 'month') {
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+        filteredSpends = allSpendLogs.filter(l => l && l.timestamp >= startOfMonth);
+    }
+    else if (currentSalesTimeframe === 'year') {
+        const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
+        filteredSpends = allSpendLogs.filter(l => l && l.timestamp >= startOfYear);
+    }
+    else if (currentSalesTimeframe === 'custom') {
+        const fromPicker = document.getElementById('sales-from-date');
+        const toPicker = document.getElementById('sales-to-date');
+        if (fromPicker && toPicker && fromPicker.value && toPicker.value) {
+            const fParts = fromPicker.value.split('-');
+            const tParts = toPicker.value.split('-');
+            const startTs = new Date(fParts[0], fParts[1] - 1, fParts[2]).getTime();
+            const endTs = new Date(tParts[0], tParts[1] - 1, tParts[2]).getTime() + 86400000;
+            filteredSpends = allSpendLogs.filter(l => l && l.timestamp >= startTs && l.timestamp < endTs);
+        }
+    }
+
+    let spendByMethod = {};
+    let totalCashSpends = 0;
+    filteredSpends.forEach(s => {
+        const m = s.method || '';
+        spendByMethod[m] = (spendByMethod[m] || 0) + s.amount;
+    });
+
     // Calculate Totals for Toggles
     let grandTotal = 0;
     let methodTotals = {};
@@ -2924,10 +2983,20 @@ function renderManaging() {
 
     const cashKey = Object.keys(methodTotals).find(k => k.toLowerCase() === 'cash' || k === 'نقدي' || k === 'كاش');
     const rawCashSales = cashKey ? methodTotals[cashKey] : 0;
+    if (cashKey && spendByMethod[cashKey]) {
+        totalCashSpends = spendByMethod[cashKey];
+    }
 
     if (cashKey) {
-        methodTotals[cashKey] = rawCashSales - totalDeposits;
+        methodTotals[cashKey] = rawCashSales - totalDeposits - totalCashSpends;
     }
+
+    // Subtract other method spends
+    Object.keys(spendByMethod).forEach(m => {
+        if (m !== cashKey && methodTotals[m] !== undefined) {
+            methodTotals[m] = methodTotals[m] - spendByMethod[m];
+        }
+    });
 
     // Sum up active methods to get grand total
     sources.forEach(s => {
@@ -2935,6 +3004,17 @@ function renderManaging() {
             grandTotal += methodTotals[s];
         }
     });
+
+    // Calculate gross sales (Total Salary)
+    let totalSalary = 0;
+    filteredLogs.forEach(l => {
+        totalSalary += l.amount;
+    });
+
+    const totalSalaryEl = document.getElementById('sales-total-salary');
+    if (totalSalaryEl) {
+        totalSalaryEl.textContent = totalSalary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
 
     document.getElementById('sales-grand-total').textContent = grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -2957,6 +3037,7 @@ function renderManaging() {
                     <div style="font-size: 0.78rem; border-top: 1px dashed rgba(255,255,255,0.25); margin-top: 8px; padding-top: 8px; display:flex; flex-direction:column; gap:4px; color:inherit;">
                         <div class="flex-between"><span>${isAr ? 'المبيعات النقدية:' : 'Cash Sales:'}</span> <span>SAR ${rawCashSales.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
                         <div class="flex-between"><span>${isAr ? 'الإيداعات:' : 'Deposited:'}</span> <span>SAR ${totalDeposits.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                        <div class="flex-between"><span>${isAr ? 'المصروفات النقدية:' : 'Spent Out:'}</span> <span style="color:#f87171;">SAR ${totalCashSpends.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
                         <div class="flex-between" style="font-weight:800; border-top: 1px solid rgba(255,255,255,0.15); margin-top:2px; padding-top:2px;"><span>${isAr ? 'المتبقي بالصندوق:' : 'Left in Box:'}</span> <span>SAR ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
                     </div>
                 `;
@@ -3184,7 +3265,8 @@ function renderManaging() {
         logDiv.innerHTML = '';
         const combined = [
             ...filteredLogs.map(l => ({ ...l, type: 'sale' })),
-            ...filteredDeposits.map(d => ({ ...d, type: 'deposit' }))
+            ...filteredDeposits.map(d => ({ ...d, type: 'deposit' })),
+            ...filteredSpends.map(s => ({ ...s, type: 'spend' }))
         ].sort((a, b) => b.timestamp - a.timestamp);
 
         if (combined.length === 0) {
@@ -3249,13 +3331,341 @@ function renderManaging() {
                             <div>${actionArea}</div>
                         </div>
                     `;
+                } else if (item.type === 'spend') {
+                    if (isSalesAdmin) {
+                        actionArea = `
+                            <button onclick="deleteSpendLog('${item.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="${t('btn-remove')}">${t('btn-undo-action')}</button>
+                        `;
+                    }
+
+                    logDiv.innerHTML += `
+                        <div class="ledger-card" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; margin-bottom: 0; border-left: 4px solid var(--danger);">
+                            <div>
+                                <div style="font-weight: 800; font-size: 1.25rem; color: var(--danger);">SAR -${item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                                <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                                    <span class="badge" style="background: var(--danger); color: white; padding:2px 8px;">${isAr ? 'مصروف مباشر' : 'Direct Spend'}</span>
+                                    <span class="badge" style="background: var(--input-bg); color: var(--text-main); border: 1px solid var(--border-color); padding:2px 8px;">${translateDynamicTerm(item.method)}</span>
+                                    <span>🕒 ${item.date}</span>
+                                    <span style="font-style:italic; opacity:0.7;">by ${item.cashier ? item.cashier.split('@')[0] : 'System'}</span>
+                                    ${item.note ? `<span style="color:var(--text-main); font-weight:600;">📝 ${item.note}</span>` : ''}
+                                </div>
+                            </div>
+                            <div>${actionArea}</div>
+                        </div>
+                    `;
                 }
             });
         }
     }
+    // Refresh pending spend orders panel
+    renderSpendOrders();
+
+}
+
+// ============================================================
+// --- SPEND ORDER SYSTEM ---
+// ============================================================
+
+function logDirectSpendGeneric(amountId, methodId, noteId) {
+    const isAr = currentAppLang === 'ar';
+    const amount = parseFloat(document.getElementById(amountId).value);
+    const method = document.getElementById(methodId).value;
+    const note = (document.getElementById(noteId).value || '').trim();
+
+    if (isNaN(amount) || amount <= 0) {
+        alert(isAr ? 'الرجاء إدخال مبلغ صحيح.' : 'Please enter a valid amount.');
+        return;
+    }
+    if (!method) {
+        alert(isAr ? 'الرجاء اختيار طريقة الدفع.' : 'Please select a payment method.');
+        return;
+    }
+    if (!note) {
+        alert(isAr ? 'الرجاء كتابة ملاحظة (سبب الصرف).' : 'Please enter a note (reason for the spend).');
+        return;
+    }
+
+    const now = new Date();
+    const tzOffset = now.getTimezoneOffset() * 60000;
+    const localDateStr = new Date(Date.now() - tzOffset).toISOString().slice(0, 10);
+    const displayDate = now.toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    const spendLogId = 'spendlog-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+    const spendLogObj = {
+        id: spendLogId,
+        amount: amount,
+        method: method,
+        note: note,
+        date: displayDate,
+        timestamp: Date.now(),
+        cashier: currentUser ? currentUser.email : 'unknown',
+        orderId: 'direct',
+        dateStr: localDateStr
+    };
+
+    const companyData = getCompanyData();
+    if (!companyData.spendLogs) companyData.spendLogs = [];
+    companyData.spendLogs.unshift(spendLogObj);
+
+    db.ref(`companies/${currentCompany}/spendLogs`).set(companyData.spendLogs)
+        .then(() => {
+            logActivity('sales', 'system', 'Direct Spend', `Logged direct spend: SAR ${amount} via ${method} — ${note}`);
+            document.getElementById(amountId).value = '';
+            document.getElementById(noteId).value = '';
+            alert(isAr ? `✅ تم تسجيل المصروف مباشرة بقيمة SAR ${amount} من ${method}.` : `✅ Direct spend logged successfully! SAR ${amount} deducted from ${method}.`);
+        })
+        .catch(err => {
+            console.error('Error logging direct spend:', err);
+            alert(isAr ? 'حدث خطأ أثناء تسجيل المصروف.' : 'Error logging direct spend.');
+        });
+}
+
+function logDirectSpend() {
+    logDirectSpendGeneric('finance-spend-amount', 'finance-spend-method', 'finance-spend-note');
+}
+
+function logDirectSpendFromSales() {
+    logDirectSpendGeneric('sales-spend-amount', 'sales-spend-method', 'sales-spend-note');
+}
+
+function renderFinanceSpendArea() {
+    const methodSelect = document.getElementById('finance-spend-method');
+    if (!methodSelect) return;
+    const sources = getCompanyData().incomeSources || ['Cash', 'Credit Card'];
+    const prevVal = methodSelect.value;
+    methodSelect.innerHTML = sources.map(s => `<option value="${s}">${s}</option>`).join('');
+    if (sources.includes(prevVal)) methodSelect.value = prevVal;
+}
+
+function submitSpendOrder() {
+    const isAr = currentAppLang === 'ar';
+    const amount = parseFloat(document.getElementById('finance-spend-amount').value);
+    const method = document.getElementById('finance-spend-method').value;
+    const note = (document.getElementById('finance-spend-note').value || '').trim();
+
+    if (isNaN(amount) || amount <= 0) {
+        alert(isAr ? 'الرجاء إدخال مبلغ صحيح.' : 'Please enter a valid amount.');
+        return;
+    }
+    if (!method) {
+        alert(isAr ? 'الرجاء اختيار طريقة الدفع.' : 'Please select a payment method.');
+        return;
+    }
+    if (!note) {
+        alert(isAr ? 'الرجاء كتابة ملاحظة (سبب الصرف).' : 'Please enter a note (reason for the spend).');
+        return;
+    }
+
+    const orderId = 'spend-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+    const now = new Date();
+    const tzOffset = now.getTimezoneOffset() * 60000;
+    const localDate = new Date(Date.now() - tzOffset).toISOString().slice(0, 10);
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const orderObj = {
+        id: orderId,
+        amount: amount,
+        suggestedMethod: method,
+        note: note,
+        status: 'pending',
+        createdBy: currentUser ? currentUser.email : 'unknown',
+        createdAt: Date.now(),
+        timestamp: Date.now(),
+        dateStr: localDate,
+        timeStr: timeStr
+    };
+
+    const companyData = getCompanyData();
+    if (!companyData.spendOrders) companyData.spendOrders = [];
+    companyData.spendOrders.unshift(orderObj);
+
+    db.ref(`companies/${currentCompany}/spendOrders`).set(companyData.spendOrders)
+        .then(() => {
+            logActivity('sales', 'system', 'Spend Requested', `Requested spend order: SAR ${amount} via ${method} — ${note}`);
+            document.getElementById('finance-spend-amount').value = '';
+            document.getElementById('finance-spend-note').value = '';
+            alert(isAr ? `✅ تم إرسال أمر الصرف للكاشير بنجاح بقيمة SAR ${amount}.` : `✅ Spend order submitted! Pending cashier approval.`);
+        })
+        .catch(err => {
+            console.error('Error submitting spend order:', err);
+            alert(isAr ? 'حدث خطأ أثناء إرسال أمر الصرف.' : 'Error submitting spend order.');
+        });
+}
+
+function cancelSpendOrder(orderId) {
+    const isAr = currentAppLang === 'ar';
+    if (!confirm(isAr ? 'هل تريد إلغاء أمر الصرف هذا؟' : 'Are you sure you want to cancel this spend order?')) return;
+
+    const companyData = getCompanyData();
+    const orders = companyData.spendOrders || [];
+    companyData.spendOrders = orders.filter(o => o && o.id !== orderId);
+
+    db.ref(`companies/${currentCompany}/spendOrders`).set(companyData.spendOrders)
+        .then(() => {
+            logActivity('sales_delete', 'system', 'Spend Cancelled', `Cancelled spend order (ID: ${orderId})`);
+        })
+        .catch(err => {
+            console.error('Error cancelling spend order:', err);
+            alert(isAr ? 'حدث خطأ أثناء إلغاء أمر الصرف.' : 'Error cancelling spend order.');
+        });
+}
+
+function rejectSpendOrder(orderId) {
+    const isAr = currentAppLang === 'ar';
+    if (!confirm(isAr ? 'هل تريد رفض أمر الصرف هذا؟' : 'Reject this spend order?')) return;
+
+    const companyData = getCompanyData();
+    const orders = companyData.spendOrders || [];
+    const orderIndex = orders.findIndex(o => o && o.id === orderId);
+    if (orderIndex === -1) return;
+
+    orders[orderIndex].status = 'rejected';
+
+    db.ref(`companies/${currentCompany}/spendOrders`).set(orders)
+        .then(() => {
+            logActivity('sales_delete', 'system', 'Spend Rejected', `Rejected spend order (ID: ${orderId})`);
+        })
+        .catch(err => {
+            console.error('Error rejecting spend order:', err);
+            alert(isAr ? 'حدث خطأ أثناء رفض أمر الصرف.' : 'Error rejecting spend order.');
+        });
+}
+
+function acceptSpendOrder(orderId) {
+    const isAr = currentAppLang === 'ar';
+    const methodSelect = document.getElementById('accept-spend-method-' + orderId);
+    const paidMethod = methodSelect ? methodSelect.value : null;
+
+    if (!paidMethod) {
+        alert(isAr ? 'الرجاء اختيار طريقة الدفع المستخدمة.' : 'Please select the payment method used.');
+        return;
+    }
+
+    const companyData = getCompanyData();
+    const orders = companyData.spendOrders || [];
+    const orderIndex = orders.findIndex(o => o && o.id === orderId);
+    if (orderIndex === -1) { alert('Order not found.'); return; }
+
+    const order = orders[orderIndex];
+
+    const now = new Date();
+    const tzOffset = now.getTimezoneOffset() * 60000;
+    const localDateStr = new Date(Date.now() - tzOffset).toISOString().slice(0, 10);
+    const displayDate = now.toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    const spendLogId = 'spendlog-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+    const spendLogObj = {
+        id: spendLogId,
+        amount: order.amount,
+        method: paidMethod,
+        note: order.note,
+        date: displayDate,
+        timestamp: Date.now(),
+        cashier: currentUser ? currentUser.email : 'unknown',
+        orderId: orderId,
+        dateStr: localDateStr
+    };
+
+    order.status = 'accepted';
+    order.acceptedBy = currentUser ? currentUser.email : 'unknown';
+    order.acceptedAt = Date.now();
+    order.paidMethod = paidMethod;
+
+    if (!companyData.spendLogs) companyData.spendLogs = [];
+    companyData.spendLogs.unshift(spendLogObj);
+
+    const updates = {};
+    updates[`companies/${currentCompany}/spendLogs`] = companyData.spendLogs;
+    updates[`companies/${currentCompany}/spendOrders`] = companyData.spendOrders;
+
+    db.ref().update(updates)
+        .then(() => {
+            logActivity('sales', 'system', 'Spend Accepted', `Spend order accepted: SAR ${order.amount} via ${paidMethod} — ${order.note}`);
+            alert(isAr ? `✅ تم قبول أمر الصرف وتسجيل مصروف SAR ${order.amount} من ${paidMethod}.` : `✅ Spend accepted! SAR ${order.amount} deducted from ${paidMethod}.`);
+        })
+        .catch(err => {
+            console.error('Error accepting spend order:', err);
+            alert(isAr ? 'حدث خطأ أثناء قبول أمر الصرف.' : 'Error accepting spend order.');
+        });
+}
+
+function deleteSpendLog(logId) {
+    const isAr = currentAppLang === 'ar';
+    if (!confirm(isAr ? 'هل تريد حذف هذا المصروف من السجل؟' : 'Delete this spend entry from the log?')) return;
+
+    const companyData = getCompanyData();
+    const logs = companyData.spendLogs || [];
+    const oldLog = logs.find(l => l.id === logId);
+    if (!oldLog) return;
+
+    companyData.spendLogs = logs.filter(l => l.id !== logId);
+
+    db.ref(`companies/${currentCompany}/spendLogs`).set(companyData.spendLogs)
+        .then(() => {
+            logActivity('sales_delete', 'system', 'Spend Log', `Deleted direct spend of SAR ${oldLog.amount} via ${oldLog.method} — ${oldLog.note}`);
+        })
+        .catch(err => {
+            console.error('Error deleting spend log:', err);
+            alert(isAr ? 'حدث خطأ أثناء حذف المصروف.' : 'Error deleting spend log.');
+        });
+}
+
+
+function renderSpendOrders() {
+    const isAr = currentAppLang === 'ar';
+    const container = document.getElementById('pending-spend-orders-list');
+    if (!container) return;
+
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    const isSalesUser = isAdmin || document.body.classList.contains('perm-sales');
+    const isFinUser = isAdmin || document.body.classList.contains('perm-finance');
+    const sources = getCompanyData().incomeSources || ['Cash', 'Credit Card'];
+    const allOrders = getCompanyData().spendOrders || {};
+
+    const pendingOrders = Object.values(allOrders)
+        .filter(o => o && o.status === 'pending')
+        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    if (pendingOrders.length === 0) {
+        container.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.9rem; padding:16px;">${isAr ? 'لا توجد أوامر صرف معلقة.' : 'No pending spend orders.'}</p>`;
+        return;
+    }
+
+    container.innerHTML = pendingOrders.map(order => {
+        const methodOptions = sources.map(s => `<option value="${s}"${s === order.suggestedMethod ? ' selected' : ''}>${s}</option>`).join('');
+        const canCancel = isFinUser && order.createdBy && currentUser && (isAdmin || order.createdBy.toLowerCase() === currentUser.email.toLowerCase());
+
+        return `
+            <div style="background:var(--card-bg); border:1px solid var(--border-color); border-left: 4px solid var(--danger); border-radius:10px; padding:14px 16px; margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap;">
+                    <div>
+                        <div style="font-size:1.15rem; font-weight:800; color:var(--danger);">SAR ${order.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                        <div style="font-size:0.82rem; color:var(--text-muted); margin-top:4px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                            <span class="badge" style="background:var(--input-bg); color:var(--text-main); border: 1px solid var(--border-color);">${translateDynamicTerm(order.suggestedMethod)}</span>
+                            <span>📝 ${order.note}</span>
+                        </div>
+                        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
+                            ${isAr ? 'طلب بواسطة:' : 'By:'} ${order.createdBy ? order.createdBy.split('@')[0] : '?'} · ${order.timeStr || ''} ${order.dateStr || ''}
+                        </div>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
+                        ${isSalesUser ? `
+                            <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                                <select id="accept-spend-method-${order.id}" style="padding:6px 10px; border-radius:6px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.85rem; font-weight:600;">${methodOptions}</select>
+                                <button onclick="acceptSpendOrder('${order.id}')" style="background:var(--success-bg); border:1px solid var(--success-border); color:var(--success); border-radius:6px; padding:7px 14px; font-weight:800; font-size:0.85rem; cursor:pointer;">✅ ${isAr ? 'قبول' : 'Accept'}</button>
+                                <button onclick="rejectSpendOrder('${order.id}')" style="background:var(--danger-bg); border:1px solid var(--danger-border); color:var(--danger); border-radius:6px; padding:7px 14px; font-weight:800; font-size:0.85rem; cursor:pointer;">❌ ${isAr ? 'رفض' : 'Reject'}</button>
+                            </div>
+                        ` : ''}
+                        ${canCancel ? `<button onclick="cancelSpendOrder('${order.id}')" style="background:transparent; border:none; color:var(--text-muted); font-size:0.75rem; cursor:pointer; text-decoration:underline;">${isAr ? 'إلغاء الأمر' : 'Cancel Order'}</button>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
 // --- COSTS DEPARTMENT SYSTEM ---
+
 let currentCostsTimeframe = 'day';
 
 function setCostsTimeframe(tf) {
@@ -7036,7 +7446,7 @@ function renderAll() {
     else if (currentTab === 'ranks') { renderRanksTable(); }
     else if (currentTab === 'attendance') { renderAttendance(); }
     else if (currentTab === 'tasks') { renderTasks(); }
-    else if (currentTab === 'finance') { renderFinanceTable(); renderFinDetails(); }
+    else if (currentTab === 'finance') { renderFinanceTable(); renderFinDetails(); renderFinanceSpendArea(); }
     else if (currentTab === 'summary') { renderSummaryTable(); renderLeaderboard(); }
     else if (currentTab === 'drivers') { renderDriversList(); renderDriverPanel(); renderDriverVolumeRewards(); }
     else if (currentTab === 'adverts') { renderAdverts(); }
@@ -11176,6 +11586,17 @@ window.deleteTaskGroup = deleteTaskGroup;
 window.addMemberToGroup = addMemberToGroup;
 window.removeMemberFromGroup = removeMemberFromGroup;
 window.renderTaskGroups = renderTaskGroups;
+
+// Spend Order System
+window.submitSpendOrder = submitSpendOrder;
+window.cancelSpendOrder = cancelSpendOrder;
+window.rejectSpendOrder = rejectSpendOrder;
+window.acceptSpendOrder = acceptSpendOrder;
+window.deleteSpendLog = deleteSpendLog;
+window.renderSpendOrders = renderSpendOrders;
+window.logDirectSpend = logDirectSpend;
+window.logDirectSpendFromSales = logDirectSpendFromSales;
+window.renderFinanceSpendArea = renderFinanceSpendArea;
 
 // Initial run
 applyTranslations();

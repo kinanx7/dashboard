@@ -1443,6 +1443,30 @@
                     </div>
 
                 </div>
+
+                <!-- Company Spends & Orders (Finance Access) -->
+                <div class="card" style="margin-top: 20px; border-top: 4px solid var(--danger);">
+                    <h2 class="card-title" style="color: var(--danger);"><span data-i18n="title-spend-order">Company Spends & Orders</span></h2>
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 15px;" data-i18n="desc-spend-finance">
+                        Log a direct expense (instant cash/card deduction) or submit a spend order to cashier.
+                    </p>
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label data-i18n="placeholder-amount">Amount (SAR)</label>
+                        <input type="number" step="any" id="finance-spend-amount" placeholder="Amount (SAR)" min="0.01">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label data-i18n="label-spend-method">Payment Method</label>
+                        <select id="finance-spend-method" style="padding: 12px;"></select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label data-i18n="placeholder-spend-note">Note / Reason</label>
+                        <input type="text" id="finance-spend-note" placeholder="e.g. Container arrival, Chicken supplier" data-i18n="[placeholder]placeholder-spend-note">
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <button onclick="logDirectSpend()" class="btn-success" style="width: 100%; padding: 12px; font-weight: 800; font-size: 0.95rem; background: linear-gradient(135deg, var(--success), #15803d); border: none; border-radius: 8px; color: white; cursor: pointer;" data-i18n="btn-log-direct-spend">Log Direct Spend</button>
+                        <button onclick="submitSpendOrder()" class="btn-danger" style="width: 100%; padding: 12px; font-weight: 800; font-size: 0.95rem; background: linear-gradient(135deg, var(--danger), #b91c1c); border: none; border-radius: 8px; color: white; cursor: pointer;" data-i18n="btn-submit-spend-req">Request Cashier Spend</button>
+                    </div>
+                </div>
             </div>
 
             <!-- Main Content: Financial Table & Export -->
@@ -1897,18 +1921,31 @@
                     </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: stretch;">
+                <div class="sales-grid-responsive">
                     <div style="display:flex; flex-direction:column; gap:20px;">
                         <div
-                            style="background: var(--input-bg); padding: 30px; border-radius: 16px; border: 1px solid var(--border-color); text-align: center; height:100%;">
-                            <div
-                                style="font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;" data-i18n="label-tf-total">
-                                Selected Timeframe Total</div>
-                            <div
-                                style="font-size: 3.5rem; font-weight: 800; color: var(--primary); margin-bottom: 30px;">
-                                SAR <span id="sales-grand-total">0.00</span></div>
+                            style="background: var(--input-bg); padding: 30px; border-radius: 16px; border: 1px solid var(--border-color); text-align: center; height:100%; display:flex; flex-direction:column; justify-content:center; gap:20px;">
+                            
+                            <!-- Total Salary (Gross Sales) -->
+                            <div>
+                                <div style="font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;" data-i18n="label-total-salary">
+                                    Total Salary (Gross Sales)</div>
+                                <div style="font-size: 2.5rem; font-weight: 800; color: var(--success); margin-top: 5px;">
+                                    SAR <span id="sales-total-salary">0.00</span></div>
+                            </div>
+
+                            <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 0 auto; width: 60%;">
+
+                            <!-- Net Remaining Left in Box -->
+                            <div>
+                                <div style="font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;" data-i18n="label-tf-total">
+                                    Selected Timeframe Total</div>
+                                <div style="font-size: 2.2rem; font-weight: 800; color: var(--primary); margin-top: 5px;">
+                                    SAR <span id="sales-grand-total">0.00</span></div>
+                            </div>
+
                             <div id="sales-method-toggles"
-                                style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;"></div>
+                                style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 10px;"></div>
                         </div>
                     </div>
 
@@ -1934,8 +1971,8 @@
                     </div>
                 </div>
 
-                <div
-                    style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: stretch; margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 30px;">
+                <div class="sales-grid-responsive"
+                    style="margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 30px;">
                     <div>
                         <h3 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--text-main);" data-i18n="title-log-sale">Log a New Transaction</h3>
                         <div
@@ -1983,6 +2020,20 @@
                             <button onclick="logDepositTransaction()" class="btn-warning" style="width:100%; padding:12px; font-weight:800; cursor:pointer;" data-i18n="btn-submit-deposit">Log Deposit Amount</button>
                         </div>
 
+                        <!-- Direct Spend Entry (Sales Access) -->
+                        <div class="sales-admin" style="margin-top: 20px; background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px solid var(--danger-border, #ef4444);">
+                            <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+                                <span style="font-size:1.1rem;">🧾</span>
+                                <h4 style="font-size:0.95rem; font-weight:700; color:var(--danger, #ef4444); margin:0;" data-i18n="title-log-direct-spend">Log Direct Spend</h4>
+                            </div>
+                            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; margin-bottom:10px;">
+                                <input type="number" step="any" id="sales-spend-amount" placeholder="Amount (SAR)" style="flex:2; min-width:110px; font-size:1rem; font-weight:700; padding:12px; color:var(--danger, #ef4444);">
+                                <select id="sales-spend-method" style="flex:1; min-width:110px; font-size:0.95rem; font-weight:600; padding:12px;"></select>
+                            </div>
+                            <input type="text" id="sales-spend-note" placeholder="Note / Reason (e.g. Chicken supplier)" style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.92rem;" data-i18n="[placeholder]placeholder-spend-note">
+                            <button onclick="logDirectSpendFromSales()" style="width:100%; padding:12px; background:linear-gradient(135deg, var(--danger, #ef4444), #b91c1c); color:white; border:none; border-radius:8px; font-size:1rem; font-weight:800; cursor:pointer;" data-i18n="btn-log-direct-spend">Log Direct Spend</button>
+                        </div>
+
                         <div class="admin-only" style="margin-top: 30px;">
                             <h3 style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 10px;" data-i18n="title-manage-income">Admin: Manage Income Sources</h3>
                             <div style="display: flex; gap: 8px;">
@@ -1996,6 +2047,17 @@
                     </div>
 
                     <div>
+                        <!-- Pending Spend Orders (Sales + Finance) -->
+                        <div class="sales-admin" style="margin-bottom: 20px; background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px solid var(--danger-border);">
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span style="font-size:1.1rem;">⏳</span>
+                                    <h4 style="font-size:0.95rem; font-weight:700; color:var(--danger); margin:0;" data-i18n="title-pending-spends">Pending Spend Orders</h4>
+                                </div>
+                            </div>
+                            <div id="pending-spend-orders-list"></div>
+                        </div>
+
                         <div class="flex-between"
                             style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
                             <h3 style="font-size: 1.1rem; margin:0;" data-i18n="title-transaction-feed">Transaction Feed</h3>
@@ -2378,7 +2440,7 @@
     </div>
 
     <script defer src="translations.js"></script>
-    <script defer src="app.js?v=37"></script>
+    <script defer src="app.js?v=42"></script>
 </body>
 
 

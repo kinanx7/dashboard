@@ -2492,10 +2492,22 @@ body:not(.role-admin) .task-grid {
     left: 0 !important;
 }
 
+.sales-grid-responsive {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    align-items: stretch;
+}
+
 /* =============================================
    MOBILE RESPONSIVE ATTENDANCE CARD HUD LAYOUT
    ============================================= */
 @media (max-width: 768px) {
+    .sales-grid-responsive {
+        grid-template-columns: 1fr !important;
+        gap: 20px !important;
+    }
+
     #view-attendance .table-container {
         overflow-x: visible !important;
         background: transparent !important;
@@ -2578,5 +2590,22 @@ body:not(.role-admin) .task-grid {
 
     #attendance-table {
         min-width: 100% !important;
+    }
+
+    /* Sales Ledger Cards Mobile Wrap */
+    .ledger-card {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 12px !important;
+        padding: 12px 14px !important;
+    }
+    .ledger-card > div {
+        width: 100% !important;
+    }
+    .ledger-card > div:last-child {
+        display: flex !important;
+        justify-content: flex-end !important;
+        align-items: center !important;
+        margin-top: 4px !important;
     }
 }
