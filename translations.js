@@ -858,7 +858,7 @@ const uiTranslations = {
         "btn-tf-custom": "📅 نطاق مخصص",
         "label-to": "إلى",
         "label-tf-total": "إجمالي الفترة المحددة",
-        "label-total-salary": "إجمالي المبيعات (الرواتب)",
+        "label-total-salary": "إجمالي المبيعات (التوتال)",
         "title-sales-trend": "📊 اتجاه المبيعات",
         "btn-sct-bar": "شريط",
         "btn-sct-line": "خطي",
