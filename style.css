@@ -2609,3 +2609,40 @@ body:not(.role-admin) .task-grid {
         margin-top: 4px !important;
     }
 }
+
+/* Premium Form Tab Switcher Styles */
+.form-tabs-container {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.form-tabs-container .btn-outline {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    min-height: unset !important;
+    box-shadow: none !important;
+}
+
+.form-tabs-container .btn-outline:hover {
+    background: rgba(217, 138, 54, 0.1) !important;
+    color: var(--primary) !important;
+    border-color: var(--primary) !important;
+    transform: translateY(-1px);
+}
+
+.form-tabs-container .btn-outline.active {
+    background: var(--primary) !important;
+    color: white !important;
+    border-color: var(--primary) !important;
+}

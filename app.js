@@ -11598,5 +11598,28 @@ window.logDirectSpend = logDirectSpend;
 window.logDirectSpendFromSales = logDirectSpendFromSales;
 window.renderFinanceSpendArea = renderFinanceSpendArea;
 
+// Form Toggling for Sales Section
+function switchSalesForm(formId) {
+    const containers = ['new-sale', 'past-sale', 'deposit', 'spend'];
+    containers.forEach(id => {
+        const el = document.getElementById(`form-${id}-container`);
+        if (el) el.style.display = 'none';
+        
+        const btn = document.getElementById(`btn-sales-tab-${id}`);
+        if (btn) {
+            btn.classList.remove('active');
+        }
+    });
+
+    const activeEl = document.getElementById(`form-${formId}-container`);
+    if (activeEl) activeEl.style.display = 'block';
+
+    const activeBtn = document.getElementById(`btn-sales-tab-${formId}`);
+    if (activeBtn) {
+        activeBtn.classList.add('active');
+    }
+}
+window.switchSalesForm = switchSalesForm;
+
 // Initial run
 applyTranslations();

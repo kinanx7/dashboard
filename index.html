@@ -1974,64 +1974,69 @@
                 <div class="sales-grid-responsive"
                     style="margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 30px;">
                     <div>
-                        <h3 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--text-main);" data-i18n="title-log-sale">Log a New Transaction</h3>
-                        <div
-                            style="background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
-                            <div style="display: flex; gap: 12px; align-items: stretch; flex-wrap: wrap;">
-                                <div style="flex: 2; min-width: 150px;">
-                                    <input type="number" step="any" id="new-sale-amount" placeholder="Amount (SAR)..." data-i18n="[placeholder]placeholder-amount-sar"
-                                        style="font-size: 1.25rem; font-weight: 700; padding: 14px; color: var(--primary); height: 100%;">
+                        <!-- Tab Form Switcher (PC/Mobile Compact Layout) -->
+                        <div class="form-tabs-container">
+                            <button onclick="switchSalesForm('new-sale')" class="btn-outline active" id="btn-sales-tab-new-sale" data-i18n="btn-tab-new-sale">Log Sale</button>
+                            <button onclick="switchSalesForm('past-sale')" class="btn-outline" id="btn-sales-tab-past-sale" data-i18n="btn-tab-past-sale">Past Day Sale</button>
+                            <button onclick="switchSalesForm('deposit')" class="btn-outline" id="btn-sales-tab-deposit" data-i18n="btn-tab-deposit">Log Deposit</button>
+                            <button onclick="switchSalesForm('spend')" class="btn-outline" id="btn-sales-tab-spend" data-i18n="btn-tab-spend">Direct Spend</button>
+                        </div>
+
+                        <!-- 1. Log New Transaction -->
+                        <div id="form-new-sale-container" style="display: block;">
+                            <h3 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--text-main);" data-i18n="title-log-sale">Log a New Transaction</h3>
+                            <div style="background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
+                                <div style="display: flex; gap: 12px; align-items: stretch; flex-wrap: wrap;">
+                                    <div style="flex: 2; min-width: 150px;">
+                                        <input type="number" step="any" id="new-sale-amount" placeholder="Amount (SAR)..." data-i18n="[placeholder]placeholder-amount-sar"
+                                            style="font-size: 1.25rem; font-weight: 700; padding: 14px; color: var(--primary); height: 100%;">
+                                    </div>
+                                    <div style="flex: 1; min-width: 120px;">
+                                        <select id="new-sale-method" style="height: 100%; font-size: 1rem; font-weight: 600; padding: 14px;"></select>
+                                    </div>
                                 </div>
-                                <div style="flex: 1; min-width: 120px;">
-                                    <select id="new-sale-method"
-                                        style="height: 100%; font-size: 1rem; font-weight: 600; padding: 14px;"></select>
+                                <button onclick="logSaleTransaction()" class="btn-success"
+                                    style="font-size: 1.1rem; padding: 14px; font-weight: 800; width:100%; margin-top: 12px;" data-i18n="btn-log-sale">✅ Log Sale</button>
+                            </div>
+                        </div>
+
+                        <!-- 2. Past Day Sale Entry -->
+                        <div id="form-past-sale-container" style="display: none;">
+                            <h3 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--text-main);" data-i18n="title-past-sale">Log Sale for a Past Day</h3>
+                            <div style="background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px dashed var(--warning-border, #f59e0b);">
+                                <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; margin-bottom:10px;">
+                                    <input type="number" step="any" id="past-sale-amount" placeholder="Amount (SAR)" style="flex:2; min-width:110px; font-size:1rem; font-weight:700; padding:12px; color:var(--primary);">
+                                    <select id="past-sale-method" style="flex:1; min-width:110px; font-size:0.95rem; font-weight:600; padding:12px;"></select>
+                                    <input type="date" id="past-sale-date" style="flex:1; min-width:130px; padding:12px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.9rem;">
                                 </div>
+                                <input type="password" id="past-sale-password" placeholder="🔑 Manager Password" style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.95rem;">
+                                <button onclick="logPastSaleTransaction()" style="width:100%; padding:12px; background:linear-gradient(135deg,#f59e0b,#d97706); color:white; border:none; border-radius:8px; font-size:1rem; font-weight:800; cursor:pointer;" data-i18n="btn-submit-past-sale">🔑 Submit Past Day Sale</button>
                             </div>
-                            <button onclick="logSaleTransaction()" class="btn-success"
-                                style="font-size: 1.1rem; padding: 14px; font-weight: 800; width:100%; margin-top: 12px;" data-i18n="btn-log-sale">✅ Log Sale</button>
                         </div>
 
-                        <!-- Past Day Sale Entry (password protected) -->
-                        <div class="sales-admin"
-                            style="margin-top: 20px; background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px dashed var(--warning-border, #f59e0b);">
-                            <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
-                                <span style="font-size:1.1rem;">🔒</span>
-                                <h4 style="font-size:0.95rem; font-weight:700; color:var(--warning, #f59e0b); margin:0;" data-i18n="title-past-sale">Log Sale for a Past Day</h4>
+                        <!-- 3. Cashier Box Deposit Entry -->
+                        <div id="form-deposit-container" style="display: none;">
+                            <h3 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--text-main);" data-i18n="title-log-deposit">Log Cashier Box Deposit</h3>
+                            <div style="background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
+                                <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; margin-bottom:10px;">
+                                    <input type="number" step="any" id="new-deposit-amount" placeholder="Deposit Amount (SAR)" style="flex:2; min-width:110px; font-size:1.1rem; font-weight:700; padding:12px; color:#f59e0b;">
+                                    <input type="date" id="new-deposit-date" style="flex:1; min-width:130px; padding:12px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.9rem;">
+                                </div>
+                                <button onclick="logDepositTransaction()" class="btn-warning" style="width:100%; padding:12px; font-weight:800; cursor:pointer;" data-i18n="btn-submit-deposit">Log Deposit Amount</button>
                             </div>
-                            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; margin-bottom:10px;">
-                                <input type="number" step="any" id="past-sale-amount" placeholder="Amount (SAR)" style="flex:2; min-width:110px; font-size:1rem; font-weight:700; padding:12px; color:var(--primary);">
-                                <select id="past-sale-method" style="flex:1; min-width:110px; font-size:0.95rem; font-weight:600; padding:12px;"></select>
-                                <input type="date" id="past-sale-date" style="flex:1; min-width:130px; padding:12px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.9rem;">
-                            </div>
-                            <input type="password" id="past-sale-password" placeholder="🔑 Manager Password" style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.95rem;">
-                            <button onclick="logPastSaleTransaction()" style="width:100%; padding:12px; background:linear-gradient(135deg,#f59e0b,#d97706); color:white; border:none; border-radius:8px; font-size:1rem; font-weight:800; cursor:pointer;" data-i18n="btn-submit-past-sale">🔑 Submit Past Day Sale</button>
                         </div>
 
-                        <!-- Cashier Box Deposit Entry (Sales Access) -->
-                        <div class="sales-admin" style="margin-top: 20px; background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
-                            <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
-                                <span style="font-size:1.1rem;">💰</span>
-                                <h4 style="font-size:0.95rem; font-weight:700; color:var(--text-main); margin:0;" data-i18n="title-log-deposit">Log Cashier Box Deposit</h4>
+                        <!-- 4. Direct Spend Entry -->
+                        <div id="form-spend-container" style="display: none;">
+                            <h3 style="font-size: 1.1rem; margin-bottom: 16px; color: var(--text-main);" data-i18n="title-log-direct-spend">Log Direct Spend</h3>
+                            <div style="background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px solid var(--danger-border, #ef4444);">
+                                <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; margin-bottom:10px;">
+                                    <input type="number" step="any" id="sales-spend-amount" placeholder="Amount (SAR)" style="flex:2; min-width:110px; font-size:1rem; font-weight:700; padding:12px; color:var(--danger, #ef4444);">
+                                    <select id="sales-spend-method" style="flex:1; min-width:110px; font-size:0.95rem; font-weight:600; padding:12px;"></select>
+                                </div>
+                                <input type="text" id="sales-spend-note" placeholder="Note / Reason (e.g. Chicken supplier)" style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.92rem;" data-i18n="[placeholder]placeholder-spend-note">
+                                <button onclick="logDirectSpendFromSales()" style="width:100%; padding:12px; background:linear-gradient(135deg, var(--danger, #ef4444), #b91c1c); color:white; border:none; border-radius:8px; font-size:1rem; font-weight:800; cursor:pointer;" data-i18n="btn-log-direct-spend">Log Direct Spend</button>
                             </div>
-                            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; margin-bottom:10px;">
-                                <input type="number" step="any" id="new-deposit-amount" placeholder="Deposit Amount (SAR)" style="flex:2; min-width:110px; font-size:1.1rem; font-weight:700; padding:12px; color:#f59e0b;">
-                                <input type="date" id="new-deposit-date" style="flex:1; min-width:130px; padding:12px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.9rem;">
-                            </div>
-                            <button onclick="logDepositTransaction()" class="btn-warning" style="width:100%; padding:12px; font-weight:800; cursor:pointer;" data-i18n="btn-submit-deposit">Log Deposit Amount</button>
-                        </div>
-
-                        <!-- Direct Spend Entry (Sales Access) -->
-                        <div class="sales-admin" style="margin-top: 20px; background: var(--bg-color); padding: 20px; border-radius: 12px; border: 1px solid var(--danger-border, #ef4444);">
-                            <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
-                                <span style="font-size:1.1rem;">🧾</span>
-                                <h4 style="font-size:0.95rem; font-weight:700; color:var(--danger, #ef4444); margin:0;" data-i18n="title-log-direct-spend">Log Direct Spend</h4>
-                            </div>
-                            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; margin-bottom:10px;">
-                                <input type="number" step="any" id="sales-spend-amount" placeholder="Amount (SAR)" style="flex:2; min-width:110px; font-size:1rem; font-weight:700; padding:12px; color:var(--danger, #ef4444);">
-                                <select id="sales-spend-method" style="flex:1; min-width:110px; font-size:0.95rem; font-weight:600; padding:12px;"></select>
-                            </div>
-                            <input type="text" id="sales-spend-note" placeholder="Note / Reason (e.g. Chicken supplier)" style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.92rem;" data-i18n="[placeholder]placeholder-spend-note">
-                            <button onclick="logDirectSpendFromSales()" style="width:100%; padding:12px; background:linear-gradient(135deg, var(--danger, #ef4444), #b91c1c); color:white; border:none; border-radius:8px; font-size:1rem; font-weight:800; cursor:pointer;" data-i18n="btn-log-direct-spend">Log Direct Spend</button>
                         </div>
 
                         <div class="admin-only" style="margin-top: 30px;">
@@ -2440,7 +2445,7 @@
     </div>
 
     <script defer src="translations.js"></script>
-    <script defer src="app.js?v=42"></script>
+    <script defer src="app.js?v=43"></script>
 </body>
 
 
