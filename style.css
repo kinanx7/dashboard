@@ -305,9 +305,11 @@ body.role-admin #worker-violation-panel {
     display: none !important;
 }
 
-body:not(.role-admin):not(.perm-warehouse) .warehouse-admin {
+body:not(.role-admin):not(.perm-warehouse) .warehouse-admin,
+body:not(.role-admin):not(.perm-warehouse) #global-stock-alerts {
     display: none !important;
 }
+
 
 /* FEATURE 2: Drivers admin controls hidden from plain drivers */
 

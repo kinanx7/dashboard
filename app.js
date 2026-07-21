@@ -1004,6 +1004,7 @@ function applyUserRoles() {
 
     // Always run after body classes are set
     markLockedTabs();
+    checkStockAlerts();
 }
 
 /**
@@ -4573,7 +4574,18 @@ function executeMove(itemId, folderName) {
 function checkStockAlerts() {
     const data = getCompanyData();
     const alertBox = document.getElementById('global-stock-alerts');
-    if (!data.warehouse) return;
+    if (!alertBox) return;
+    if (!data.warehouse) {
+        alertBox.style.display = 'none';
+        return;
+    }
+
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    const hasWhAccess = isAdmin || document.body.classList.contains('perm-warehouse');
+    if (!hasWhAccess) {
+        alertBox.style.display = 'none';
+        return;
+    }
 
     const lowItems = data.warehouse.filter(i => i.currentStock <= i.riskAmount);
 
