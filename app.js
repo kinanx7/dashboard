@@ -4456,6 +4456,42 @@ function editMaxStock(itemId) {
     }
 }
 
+function editRiskAmount(itemId) {
+    const itemIndex = getCompanyData().warehouse.findIndex(i => i.id === itemId);
+    if (itemIndex === -1) return;
+
+    const item = getCompanyData().warehouse[itemIndex];
+    const isAr = currentAppLang === 'ar';
+    const newRisk = prompt(isAr ? `أدخل حد تنبيه الخطر الجديد للمنتج (${item.name}):` : `Enter new Risk Alert threshold for ${item.name}:`, item.riskAmount);
+    const parsed = parseFloat(newRisk);
+    if (!isNaN(parsed) && parsed >= 0) {
+        item.riskAmount = parsed;
+
+        let workerId = "";
+        let workerName = "Admin";
+        if (currentUser && currentUser.role === 'admin') {
+            workerId = "admin";
+            workerName = currentUser.email ? currentUser.email.split('@')[0] : "Admin";
+        } else {
+            const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+            workerId = myWorker ? myWorker.id : "";
+            workerName = myWorker ? myWorker.name : "Staff";
+        }
+        item.workerId = workerId;
+        if (!item.logs) item.logs = [];
+        item.logs.unshift({ date: formatTimestamp(), amount: item.currentStock, difference: 0, note: `Risk Alert Limit changed to ${parsed}`, workerId: workerId, workerName: workerName });
+
+        db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex).set(item)
+            .then(() => {
+                logActivity('warehouse', workerId, workerName, `Changed Risk Alert limit of "${item.name}" to ${parsed}`);
+                renderAll();
+                checkStockAlerts();
+            })
+            .catch(err => console.error("Error editing risk amount:", err));
+    }
+}
+
+
 function deleteWarehouseItem(itemId) {
     if (!currentUser || (currentUser.role !== 'admin' && !document.body.classList.contains('perm-warehouse'))) {
         alert("You do not have permission to delete products.");
@@ -4675,7 +4711,7 @@ function renderWarehouse() {
                                 <h3 style="margin:0; color:var(--text-main); font-size:1.15rem;">${item.name}</h3>
                                 <div style="text-align:right;"><span style="font-size:1.4rem; font-weight:800; color:${isLow ? 'var(--danger)' : 'var(--primary)'}">${item.currentStock}</span> <span style="color:var(--text-muted); font-weight:600;">/ ${item.maxStock}</span></div>
                             </div>
-                            ${isLow ? `<div class="text-danger" style="font-size:0.8rem; margin-top:4px; font-weight:600;">⚠️ ${t('label-currently-left')} (${item.riskAmount})</div>` : ''}
+                            ${isLow ? `<div class="text-danger" style="font-size:0.8rem; margin-top:4px; font-weight:600;">⚠️ ${t('label-currently-left')}: ${item.currentStock} (${t('label-risk-alert')}: ${item.riskAmount})</div>` : ''}
                             <div class="wh-progress"><div class="wh-fill ${isLow ? 'low' : ''}" style="width: ${pct}%"></div></div>
                             
                             <div class="flex-between" style="margin-top: 20px; flex-wrap:wrap; gap:10px;">
@@ -4694,6 +4730,7 @@ function renderWarehouse() {
                                         </select>
                                     ` : ''}
                                     ${isWHAdmin ? `<button onclick="editMaxStock('${item.id}')" class="btn-outline">✏️ Max</button>` : ''}
+                                    ${isWHAdmin ? `<button onclick="editRiskAmount('${item.id}')" class="btn-outline">⚠️ Risk</button>` : ''}
                                     ${isWHAdmin ? `<button onclick="deleteWarehouseItem('${item.id}')" class="btn-outline-danger">✖</button>` : ''}
                                 </div>
                             </div>
@@ -11620,6 +11657,8 @@ function switchSalesForm(formId) {
     }
 }
 window.switchSalesForm = switchSalesForm;
+window.editRiskAmount = editRiskAmount;
 
 // Initial run
 applyTranslations();
+
