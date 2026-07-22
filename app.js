@@ -5899,6 +5899,7 @@ function deleteTask(workerId, taskId) {
 }
 
 function renderTasks() {
+    const isAr = currentAppLang === 'ar';
     // Render Templates
     const tList = document.getElementById('task-template-list');
     const dList = document.getElementById('task-datalist');
@@ -6000,7 +6001,8 @@ function renderTasks() {
                 actionBtn = `
                     <div style="display:flex; gap:8px; align-items:center;">
                         <span style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">${labelText}</span>
-                        <button onclick="deleteGeneralTask('${gt.id}')" style="background:none; border:none; color: var(--danger); cursor:pointer; font-size:1.2rem; padding:0 6px;" title="${t('btn-remove')}">✖</button>
+                        <button onclick="openEditTaskModal('general', '${gt.id}', true)" style="background:none; border:none; color: var(--secondary); cursor:pointer; font-size:1.1rem; padding:0 4px;" title="${isAr ? 'تعديل المهمة' : 'Edit Task'}">✏️</button>
+                        <button onclick="deleteGeneralTask('${gt.id}')" style="background:none; border:none; color: var(--danger); cursor:pointer; font-size:1.2rem; padding:0 4px;" title="${t('btn-remove')}">✖</button>
                     </div>`;
             }
 
@@ -6035,7 +6037,8 @@ function renderTasks() {
         if (!worker.jobs || worker.jobs.length === 0) return;
 
         let jobsHtml = worker.jobs.map(j => {
-            const delBtn = isAdmin ? `<button onclick="deleteTask('${worker.id}', '${j.id}')" style="background:none; border:none; color: var(--danger); cursor:pointer; font-size:1.1rem; padding:0 6px;" title="Delete">✖</button>` : '';
+            const editBtn = isAdmin ? `<button onclick="openEditTaskModal('${worker.id}', '${j.id}')" style="background:none; border:none; color: var(--secondary); cursor:pointer; font-size:1rem; padding:0 4px;" title="${isAr ? 'تعديل المهمة' : 'Edit Task'}">✏️</button>` : '';
+            const delBtn = isAdmin ? `<button onclick="deleteTask('${worker.id}', '${j.id}')" style="background:none; border:none; color: var(--danger); cursor:pointer; font-size:1.1rem; padding:0 4px;" title="Delete">✖</button>` : '';
 
             const status = j.status || (j.done ? 'completed' : 'assigned');
             const isAssignedToMe = (currentUser && worker.email && worker.email.toLowerCase() === currentUser.email.toLowerCase());
@@ -6097,7 +6100,7 @@ function renderTasks() {
                             </div>
                             <div class="flex-between" style="border-top:1px dashed var(--border-color); padding-top:10px; margin-top:4px; gap: 10px;">
                                 <div style="flex-grow:1;">${actionHtml}</div>
-                                <div>${delBtn}</div>
+                                <div style="display:flex; align-items:center; gap:4px;">${editBtn}${delBtn}</div>
                             </div>
                         </div>
                     `;
@@ -6197,6 +6200,252 @@ function deleteGeneralTask(taskId) {
     }).catch(() => {
         db.ref(`companies/${currentCompany}/generalTasks/${taskId}`).remove();
     });
+}
+
+function openEditTaskModal(workerId, taskId, isGeneral = false) {
+    const modal = document.getElementById('edit-task-modal');
+    if (!modal) return;
+
+    const companyData = getCompanyData();
+    const isAr = currentAppLang === 'ar';
+
+    // Populate worker dropdown
+    const select = document.getElementById('edit-task-worker-select');
+    if (select) {
+        select.innerHTML = `
+            <option value="general">🌍 ${isAr ? 'مهمة عامة' : 'General Task'}</option>
+        `;
+
+        const groups = companyData.taskGroups || [];
+        if (groups.length > 0) {
+            const groupOptGroup = document.createElement('optgroup');
+            groupOptGroup.label = isAr ? 'المجموعات' : 'Groups';
+            groups.forEach(g => {
+                const opt = document.createElement('option');
+                opt.value = `group_${g.id}`;
+                opt.textContent = `👥 ${g.name}`;
+                groupOptGroup.appendChild(opt);
+            });
+            select.appendChild(groupOptGroup);
+        }
+
+        const workerOptGroup = document.createElement('optgroup');
+        workerOptGroup.label = isAr ? 'الموظفين' : 'Employees';
+        (companyData.workers || []).forEach(w => {
+            const opt = document.createElement('option');
+            opt.value = w.id;
+            opt.textContent = w.name;
+            workerOptGroup.appendChild(opt);
+        });
+        select.appendChild(workerOptGroup);
+    }
+
+    let taskObj = null;
+    let currentAssignee = workerId;
+
+    if (isGeneral || workerId === 'general' || workerId.startsWith('group_')) {
+        const genTasks = companyData.generalTasks || [];
+        taskObj = genTasks.find(gt => gt.id === taskId);
+        if (taskObj && taskObj.targetGroupId) {
+            currentAssignee = `group_${taskObj.targetGroupId}`;
+        } else {
+            currentAssignee = 'general';
+        }
+    } else {
+        const workerIndex = (companyData.workers || []).findIndex(w => w.id === workerId);
+        if (workerIndex !== -1) {
+            const worker = companyData.workers[workerIndex];
+            taskObj = (worker.jobs || []).find(j => j.id === taskId);
+            currentAssignee = workerId;
+        }
+    }
+
+    if (!taskObj) {
+        alert(isAr ? 'لم يتم العثور على المهمة.' : 'Task not found.');
+        return;
+    }
+
+    document.getElementById('edit-task-id-hidden').value = taskId;
+    document.getElementById('edit-task-original-worker-hidden').value = workerId;
+    document.getElementById('edit-task-worker-select').value = currentAssignee;
+    document.getElementById('edit-task-title-input').value = taskObj.title || '';
+    document.getElementById('edit-task-urgency-select').value = taskObj.urgency || 'normal';
+    document.getElementById('edit-task-deadline-input').value = taskObj.deadlineMins || '';
+
+    modal.style.display = 'flex';
+}
+
+function closeEditTaskModal() {
+    const modal = document.getElementById('edit-task-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function saveEditedTask() {
+    const isAr = currentAppLang === 'ar';
+    const taskId = document.getElementById('edit-task-id-hidden').value;
+    const origWorkerId = document.getElementById('edit-task-original-worker-hidden').value;
+    const newAssignee = document.getElementById('edit-task-worker-select').value;
+    const newTitle = document.getElementById('edit-task-title-input').value.trim();
+    const newUrgency = document.getElementById('edit-task-urgency-select').value;
+    const newDeadline = parseInt(document.getElementById('edit-task-deadline-input').value) || 0;
+
+    if (!newTitle) {
+        alert(isAr ? 'الرجاء إدخال تفاصيل المهمة.' : 'Please enter task details.');
+        return;
+    }
+
+    const companyData = getCompanyData();
+    const isOrigGeneral = origWorkerId === 'general' || origWorkerId.startsWith('gt-') || origWorkerId.startsWith('group_');
+
+    if (isOrigGeneral) {
+        // Task was in generalTasks
+        const genTasks = companyData.generalTasks || [];
+        const taskIndex = genTasks.findIndex(gt => gt.id === taskId);
+        if (taskIndex === -1) {
+            alert(isAr ? 'تعذر العثور على المهمة.' : 'Could not find task.');
+            return;
+        }
+        const task = genTasks[taskIndex];
+
+        if (newAssignee === 'general' || newAssignee.startsWith('group_')) {
+            // Still in general/group pool
+            const targetGroupId = newAssignee.startsWith('group_') ? newAssignee.replace('group_', '') : null;
+            let targetGroupName = null;
+            if (targetGroupId) {
+                const grp = (companyData.taskGroups || []).find(g => g.id === targetGroupId);
+                if (grp) targetGroupName = grp.name;
+            }
+
+            db.ref(`companies/${currentCompany}/generalTasks/${taskId}`).update({
+                title: newTitle,
+                urgency: newUrgency,
+                deadlineMins: newDeadline,
+                targetGroupId: targetGroupId,
+                targetGroupName: targetGroupName
+            }).then(() => {
+                logActivity('task', 'general', 'General Pool', `Updated task: "${newTitle}"`);
+                closeEditTaskModal();
+                renderAll();
+            }).catch(err => console.error("Error updating general task:", err));
+        } else {
+            // Reassigned from general pool to a specific worker
+            const newWorkerIndex = (companyData.workers || []).findIndex(w => w.id === newAssignee);
+            if (newWorkerIndex === -1) return;
+            const newWorker = companyData.workers[newWorkerIndex];
+            if (!newWorker.jobs) newWorker.jobs = [];
+
+            const movedJob = {
+                id: Date.now().toString(),
+                title: newTitle,
+                date: task.date || formatTimestamp(),
+                timestamp: task.timestamp || Date.now(),
+                urgency: newUrgency,
+                deadlineMins: newDeadline,
+                status: 'assigned',
+                done: false
+            };
+
+            newWorker.jobs.push(movedJob);
+
+            const updates = {};
+            updates[`companies/${currentCompany}/workers/${newWorkerIndex}/jobs`] = newWorker.jobs;
+            updates[`companies/${currentCompany}/generalTasks/${taskId}`] = null;
+
+            db.ref().update(updates).then(() => {
+                logActivity('task', newWorker.id, newWorker.name, `Assigned task to ${newWorker.name}: "${newTitle}"`);
+                closeEditTaskModal();
+                renderAll();
+            }).catch(err => console.error("Error reassigning general task to worker:", err));
+        }
+    } else {
+        // Task was assigned to a specific worker
+        const origWorkerIndex = (companyData.workers || []).findIndex(w => w.id === origWorkerId);
+        if (origWorkerIndex === -1) return;
+        const origWorker = companyData.workers[origWorkerIndex];
+        const jobIndex = (origWorker.jobs || []).findIndex(j => j.id === taskId);
+        if (jobIndex === -1) return;
+
+        const job = origWorker.jobs[jobIndex];
+
+        if (newAssignee === origWorkerId) {
+            // Same worker: update fields
+            job.title = newTitle;
+            job.urgency = newUrgency;
+            job.deadlineMins = newDeadline;
+
+            db.ref(`companies/${currentCompany}/workers/${origWorkerIndex}/jobs/${jobIndex}`).update({
+                title: newTitle,
+                urgency: newUrgency,
+                deadlineMins: newDeadline
+            }).then(() => {
+                logActivity('task', origWorker.id, origWorker.name, `Updated task for ${origWorker.name}: "${newTitle}"`);
+                closeEditTaskModal();
+                renderAll();
+            }).catch(err => console.error("Error updating worker task:", err));
+        } else if (newAssignee === 'general' || newAssignee.startsWith('group_')) {
+            // Moved from worker to general/group task
+            origWorker.jobs.splice(jobIndex, 1);
+
+            const targetGroupId = newAssignee.startsWith('group_') ? newAssignee.replace('group_', '') : null;
+            let targetGroupName = null;
+            if (targetGroupId) {
+                const grp = (companyData.taskGroups || []).find(g => g.id === targetGroupId);
+                if (grp) targetGroupName = grp.name;
+            }
+
+            const newGenTask = {
+                id: 'gt-' + Date.now().toString(),
+                title: newTitle,
+                date: job.date || formatTimestamp(),
+                timestamp: job.timestamp || Date.now(),
+                urgency: newUrgency,
+                deadlineMins: newDeadline,
+                status: 'pending',
+                targetGroupId: targetGroupId,
+                targetGroupName: targetGroupName,
+                acceptedBy: null,
+                acceptedById: null,
+                acceptedAt: null
+            };
+
+            const updates = {};
+            updates[`companies/${currentCompany}/workers/${origWorkerIndex}/jobs`] = origWorker.jobs;
+            updates[`companies/${currentCompany}/generalTasks/${newGenTask.id}`] = newGenTask;
+
+            db.ref().update(updates).then(() => {
+                logActivity('task', 'general', 'General Pool', `Moved task from ${origWorker.name} to general pool: "${newTitle}"`);
+                closeEditTaskModal();
+                renderAll();
+            }).catch(err => console.error("Error moving task to general pool:", err));
+        } else {
+            // Reassigned to another worker
+            const newWorkerIndex = (companyData.workers || []).findIndex(w => w.id === newAssignee);
+            if (newWorkerIndex === -1) return;
+            const newWorker = companyData.workers[newWorkerIndex];
+            if (!newWorker.jobs) newWorker.jobs = [];
+
+            origWorker.jobs.splice(jobIndex, 1);
+
+            const reassignedJob = {
+                ...job,
+                title: newTitle,
+                urgency: newUrgency,
+                deadlineMins: newDeadline
+            };
+
+            newWorker.jobs.push(reassignedJob);
+
+            const updates = {};
+            updates[`companies/${currentCompany}/workers/${origWorkerIndex}/jobs`] = origWorker.jobs;
+            updates[`companies/${currentCompany}/workers/${newWorkerIndex}/jobs`] = newWorker.jobs;
+
+            db.ref().update(updates).then(() => {
+                logActivity('task', newWorker.id, newWorker.name, `Reassigned task from ${origWorker.name} to ${newWorker.name}: "${newTitle}"`);
+                closeEditTaskModal();
+                renderAll();
+            }).catch(err => console.error("Error reassigning task to another worker:", err));
+        }
+    }
 }
 
 // --- DRIVERS SYSTEM ---
@@ -11877,6 +12126,9 @@ window.editRiskAmount = editRiskAmount;
 window.showUnassignedOverlay = showUnassignedOverlay;
 window.hideUnassignedOverlay = hideUnassignedOverlay;
 window.checkUnassignedUserAccess = checkUnassignedUserAccess;
+window.openEditTaskModal = openEditTaskModal;
+window.closeEditTaskModal = closeEditTaskModal;
+window.saveEditedTask = saveEditedTask;
 
 // Initial run
 applyTranslations();

@@ -206,8 +206,9 @@ const uiTranslations = {
         "opt-urgency-high": "🔴 Urgent / High Priority",
         "label-time-to-complete": "Time to Complete (Minutes)",
         "placeholder-task-mins": "e.g. 30 (Optional)",
-        "btn-assign-task": "Assign Task to Worker",
         "title-tasks-board": "Tasks Board",
+        "title-edit-task": "Edit Task",
+        "btn-save-changes": "Save Changes",
 
         // Warehouse Extra
         "title-add-product": "Add New Product",
@@ -743,6 +744,8 @@ const uiTranslations = {
         "placeholder-task-mins": "مثال: 30 (اختياري)",
         "btn-assign-task": "تعيين المهمة للموظف",
         "title-tasks-board": "لوحة المهام",
+        "title-edit-task": "تعديل المهمة",
+        "btn-save-changes": "حفظ التعديلات",
         "title-add-product": "إضافة منتج جديد",
         "desc-add-product": "سجل الأصناف لتتبع استهلاكها.",
         "label-product-name": "اسم المنتج",
