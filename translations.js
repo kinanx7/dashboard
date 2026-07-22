@@ -540,10 +540,20 @@ const uiTranslations = {
         "Thursday": "Thursday",
         "Friday": "Friday",
         "Saturday": "Saturday",
-        "Sunday": "Sunday"
+        "Sunday": "Sunday",
+        "unassigned-title": "Account Pending Assignment",
+        "unassigned-msg": "Please wait until you get assigned to a company by the manager.",
+        "unassigned-checking": "Checking status in real-time...",
+        "btn-check-status": "🔄 Refresh Status",
+        "unassigned-still-pending": "Your account is still pending assignment by the admin."
     },
     ar: {
-        // شاشة الدخول
+        "Sunday": "الأحد",
+        "unassigned-title": "الحساب قيد التعيين",
+        "unassigned-msg": "يرجى الانتظار حتى يتم تعيينك في شركة من قبل المدير.",
+        "unassigned-checking": "جاري التحقق من التعيين بشكل مباشر...",
+        "btn-check-status": "🔄 إعادة التحقق",
+        "unassigned-still-pending": "حسابك لا يزال بانتظار التعيين في شركة من قبل المدير.",
         "auth-title-login": "تسجيل الدخول للوحة التحكم",
         "auth-title-signup": "إنشاء حساب مشاهد",
         "placeholder-email": "البريد الإلكتروني",

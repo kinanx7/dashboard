@@ -254,7 +254,7 @@ function startGlobalNotificationListeners(email) {
             }
 
             if (workersSnap && workersSnap.exists()) {
-                const workersVal = workersSnap.val() || [];
+                const workersVal = parseWorkersSnap(workersSnap);
                 workerIndex = workersVal.findIndex(w => w && w.email && w.email.toLowerCase() === email.toLowerCase());
                 if (workerIndex !== -1) {
                     myWorkerData = workersVal[workerIndex];
@@ -299,7 +299,8 @@ function startGlobalNotificationListeners(email) {
 
                     let updatedWorker = null;
                     if (companyData.workers) {
-                        updatedWorker = companyData.workers.find(w => w && w.email && w.email.toLowerCase() === email.toLowerCase());
+                        const workersArr = Array.isArray(companyData.workers) ? companyData.workers : Object.values(companyData.workers);
+                        updatedWorker = workersArr.find(w => w && w.email && w.email.toLowerCase() === email.toLowerCase());
                     }
 
                     if (isFirstTrigger) {
@@ -535,6 +536,28 @@ function toggleDarkMode(event) {
 }
 applyDarkMode();
 
+function parseAdminsSnap(snap) {
+    if (!snap || typeof snap.val !== 'function') return {};
+    const val = snap.val();
+    if (!val) return {};
+    if (Array.isArray(val)) {
+        const map = {};
+        val.forEach(e => { if (e) map[String(e).toLowerCase().replace(/\./g, ',')] = true; });
+        return map;
+    }
+    if (typeof val === 'object') return val;
+    return {};
+}
+
+function parseWorkersSnap(snap) {
+    if (!snap || typeof snap.val !== 'function') return [];
+    const val = snap.val();
+    if (!val) return [];
+    if (Array.isArray(val)) return val.filter(w => w && typeof w === 'object');
+    if (typeof val === 'object') return Object.values(val).filter(w => w && typeof w === 'object');
+    return [];
+}
+
 // --- CORE STATE & DATA ---
 let currentCompany = 'burgeroov';
 let appData = {
@@ -564,6 +587,9 @@ function getCompanyData() {
 
 function showCompanySelectionHUD(event) {
     if (event) event.stopPropagation();
+    const launchLoader = document.getElementById('launch-loader-overlay');
+    if (launchLoader) launchLoader.style.display = 'none';
+    if (typeof hideUnassignedOverlay === 'function') hideUnassignedOverlay();
     document.getElementById('company-selection-overlay').style.display = 'flex';
     document.getElementById('app-wrapper').style.display = 'none';
 }
@@ -572,7 +598,18 @@ function selectCompany(companyId) {
     currentCompany = companyId;
     localStorage.setItem('selected_company', companyId);
 
-    document.getElementById('company-selection-overlay').style.display = 'none';
+    const launchLoader = document.getElementById('launch-loader-overlay');
+    if (launchLoader) launchLoader.style.display = 'none';
+
+    const hudOverlay = document.getElementById('company-selection-overlay');
+    if (hudOverlay) hudOverlay.style.display = 'none';
+
+    const authOverlay = document.getElementById('auth-overlay');
+    if (authOverlay) authOverlay.style.display = 'none';
+
+    if (typeof hideUnassignedOverlay === 'function') {
+        hideUnassignedOverlay();
+    }
 
     document.body.classList.remove('theme-burgeroov', 'theme-mvc', 'theme-mvcfresh');
     document.body.classList.add('theme-' + companyId);
@@ -612,8 +649,8 @@ function selectCompany(companyId) {
             db.ref(`companies/${companyId}/admins`).once('value').catch(() => null),
             db.ref(`companies/${companyId}/workers`).once('value').catch(() => null)
         ]).then(([adminsSnap, workersSnap]) => {
-            const admins = adminsSnap ? (adminsSnap.val() || {}) : {};
-            const workers = workersSnap ? (workersSnap.val() || []) : [];
+            const admins = parseAdminsSnap(adminsSnap);
+            const workers = parseWorkersSnap(workersSnap);
             
             const sanitizedEmail = email.replace(/\./g, ',');
             const isCompanyAdmin = email === 'kinan.rahal@hotmail.com' || admins[sanitizedEmail] !== undefined;
@@ -729,39 +766,24 @@ auth.onAuthStateChanged((user) => {
                 document.getElementById('auth-loader').style.display = 'none';
                 document.getElementById('auth-btn').style.display = 'block';
 
-                let burgeroovAdmins = (bgAdmins && typeof bgAdmins.val === 'function') ? (bgAdmins.val() || {}) : {};
-                if (Array.isArray(burgeroovAdmins)) {
-                    const map = {};
-                    burgeroovAdmins.forEach(e => { if (e) map[e.toLowerCase().replace(/\./g, ',')] = true; });
-                    burgeroovAdmins = map;
-                }
-                const burgeroovWorkers = (bgWorkers && typeof bgWorkers.val === 'function') ? (bgWorkers.val() || []) : [];
+                const burgeroovAdmins = parseAdminsSnap(bgAdmins);
+                const burgeroovWorkers = parseWorkersSnap(bgWorkers);
 
-                let mvcAdminsList = (mvcAdmins && typeof mvcAdmins.val === 'function') ? (mvcAdmins.val() || {}) : {};
-                if (Array.isArray(mvcAdminsList)) {
-                    const map = {};
-                    mvcAdminsList.forEach(e => { if (e) map[e.toLowerCase().replace(/\./g, ',')] = true; });
-                    mvcAdminsList = map;
-                }
-                const mvcWorkersList = (mvcWorkers && typeof mvcWorkers.val === 'function') ? (mvcWorkers.val() || []) : [];
+                const mvcAdminsList = parseAdminsSnap(mvcAdmins);
+                const mvcWorkersList = parseWorkersSnap(mvcWorkers);
 
-                let mvcfreshAdminsList = (freshAdmins && typeof freshAdmins.val === 'function') ? (freshAdmins.val() || {}) : {};
-                if (Array.isArray(mvcfreshAdminsList)) {
-                    const map = {};
-                    mvcfreshAdminsList.forEach(e => { if (e) map[e.toLowerCase().replace(/\./g, ',')] = true; });
-                    mvcfreshAdminsList = map;
-                }
-                const mvcfreshWorkersList = (freshWorkers && typeof freshWorkers.val === 'function') ? (freshWorkers.val() || []) : [];
+                const mvcfreshAdminsList = parseAdminsSnap(freshAdmins);
+                const mvcfreshWorkersList = parseWorkersSnap(freshWorkers);
 
                 const sanitizedEmail = email.replace(/\./g, ',');
                 const inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
-                    burgeroovWorkers.some(w => w.email && w.email.toLowerCase() === email);
+                    burgeroovWorkers.some(w => w && w.email && w.email.toLowerCase() === email);
 
                 const inMvc = mvcAdminsList[sanitizedEmail] === true ||
-                    mvcWorkersList.some(w => w.email && w.email.toLowerCase() === email);
+                    mvcWorkersList.some(w => w && w.email && w.email.toLowerCase() === email);
 
                 const inMvcFresh = mvcfreshAdminsList[sanitizedEmail] === true ||
-                    mvcfreshWorkersList.some(w => w.email && w.email.toLowerCase() === email);
+                    mvcfreshWorkersList.some(w => w && w.email && w.email.toLowerCase() === email);
 
                 // Update selector cards display based on assigned status
                 const cardBurgeroov = document.querySelector('.burgeroov-card');
@@ -819,7 +841,7 @@ auth.onAuthStateChanged((user) => {
                     } else if (activeCompanies.length === 1) {
                         selectCompany(activeCompanies[0]);
                     } else {
-                        selectCompany('burgeroov');
+                        showUnassignedOverlay(user.email);
                     }
                 }
             }).catch((error) => {
@@ -838,6 +860,7 @@ auth.onAuthStateChanged((user) => {
         }
     } else {
         currentUser = null;
+        hideUnassignedOverlay();
         // Stop all notification listeners
         Object.keys(notificationListeners).forEach(companyId => {
             if (notificationListeners[companyId]) {
@@ -858,6 +881,104 @@ auth.onAuthStateChanged((user) => {
         }
     }
 });
+
+let unassignedCheckInterval = null;
+
+function showUnassignedOverlay(userEmail) {
+    const overlay = document.getElementById('auth-overlay');
+    const appWrapper = document.getElementById('app-wrapper');
+    const hudOverlay = document.getElementById('company-selection-overlay');
+    const unassignedOverlay = document.getElementById('unassigned-company-overlay');
+
+    if (overlay) overlay.style.display = 'none';
+    if (appWrapper) appWrapper.style.display = 'none';
+    if (hudOverlay) hudOverlay.style.display = 'none';
+
+    if (unassignedOverlay) {
+        unassignedOverlay.style.display = 'flex';
+        const emailEl = document.getElementById('unassigned-user-email');
+        if (emailEl) emailEl.textContent = userEmail || (currentUser ? currentUser.email : '');
+    }
+
+    if (!unassignedCheckInterval) {
+        unassignedCheckInterval = setInterval(() => {
+            checkUnassignedUserAccess(false);
+        }, 5000);
+    }
+}
+
+function hideUnassignedOverlay() {
+    const unassignedOverlay = document.getElementById('unassigned-company-overlay');
+    if (unassignedOverlay) {
+        unassignedOverlay.style.display = 'none';
+    }
+    if (unassignedCheckInterval) {
+        clearInterval(unassignedCheckInterval);
+        unassignedCheckInterval = null;
+    }
+}
+
+function checkUnassignedUserAccess(isManualTrigger = false) {
+    if (!currentUser || !currentUser.email) return;
+
+    const email = currentUser.email.toLowerCase();
+    const sanitizedEmail = email.replace(/\./g, ',');
+
+    Promise.all([
+        db.ref('companies/burgeroov/admins').once('value').catch(() => null),
+        db.ref('companies/burgeroov/workers').once('value').catch(() => null),
+        db.ref('companies/mvc/admins').once('value').catch(() => null),
+        db.ref('companies/mvc/workers').once('value').catch(() => null),
+        db.ref('companies/mvcfresh/admins').once('value').catch(() => null),
+        db.ref('companies/mvcfresh/workers').once('value').catch(() => null)
+    ]).then(([bgAdmins, bgWorkers, mvcAdmins, mvcWorkers, freshAdmins, freshWorkers]) => {
+        const burgeroovAdmins = parseAdminsSnap(bgAdmins);
+        const burgeroovWorkers = parseWorkersSnap(bgWorkers);
+
+        const mvcAdminsList = parseAdminsSnap(mvcAdmins);
+        const mvcWorkersList = parseWorkersSnap(mvcWorkers);
+
+        const mvcfreshAdminsList = parseAdminsSnap(freshAdmins);
+        const mvcfreshWorkersList = parseWorkersSnap(freshWorkers);
+
+        const inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
+            burgeroovWorkers.some(w => w && w.email && w.email.toLowerCase() === email);
+
+        const inMvc = mvcAdminsList[sanitizedEmail] === true ||
+            mvcWorkersList.some(w => w && w.email && w.email.toLowerCase() === email);
+
+        const inMvcFresh = mvcfreshAdminsList[sanitizedEmail] === true ||
+            mvcfreshWorkersList.some(w => w && w.email && w.email.toLowerCase() === email);
+
+        const activeCompanies = [];
+        if (inBurgeroov) activeCompanies.push('burgeroov');
+        if (inMvc) activeCompanies.push('mvc');
+        if (inMvcFresh) activeCompanies.push('mvcfresh');
+
+        if (activeCompanies.length > 0) {
+            hideUnassignedOverlay();
+
+            const cardBurgeroov = document.querySelector('.burgeroov-card');
+            const cardMvc = document.querySelector('.mvc-card');
+            const cardMvcFresh = document.querySelector('.mvcfresh-card');
+
+            if (cardBurgeroov) cardBurgeroov.style.display = inBurgeroov ? 'block' : 'none';
+            if (cardMvc) cardMvc.style.display = inMvc ? 'block' : 'none';
+            if (cardMvcFresh) cardMvcFresh.style.display = inMvcFresh ? 'block' : 'none';
+
+            window.isMultiCompany = activeCompanies.length > 1;
+
+            if (activeCompanies.length > 1) {
+                showCompanySelectionHUD();
+            } else {
+                selectCompany(activeCompanies[0]);
+            }
+        } else if (isManualTrigger) {
+            alert(t('unassigned-still-pending') || "Your account is still pending assignment by the admin.");
+        }
+    });
+}
+
 
 function toggleAuthMode() {
     authMode = authMode === 'login' ? 'signup' : 'login';
@@ -931,6 +1052,7 @@ function handleAuthSubmit() {
 }
 
 function logout() {
+    hideUnassignedOverlay();
     localStorage.removeItem('selected_company');
     auth.signOut();
 }
@@ -8841,6 +8963,7 @@ function submitPaymentRequest() {
 
 // 2. Accept Request (Finance / Admin Manager)
 function acceptPaymentRequest(reqId) {
+    const isAr = currentAppLang === 'ar';
     const pRequests = getCompanyData().paymentRequests || {};
     const req = pRequests[reqId];
     if (!req) return;
@@ -8855,17 +8978,27 @@ function acceptPaymentRequest(reqId) {
         }
     }
 
+    let note = '';
+    const noteInput = document.getElementById(`admin-note-${reqId}`);
+    if (noteInput && noteInput.value.trim() !== '') {
+        note = noteInput.value.trim();
+    }
+
     const threshold = parseFloat(getCompanyData().highMoneyThreshold) || 0;
     const isHighRequest = threshold > 0 && approvedAmount >= threshold;
 
+    const updateData = {
+        amount: approvedAmount,
+        requestedAmount: req.requestedAmount !== undefined ? req.requestedAmount : req.amount,
+        adminNote: note || (req.adminNote || null),
+        handledAt: Date.now()
+    };
+
     if (isHighRequest) {
-        db.ref(`companies/${currentCompany}/paymentRequests/${reqId}`).update({
-            status: 'waiting_manager_approval',
-            amount: approvedAmount,
-            requestedAmount: req.requestedAmount !== undefined ? req.requestedAmount : req.amount,
-            code: null,
-            handledAt: Date.now()
-        }).then(() => {
+        updateData.status = 'waiting_manager_approval';
+        updateData.code = null;
+
+        db.ref(`companies/${currentCompany}/paymentRequests/${reqId}`).update(updateData).then(() => {
             if (typeof logActivity === 'function') {
                 logActivity('finance', req.workerId, req.workerName, `Financial department accepted high payment request of SAR ${approvedAmount} for ${req.workerName} (Awaiting Manager final approval)`);
             }
@@ -8873,14 +9006,10 @@ function acceptPaymentRequest(reqId) {
     } else {
         // Generate random 6 digit code
         const code = Math.floor(100000 + Math.random() * 900000).toString();
+        updateData.status = 'accepted';
+        updateData.code = code;
 
-        db.ref(`companies/${currentCompany}/paymentRequests/${reqId}`).update({
-            status: 'accepted',
-            amount: approvedAmount,
-            requestedAmount: req.requestedAmount !== undefined ? req.requestedAmount : req.amount,
-            code: code,
-            handledAt: Date.now()
-        }).then(() => {
+        db.ref(`companies/${currentCompany}/paymentRequests/${reqId}`).update(updateData).then(() => {
             if (typeof logActivity === 'function') {
                 logActivity('finance', req.workerId, req.workerName, `Accepted payment request of SAR ${approvedAmount} for ${req.workerName}`);
             }
@@ -8909,16 +9038,29 @@ function undoAcceptPaymentRequest(reqId) {
 
 // 3. Reject Request (Finance / Admin Manager)
 function rejectPaymentRequest(reqId) {
+    const isAr = currentAppLang === 'ar';
     const pRequests = getCompanyData().paymentRequests || {};
     const req = pRequests[reqId];
     if (!req) return;
 
+    let note = '';
+    const noteInput = document.getElementById(`admin-note-${reqId}`);
+    if (noteInput && noteInput.value.trim() !== '') {
+        note = noteInput.value.trim();
+    } else {
+        const prompted = prompt(isAr ? 'الرجاء كتابة سبب الرفض أو ملاحظة (اختياري):' : 'Enter rejection reason or note (optional):');
+        if (prompted === null) return; // User canceled
+        note = prompted.trim();
+    }
+
     db.ref(`companies/${currentCompany}/paymentRequests/${reqId}`).update({
         status: 'rejected',
+        adminNote: note || null,
         handledAt: Date.now()
     }).then(() => {
         if (typeof logActivity === 'function') {
-            logActivity('finance', req.workerId, req.workerName, `Rejected payment request of SAR ${req.amount} for ${req.workerName}`);
+            const detailMsg = note ? ` (Reason: ${note})` : '';
+            logActivity('finance', req.workerId, req.workerName, `Rejected payment request of SAR ${req.amount} for ${req.workerName}${detailMsg}`);
         }
     }).catch(err => console.error("Error rejecting request:", err));
 }
@@ -9021,6 +9163,21 @@ function renderPaymentRequests() {
                     statusBadge = `<span class="badge" style="background:#2563eb;">${isAr ? 'تم الاستلام' : 'Given'}</span>`;
                 }
 
+                let adminNoteDisplay = '';
+                if (req.adminNote) {
+                    if (req.status === 'rejected') {
+                        adminNoteDisplay = `
+                            <div style="font-size: 0.85rem; margin-top: 8px; padding: 8px 12px; background: rgba(220, 38, 38, 0.08); border-left: 4px solid var(--danger); border-radius: 6px; color: var(--danger); font-weight: 600;">
+                                💬 ${isAr ? 'سبب الرفض / ملاحظة الإدارة:' : 'Rejection Reason / Admin Note:'} <span style="font-weight: 500; color: var(--text-main);">${req.adminNote}</span>
+                            </div>`;
+                    } else {
+                        adminNoteDisplay = `
+                            <div style="font-size: 0.85rem; margin-top: 8px; padding: 8px 12px; background: rgba(197, 131, 43, 0.08); border-left: 4px solid var(--secondary); border-radius: 6px; color: var(--text-main); font-weight: 500;">
+                                💬 ${isAr ? 'ملاحظة الإدارة:' : 'Admin Note:'} <span>${req.adminNote}</span>
+                            </div>`;
+                    }
+                }
+
                 workerRequestsDiv.innerHTML += `
                     <div class="ledger-card" style="border-left: 4px solid var(--primary);">
                         <div class="flex-between">
@@ -9029,6 +9186,7 @@ function renderPaymentRequests() {
                         </div>
                         <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">🕒 ${dateStr}</div>
                         <div style="font-size: 0.85rem; margin-top: 6px; color: var(--text-main);">${isAr ? 'السبب:' : 'Reason:'} <em>${req.reason}</em></div>
+                        ${adminNoteDisplay}
                         ${codeDisplay}
                     </div>
                 `;
@@ -9054,12 +9212,18 @@ function renderPaymentRequests() {
                     cardStyle = 'border-left: 4px solid var(--warning);';
                     statusHeader = `<span class="badge" style="background:#d97706; font-size:0.75rem; font-weight:700; padding:4px 8px; border-radius:4px; color:white;">${isAr ? 'قيد الانتظار' : 'Pending'}</span>`;
                     actionArea = `
-                        <div style="display:flex; gap:8px; margin-top: 12px; justify-content: flex-end; align-items:center; flex-wrap:wrap;">
-                            <label style="margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">${isAr ? 'تعديل المبلغ (ريال):' : 'Adjust Amount (SAR):'}</label>
-                            <input type="number" step="any" id="adjust-amount-${req.id}" value="${req.amount}" min="0.01" 
-                                style="max-width: 90px; padding: 6px 10px; font-size: 0.85rem; height: 34px;">
-                            <button onclick="rejectPaymentRequest('${req.id}')" class="btn-outline-danger" style="padding: 6px 14px; font-size: 0.8rem; height: 34px;">${isAr ? 'رفض' : 'Reject'}</button>
-                            <button onclick="acceptPaymentRequest('${req.id}')" class="btn-success" style="padding: 6px 14px; font-size: 0.8rem; height: 34px;">${isAr ? 'قبول واعتماد' : 'Accept & Approve'}</button>
+                        <div style="display:flex; flex-direction:column; gap:8px; margin-top: 12px;">
+                            <div style="display:flex; gap:8px; justify-content: flex-end; align-items:center; flex-wrap:wrap;">
+                                <label style="margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">${isAr ? 'تعديل المبلغ (ريال):' : 'Adjust Amount (SAR):'}</label>
+                                <input type="number" step="any" id="adjust-amount-${req.id}" value="${req.amount}" min="0.01" 
+                                    style="max-width: 90px; padding: 6px 10px; font-size: 0.85rem; height: 34px;">
+                            </div>
+                            <div style="display:flex; gap:8px; justify-content: flex-end; align-items:center; flex-wrap:wrap;">
+                                <input type="text" id="admin-note-${req.id}" placeholder="${isAr ? 'سبب الرفض / ملاحظة (اختياري)...' : 'Rejection reason / Note (optional)...'}" 
+                                    style="flex: 1; min-width: 180px; padding: 6px 10px; font-size: 0.85rem; height: 34px;">
+                                <button onclick="rejectPaymentRequest('${req.id}')" class="btn-outline-danger" style="padding: 6px 14px; font-size: 0.8rem; height: 34px; font-weight:700;">${isAr ? 'رفض' : 'Reject'}</button>
+                                <button onclick="acceptPaymentRequest('${req.id}')" class="btn-success" style="padding: 6px 14px; font-size: 0.8rem; height: 34px; font-weight:700;">${isAr ? 'قبول واعتماد' : 'Accept & Approve'}</button>
+                            </div>
                         </div>
                     `;
                 } else if (req.status === 'waiting_manager_approval') {
@@ -9101,6 +9265,12 @@ function renderPaymentRequests() {
                     actionArea = '';
                 }
 
+                let adminNoteText = '';
+                if (req.adminNote) {
+                    const noteColor = req.status === 'rejected' ? 'var(--danger)' : 'var(--secondary)';
+                    adminNoteText = `<div style="font-size: 0.85rem; margin-top: 6px; color: ${noteColor}; font-weight: 600;">💬 ${isAr ? 'ملاحظة الإدارة / سبب الرفض:' : 'Admin Note / Rejection Reason:'} <span style="font-weight:400; color:var(--text-main);">${req.adminNote}</span></div>`;
+                }
+
                 pendingListDiv.innerHTML += `
                     <div class="ledger-card" style="${cardStyle}">
                         <div class="flex-between">
@@ -9114,6 +9284,7 @@ function renderPaymentRequests() {
                             </div>
                         </div>
                         <div style="font-size: 0.85rem; margin-top: 8px; color:var(--text-main);">${isAr ? 'السبب:' : 'Reason:'} <em>${req.reason}</em></div>
+                        ${adminNoteText}
                         ${actionArea}
                     </div>
                 `;
@@ -9245,6 +9416,11 @@ function renderHighMoneyApprovals() {
         } else {
             highReqs.forEach(req => {
                 const dateStr = new Date(req.timestamp).toLocaleString();
+                let adminNoteText = '';
+                if (req.adminNote) {
+                    adminNoteText = `<div style="font-size: 0.85rem; margin-top: 6px; color: var(--secondary); font-weight: 600;">💬 ${isAr ? 'ملاحظة الإدارة:' : 'Admin Note:'} <span style="font-weight:400; color:var(--text-main);">${req.adminNote}</span></div>`;
+                }
+
                 approvalsListDiv.innerHTML += `
                     <div class="ledger-card" style="border-left: 4px solid var(--secondary); padding: 14px;">
                         <div class="flex-between" style="align-items: flex-start; flex-wrap: wrap;">
@@ -9252,6 +9428,7 @@ function renderHighMoneyApprovals() {
                                 <strong style="font-size:1.05rem; display:block;">${req.workerName}</strong>
                                 <span style="font-size:0.75rem; color:var(--text-muted); margin-left: 8px;">🕒 Requested: ${dateStr}</span>
                                 <div style="font-size: 0.85rem; margin-top: 8px; color:var(--text-main);">${isAr ? 'السبب:' : 'Reason:'} <em>${req.reason}</em></div>
+                                ${adminNoteText}
                             </div>
                             <div style="text-align: right;">
                                 <span style="font-size:0.8rem; font-weight:700; color:var(--warning); display:block; margin-bottom:4px;">
@@ -9260,12 +9437,18 @@ function renderHighMoneyApprovals() {
                                 <strong class="text-primary" style="font-size:1.15rem;">SAR ${req.amount}</strong>
                             </div>
                         </div>
-                        <div style="display:flex; gap:8px; margin-top: 14px; justify-content: flex-end; align-items:center; flex-wrap:wrap;">
-                            <label style="margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">${isAr ? 'تعديل المبلغ (ريال):' : 'Adjust Amount (SAR):'}</label>
-                            <input type="number" step="any" id="manager-adjust-amount-${req.id}" value="${req.amount}" min="0.01" 
-                                style="max-width: 90px; padding: 6px 10px; font-size: 0.85rem; height: 34px;">
-                            <button onclick="managerRejectPaymentRequest('${req.id}')" class="btn-outline-danger" style="padding: 6px 14px; font-size: 0.8rem; height: 34px;">${isAr ? 'رفض' : 'Reject'}</button>
-                            <button onclick="managerAcceptPaymentRequest('${req.id}')" class="btn-success" style="padding: 6px 14px; font-size: 0.8rem; height: 34px;">${isAr ? 'قبول واعتماد نهائي' : 'Approve & Release Code'}</button>
+                        <div style="display:flex; flex-direction:column; gap:8px; margin-top: 14px;">
+                            <div style="display:flex; gap:8px; justify-content: flex-end; align-items:center; flex-wrap:wrap;">
+                                <label style="margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">${isAr ? 'تعديل المبلغ (ريال):' : 'Adjust Amount (SAR):'}</label>
+                                <input type="number" step="any" id="manager-adjust-amount-${req.id}" value="${req.amount}" min="0.01" 
+                                    style="max-width: 90px; padding: 6px 10px; font-size: 0.85rem; height: 34px;">
+                            </div>
+                            <div style="display:flex; gap:8px; justify-content: flex-end; align-items:center; flex-wrap:wrap;">
+                                <input type="text" id="manager-note-${req.id}" placeholder="${isAr ? 'ملاحظة المدير / سبب الرفض (اختياري)...' : 'Manager note / Rejection reason (optional)...'}" 
+                                    style="flex: 1; min-width: 180px; padding: 6px 10px; font-size: 0.85rem; height: 34px;">
+                                <button onclick="managerRejectPaymentRequest('${req.id}')" class="btn-outline-danger" style="padding: 6px 14px; font-size: 0.8rem; height: 34px; font-weight:700;">${isAr ? 'رفض' : 'Reject'}</button>
+                                <button onclick="managerAcceptPaymentRequest('${req.id}')" class="btn-success" style="padding: 6px 14px; font-size: 0.8rem; height: 34px; font-weight:700;">${isAr ? 'قبول واعتماد نهائي' : 'Approve & Release Code'}</button>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -9275,6 +9458,7 @@ function renderHighMoneyApprovals() {
 }
 
 function managerAcceptPaymentRequest(reqId) {
+    const isAr = currentAppLang === 'ar';
     const pRequests = getCompanyData().paymentRequests || {};
     const req = pRequests[reqId];
     if (!req) return;
@@ -9288,12 +9472,19 @@ function managerAcceptPaymentRequest(reqId) {
         }
     }
 
+    let note = '';
+    const noteInput = document.getElementById(`manager-note-${reqId}`);
+    if (noteInput && noteInput.value.trim() !== '') {
+        note = noteInput.value.trim();
+    }
+
     const code = Math.floor(100000 + Math.random() * 900000).toString();
 
     db.ref(`companies/${currentCompany}/paymentRequests/${reqId}`).update({
         status: 'accepted',
         amount: approvedAmount,
         code: code,
+        adminNote: note || (req.adminNote || null),
         managerApprovedAt: Date.now()
     }).then(() => {
         if (typeof logActivity === 'function') {
@@ -9303,16 +9494,29 @@ function managerAcceptPaymentRequest(reqId) {
 }
 
 function managerRejectPaymentRequest(reqId) {
+    const isAr = currentAppLang === 'ar';
     const pRequests = getCompanyData().paymentRequests || {};
     const req = pRequests[reqId];
     if (!req) return;
 
+    let note = '';
+    const noteInput = document.getElementById(`manager-note-${reqId}`);
+    if (noteInput && noteInput.value.trim() !== '') {
+        note = noteInput.value.trim();
+    } else {
+        const prompted = prompt(isAr ? 'الرجاء كتابة سبب الرفض أو ملاحظة (اختياري):' : 'Enter rejection reason or note (optional):');
+        if (prompted === null) return; // User canceled
+        note = prompted.trim();
+    }
+
     db.ref(`companies/${currentCompany}/paymentRequests/${reqId}`).update({
         status: 'rejected',
+        adminNote: note || (req.adminNote || null),
         managerHandledAt: Date.now()
     }).then(() => {
         if (typeof logActivity === 'function') {
-            logActivity('finance', req.workerId, req.workerName, `Manager rejected high payment request of SAR ${req.amount} for ${req.workerName}`);
+            const detailMsg = note ? ` (Reason: ${note})` : '';
+            logActivity('finance', req.workerId, req.workerName, `Manager rejected high payment request of SAR ${req.amount} for ${req.workerName}${detailMsg}`);
         }
     }).catch(err => console.error("Error final rejecting request:", err));
 }
@@ -11670,7 +11874,11 @@ function switchSalesForm(formId) {
 }
 window.switchSalesForm = switchSalesForm;
 window.editRiskAmount = editRiskAmount;
+window.showUnassignedOverlay = showUnassignedOverlay;
+window.hideUnassignedOverlay = hideUnassignedOverlay;
+window.checkUnassignedUserAccess = checkUnassignedUserAccess;
 
 // Initial run
 applyTranslations();
+
 
