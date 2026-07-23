@@ -2306,8 +2306,10 @@ function postManagerNote() {
         checkboxes.forEach(cb => targets.push(cb.value));
     }
 
+    const nowMs = Date.now();
     const newNote = {
-        id: Date.now().toString(),
+        id: nowMs.toString(),
+        timestamp: nowMs,
         text: text,
         date: formatTimestamp(),
         author: currentUser.email,
@@ -2358,6 +2360,50 @@ function deleteManagerNote(id) {
             console.error("Error deleting note:", error);
             alert("Failed to delete note.");
         });
+}
+
+function editManagerNote(id) {
+    const isAr = currentAppLang === 'ar';
+    const notes = getCompanyData().managerNotes || [];
+    const note = notes.find(n => n.id === id);
+    if (!note) return;
+
+    const now = Date.now();
+    const noteTime = note.timestamp || parseInt(note.id) || 0;
+    const ageMs = now - noteTime;
+    const TWO_MINS_MS = 2 * 60 * 1000;
+
+    const isAuthor = currentUser && currentUser.email && note.author && (note.author.toLowerCase() === currentUser.email.toLowerCase());
+    const isAdmin = currentUser && currentUser.role === 'admin';
+
+    if (!isAuthor && !isAdmin) {
+        alert(isAr ? 'لا يمكنك تعديل هذه الملاحظة.' : 'You do not have permission to edit this note.');
+        return;
+    }
+
+    if (ageMs > TWO_MINS_MS) {
+        alert(isAr ? 'عذراً، لا يمكن تعديل الملاحظة بعد مرور أكثر من دقيقتين من نشرها.' : 'Notes can only be edited within 2 minutes of publishing.');
+        return;
+    }
+
+    const newText = prompt(isAr ? 'تعديل الملاحظة:' : 'Edit note text:', note.text || '');
+    if (newText === null) return;
+    const trimmed = newText.trim();
+    if (!trimmed && !note.attachmentData) {
+        alert(isAr ? 'لا يمكن ترك الملاحظة فارغة.' : 'Note content cannot be empty.');
+        return;
+    }
+
+    note.text = trimmed;
+    db.ref(`companies/${currentCompany}/managerNotes/${id}`).update({
+        text: trimmed,
+        editedAt: now
+    }).then(() => {
+        renderNotes();
+    }).catch(err => {
+        console.error("Error editing note:", err);
+        alert(isAr ? 'حدث خطأ أثناء تعديل الملاحظة.' : 'Error editing note.');
+    });
 }
 
 function addNoteReply(noteId) {
@@ -2430,6 +2476,7 @@ function deleteNoteReply(noteId, replyKey) {
 
 function renderNotes() {
     if (currentTab !== 'notes') return;
+    const isAr = currentAppLang === 'ar';
 
     const cbContainer = document.getElementById('private-worker-checkboxes');
     if (cbContainer) {
@@ -2462,6 +2509,18 @@ function renderNotes() {
         const div = document.createElement('div');
         div.className = 'card';
         div.style.cssText = `border-left: ${n.isPrivate ? '6px solid var(--danger)' : '6px solid var(--info)'}; padding: 20px; margin-bottom:15px; border-radius: 12px;`;
+
+        const now = Date.now();
+        const noteTime = n.timestamp || parseInt(n.id) || 0;
+        const ageMs = now - noteTime;
+        const isWithin2Mins = ageMs <= 2 * 60 * 1000;
+        const isAuthor = currentUser && currentUser.email && n.author && (n.author.toLowerCase() === currentUser.email.toLowerCase());
+        const isAdmin = currentUser && currentUser.role === 'admin';
+
+        let editBtn = '';
+        if ((isAuthor || isAdmin) && isWithin2Mins) {
+            editBtn = `<button onclick="editManagerNote('${n.id}')" class="btn-outline" style="padding:2px 8px; font-size:0.75rem; border-radius:4px; border:1px solid var(--primary); color:var(--primary); font-weight:600; cursor:pointer; margin-left:6px;" title="${isAr ? 'تعديل الملاحظة' : 'Edit note'}">✏️ ${isAr ? 'تعديل' : 'Edit'}</button>`;
+        }
 
         let delBtn = (currentUser.role === 'admin') ? `<button onclick="deleteManagerNote('${n.id}')" class="btn-outline-danger" style="padding:4px 10px; font-size:0.8rem; border:none; text-decoration:underline;">Delete Thread</button>` : '';
         let lockIcon = n.isPrivate ? `<span class="badge" style="background:var(--danger); font-size:0.85rem;">🔒 Private Note</span>` : `<span class="badge" style="background:var(--info); font-size:0.85rem;">📢 Public Announcement</span>`;
@@ -2559,8 +2618,9 @@ function renderNotes() {
 
         div.innerHTML = `
                     <div class="flex-between" style="margin-bottom:12px;">
-                        <div style="display:flex; gap:10px; align-items:center;">
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                             ${lockIcon} <span style="font-size:0.85rem; color:var(--text-muted);">🕒 ${n.date}</span>
+                            ${editBtn}
                         </div>
                         ${delBtn}
                     </div>
@@ -2912,6 +2972,7 @@ function toggleSalesMethod(methodName) {
 
 function renderManaging() {
     if (currentTab !== 'managing') return;
+    populateWorkerDropdowns();
 
     const now = new Date();
     const tzOffset = now.getTimezoneOffset() * 60000;
@@ -4553,7 +4614,7 @@ function updateWarehouseStock(itemId) {
     if (itemIndex === -1) return;
 
     const item = getCompanyData().warehouse[itemIndex];
-    const diff = newStock - item.currentStock;
+    const diff = Math.round((newStock - item.currentStock) * 1000) / 1000;
     if (diff === 0) { inputEl.value = ''; return; }
 
     let workerId = "";
@@ -4757,6 +4818,7 @@ function renderWarehouse() {
 
     const list = document.getElementById('warehouse-list'); list.innerHTML = '';
     const data = getCompanyData();
+    const isAr = currentAppLang === 'ar';
 
     let isWHAdmin = false;
     if (currentUser && (currentUser.role === 'admin' || document.body.classList.contains('perm-warehouse'))) {
@@ -4861,11 +4923,12 @@ function renderWarehouse() {
                             changerName = 'Staff';
                         }
                     }
+                    const logDiff = (typeof l.difference === 'number') ? (Math.round(l.difference * 1000) / 1000) : l.difference;
                     return `
                              <div class="flex-between" style="border-bottom: 1px solid var(--border-color); padding: 6px 0; font-size: 0.85rem;">
                                  <span>🕒 ${l.date}</span>
                                  <span>${t('label-by')}: <strong style="color:var(--primary);">${changerName}</strong></span>
-                                 <span>Total: <strong>${l.amount}</strong> <span style="color:${l.difference > 0 ? 'var(--success)' : 'var(--danger)'}">(${l.difference > 0 ? '+' : ''}${l.difference})</span></span>
+                                 <span>Total: <strong>${l.amount}</strong> <span style="color:${logDiff > 0 ? 'var(--success)' : 'var(--danger)'}">(${logDiff > 0 ? '+' : ''}${logDiff})</span></span>
                              </div>`;
                 }).join('');
 
@@ -4884,7 +4947,7 @@ function renderWarehouse() {
                             
                             <div class="flex-between" style="margin-top: 20px; flex-wrap:wrap; gap:10px;">
                                 <div style="display:flex; gap:8px; flex:1; min-width: 200px;">
-                                    <input type="number" step="any" id="wh-update-${item.id}" placeholder="${t('placeholder-product-name')}" style="flex:1;" min="0">
+                                    <input type="number" step="any" id="wh-update-${item.id}" placeholder="${isAr ? 'الكمية الجديدة (مثال: 0.5)' : 'New stock amount (e.g. 0.5)'}" style="flex:1;" min="0">
                                     <button onclick="updateWarehouseStock('${item.id}')" class="btn-success">${t('btn-change-stock') || 'Change'}</button>
                                 </div>
                                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -9212,9 +9275,15 @@ document.addEventListener('click', function (e) {
 
 // Helper: Get active worker record corresponding to logged-in user
 function getActiveWorker() {
-    if (!currentUser || currentUser.role !== 'worker') return null;
+    if (!currentUser || !currentUser.email) return null;
     const workers = getCompanyData().workers || [];
-    return workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+    const activeW = workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+    if (activeW) {
+        document.body.classList.add('has-worker-profile');
+    } else {
+        document.body.classList.remove('has-worker-profile');
+    }
+    return activeW;
 }
 
 // 1. Submit Payment Request (Worker)
@@ -9449,8 +9518,10 @@ function renderPaymentRequests() {
                 let statusBadge = '';
                 let codeDisplay = '';
 
+                let editBtn = '';
                 if (req.status === 'pending') {
                     statusBadge = `<span class="badge" style="background:#d97706;">${isAr ? 'قيد الانتظار' : 'Pending'}</span>`;
+                    editBtn = `<button onclick="editPaymentRequestAmount('${req.id}')" class="btn-outline" style="padding: 2px 8px; font-size: 0.75rem; font-weight: 600; margin-left: 6px; cursor:pointer;" title="${isAr ? 'تعديل المبلغ' : 'Edit Amount'}">✏️ ${isAr ? 'تعديل' : 'Edit'}</button>`;
                 } else if (req.status === 'waiting_manager_approval') {
                     statusBadge = `<span class="badge" style="background:#f59e0b;">${isAr ? 'موافق مالياً (بانتظار موافقة المدير)' : 'Financial Approved (Waiting for Manager Approval)'}</span>`;
                 } else if (req.status === 'accepted') {
@@ -9480,7 +9551,10 @@ function renderPaymentRequests() {
                 workerRequestsDiv.innerHTML += `
                     <div class="ledger-card" style="border-left: 4px solid var(--primary);">
                         <div class="flex-between">
-                            <strong>SAR ${req.amount}</strong>
+                            <div>
+                                <strong>SAR ${req.amount}</strong>
+                                ${editBtn}
+                            </div>
                             ${statusBadge}
                         </div>
                         <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">🕒 ${dateStr}</div>
@@ -10146,6 +10220,16 @@ function renderAttendance() {
     const isAttAdmin = currentUser && (currentUser.role === 'admin' || document.body.classList.contains('perm-attendance'));
     const currentEmail = currentUser && currentUser.email ? currentUser.email.toLowerCase() : '';
     const myWorker = companyData.workers.find(w => w.email && w.email.toLowerCase() === currentEmail);
+    const workerOnlyCard = document.querySelector('.attendance-worker-only');
+    if (workerOnlyCard) {
+        if (myWorker) {
+            workerOnlyCard.style.display = 'block';
+            document.body.classList.add('has-worker-profile');
+        } else {
+            workerOnlyCard.style.display = 'none';
+            document.body.classList.remove('has-worker-profile');
+        }
+    }
 
     // Populate Late Config Inputs
     const graceInput = document.getElementById('late-grace-input');
@@ -11543,9 +11627,11 @@ function renderWorkerCustodyRequests() {
         const dateStr = new Date(req.timestamp).toLocaleString();
         let statusBadge = '';
         let codeDisplay = '';
+        let editBtn = '';
 
         if (req.status === 'pending') {
             statusBadge = `<span class="badge" style="background:#d97706;">${isAr ? 'قيد الانتظار' : 'Pending'}</span>`;
+            editBtn = `<button onclick="editCustodyRequestAmount('${req.id}')" class="btn-outline" style="padding: 2px 8px; font-size: 0.75rem; font-weight: 600; margin-left: 6px; cursor:pointer;" title="${isAr ? 'تعديل المبلغ' : 'Edit Amount'}">✏️ ${isAr ? 'تعديل' : 'Edit'}</button>`;
         } else if (req.status === 'accepted') {
             statusBadge = `<span class="badge" style="background:#16a34a;">${isAr ? 'مقبول للتسليم' : 'Approved for Release'}</span>`;
             codeDisplay = `<div style="margin-top: 5px; font-weight: 800; font-size: 1rem; color: var(--success);">${isAr ? 'الرمز السري:' : 'Verification Code:'} <span style="background:var(--input-bg); padding: 2px 6px; border-radius: 4px; border: 1px dashed var(--success);">${req.code}</span></div>`;
@@ -11558,7 +11644,10 @@ function renderWorkerCustodyRequests() {
         listDiv.innerHTML += `
             <div class="ledger-card" style="border-left: 4px solid #f59e0b;">
                 <div class="flex-between">
-                    <strong>SAR ${req.amount}</strong>
+                    <div>
+                        <strong>SAR ${req.amount}</strong>
+                        ${editBtn}
+                    </div>
                     ${statusBadge}
                 </div>
                 <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
@@ -11640,6 +11729,88 @@ function renderAcceptedCustodyReleases() {
                 </div>
             </div>
         `;
+    });
+}
+
+function editPaymentRequestAmount(reqId) {
+    const isAr = currentAppLang === 'ar';
+    const pRequests = getCompanyData().paymentRequests || {};
+    const req = pRequests[reqId];
+    if (!req) return;
+
+    const worker = getActiveWorker();
+    if (!worker || req.workerId !== worker.id) {
+        alert(isAr ? 'لا يمكنك تعديل هذا الطلب.' : 'You cannot edit this request.');
+        return;
+    }
+
+    if (req.status !== 'pending') {
+        alert(isAr ? 'لا يمكن تعديل الطلب بعد قبوله أو معالجته من قبل الإدارة.' : 'Cannot edit request once it has been processed by management.');
+        return;
+    }
+
+    const newAmtStr = prompt(isAr ? 'أدخل المبلغ الجديد المطلوب (ريال):' : 'Enter new requested amount (SAR):', req.amount);
+    if (newAmtStr === null) return;
+
+    const newAmt = parseFloat(newAmtStr);
+    if (isNaN(newAmt) || newAmt <= 0) {
+        alert(isAr ? 'يرجى إدخال مبلغ صحيح أكبر من الصفر.' : 'Please enter a valid amount greater than 0.');
+        return;
+    }
+
+    db.ref(`companies/${currentCompany}/paymentRequests/${reqId}`).update({
+        amount: newAmt,
+        requestedAmount: newAmt,
+        updatedAt: Date.now()
+    }).then(() => {
+        if (typeof logActivity === 'function') {
+            logActivity('sales', worker.id, worker.name, `Updated payment request amount to SAR ${newAmt}`);
+        }
+        renderPaymentRequests();
+    }).catch(err => {
+        console.error("Error editing payment request amount:", err);
+        alert(isAr ? 'حدث خطأ أثناء تعديل المبلغ.' : 'Error updating requested amount.');
+    });
+}
+
+function editCustodyRequestAmount(reqId) {
+    const isAr = currentAppLang === 'ar';
+    const custodyReqs = getCompanyData().custodyRequests || {};
+    const req = custodyReqs[reqId];
+    if (!req) return;
+
+    const worker = getActiveWorker();
+    if (!worker || req.workerId !== worker.id) {
+        alert(isAr ? 'لا يمكنك تعديل هذا الطلب.' : 'You cannot edit this request.');
+        return;
+    }
+
+    if (req.status !== 'pending') {
+        alert(isAr ? 'لا يمكن تعديل الطلب بعد قبوله أو معالجته من قبل الإدارة.' : 'Cannot edit request once it has been processed by management.');
+        return;
+    }
+
+    const newAmtStr = prompt(isAr ? 'أدخل المبلغ الجديد لطلب العهدة (ريال):' : 'Enter new requested custody amount (SAR):', req.amount);
+    if (newAmtStr === null) return;
+
+    const newAmt = parseFloat(newAmtStr);
+    if (isNaN(newAmt) || newAmt <= 0) {
+        alert(isAr ? 'يرجى إدخال مبلغ صحيح أكبر من الصفر.' : 'Please enter a valid amount greater than 0.');
+        return;
+    }
+
+    db.ref(`companies/${currentCompany}/custodyRequests/${reqId}`).update({
+        amount: newAmt,
+        updatedAt: Date.now()
+    }).then(() => {
+        if (typeof logActivity === 'function') {
+            logActivity('finance', worker.id, worker.name, `Updated custody request amount to SAR ${newAmt}`);
+        }
+        renderWorkerCustodyRequests();
+        renderPendingCustodyRequests();
+    }).catch(err => {
+        console.error("Error editing custody request amount:", err);
+        alert(isAr ? 'حدث خطأ أثناء تعديل المبلغ.' : 'Error updating requested custody amount.');
     });
 }
 
@@ -12211,6 +12382,9 @@ window.checkUnassignedUserAccess = checkUnassignedUserAccess;
 window.openEditTaskModal = openEditTaskModal;
 window.closeEditTaskModal = closeEditTaskModal;
 window.saveEditedTask = saveEditedTask;
+window.editPaymentRequestAmount = editPaymentRequestAmount;
+window.editCustodyRequestAmount = editCustodyRequestAmount;
+window.editManagerNote = editManagerNote;
 
 // Initial run
 applyTranslations();

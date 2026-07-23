@@ -661,6 +661,111 @@
                         </div>
                     </div>
 
+                    <!-- Vacation Management Card (Operations) -->
+                    <div class="card admin-only" id="attendance-vacation-card"
+                        style="margin-bottom: 24px; border-top: 4px solid #0284c7; width: 100%;">
+                        <h3
+                            style="margin: 0 0 16px 0; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; color: #0284c7; display: flex; align-items: center; gap: 8px;">
+                            🌴 <span data-i18n="title-vacation-management">Vacation Management</span>
+                        </h3>
+
+                        <div class="grid-2-col" style="margin-bottom: 16px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label data-i18n="label-select-emp">Select Employee</label>
+                                <select id="vacation-worker-select"
+                                    style="padding: 10px; width: 100%; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);"></select>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label data-i18n="label-vacation-date">Vacation Date</label>
+                                <input type="date" id="vacation-date-input"
+                                    style="padding: 10px; width: 100%; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);" />
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                            <button onclick="setWorkerVacationStatus(true)" class="btn-warning"
+                                style="background: #0284c7; border-color: #0284c7; font-weight: bold; color: white;"
+                                data-i18n="btn-mark-vacation">🌴 Mark Vacation</button>
+                            <button onclick="setWorkerVacationStatus(false)" class="btn-outline" style="font-weight: bold;"
+                                data-i18n="btn-clear-vacation">🔄 Remove Vacation</button>
+                        </div>
+                    </div>
+
+                    <!-- Overtime Management Card (Operations) -->
+                    <div class="card admin-only" id="attendance-overtime-card"
+                        style="margin-bottom: 24px; border-top: 4px solid #f59e0b; width: 100%;">
+                        <h3 data-i18n="title-overtime-management"
+                            style="margin: 0 0 16px 0; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; color: #f59e0b;">
+                            Overtime Management</h3>
+
+                        <div class="form-group" style="margin-bottom: 16px;">
+                            <label data-i18n="label-select-emp">Select Employee</label>
+                            <select id="attendance-overtime-worker-select" onchange="renderAttendanceOvertimeDetails()"
+                                style="padding: 10px; width: 100%; max-width: 300px; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);"></select>
+                        </div>
+
+                        <div id="attendance-overtime-details-area" style="display: none;">
+                            <div class="grid-2-col" style="margin-bottom: 16px;">
+                                <div
+                                    style="background:var(--input-bg); padding:12px; border-radius:8px; border:1px solid var(--border-color); text-align:center;">
+                                    <span style="font-size:0.85rem; color:var(--text-muted);"
+                                        data-i18n="label-shift-duration">Active Shift Duration</span>
+                                    <h4 id="att-ov-shift-duration"
+                                        style="margin-top:6px; font-weight:800; color:var(--primary);">--</h4>
+                                </div>
+                                <div
+                                    style="background:var(--input-bg); padding:12px; border-radius:8px; border:1px solid var(--border-color); text-align:center;">
+                                    <span style="font-size:0.85rem; color:var(--text-muted);"
+                                        data-i18n="label-hourly-rate">Calculated Hourly Rate</span>
+                                    <h4 id="att-ov-hourly-rate"
+                                        style="margin-top:6px; font-weight:800; color:var(--secondary);">--</h4>
+                                </div>
+                            </div>
+
+                            <div
+                                style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; align-items:end; margin-bottom: 16px;">
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label data-i18n="label-ov-hours">Overtime Hours</label>
+                                    <select id="att-ov-hours"
+                                        style="padding:10px; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);">
+                                        <option value="1">+1 Hour</option>
+                                        <option value="2">+2 Hours</option>
+                                        <option value="3">+3 Hours</option>
+                                        <option value="4">+4 Hours</option>
+                                        <option value="5">+5 Hours</option>
+                                        <option value="6">+6 Hours</option>
+                                        <option value="7">+7 Hours</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label data-i18n="label-ov-multiplier">Overtime Multiplier</label>
+                                    <select id="att-ov-multiplier"
+                                        style="padding:10px; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);">
+                                        <option value="1.0">x1.00 (Standard)</option>
+                                        <option value="1.25">x1.25 (Peak Day)</option>
+                                        <option value="1.5">x1.50 (Weekend/Holiday)</option>
+                                        <option value="1.75">x1.75</option>
+                                        <option value="2.0">x2.00 (Double Pay)</option>
+                                    </select>
+                                </div>
+                                <div style="text-align: right; display: flex; flex-direction: column; gap: 4px;">
+                                    <button onclick="addOvertimeHourFromAtt()" class="btn-warning"
+                                        style="width:100%; padding:10px; font-weight:bold;" data-i18n="btn-add-overtime">➕
+                                        Log Overtime</button>
+                                </div>
+                            </div>
+
+                            <!-- Overtime Log History -->
+                            <div>
+                                <h4 data-i18n="title-overtime-log" style="margin-bottom:10px; color: var(--text-main);">
+                                    Overtime Logs (<span class="display-current-month"></span>)</h4>
+                                <div id="att-worker-overtime-history" style="display:flex; flex-direction:column; gap:8px;">
+                                    <!-- Rendered dynamically -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Daily Notes & Management Card -->
                     <div class="card admin-only">
                         <h2 class="card-title" data-i18n="title-ops-tracking">Daily Operations Tracking</h2>
@@ -1008,110 +1113,6 @@
                     </div>
                 </div>
 
-                <!-- Vacation Management Card -->
-                <div class="attendance-admin-only card" id="attendance-vacation-card"
-                    style="margin-top: 24px; border-top: 4px solid #0284c7; width: 100%;">
-                    <h3
-                        style="margin: 0 0 16px 0; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; color: #0284c7; display: flex; align-items: center; gap: 8px;">
-                        🌴 <span data-i18n="title-vacation-management">Vacation Management</span>
-                    </h3>
-
-                    <div class="grid-2-col" style="margin-bottom: 16px;">
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label data-i18n="label-select-emp">Select Employee</label>
-                            <select id="vacation-worker-select"
-                                style="padding: 10px; width: 100%; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);"></select>
-                        </div>
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label data-i18n="label-vacation-date">Vacation Date</label>
-                            <input type="date" id="vacation-date-input"
-                                style="padding: 10px; width: 100%; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);" />
-                        </div>
-                    </div>
-
-                    <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                        <button onclick="setWorkerVacationStatus(true)" class="btn-warning"
-                            style="background: #0284c7; border-color: #0284c7; font-weight: bold; color: white;"
-                            data-i18n="btn-mark-vacation">🌴 Mark Vacation</button>
-                        <button onclick="setWorkerVacationStatus(false)" class="btn-outline" style="font-weight: bold;"
-                            data-i18n="btn-clear-vacation">🔄 Remove Vacation</button>
-                    </div>
-                </div>
-
-                <!-- Overtime Management Area (Moved here) -->
-                <div class="attendance-admin-only card" id="attendance-overtime-card"
-                    style="margin-top: 24px; border-top: 4px solid #f59e0b; width: 100%;">
-                    <h3 data-i18n="title-overtime-management"
-                        style="margin: 0 0 16px 0; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; color: #f59e0b;">
-                        Overtime Management</h3>
-
-                    <div class="form-group" style="margin-bottom: 16px;">
-                        <label data-i18n="label-select-emp">Select Employee</label>
-                        <select id="attendance-overtime-worker-select" onchange="renderAttendanceOvertimeDetails()"
-                            style="padding: 10px; width: 100%; max-width: 300px; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);"></select>
-                    </div>
-
-                    <div id="attendance-overtime-details-area" style="display: none;">
-                        <div class="grid-2-col" style="margin-bottom: 16px;">
-                            <div
-                                style="background:var(--input-bg); padding:12px; border-radius:8px; border:1px solid var(--border-color); text-align:center;">
-                                <span style="font-size:0.85rem; color:var(--text-muted);"
-                                    data-i18n="label-shift-duration">Active Shift Duration</span>
-                                <h4 id="att-ov-shift-duration"
-                                    style="margin-top:6px; font-weight:800; color:var(--primary);">--</h4>
-                            </div>
-                            <div
-                                style="background:var(--input-bg); padding:12px; border-radius:8px; border:1px solid var(--border-color); text-align:center;">
-                                <span style="font-size:0.85rem; color:var(--text-muted);"
-                                    data-i18n="label-hourly-rate">Calculated Hourly Rate</span>
-                                <h4 id="att-ov-hourly-rate"
-                                    style="margin-top:6px; font-weight:800; color:var(--secondary);">--</h4>
-                            </div>
-                        </div>
-
-                        <div
-                            style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; align-items:end; margin-bottom: 16px;">
-                            <div class="form-group" style="margin-bottom:0;">
-                                <label data-i18n="label-ov-hours">Overtime Hours</label>
-                                <select id="att-ov-hours"
-                                    style="padding:10px; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);">
-                                    <option value="1">+1 Hour</option>
-                                    <option value="2">+2 Hours</option>
-                                    <option value="3">+3 Hours</option>
-                                    <option value="4">+4 Hours</option>
-                                    <option value="5">+5 Hours</option>
-                                    <option value="6">+6 Hours</option>
-                                    <option value="7">+7 Hours</option>
-                                </select>
-                            </div>
-                            <div class="form-group" style="margin-bottom:0;">
-                                <label data-i18n="label-ov-multiplier">Overtime Multiplier</label>
-                                <select id="att-ov-multiplier"
-                                    style="padding:10px; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);">
-                                    <option value="1.0">x1.00 (Standard)</option>
-                                    <option value="1.25">x1.25 (Peak Day)</option>
-                                    <option value="1.5">x1.50 (Weekend/Holiday)</option>
-                                    <option value="1.75">x1.75</option>
-                                    <option value="2.0">x2.00 (Double Pay)</option>
-                                </select>
-                            </div>
-                            <div style="text-align: right; display: flex; flex-direction: column; gap: 4px;">
-                                <button onclick="addOvertimeHourFromAtt()" class="btn-warning"
-                                    style="width:100%; padding:10px; font-weight:bold;" data-i18n="btn-add-overtime">➕
-                                    Log Overtime</button>
-                            </div>
-                        </div>
-
-                        <!-- Overtime Log History -->
-                        <div>
-                            <h4 data-i18n="title-overtime-log" style="margin-bottom:10px; color: var(--text-main);">
-                                Overtime Logs (<span class="display-current-month"></span>)</h4>
-                            <div id="att-worker-overtime-history" style="display:flex; flex-direction:column; gap:8px;">
-                                <!-- Rendered dynamically -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <!-- ========================================== -->
@@ -2162,7 +2163,7 @@
                 <div class="card" style="width: 100%;">
                     <h2 class="card-title">📝 Team Communication & Notes</h2>
 
-                    <form onsubmit="event.preventDefault(); postManagerNote();" class="admin-only"
+                    <form onsubmit="event.preventDefault(); postManagerNote();"
                         style="background: var(--input-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 30px; box-shadow: var(--shadow-sm); display: block;">
                         <h3 style="font-size: 1.05rem; margin-bottom: 12px;" data-i18n="title-post-new-note">Post a New
                             Note</h3>
@@ -2969,7 +2970,7 @@
     </div>
 
     <script defer src="translations.js"></script>
-    <script defer src="app.js?v=53"></script>
+    <script defer src="app.js?v=56"></script>
 </body>
 
 

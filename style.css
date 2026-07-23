@@ -295,8 +295,7 @@ body:not(.role-admin):not(.perm-attendance) .attendance-admin-only {
     display: none !important;
 }
 
-body.role-admin .attendance-worker-only,
-body.perm-attendance .attendance-worker-only {
+body:not(.has-worker-profile) .attendance-worker-only {
     display: none !important;
 }
 
