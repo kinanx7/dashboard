@@ -1174,8 +1174,22 @@ function ensureArraysExist(data) {
     if (!data.branches) data.branches = [];
     data.branches = data.branches.filter(b => b);
 
+    if (data.workers && !Array.isArray(data.workers)) {
+        data.workers = Object.values(data.workers);
+    }
     if (!data.workers) data.workers = [];
     data.workers = data.workers.filter(w => w);
+    data.workers.forEach(w => {
+        if (!w.jobs) w.jobs = [];
+        else if (!Array.isArray(w.jobs)) w.jobs = Object.values(w.jobs);
+        w.jobs = w.jobs.filter(j => j && j.id);
+    });
+
+    if (data.generalTasks && !Array.isArray(data.generalTasks)) {
+        data.generalTasks = Object.values(data.generalTasks);
+    }
+    if (!data.generalTasks) data.generalTasks = [];
+    data.generalTasks = data.generalTasks.filter(gt => gt && gt.id);
 
     if (!data.violationRules) data.violationRules = [];
     data.violationRules = data.violationRules.filter(r => r);
@@ -1194,8 +1208,8 @@ function ensureArraysExist(data) {
         data.salesLogs = Object.values(data.salesLogs);
     }
     if (!data.salesLogs) data.salesLogs = [];
-    data.salesLogs = data.salesLogs.filter(s => s && s.timestamp);
-    data.salesLogs.sort((a, b) => b.timestamp - a.timestamp);
+    data.salesLogs = data.salesLogs.filter(s => s && s.id);
+    data.salesLogs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
     if (data.costLogs && !Array.isArray(data.costLogs)) {
         data.costLogs = Object.values(data.costLogs);
@@ -2667,20 +2681,32 @@ function logSaleTransaction() {
 }
 
 function deleteSaleTransaction(id) {
-    if (!confirm("Delete this transaction record?")) return;
-    const oldLog = getCompanyData().salesLogs.find(l => l.id === id);
-    getCompanyData().salesLogs = getCompanyData().salesLogs.filter(l => l.id !== id);
+    const isAr = currentAppLang === 'ar';
+    if (!confirm(isAr ? "هل أنت تأكد من حذف هذا السجل؟" : "Delete this transaction record?")) return;
+    const companyData = getCompanyData();
+    if (!companyData.salesLogs) companyData.salesLogs = [];
+    const oldLog = companyData.salesLogs.find(l => l && l.id === id);
+    companyData.salesLogs = companyData.salesLogs.filter(l => l && l.id !== id);
 
-    // Targeted removal for sales transactions
-    db.ref('companies/' + currentCompany + '/salesLogs/' + id).remove()
+    // Render immediately to update local UI
+    renderAll();
+
+    // 1. Remove individual child key if stored as object map
+    const p1 = db.ref('companies/' + currentCompany + '/salesLogs/' + id).remove();
+    // 2. Overwrite salesLogs array in Firebase to handle array storage format
+    const p2 = db.ref('companies/' + currentCompany + '/salesLogs').set(companyData.salesLogs);
+
+    Promise.all([p1, p2])
         .then(() => {
             if (oldLog) {
-                logActivity('sales_delete', oldLog.workerId, oldLog.cashier, `Deleted/Undid sale transaction of SAR ${oldLog.amount} via ${oldLog.method}`);
+                logActivity('sales_delete', oldLog.workerId || '', oldLog.cashier || 'System', `Deleted/Undid sale transaction of SAR ${oldLog.amount} via ${oldLog.method}`);
             }
+            renderAll();
         })
         .catch(error => {
             console.error("Error deleting sale:", error);
-            alert("Failed to delete transaction.");
+            alert(isAr ? "فشل حذف المعاملة." : "Failed to delete transaction.");
+            renderAll();
         });
 }
 
@@ -3888,22 +3914,30 @@ function logCostTransaction() {
 }
 
 function deleteCostTransaction(id) {
-    if (!confirm("Delete this cost record?")) return;
-    const oldLog = getCompanyData().costLogs.find(l => l.id === id);
-    getCompanyData().costLogs = getCompanyData().costLogs.filter(l => l.id !== id);
+    const isAr = currentAppLang === 'ar';
+    if (!confirm(isAr ? "هل أنت تأكد من حذف هذا السجل؟" : "Delete this cost record?")) return;
+    const companyData = getCompanyData();
+    if (!companyData.costLogs) companyData.costLogs = [];
+    const oldLog = companyData.costLogs.find(l => l && l.id === id);
+    companyData.costLogs = companyData.costLogs.filter(l => l && l.id !== id);
 
-    // Targeted removal from costLogs
-    db.ref('companies/' + currentCompany + '/costLogs/' + id).remove()
+    renderAll();
+
+    const p1 = db.ref('companies/' + currentCompany + '/costLogs/' + id).remove();
+    const p2 = db.ref('companies/' + currentCompany + '/costLogs').set(companyData.costLogs);
+
+    Promise.all([p1, p2])
         .then(() => {
             if (oldLog) {
-                logActivity('costs_delete', oldLog.workerId, oldLog.cashier, `Deleted/Undid cost transaction of SAR ${oldLog.amount} for category "${oldLog.method}"`);
+                logActivity('costs_delete', oldLog.workerId || '', oldLog.cashier || 'System', `Deleted/Undid cost transaction of SAR ${oldLog.amount} for category "${oldLog.method}"`);
             }
+            renderAll();
         })
         .catch(error => {
             console.error("Error deleting cost:", error);
-            alert("Failed to delete cost transaction.");
+            alert(isAr ? "فشل حذف التكلفة." : "Failed to delete cost transaction.");
+            renderAll();
         });
-    renderCosts();
 }
 
 // Log past costs
@@ -5881,12 +5915,17 @@ function toggleTaskDone(workerId, taskId) {
 }
 
 function deleteTask(workerId, taskId) {
-    if (!confirm("Delete this task?")) return;
+    const isAr = currentAppLang === 'ar';
+    if (!confirm(isAr ? "هل أنت تأكد من حذف هذه المهمة؟" : "Delete this task?")) return;
     const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
     if (workerIndex === -1) return;
     const worker = getCompanyData().workers[workerIndex];
-    const oldTask = worker.jobs.find(j => j.id === taskId);
-    worker.jobs = worker.jobs.filter(j => j.id !== taskId);
+    if (!worker.jobs) worker.jobs = [];
+    const oldTask = worker.jobs.find(j => j && j.id === taskId);
+    worker.jobs = worker.jobs.filter(j => j && j.id !== taskId);
+
+    // Re-render UI immediately to prevent freezing
+    renderAll();
 
     // Targeted write to worker jobs path
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
@@ -5894,8 +5933,12 @@ function deleteTask(workerId, taskId) {
             if (oldTask) {
                 logActivity('task_delete', worker.id, worker.name, `Deleted task for ${worker.name}: "${oldTask.title}"`);
             }
+            renderAll();
         })
-        .catch(err => console.error("Error deleting task:", err));
+        .catch(err => {
+            console.error("Error deleting task:", err);
+            renderAll();
+        });
 }
 
 function renderTasks() {
@@ -6186,20 +6229,27 @@ function acceptGeneralTask(taskId) {
 }
 
 function deleteGeneralTask(taskId) {
-    if (!confirm("Delete this general task?")) return;
-    db.ref(`companies/${currentCompany}/generalTasks/${taskId}`).once('value').then(snap => {
-        const task = snap.val();
-        db.ref(`companies/${currentCompany}/generalTasks/${taskId}`).remove()
-            .then(() => {
-                if (task) {
-                    logActivity('task_delete', 'general', 'General Pool', `Deleted general task: "${task.title}"`);
-                }
-                alert("General task deleted.");
-            })
-            .catch(err => console.error("Error deleting general task:", err));
-    }).catch(() => {
-        db.ref(`companies/${currentCompany}/generalTasks/${taskId}`).remove();
-    });
+    const isAr = currentAppLang === 'ar';
+    if (!confirm(isAr ? "هل أنت تأكد من حذف هذه المهمة العامة؟" : "Delete this general task?")) return;
+    const companyData = getCompanyData();
+    if (!companyData.generalTasks) companyData.generalTasks = [];
+    const task = companyData.generalTasks.find(gt => gt && gt.id === taskId);
+    companyData.generalTasks = companyData.generalTasks.filter(gt => gt && gt.id !== taskId);
+
+    // Re-render UI immediately
+    renderAll();
+
+    db.ref(`companies/${currentCompany}/generalTasks/${taskId}`).remove()
+        .then(() => {
+            if (task) {
+                logActivity('task_delete', 'general', 'General Pool', `Deleted general task: "${task.title}"`);
+            }
+            renderAll();
+        })
+        .catch(err => {
+            console.error("Error deleting general task:", err);
+            renderAll();
+        });
 }
 
 function openEditTaskModal(workerId, taskId, isGeneral = false) {
@@ -9924,6 +9974,12 @@ function calculateLateness(startTimeStr, checkTimeStr) {
 }
 
 function markWorkerAttendance(workerId, status) {
+    const isAttAdmin = currentUser && (currentUser.role === 'admin' || document.body.classList.contains('perm-attendance'));
+    if (!isAttAdmin) {
+        alert(currentAppLang === 'ar' ? 'فقط الإدارة يمكنها تعديل الحضور مباشرة.' : 'Only administrators can mark worker attendance directly.');
+        return;
+    }
+
     // Determine date string from date picker, default to today
     let dateStr = document.getElementById('attendance-date-picker')?.value;
     if (!dateStr) {
@@ -9995,6 +10051,11 @@ function markWorkerAttendance(workerId, status) {
 }
 
 function clearWorkerAttendance(workerId) {
+    const isAttAdmin = currentUser && (currentUser.role === 'admin' || document.body.classList.contains('perm-attendance'));
+    if (!isAttAdmin) {
+        alert(currentAppLang === 'ar' ? 'فقط الإدارة يمكنها مسح سجل الحضور.' : 'Only administrators can clear attendance records.');
+        return;
+    }
     let dateStr = document.getElementById('attendance-date-picker')?.value;
     if (!dateStr) return;
     const worker = getCompanyData().workers.find(w => w.id === workerId);
@@ -10179,14 +10240,28 @@ function renderAttendance() {
                 </div>
             `;
         } else if (myWorker && w.id === myWorker.id) {
-            if (att && att.status === 'vacation') {
+            const todayDateStr = `${todayNow.getFullYear()}-${String(todayNow.getMonth() + 1).padStart(2, '0')}-${String(todayNow.getDate()).padStart(2, '0')}`;
+            if (dateStr !== todayDateStr) {
+                // Past or future date: non-admin worker cannot edit attendance
+                if (att && att.status === 'present') {
+                    actionsHtml = `<span style="color:var(--success); font-weight:700; font-size:0.85rem;">✅ ${isAr ? 'حاضر' : 'Present'}</span>`;
+                } else if (att && att.status === 'absent') {
+                    actionsHtml = `<span style="color:var(--danger); font-weight:700; font-size:0.85rem;">❌ ${isAr ? 'غائب' : 'Absent'}</span>`;
+                } else if (att && att.status === 'vacation') {
+                    actionsHtml = `<span style="color:#0284c7; font-weight:700; font-size:0.85rem;">🌴 ${isAr ? 'إجازة' : 'Vacation'}</span>`;
+                } else {
+                    actionsHtml = `<span style="color:var(--text-muted); font-size:0.85rem;">🔒 ${isAr ? 'انتهى التسجيل' : 'Locked'}</span>`;
+                }
+            } else if (att && att.status === 'vacation') {
                 actionsHtml = `<span style="color:#0284c7; font-weight:700; font-size:0.85rem;">🌴 ${isAr ? 'إجازة' : 'Vacation'}</span>`;
-            } else if (!att || att.status !== 'present') {
+            } else if (!att) {
                 actionsHtml = `
                     <button onclick="markWorkerSelfAttendance()" class="btn-success" style="padding: 6px 12px; font-size: 0.8rem; font-weight:700;" title="${isAr ? 'تسجيل حضور' : 'Check-In'}">✔️ ${isAr ? 'حضور' : 'Check-In'}</button>
                 `;
-            } else {
+            } else if (att.status === 'present') {
                 actionsHtml = `<span style="color:var(--success); font-weight:700; font-size:0.85rem;">✅ ${isAr ? 'تم تسجيل الحضور' : 'Checked In'}</span>`;
+            } else {
+                actionsHtml = `<span style="color:var(--danger); font-weight:700; font-size:0.85rem;">❌ ${isAr ? 'غائب' : 'Absent'}</span>`;
             }
         }
 
@@ -11874,7 +11949,14 @@ function markWorkerSelfAttendance() {
     const todayStr = `${yyyy}-${mm}-${dd}`;
 
     if (dateStr !== todayStr) {
-        alert(currentAppLang === 'ar' ? 'يمكنك تسجيل حضورك لليوم الحالي فقط!' : 'You can only check in for today\'s date!');
+        alert(currentAppLang === 'ar' ? 'يمكنك تسجيل حضورك لليوم الحالي فقط ولا يمكنك تعديل الأيام السابقة!' : 'You can only check in for today\'s date and cannot edit past attendance!');
+        return;
+    }
+
+    const attendanceMap = (getCompanyData().attendance || {})[todayStr] || {};
+    const existingAtt = attendanceMap[worker.id];
+    if (existingAtt && existingAtt.status === 'present') {
+        alert(currentAppLang === 'ar' ? 'لقد قمت بتسجيل حضورك بالفعل اليوم!' : 'You have already checked in for today!');
         return;
     }
 
