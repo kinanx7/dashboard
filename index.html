@@ -646,16 +646,50 @@
 
                 <!-- Main Content: Daily Ops -->
                 <div>
-                    <!-- High Money Requests Approval Card -->
+                    <!-- High Money / Money Requests Approval Card -->
                     <div class="card admin-only" id="high-money-approvals-card"
                         style="border-top: 4px solid var(--secondary); margin-bottom: 24px;">
-                        <h2 class="card-title" data-i18n="title-high-money-approvals">💰 High Money Requests Approval
-                        </h2>
+                        <h2 class="card-title" data-i18n="title-high-money-approvals">💰 Workers Money Requests Management & History</h2>
                         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;"
                             data-i18n="desc-high-money-approvals">
-                            Review high-value payment requests that have been accepted by the financial department and
-                            require final manager/admin approval.
+                            Filter, review, and manage worker payment requests by status and date timeframe.
                         </p>
+
+                        <!-- Filter Controls Bar -->
+                        <div style="background: var(--input-bg); padding: 14px; border-radius: 10px; border: 1px solid var(--border-color); margin-bottom: 16px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+                            <div style="flex: 1; min-width: 160px;">
+                                <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;" data-i18n="label-status-filter">Status Filter:</label>
+                                <select id="ops-money-status-filter" onchange="renderHighMoneyApprovals()" style="width: 100%; padding: 8px 12px; font-size: 0.85rem; border-radius: 6px;">
+                                    <option value="waiting_manager_approval" selected data-i18n="opt-status-waiting-manager">⏳ Waiting Manager Approval</option>
+                                    <option value="all" data-i18n="opt-status-all">🌐 All Statuses</option>
+                                    <option value="accepted" data-i18n="opt-status-accepted">✅ Accepted (Code Ready)</option>
+                                    <option value="given" data-i18n="opt-status-given">💸 Get Paid (Disbursed)</option>
+                                    <option value="pending" data-i18n="opt-status-pending">🕒 Pending Finance</option>
+                                    <option value="rejected" data-i18n="opt-status-rejected">❌ Rejected</option>
+                                </select>
+                            </div>
+                            <div style="flex: 1; min-width: 160px;">
+                                <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;" data-i18n="label-timeframe-filter">Timeframe Filter:</label>
+                                <select id="ops-money-timeframe-filter" onchange="toggleOpsMoneyCustomRange(); renderHighMoneyApprovals();" style="width: 100%; padding: 8px 12px; font-size: 0.85rem; border-radius: 6px;">
+                                    <option value="all" selected data-i18n="opt-timeframe-all">📅 All Time</option>
+                                    <option value="today" data-i18n="opt-timeframe-today">📅 Today</option>
+                                    <option value="week" data-i18n="opt-timeframe-week">📅 Last 7 Days (1 Week)</option>
+                                    <option value="month" data-i18n="opt-timeframe-month">📅 Last 30 Days (1 Month)</option>
+                                    <option value="custom" data-i18n="opt-timeframe-custom">📅 Custom Date Range</option>
+                                </select>
+                            </div>
+                            <div id="ops-money-custom-range" style="display: none; gap: 8px; flex-wrap: wrap; align-items: center; min-width: 240px;">
+                                <div>
+                                    <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); display: block;" data-i18n="label-from-date">From:</label>
+                                    <input type="date" id="ops-money-from-date" onchange="renderHighMoneyApprovals()" style="padding: 6px 10px; font-size: 0.85rem;">
+                                </div>
+                                <div>
+                                    <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); display: block;" data-i18n="label-to-date">To:</label>
+                                    <input type="date" id="ops-money-to-date" onchange="renderHighMoneyApprovals()" style="padding: 6px 10px; font-size: 0.85rem;">
+                                </div>
+                            </div>
+                        </div>
+
                         <div id="high-money-approvals-list" style="display:flex; flex-direction:column; gap:12px;">
                             <!-- Rendered dynamically -->
                         </div>
@@ -1234,7 +1268,72 @@
 
                         <!-- Tasks Board -->
                         <div class="card">
-                            <h2 class="card-title" data-i18n="title-tasks-board">Tasks Board</h2>
+                            <h2 class="card-title" data-i18n="title-tasks-board">📋 Tasks Board & Worker Performance</h2>
+
+                            <!-- Worker Task Statistics Summary Banner -->
+                            <div id="tasks-stats-banner" style="background: var(--input-bg); border-radius: 12px; border: 1px solid var(--border-color); padding: 16px; margin-bottom: 20px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                                    <h4 style="margin: 0; color: var(--primary); font-size: 1.05rem; display: flex; align-items: center; gap: 6px;">
+                                        📊 <span id="task-stats-title">Worker Task Statistics</span>
+                                    </h4>
+                                    <span id="task-stats-completion-badge" class="badge" style="background: var(--primary); color: white; font-weight: 700; font-size: 0.85rem; padding: 4px 10px; border-radius: 20px;">
+                                        Completion Rate: 0%
+                                    </span>
+                                </div>
+                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; text-align: center;">
+                                    <div style="background: var(--card-bg); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                        <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;" data-i18n="label-total-assigned">Total Assigned</div>
+                                        <div id="task-stats-total" style="font-size: 1.4rem; font-weight: 800; color: var(--text-main); margin-top: 4px;">0</div>
+                                    </div>
+                                    <div style="background: var(--card-bg); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                        <div style="font-size: 0.75rem; color: var(--success); font-weight: 600;" data-i18n="label-completed">Completed</div>
+                                        <div id="task-stats-completed" style="font-size: 1.4rem; font-weight: 800; color: var(--success); margin-top: 4px;">0</div>
+                                    </div>
+                                    <div style="background: var(--card-bg); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                        <div style="font-size: 0.75rem; color: var(--warning); font-weight: 600;" data-i18n="label-not-completed-yet">Not Completed Yet</div>
+                                        <div id="task-stats-pending" style="font-size: 1.4rem; font-weight: 800; color: var(--warning); margin-top: 4px;">0</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Filter Controls Bar -->
+                            <div style="background: var(--card-bg); padding: 14px; border-radius: 10px; border: 1px solid var(--border-color); margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+                                <div style="flex: 1; min-width: 140px;">
+                                    <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;" data-i18n="label-filter-status">Filter Status:</label>
+                                    <select id="tasks-filter-status" onchange="renderTasks()" style="width: 100%; padding: 8px 10px; font-size: 0.85rem; border-radius: 6px;">
+                                        <option value="all" selected data-i18n="opt-tasks-all">🌐 All Tasks</option>
+                                        <option value="incomplete" data-i18n="opt-tasks-incomplete">⏳ Not Completed Yet</option>
+                                        <option value="completed" data-i18n="opt-tasks-completed">✅ Completed</option>
+                                    </select>
+                                </div>
+                                <div style="flex: 1; min-width: 160px;">
+                                    <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;" data-i18n="label-filter-worker">Filter Worker:</label>
+                                    <select id="tasks-filter-worker" onchange="renderTasks()" style="width: 100%; padding: 8px 10px; font-size: 0.85rem; border-radius: 6px;">
+                                        <option value="all" selected data-i18n="opt-workers-all">👥 All Workers</option>
+                                    </select>
+                                </div>
+                                <div style="flex: 1; min-width: 150px;">
+                                    <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;" data-i18n="label-timeframe-filter">Timeframe Filter:</label>
+                                    <select id="tasks-filter-timeframe" onchange="toggleTasksCustomRange(); renderTasks();" style="width: 100%; padding: 8px 10px; font-size: 0.85rem; border-radius: 6px;">
+                                        <option value="all" selected data-i18n="opt-timeframe-all">📅 All Time</option>
+                                        <option value="today" data-i18n="opt-timeframe-today">📅 Today</option>
+                                        <option value="week" data-i18n="opt-timeframe-week">📅 Last 7 Days (1 Week)</option>
+                                        <option value="month" data-i18n="opt-timeframe-month">📅 Last 30 Days (1 Month)</option>
+                                        <option value="custom" data-i18n="opt-timeframe-custom">📅 Custom Date Range</option>
+                                    </select>
+                                </div>
+                                <div id="tasks-custom-range" style="display: none; gap: 8px; flex-wrap: wrap; align-items: center; min-width: 230px;">
+                                    <div>
+                                        <label style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); display: block;" data-i18n="label-from-date">From:</label>
+                                        <input type="date" id="tasks-from-date" onchange="renderTasks()" style="padding: 6px 10px; font-size: 0.85rem;">
+                                    </div>
+                                    <div>
+                                        <label style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); display: block;" data-i18n="label-to-date">To:</label>
+                                        <input type="date" id="tasks-to-date" onchange="renderTasks()" style="padding: 6px 10px; font-size: 0.85rem;">
+                                    </div>
+                                </div>
+                            </div>
+
                             <div id="tasks-board-list" style="display:flex; flex-direction:column; gap:12px;">
                                 <!-- Dynamically populated per user -->
                             </div>
@@ -2970,7 +3069,7 @@
     </div>
 
     <script defer src="translations.js"></script>
-    <script defer src="app.js?v=56"></script>
+    <script defer src="app.js?v=59"></script>
 </body>
 
 

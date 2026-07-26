@@ -6004,6 +6004,27 @@ function deleteTask(workerId, taskId) {
         });
 }
 
+function toggleTasksCustomRange() {
+    const tf = document.getElementById('tasks-filter-timeframe') ? document.getElementById('tasks-filter-timeframe').value : 'all';
+    const div = document.getElementById('tasks-custom-range');
+    if (div) {
+        div.style.display = tf === 'custom' ? 'flex' : 'none';
+    }
+}
+window.toggleTasksCustomRange = toggleTasksCustomRange;
+
+function getJobTimestamp(j) {
+    if (j.timestamp) return j.timestamp;
+    if (j.createdAt) return j.createdAt;
+    const parsedId = parseInt(j.id);
+    if (!isNaN(parsedId) && parsedId > 1000000000000) return parsedId;
+    if (j.date) {
+        const parsedDate = Date.parse(j.date);
+        if (!isNaN(parsedDate)) return parsedDate;
+    }
+    return 0;
+}
+
 function renderTasks() {
     const isAr = currentAppLang === 'ar';
     // Render Templates
@@ -6023,7 +6044,6 @@ function renderTasks() {
     const assignSel = document.getElementById('task-worker-select');
     if (assignSel) {
         const oldVal = assignSel.value;
-        const isAr = currentAppLang === 'ar';
         const companyData = getCompanyData();
 
         assignSel.innerHTML = `
@@ -6056,6 +6076,23 @@ function renderTasks() {
         assignSel.value = oldVal;
     }
 
+    // Populate Worker Filter Dropdown
+    const workerFilterSel = document.getElementById('tasks-filter-worker');
+    if (workerFilterSel) {
+        const oldFilterVal = workerFilterSel.value;
+        const visibleWorkers = getVisibleWorkers();
+        workerFilterSel.innerHTML = `<option value="all">${isAr ? '👥 جميع الموظفين' : '👥 All Workers'}</option>`;
+        visibleWorkers.forEach(w => {
+            const opt = document.createElement('option');
+            opt.value = w.id;
+            opt.textContent = w.name;
+            workerFilterSel.appendChild(opt);
+        });
+        if (oldFilterVal && Array.from(workerFilterSel.options).some(o => o.value === oldFilterVal)) {
+            workerFilterSel.value = oldFilterVal;
+        }
+    }
+
     renderTaskGroups();
 
     // Render Board (Filtered for user)
@@ -6066,83 +6103,170 @@ function renderTasks() {
     const isAdmin = currentUser && currentUser.role === 'admin';
     const data = getCompanyData();
 
-    // Render General Tasks at the top of the board
-    const generalTasks = data.generalTasks || [];
-    const activeWorker = getActiveWorker();
-    const pendingGeneralTasks = generalTasks.filter(gt => {
-        if (gt.status !== 'pending') return false;
-        if (isAdmin) return true; // Admin sees all
-        if (!gt.targetGroupId) return true; // Available to everyone
+    // Gather Filter Values
+    const statusFilter = document.getElementById('tasks-filter-status') ? document.getElementById('tasks-filter-status').value : 'all';
+    const selectedWorkerId = document.getElementById('tasks-filter-worker') ? document.getElementById('tasks-filter-worker').value : 'all';
+    const timeframeFilter = document.getElementById('tasks-filter-timeframe') ? document.getElementById('tasks-filter-timeframe').value : 'all';
+    const fromInput = document.getElementById('tasks-from-date') ? document.getElementById('tasks-from-date').value : '';
+    const toInput = document.getElementById('tasks-to-date') ? document.getElementById('tasks-to-date').value : '';
 
-        // Group task - check if the logged in worker is in the target group
-        const groups = data.taskGroups || [];
-        const group = groups.find(g => g.id === gt.targetGroupId);
-        if (group && group.members && activeWorker) {
-            return group.members.includes(activeWorker.id);
-        }
-        return false;
-    });
+    const now = Date.now();
+    const startOfToday = new Date().setHours(0, 0, 0, 0);
+    const weekAgo = now - (7 * 24 * 60 * 60 * 1000);
+    const monthAgo = now - (30 * 24 * 60 * 60 * 1000);
+    const fromMs = fromInput ? new Date(fromInput).setHours(0, 0, 0, 0) : 0;
+    const toMs = toInput ? new Date(toInput).setHours(23, 59, 59, 999) : Infinity;
 
-    if (pendingGeneralTasks.length > 0) {
-        const genCard = document.createElement('div');
-        genCard.className = "card";
-        genCard.style.padding = "20px";
-        genCard.style.marginBottom = "16px";
-        genCard.style.border = "2px dashed var(--warning)";
-        genCard.style.background = "var(--warning-bg)";
+    // Helper: Date filter matching
+    const passesDateFilter = (timestamp) => {
+        if (timeframeFilter === 'today') return timestamp >= startOfToday;
+        if (timeframeFilter === 'week') return timestamp >= weekAgo;
+        if (timeframeFilter === 'month') return timestamp >= monthAgo;
+        if (timeframeFilter === 'custom') return timestamp >= fromMs && timestamp <= toMs;
+        return true;
+    };
 
-        let genHtml = `<h3 style="margin-top:0; color:var(--warning); display:flex; align-items:center; gap:8px; font-size:1.15rem;">🌍 ${t('title-available-general-tasks')}</h3>`;
+    // Calculate Statistics across all visible tasks matching date & worker filters
+    let totalAssigned = 0;
+    let completedCount = 0;
+    let pendingCount = 0;
 
-        pendingGeneralTasks.forEach(gt => {
-            const urgencyBadge = gt.urgency === 'urgent' ? `<span class="badge" style="background:var(--danger); margin-left:8px;">🔴 ${t('opt-urgency-high').replace('🔴 ', '')}</span>` : '';
-            const groupBadge = gt.targetGroupName ? `<span class="badge" style="background:var(--primary); margin-left:8px; color:white;">👥 ${gt.targetGroupName}</span>` : '';
-            const deadlineText = gt.deadlineMins > 0 ? `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">⏱️ ${t('status-time-remaining').replace('⏳ ', '')} ${gt.deadlineMins} mins</div>` : '';
-
-            const isWorker = currentUser && currentUser.role === 'worker';
-            let actionBtn = '';
-            if (isWorker) {
-                actionBtn = `<button onclick="acceptGeneralTask('${gt.id}')" class="btn-warning" style="padding:8px 16px; font-size:0.85rem; min-height: unset; height: auto;">📥 ${t('btn-accept-task')}</button>`;
-            } else if (isAdmin) {
-                const labelText = gt.targetGroupName ? `${t('label-available-all-workers')} (${gt.targetGroupName})` : t('label-available-all-workers');
-                actionBtn = `
-                    <div style="display:flex; gap:8px; align-items:center;">
-                        <span style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">${labelText}</span>
-                        <button onclick="openEditTaskModal('general', '${gt.id}', true)" style="background:none; border:none; color: var(--secondary); cursor:pointer; font-size:1.1rem; padding:0 4px;" title="${isAr ? 'تعديل المهمة' : 'Edit Task'}">✏️</button>
-                        <button onclick="deleteGeneralTask('${gt.id}')" style="background:none; border:none; color: var(--danger); cursor:pointer; font-size:1.2rem; padding:0 4px;" title="${t('btn-remove')}">✖</button>
-                    </div>`;
-            }
-
-            genHtml += `
-                <div style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-                    <div>
-                        <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">Created: ${gt.date}</div>
-                        <div style="font-size:1.05rem; font-weight:700; color:var(--text-main);">${gt.title} ${urgencyBadge} ${groupBadge}</div>
-                        ${deadlineText}
-                    </div>
-                    <div>
-                        ${actionBtn}
-                    </div>
-                </div>
-            `;
-        });
-
-        genCard.innerHTML = genHtml;
-        board.appendChild(genCard);
+    let visibleWorkers = getVisibleWorkers();
+    if (selectedWorkerId !== 'all') {
+        visibleWorkers = visibleWorkers.filter(w => w.id === selectedWorkerId);
     }
 
-    const workers = getVisibleWorkers();
+    visibleWorkers.forEach(w => {
+        (w.jobs || []).forEach(j => {
+            const jTs = getJobTimestamp(j);
+            if (passesDateFilter(jTs)) {
+                totalAssigned++;
+                const isDone = j.status === 'completed' || j.done;
+                if (isDone) completedCount++;
+                else pendingCount++;
+            }
+        });
+    });
 
-    if (workers.length === 0 && !isAdmin) {
+    // Update Statistics Banner UI
+    const statsTitleEl = document.getElementById('task-stats-title');
+    const totalEl = document.getElementById('task-stats-total');
+    const completedEl = document.getElementById('task-stats-completed');
+    const pendingEl = document.getElementById('task-stats-pending');
+    const badgeEl = document.getElementById('task-stats-completion-badge');
+
+    if (statsTitleEl && totalEl && completedEl && pendingEl && badgeEl) {
+        if (selectedWorkerId !== 'all') {
+            const targetW = data.workers ? data.workers.find(w => w.id === selectedWorkerId) : null;
+            const nameStr = targetW ? targetW.name : '';
+            statsTitleEl.textContent = isAr ? `إحصائيات المهام للموظف: ${nameStr}` : `Task Statistics for ${nameStr}`;
+        } else {
+            statsTitleEl.textContent = isAr ? 'إحصائيات مهام الفريق' : 'Team Task Statistics';
+        }
+
+        totalEl.textContent = totalAssigned;
+        completedEl.textContent = completedCount;
+        pendingEl.textContent = pendingCount;
+        const pct = totalAssigned > 0 ? Math.round((completedCount / totalAssigned) * 100) : 0;
+        badgeEl.textContent = `${isAr ? 'نسبة الإنجاز: ' : 'Completion Rate: '}${pct}%`;
+    }
+
+    // Render General Tasks at top of board (if not filtering for a specific worker)
+    if (selectedWorkerId === 'all') {
+        const generalTasks = data.generalTasks || [];
+        const activeWorker = getActiveWorker();
+        let pendingGeneralTasks = generalTasks.filter(gt => {
+            if (gt.status !== 'pending') return false;
+            if (!passesDateFilter(getJobTimestamp(gt))) return false;
+            if (isAdmin) return true; // Admin sees all
+            if (!gt.targetGroupId) return true; // Available to everyone
+
+            const groups = data.taskGroups || [];
+            const group = groups.find(g => g.id === gt.targetGroupId);
+            if (group && group.members && activeWorker) {
+                return group.members.includes(activeWorker.id);
+            }
+            return false;
+        });
+
+        // Sort General tasks newest first
+        pendingGeneralTasks.sort((a, b) => getJobTimestamp(b) - getJobTimestamp(a));
+
+        if (pendingGeneralTasks.length > 0 && statusFilter !== 'completed') {
+            const genCard = document.createElement('div');
+            genCard.className = "card";
+            genCard.style.padding = "20px";
+            genCard.style.marginBottom = "16px";
+            genCard.style.border = "2px dashed var(--warning)";
+            genCard.style.background = "var(--warning-bg)";
+
+            let genHtml = `<h3 style="margin-top:0; color:var(--warning); display:flex; align-items:center; gap:8px; font-size:1.15rem;">🌍 ${t('title-available-general-tasks')}</h3>`;
+
+            pendingGeneralTasks.forEach(gt => {
+                const urgencyBadge = gt.urgency === 'urgent' ? `<span class="badge" style="background:var(--danger); margin-left:8px;">🔴 ${t('opt-urgency-high').replace('🔴 ', '')}</span>` : '';
+                const groupBadge = gt.targetGroupName ? `<span class="badge" style="background:var(--primary); margin-left:8px; color:white;">👥 ${gt.targetGroupName}</span>` : '';
+                const deadlineText = gt.deadlineMins > 0 ? `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">⏱️ ${t('status-time-remaining').replace('⏳ ', '')} ${gt.deadlineMins} mins</div>` : '';
+
+                const isWorker = currentUser && currentUser.role === 'worker';
+                let actionBtn = '';
+                if (isWorker) {
+                    actionBtn = `<button onclick="acceptGeneralTask('${gt.id}')" class="btn-warning" style="padding:8px 16px; font-size:0.85rem; min-height: unset; height: auto;">📥 ${t('btn-accept-task')}</button>`;
+                } else if (isAdmin) {
+                    const labelText = gt.targetGroupName ? `${t('label-available-all-workers')} (${gt.targetGroupName})` : t('label-available-all-workers');
+                    actionBtn = `
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <span style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">${labelText}</span>
+                            <button onclick="openEditTaskModal('general', '${gt.id}', true)" style="background:none; border:none; color: var(--secondary); cursor:pointer; font-size:1.1rem; padding:0 4px;" title="${isAr ? 'تعديل المهمة' : 'Edit Task'}">✏️</button>
+                            <button onclick="deleteGeneralTask('${gt.id}')" style="background:none; border:none; color: var(--danger); cursor:pointer; font-size:1.2rem; padding:0 4px;" title="${t('btn-remove')}">✖</button>
+                        </div>`;
+                }
+
+                genHtml += `
+                    <div style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                        <div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">Created: ${gt.date || new Date(getJobTimestamp(gt)).toLocaleString()}</div>
+                            <div style="font-size:1.05rem; font-weight:700; color:var(--text-main);">${gt.title} ${urgencyBadge} ${groupBadge}</div>
+                            ${deadlineText}
+                        </div>
+                        <div>
+                            ${actionBtn}
+                        </div>
+                    </div>
+                `;
+            });
+
+            genCard.innerHTML = genHtml;
+            board.appendChild(genCard);
+        }
+    }
+
+    if (visibleWorkers.length === 0 && !isAdmin) {
         if (board.innerHTML === '') {
-            board.innerHTML = `<p style="text-align:center; color:var(--text-muted);">${t('not-linked-worker')}</p>`;
+            board.innerHTML = `<p style="text-align:center; color:var(--text-muted); padding:20px;">${t('not-linked-worker')}</p>`;
         }
         return;
     }
 
-    workers.forEach(worker => {
-        if (!worker.jobs || worker.jobs.length === 0) return;
+    visibleWorkers.forEach(worker => {
+        let jobs = worker.jobs ? [...worker.jobs] : [];
+        if (jobs.length === 0) return;
 
-        let jobsHtml = worker.jobs.map(j => {
+        // Apply Status Filter
+        if (statusFilter === 'completed') {
+            jobs = jobs.filter(j => j.status === 'completed' || j.done);
+        } else if (statusFilter === 'incomplete') {
+            jobs = jobs.filter(j => j.status !== 'completed' && !j.done);
+        }
+
+        // Apply Date Filter
+        jobs = jobs.filter(j => passesDateFilter(getJobTimestamp(j)));
+
+        if (jobs.length === 0) return;
+
+        // Sort Newest Tasks to the Top
+        jobs.sort((a, b) => getJobTimestamp(b) - getJobTimestamp(a));
+
+        let jobsHtml = jobs.map(j => {
             const editBtn = isAdmin ? `<button onclick="openEditTaskModal('${worker.id}', '${j.id}')" style="background:none; border:none; color: var(--secondary); cursor:pointer; font-size:1rem; padding:0 4px;" title="${isAr ? 'تعديل المهمة' : 'Edit Task'}">✏️</button>` : '';
             const delBtn = isAdmin ? `<button onclick="deleteTask('${worker.id}', '${j.id}')" style="background:none; border:none; color: var(--danger); cursor:pointer; font-size:1.1rem; padding:0 4px;" title="Delete">✖</button>` : '';
 
@@ -6154,7 +6278,7 @@ function renderTasks() {
             let urgencyBadge = j.urgency === 'urgent' ? `<span class="badge" style="background:var(--danger); margin-left:8px;">🔴 ${t('opt-urgency-high').replace('🔴 ', '')}</span>` : '';
             let timeInfoHtml = '';
 
-            if (status === 'completed') {
+            if (status === 'completed' || j.done) {
                 statusBadge = `<span class="badge badge-good">${t('btn-mark-completed').replace('✅ ', '')} ✅</span>`;
                 actionHtml = isAdmin ? `<button onclick="toggleTaskDone('${worker.id}', '${j.id}')" class="btn-outline" style="font-size:0.75rem; padding:4px 8px;">${t('btn-undo-action')}</button>` : '';
                 if (j.completedAt) {
@@ -6184,15 +6308,15 @@ function renderTasks() {
                 }
             }
 
-            const doneColor = status === 'completed' ? 'var(--success)' : (j.urgency === 'urgent' ? 'var(--danger)' : 'var(--primary)');
-            const doneText = status === 'completed' ? 'line-through' : 'none';
+            const doneColor = (status === 'completed' || j.done) ? 'var(--success)' : (j.urgency === 'urgent' ? 'var(--danger)' : 'var(--primary)');
+            const doneText = (status === 'completed' || j.done) ? 'line-through' : 'none';
             let isGeneralBadge = j.isGeneral ? `<span class="badge" style="background:var(--info); color:var(--text-light); margin-right:8px; font-size:0.75rem; vertical-align:middle;">🌍 General Task</span>` : '';
 
             return `
                         <div class="mission-item" style="border-left: 4px solid ${doneColor}; display:flex; flex-direction:column; align-items:stretch;">
                             <div class="flex-between" style="margin-bottom:8px; align-items:flex-start;">
                                 <div>
-                                    <div style="font-size: 0.75rem; color:var(--text-muted); margin-bottom:4px;">Assigned: ${j.date}</div>
+                                    <div style="font-size: 0.75rem; color:var(--text-muted); margin-bottom:4px;">Assigned: ${j.date || new Date(getJobTimestamp(j)).toLocaleString()}</div>
                                     <div style="display:flex; align-items:center; flex-wrap:wrap; gap:4px;">
                                         ${isGeneralBadge}
                                         <span class="mission-text" style="text-decoration: ${doneText}; margin-right:4px;">${j.title}</span>
@@ -6225,7 +6349,7 @@ function renderTasks() {
     });
 
     if (board.innerHTML === '') {
-        board.innerHTML = `<p style="text-align:center; color:var(--text-muted);">No active tasks.</p>`;
+        board.innerHTML = `<p style="text-align:center; color:var(--text-muted); padding: 20px;">${isAr ? 'لا توجد مهام تطابق التصفية المختارة.' : 'No tasks match the selected filters.'}</p>`;
     }
 }
 
@@ -9293,16 +9417,37 @@ function submitPaymentRequest() {
         alert("Only registered workers can request payments.");
         return;
     }
+    const isAr = currentAppLang === 'ar';
     const amountVal = parseFloat(document.getElementById('payment-req-amount').value);
     const reasonVal = document.getElementById('payment-req-reason').value.trim();
 
     if (isNaN(amountVal) || amountVal <= 0) {
-        alert(currentAppLang === 'ar' ? 'يرجى إدخال مبلغ صحيح أكبر من 0.' : 'Please enter a valid amount greater than 0.');
+        alert(isAr ? 'يرجى إدخال مبلغ صحيح أكبر من 0.' : 'Please enter a valid amount greater than 0.');
         return;
     }
     if (!reasonVal) {
-        alert(currentAppLang === 'ar' ? 'يرجى إدخال سبب الطلب.' : 'Please enter a reason for the request.');
+        alert(isAr ? 'يرجى إدخال سبب الطلب.' : 'Please enter a reason for the request.');
         return;
+    }
+
+    // 1-Week (7 days) Cooldown Check between payment requests
+    const allRequests = Object.values(getCompanyData().paymentRequests || {});
+    const workerRequests = allRequests.filter(r => r.workerId === worker.id && r.timestamp);
+
+    if (workerRequests.length > 0) {
+        const lastTimestamp = Math.max(...workerRequests.map(r => r.timestamp || 0));
+        const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000; // 604,800,000 ms
+        const timeElapsed = Date.now() - lastTimestamp;
+        if (timeElapsed < ONE_WEEK_MS) {
+            const remainingMs = ONE_WEEK_MS - timeElapsed;
+            const remainingDays = Math.floor(remainingMs / (24 * 60 * 60 * 1000));
+            const remainingHours = Math.floor((remainingMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+            const timeMsg = isAr ? `${remainingDays} يوم و ${remainingHours} ساعة` : `${remainingDays}d ${remainingHours}h`;
+            alert(isAr 
+                ? `عذراً، يجب الانتظار لمدة أسبوع واحد (7 أيام) بين كل طلب دفع وآخر. الوقت المتبقي: ${timeMsg}.` 
+                : `Sorry, you must wait 1 week (7 days) between payment requests. Time remaining: ${timeMsg}.`);
+            return;
+        }
     }
 
     const reqId = 'req-' + Date.now();
@@ -9321,7 +9466,7 @@ function submitPaymentRequest() {
         .then(() => {
             document.getElementById('payment-req-amount').value = '';
             document.getElementById('payment-req-reason').value = '';
-            alert(currentAppLang === 'ar' ? 'تم تقديم الطلب بنجاح وهو قيد المراجعة.' : 'Request submitted successfully and is pending review.');
+            alert(isAr ? 'تم تقديم الطلب بنجاح وهو قيد المراجعة.' : 'Request submitted successfully and is pending review.');
         })
         .catch(err => {
             console.error("Error submitting payment request:", err);
@@ -9773,61 +9918,155 @@ function saveHighMoneyThreshold() {
         });
 }
 
+function toggleOpsMoneyCustomRange() {
+    const tf = document.getElementById('ops-money-timeframe-filter') ? document.getElementById('ops-money-timeframe-filter').value : 'all';
+    const rangeDiv = document.getElementById('ops-money-custom-range');
+    if (rangeDiv) {
+        rangeDiv.style.display = tf === 'custom' ? 'flex' : 'none';
+    }
+}
+window.toggleOpsMoneyCustomRange = toggleOpsMoneyCustomRange;
+
 function renderHighMoneyApprovals() {
     const isAr = currentAppLang === 'ar';
     const companyData = getCompanyData();
     const pRequests = companyData.paymentRequests || {};
-    const reqList = Object.values(pRequests).sort((a, b) => b.timestamp - a.timestamp);
+    let reqList = Object.values(pRequests).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     const approvalsListDiv = document.getElementById('high-money-approvals-list');
     
-    if (approvalsListDiv) {
-        approvalsListDiv.innerHTML = '';
-        const highReqs = reqList.filter(r => r.status === 'waiting_manager_approval');
-        
-        if (highReqs.length === 0) {
-            approvalsListDiv.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted); text-align:center;">${isAr ? 'لا توجد طلبات سلف عالية بانتظار موافقة المدير حالياً.' : 'No high money requests awaiting manager approval.'}</p>`;
-        } else {
-            highReqs.forEach(req => {
-                const dateStr = new Date(req.timestamp).toLocaleString();
-                let adminNoteText = '';
-                if (req.adminNote) {
-                    adminNoteText = `<div style="font-size: 0.85rem; margin-top: 6px; color: var(--secondary); font-weight: 600;">💬 ${isAr ? 'ملاحظة الإدارة:' : 'Admin Note:'} <span style="font-weight:400; color:var(--text-main);">${req.adminNote}</span></div>`;
-                }
+    if (!approvalsListDiv) return;
+    approvalsListDiv.innerHTML = '';
 
-                approvalsListDiv.innerHTML += `
-                    <div class="ledger-card" style="border-left: 4px solid var(--secondary); padding: 14px;">
-                        <div class="flex-between" style="align-items: flex-start; flex-wrap: wrap;">
-                            <div>
-                                <strong style="font-size:1.05rem; display:block;">${req.workerName}</strong>
-                                <span style="font-size:0.75rem; color:var(--text-muted); margin-left: 8px;">🕒 Requested: ${dateStr}</span>
-                                <div style="font-size: 0.85rem; margin-top: 8px; color:var(--text-main);">${isAr ? 'السبب:' : 'Reason:'} <em>${req.reason}</em></div>
-                                ${adminNoteText}
-                            </div>
-                            <div style="text-align: right;">
-                                <span style="font-size:0.8rem; font-weight:700; color:var(--warning); display:block; margin-bottom:4px;">
-                                    ${isAr ? 'بانتظار موافقة المدير' : 'Awaiting Manager Approval'}
-                                </span>
-                                <strong class="text-primary" style="font-size:1.15rem;">SAR ${req.amount}</strong>
-                            </div>
-                        </div>
-                        <div style="display:flex; flex-direction:column; gap:8px; margin-top: 14px;">
-                            <div style="display:flex; gap:8px; justify-content: flex-end; align-items:center; flex-wrap:wrap;">
-                                <label style="margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">${isAr ? 'تعديل المبلغ (ريال):' : 'Adjust Amount (SAR):'}</label>
-                                <input type="number" step="any" id="manager-adjust-amount-${req.id}" value="${req.amount}" min="0.01" 
-                                    style="max-width: 90px; padding: 6px 10px; font-size: 0.85rem; height: 34px;">
-                            </div>
-                            <div style="display:flex; gap:8px; justify-content: flex-end; align-items:center; flex-wrap:wrap;">
-                                <input type="text" id="manager-note-${req.id}" placeholder="${isAr ? 'ملاحظة المدير / سبب الرفض (اختياري)...' : 'Manager note / Rejection reason (optional)...'}" 
-                                    style="flex: 1; min-width: 180px; padding: 6px 10px; font-size: 0.85rem; height: 34px;">
-                                <button onclick="managerRejectPaymentRequest('${req.id}')" class="btn-outline-danger" style="padding: 6px 14px; font-size: 0.8rem; height: 34px; font-weight:700;">${isAr ? 'رفض' : 'Reject'}</button>
-                                <button onclick="managerAcceptPaymentRequest('${req.id}')" class="btn-success" style="padding: 6px 14px; font-size: 0.8rem; height: 34px; font-weight:700;">${isAr ? 'قبول واعتماد نهائي' : 'Approve & Release Code'}</button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
+    const statusFilter = document.getElementById('ops-money-status-filter') ? document.getElementById('ops-money-status-filter').value : 'waiting_manager_approval';
+    const timeframeFilter = document.getElementById('ops-money-timeframe-filter') ? document.getElementById('ops-money-timeframe-filter').value : 'all';
+
+    // 1. Filter by Status
+    if (statusFilter !== 'all') {
+        reqList = reqList.filter(r => r.status === statusFilter);
+    }
+
+    // 2. Filter by Timeframe / Date
+    const now = Date.now();
+    if (timeframeFilter === 'today') {
+        const startOfToday = new Date().setHours(0, 0, 0, 0);
+        reqList = reqList.filter(r => (r.timestamp || 0) >= startOfToday);
+    } else if (timeframeFilter === 'week') {
+        const weekAgo = now - (7 * 24 * 60 * 60 * 1000);
+        reqList = reqList.filter(r => (r.timestamp || 0) >= weekAgo);
+    } else if (timeframeFilter === 'month') {
+        const monthAgo = now - (30 * 24 * 60 * 60 * 1000);
+        reqList = reqList.filter(r => (r.timestamp || 0) >= monthAgo);
+    } else if (timeframeFilter === 'custom') {
+        const fromInput = document.getElementById('ops-money-from-date') ? document.getElementById('ops-money-from-date').value : '';
+        const toInput = document.getElementById('ops-money-to-date') ? document.getElementById('ops-money-to-date').value : '';
+        if (fromInput) {
+            const fromMs = new Date(fromInput).setHours(0, 0, 0, 0);
+            reqList = reqList.filter(r => (r.timestamp || 0) >= fromMs);
+        }
+        if (toInput) {
+            const toMs = new Date(toInput).setHours(23, 59, 59, 999);
+            reqList = reqList.filter(r => (r.timestamp || 0) <= toMs);
         }
     }
+
+    if (reqList.length === 0) {
+        approvalsListDiv.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted); text-align:center; padding: 20px;">${isAr ? 'لا توجد طلبات سلف تطابق التصفية المختارة.' : 'No payment requests match the selected filters.'}</p>`;
+        return;
+    }
+
+    reqList.forEach(req => {
+        const dateStr = req.timestamp ? new Date(req.timestamp).toLocaleString() : (req.date || '');
+        let adminNoteText = '';
+        if (req.adminNote) {
+            const noteColor = req.status === 'rejected' ? 'var(--danger)' : 'var(--secondary)';
+            adminNoteText = `<div style="font-size: 0.85rem; margin-top: 6px; color: ${noteColor}; font-weight: 600;">💬 ${isAr ? 'ملاحظة الإدارة / سبب الرفض:' : 'Admin Note / Rejection Reason:'} <span style="font-weight:400; color:var(--text-main);">${req.adminNote}</span></div>`;
+        }
+
+        let statusBadge = '';
+        let controlsArea = '';
+        let borderCol = 'var(--info)';
+
+        if (req.status === 'pending') {
+            borderCol = 'var(--warning)';
+            statusBadge = `<span class="badge" style="background:#d97706; color:#fff; font-weight:700;">🕒 ${isAr ? 'بانتظار موافقة المالية' : 'Pending Finance Approval'}</span>`;
+            controlsArea = `
+                <div style="display:flex; flex-direction:column; gap:8px; margin-top: 14px;">
+                    <div style="display:flex; gap:8px; justify-content: flex-end; align-items:center; flex-wrap:wrap;">
+                        <label style="margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">${isAr ? 'تعديل المبلغ (ريال):' : 'Adjust Amount (SAR):'}</label>
+                        <input type="number" step="any" id="adjust-amount-${req.id}" value="${req.amount}" min="0.01" 
+                            style="max-width: 90px; padding: 6px 10px; font-size: 0.85rem; height: 34px;">
+                    </div>
+                    <div style="display:flex; gap:8px; justify-content: flex-end; align-items:center; flex-wrap:wrap;">
+                        <input type="text" id="admin-note-${req.id}" placeholder="${isAr ? 'سبب الرفض / ملاحظة (اختياري)...' : 'Rejection reason / Note (optional)...'}" 
+                            style="flex: 1; min-width: 180px; padding: 6px 10px; font-size: 0.85rem; height: 34px;">
+                        <button onclick="rejectPaymentRequest('${req.id}')" class="btn-outline-danger" style="padding: 6px 14px; font-size: 0.8rem; height: 34px; font-weight:700;">${isAr ? 'رفض' : 'Reject'}</button>
+                        <button onclick="acceptPaymentRequest('${req.id}')" class="btn-success" style="padding: 6px 14px; font-size: 0.8rem; height: 34px; font-weight:700;">${isAr ? 'قبول واعتماد' : 'Accept & Approve'}</button>
+                    </div>
+                </div>
+            `;
+        } else if (req.status === 'waiting_manager_approval') {
+            borderCol = 'var(--warning)';
+            statusBadge = `<span class="badge" style="background:#f59e0b; color:#fff; font-weight:700;">⏳ ${isAr ? 'بانتظار موافقة المدير' : 'Awaiting Manager Approval'}</span>`;
+            controlsArea = `
+                <div style="display:flex; flex-direction:column; gap:8px; margin-top: 14px;">
+                    <div style="display:flex; gap:8px; justify-content: flex-end; align-items:center; flex-wrap:wrap;">
+                        <label style="margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">${isAr ? 'تعديل المبلغ (ريال):' : 'Adjust Amount (SAR):'}</label>
+                        <input type="number" step="any" id="manager-adjust-amount-${req.id}" value="${req.amount}" min="0.01" 
+                            style="max-width: 90px; padding: 6px 10px; font-size: 0.85rem; height: 34px;">
+                    </div>
+                    <div style="display:flex; gap:8px; justify-content: flex-end; align-items:center; flex-wrap:wrap;">
+                        <input type="text" id="manager-note-${req.id}" placeholder="${isAr ? 'ملاحظة المدير / سبب الرفض (اختياري)...' : 'Manager note / Rejection reason (optional)...'}" 
+                            style="flex: 1; min-width: 180px; padding: 6px 10px; font-size: 0.85rem; height: 34px;">
+                        <button onclick="managerRejectPaymentRequest('${req.id}')" class="btn-outline-danger" style="padding: 6px 14px; font-size: 0.8rem; height: 34px; font-weight:700;">${isAr ? 'رفض' : 'Reject'}</button>
+                        <button onclick="managerAcceptPaymentRequest('${req.id}')" class="btn-success" style="padding: 6px 14px; font-size: 0.8rem; height: 34px; font-weight:700;">${isAr ? 'قبول واعتماد نهائي' : 'Approve & Release Code'}</button>
+                    </div>
+                </div>
+            `;
+        } else if (req.status === 'accepted') {
+            borderCol = 'var(--success)';
+            statusBadge = `
+                <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
+                    <span class="badge" style="background:#16a34a; font-size:0.75rem; font-weight:700; padding:4px 8px; border-radius:4px; color:white;">
+                        ${isAr ? 'مقبول (كود التسليم: ' + (req.code || '') + ')' : 'Accepted (Code: ' + (req.code || '') + ')'}
+                    </span>
+                </div>
+            `;
+            controlsArea = `
+                <div style="display:flex; flex-direction:column; gap:8px; margin-top: 14px;">
+                    <div style="display:flex; gap:8px; justify-content: flex-end; align-items:center; flex-wrap:wrap;">
+                        <input type="text" id="verify-code-${req.id}" placeholder="${isAr ? 'إدخال رمز التحقق لتأكيد التسليم...' : 'Enter verification code to confirm disbursal...'}" 
+                            style="max-width: 220px; padding: 6px 10px; font-size: 0.85rem; height: 34px;">
+                        <button onclick="confirmPaymentGiven('${req.id}')" class="btn-success" style="padding: 6px 14px; font-size: 0.8rem; height: 34px; font-weight:700;">${isAr ? 'تأكيد التسليم' : 'Confirm Disbursal'}</button>
+                        <button onclick="undoAcceptPaymentRequest('${req.id}')" class="btn-outline-danger" style="padding: 6px 14px; font-size: 0.8rem; height: 34px; font-weight:700;">${isAr ? 'تراجع' : 'Undo Accept'}</button>
+                    </div>
+                </div>
+            `;
+        } else if (req.status === 'given') {
+            borderCol = '#0284c7';
+            statusBadge = `<span class="badge" style="background:#0284c7; color:#fff; font-weight:700;">💸 ${isAr ? 'تم التسليم والمصادقة' : 'Get Paid / Disbursed'}</span>`;
+        } else if (req.status === 'rejected') {
+            borderCol = 'var(--danger)';
+            statusBadge = `<span class="badge" style="background:#dc2626; color:#fff; font-weight:700;">❌ ${isAr ? 'مرفوض' : 'Rejected'}</span>`;
+        }
+
+        approvalsListDiv.innerHTML += `
+            <div class="ledger-card" style="border-left: 4px solid ${borderCol}; padding: 14px;">
+                <div class="flex-between" style="align-items: flex-start; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <strong style="font-size:1.05rem; display:block;">${req.workerName}</strong>
+                        <span style="font-size:0.75rem; color:var(--text-muted);">🕒 Requested: ${dateStr}</span>
+                        <div style="font-size: 0.85rem; margin-top: 8px; color:var(--text-main);">${isAr ? 'السبب:' : 'Reason:'} <em>${req.reason}</em></div>
+                        ${adminNoteText}
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="margin-bottom: 4px;">${statusBadge}</div>
+                        <strong class="text-primary" style="font-size:1.15rem;">SAR ${req.amount}</strong>
+                    </div>
+                </div>
+                ${controlsArea}
+            </div>
+        `;
+    });
 }
 
 function managerAcceptPaymentRequest(reqId) {
