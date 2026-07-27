@@ -295,8 +295,44 @@ body:not(.role-admin):not(.perm-attendance) .attendance-admin-only {
     display: none !important;
 }
 
+body:not(.role-admin):not(.perm-tasks) .task-assign-access-only {
+    display: none !important;
+}
+
 body:not(.has-worker-profile) .attendance-worker-only {
     display: none !important;
+}
+
+/* Custom Department Tab Button Drag & Drop Engine */
+body.tabs-reorder-mode .dept-tab {
+    border: 2px dashed var(--secondary) !important;
+    cursor: grab !important;
+    user-select: none;
+    touch-action: none;
+    transition: transform 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+}
+
+body.tabs-reorder-mode .dept-tab:active {
+    cursor: grabbing !important;
+}
+
+.dept-tab.is-dragging {
+    opacity: 0.4 !important;
+    transform: scale(0.95) !important;
+    border-color: var(--warning) !important;
+}
+
+.dept-tab.drag-over {
+    border: 2px solid var(--primary) !important;
+    background: rgba(59, 130, 246, 0.15) !important;
+    transform: scale(1.04) !important;
+}
+
+/* Hide Reorder Tabs button on phone / mobile version */
+@media (max-width: 768px) {
+    #tab-reorder-btn {
+        display: none !important;
+    }
 }
 
 /* Worker self-view violation panel: always hidden from admins, shown via JS for workers */

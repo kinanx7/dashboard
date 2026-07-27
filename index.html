@@ -418,35 +418,41 @@
                 <input type="month" id="global-month" onchange="handleMonthChange()" aria-label="Select month" />
             </div>
 
-            <!-- Modern Department Tabs -->
-            <div class="department-tabs">
-                <button id="tab-ops" class="dept-tab active-tab" onclick="switchTab('ops')" data-i18n="tab-ops">⚙️
-                    Operations</button>
-                <button id="tab-ranks" class="dept-tab" onclick="switchTab('ranks')" data-i18n="tab-ranks">🏆
-                    Ranks</button>
-                <button id="tab-attendance" class="dept-tab" onclick="switchTab('attendance')"
-                    data-i18n="tab-attendance">📅 Attendance</button>
-                <button id="tab-tasks" class="dept-tab" onclick="switchTab('tasks')" data-i18n="tab-tasks">📋
-                    Tasks</button>
-                <button id="tab-warehouse" class="dept-tab" onclick="switchTab('warehouse')"
-                    data-i18n="tab-warehouse">📦
-                    Warehouse</button>
-                <button id="tab-drivers" class="dept-tab" onclick="switchTab('drivers')" data-i18n="tab-drivers">🚚
-                    Drivers</button>
-                <button id="tab-finance" class="dept-tab" onclick="switchTab('finance')" data-i18n="tab-finance">💰
-                    Financial</button>
-                <button id="tab-summary" class="dept-tab" onclick="switchTab('summary')" data-i18n="tab-summary">📊
-                    Summary</button>
-                <button id="tab-adverts" class="dept-tab" onclick="switchTab('adverts')" data-i18n="tab-ads">📢
-                    Ads</button>
-                <button id="tab-notes" class="dept-tab" onclick="switchTab('notes')" data-i18n="tab-notes">📝
-                    Notes</button>
-                <button id="tab-activity" class="dept-tab admin-only" onclick="switchTab('activity')"
-                    data-i18n="tab-activity">📜 Activity Log</button>
-                <button id="tab-managing" class="dept-tab" onclick="switchTab('managing')" data-i18n="tab-sales">💰
-                    Sales</button>
-                <button id="tab-costs" class="dept-tab" onclick="switchTab('costs')" data-i18n="tab-costs">📉
-                    Costs</button>
+            <!-- Modern Department Tabs Bar -->
+            <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin: 24px auto 16px; max-width: 1400px; flex-wrap:wrap;">
+                <div class="department-tabs" id="department-tabs-container" style="margin: 0;">
+                    <button id="tab-ops" class="dept-tab active-tab" onclick="switchTab('ops')" data-i18n="tab-ops">⚙️
+                        Operations</button>
+                    <button id="tab-ranks" class="dept-tab" onclick="switchTab('ranks')" data-i18n="tab-ranks">🏆
+                        Ranks</button>
+                    <button id="tab-attendance" class="dept-tab" onclick="switchTab('attendance')"
+                        data-i18n="tab-attendance">📅 Attendance</button>
+                    <button id="tab-tasks" class="dept-tab" onclick="switchTab('tasks')" data-i18n="tab-tasks">📋
+                        Tasks</button>
+                    <button id="tab-warehouse" class="dept-tab" onclick="switchTab('warehouse')"
+                        data-i18n="tab-warehouse">📦
+                        Warehouse</button>
+                    <button id="tab-drivers" class="dept-tab" onclick="switchTab('drivers')" data-i18n="tab-drivers">🚚
+                        Drivers</button>
+                    <button id="tab-finance" class="dept-tab" onclick="switchTab('finance')" data-i18n="tab-finance">💰
+                        Financial</button>
+                    <button id="tab-summary" class="dept-tab" onclick="switchTab('summary')" data-i18n="tab-summary">📊
+                        Summary</button>
+                    <button id="tab-adverts" class="dept-tab" onclick="switchTab('adverts')" data-i18n="tab-ads">📢
+                        Ads</button>
+                    <button id="tab-notes" class="dept-tab" onclick="switchTab('notes')" data-i18n="tab-notes">📝
+                        Notes</button>
+                    <button id="tab-activity" class="dept-tab admin-only" onclick="switchTab('activity')"
+                        data-i18n="tab-activity">📜 Activity Log</button>
+                    <button id="tab-managing" class="dept-tab" onclick="switchTab('managing')" data-i18n="tab-sales">💰
+                        Sales</button>
+                    <button id="tab-costs" class="dept-tab" onclick="switchTab('costs')" data-i18n="tab-costs">📉
+                        Costs</button>
+                </div>
+                <button type="button" class="btn-outline" id="tab-reorder-btn" onclick="toggleTabReorderMode()"
+                    style="padding: 8px 16px; border-radius: 100px; font-weight: 700; font-size: 0.85rem;" data-i18n="btn-reorder-tabs">
+                    ✏️ Reorder Tabs
+                </button>
             </div>
 
             <!-- ========================================== -->
@@ -504,6 +510,11 @@
                                 style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
                                 <input type="checkbox" id="perm-attendance" style="width:auto;"> <span
                                     data-i18n="tab-attendance">Attendance</span>
+                            </label>
+                            <label
+                                style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                                <input type="checkbox" id="perm-tasks" style="width:auto;"> <span
+                                    data-i18n="tab-tasks">Tasks</span>
                             </label>
                         </div>
                         <button onclick="saveWorkerPerms()" style="width: 100%;" data-i18n="btn-save-worker-perms">Save
@@ -1229,7 +1240,7 @@
                     <!-- Main Content: Task Assignment & Board -->
                     <div>
                         <!-- Assign Task Box -->
-                        <form onsubmit="event.preventDefault(); assignTask();" class="card admin-only"
+                        <form onsubmit="event.preventDefault(); assignTask();" class="card task-assign-access-only"
                             style="display: block;">
                             <h2 class="card-title" data-i18n="title-assign-tasks">Assign Tasks</h2>
                             <div class="grid-2-col" style="align-items: end;">
@@ -3069,7 +3080,7 @@
     </div>
 
     <script defer src="translations.js"></script>
-    <script defer src="app.js?v=59"></script>
+    <script defer src="app.js?v=63"></script>
 </body>
 
 

@@ -615,7 +615,7 @@ function selectCompany(companyId) {
     document.body.classList.add('theme-' + companyId);
 
     // Lock all tabs by default initially until database connection verifies permissions
-    document.body.classList.remove('role-admin', 'role-worker', 'perm-warehouse', 'perm-drivers', 'perm-finance', 'perm-sales', 'perm-costs', 'perm-adverts', 'perm-attendance', 'is-driver');
+    document.body.classList.remove('role-admin', 'role-worker', 'perm-warehouse', 'perm-drivers', 'perm-finance', 'perm-sales', 'perm-costs', 'perm-adverts', 'perm-attendance', 'perm-tasks', 'is-driver');
     if (typeof markLockedTabs === 'function') {
         markLockedTabs();
     }
@@ -1114,6 +1114,7 @@ function applyUserRoles() {
         if (wPerms.costs || deptPrivacy.costs === 'public') document.body.classList.add('perm-costs');
         if (wPerms.adverts || deptPrivacy.adverts === 'public') document.body.classList.add('perm-adverts');
         if (wPerms.attendance) document.body.classList.add('perm-attendance');
+        if (wPerms.tasks) document.body.classList.add('perm-tasks');
         if (isDriver) document.body.classList.add('is-driver');
         if (typeof checkWorkerSystemViolationAlerts === 'function') {
             checkWorkerSystemViolationAlerts(worker);
@@ -1859,11 +1860,12 @@ function loadWorkerPerms() {
         document.getElementById('perm-costs').checked = false;
         document.getElementById('perm-adverts').checked = false;
         document.getElementById('perm-attendance').checked = false;
+        if (document.getElementById('perm-tasks')) document.getElementById('perm-tasks').checked = false;
         return;
     }
     const worker = getCompanyData().workers.find(w => w.id === wId);
     if (!worker) return;
-    const p = worker.permissions || { warehouse: false, drivers: false, finance: false, sales: false, costs: false, adverts: false, attendance: false };
+    const p = worker.permissions || { warehouse: false, drivers: false, finance: false, sales: false, costs: false, adverts: false, attendance: false, tasks: false };
     document.getElementById('perm-wh').checked = !!p.warehouse;
     document.getElementById('perm-drv').checked = !!p.drivers;
     document.getElementById('perm-fin').checked = !!p.finance;
@@ -1871,6 +1873,7 @@ function loadWorkerPerms() {
     document.getElementById('perm-costs').checked = !!p.costs;
     document.getElementById('perm-adverts').checked = !!p.adverts;
     document.getElementById('perm-attendance').checked = !!p.attendance;
+    if (document.getElementById('perm-tasks')) document.getElementById('perm-tasks').checked = !!p.tasks;
 }
 
 function saveWorkerPerms() {
@@ -1886,7 +1889,8 @@ function saveWorkerPerms() {
         sales: document.getElementById('perm-sales').checked,
         costs: document.getElementById('perm-costs').checked,
         adverts: document.getElementById('perm-adverts').checked,
-        attendance: document.getElementById('perm-attendance').checked
+        attendance: document.getElementById('perm-attendance').checked,
+        tasks: document.getElementById('perm-tasks') ? document.getElementById('perm-tasks').checked : false
     };
 
     // Targeted write to worker permissions path
@@ -8116,6 +8120,9 @@ function renderAll() {
     renderWorkerCustodyRequests();
     renderPendingCustodyRequests();
     renderAcceptedCustodyReleases();
+    if (typeof applyUserTabOrder === 'function') {
+        applyUserTabOrder();
+    }
 }
 
 function renderWorkerViolationPanel() {
@@ -12624,6 +12631,203 @@ window.saveEditedTask = saveEditedTask;
 window.editPaymentRequestAmount = editPaymentRequestAmount;
 window.editCustodyRequestAmount = editCustodyRequestAmount;
 window.editManagerNote = editManagerNote;
+
+// =========================================================================
+// CUSTOM DEPARTMENT TAB BUTTON DRAG & DROP REORDERING ENGINE
+// =========================================================================
+let draggedTabElement = null;
+
+function toggleTabReorderMode() {
+    const isAr = currentAppLang === 'ar';
+    const isEditing = document.body.classList.toggle('tabs-reorder-mode');
+    const btn = document.getElementById('tab-reorder-btn');
+    const container = document.getElementById('department-tabs-container');
+    if (!container) return;
+
+    const tabs = container.querySelectorAll('.dept-tab');
+
+    if (isEditing) {
+        if (btn) btn.innerHTML = `💾 ${isAr ? 'حفظ الترتيب' : 'Save Tab Order'}`;
+        // Enable dragging on tabs
+        tabs.forEach(tab => {
+            tab.setAttribute('draggable', 'true');
+            initTabDragEvents(tab, container);
+        });
+    } else {
+        if (btn) btn.innerHTML = `✏️ ${isAr ? 'تعديل التبويبات' : 'Reorder Tabs'}`;
+        // Disable dragging on tabs
+        tabs.forEach(tab => {
+            tab.removeAttribute('draggable');
+            tab.classList.remove('is-dragging', 'drag-over');
+        });
+        saveUserTabOrder();
+        alert(isAr ? 'تم حفظ ترتيب التبويبات بنجاح!' : 'Department tab order saved successfully!');
+    }
+}
+window.toggleTabReorderMode = toggleTabReorderMode;
+
+function initTabDragEvents(tab, container) {
+    if (tab.dataset.dragInitialized) return;
+    tab.dataset.dragInitialized = 'true';
+
+    // --- MOUSE DRAG EVENTS ---
+    tab.addEventListener('dragstart', (e) => {
+        if (!document.body.classList.contains('tabs-reorder-mode')) return;
+        draggedTabElement = tab;
+        tab.classList.add('is-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', tab.id);
+    });
+
+    tab.addEventListener('dragend', () => {
+        tab.classList.remove('is-dragging');
+        const allTabs = container.querySelectorAll('.dept-tab');
+        allTabs.forEach(t => t.classList.remove('drag-over'));
+        draggedTabElement = null;
+        saveUserTabOrder();
+    });
+
+    tab.addEventListener('dragover', (e) => {
+        if (!document.body.classList.contains('tabs-reorder-mode')) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (draggedTabElement && draggedTabElement !== tab) {
+            tab.classList.add('drag-over');
+            const targetBounding = tab.getBoundingClientRect();
+            const mouseX = e.clientX;
+            const targetCenter = targetBounding.left + (targetBounding.width / 2);
+            if (mouseX < targetCenter) {
+                container.insertBefore(draggedTabElement, tab);
+            } else {
+                container.insertBefore(draggedTabElement, tab.nextElementSibling);
+            }
+        }
+    });
+
+    tab.addEventListener('dragleave', () => {
+        tab.classList.remove('drag-over');
+    });
+
+    tab.addEventListener('drop', (e) => {
+        if (!document.body.classList.contains('tabs-reorder-mode')) return;
+        e.preventDefault();
+        tab.classList.remove('drag-over');
+        saveUserTabOrder();
+    });
+
+    // --- TOUCH / MOBILE DRAG & HOLD EVENTS ---
+    let touchTimer = null;
+    let isTouchDragging = false;
+
+    tab.addEventListener('touchstart', (e) => {
+        if (!document.body.classList.contains('tabs-reorder-mode')) return;
+        touchTimer = setTimeout(() => {
+            isTouchDragging = true;
+            draggedTabElement = tab;
+            tab.classList.add('is-dragging');
+            if (navigator.vibrate) navigator.vibrate(50);
+        }, 200);
+    }, { passive: true });
+
+    tab.addEventListener('touchmove', (e) => {
+        if (!document.body.classList.contains('tabs-reorder-mode') || !isTouchDragging) {
+            clearTimeout(touchTimer);
+            return;
+        }
+        e.preventDefault();
+        const touch = e.touches[0];
+        const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+        if (targetEl) {
+            const closestTab = targetEl.closest('.dept-tab');
+            if (closestTab && closestTab !== draggedTabElement && closestTab.parentNode === container) {
+                const targetBounding = closestTab.getBoundingClientRect();
+                const touchX = touch.clientX;
+                const targetCenter = targetBounding.left + (targetBounding.width / 2);
+                if (touchX < targetCenter) {
+                    container.insertBefore(draggedTabElement, closestTab);
+                } else {
+                    container.insertBefore(draggedTabElement, closestTab.nextElementSibling);
+                }
+            }
+        }
+    }, { passive: false });
+
+    tab.addEventListener('touchend', () => {
+        clearTimeout(touchTimer);
+        if (isTouchDragging) {
+            isTouchDragging = false;
+            if (draggedTabElement) {
+                draggedTabElement.classList.remove('is-dragging');
+            }
+            draggedTabElement = null;
+            saveUserTabOrder();
+        }
+    });
+}
+
+function saveUserTabOrder() {
+    if (!currentUser || !currentUser.email) return;
+    const container = document.getElementById('department-tabs-container');
+    if (!container) return;
+
+    const tabIds = Array.from(container.children)
+        .filter(el => el.classList && el.classList.contains('dept-tab'))
+        .map(el => el.id);
+
+    const emailKey = currentUser.email.toLowerCase();
+    const storageKey = `user_tab_order_${emailKey}_${currentCompany}`;
+    try {
+        localStorage.setItem(storageKey, JSON.stringify(tabIds));
+    } catch (e) { console.error(e); }
+
+    if (db && currentCompany && emailKey) {
+        const userKey = emailKey.replace(/\./g, ',');
+        db.ref(`companies/${currentCompany}/userTabOrders/${userKey}`).set(tabIds)
+            .catch(err => console.error("Error syncing tab order:", err));
+    }
+}
+window.saveUserTabOrder = saveUserTabOrder;
+
+function applyUserTabOrder() {
+    if (!currentUser || !currentUser.email) return;
+    const container = document.getElementById('department-tabs-container');
+    if (!container) return;
+
+    const emailKey = currentUser.email.toLowerCase();
+    const storageKey = `user_tab_order_${emailKey}_${currentCompany}`;
+    let tabIds = null;
+    try {
+        const stored = localStorage.getItem(storageKey);
+        if (stored) tabIds = JSON.parse(stored);
+    } catch (e) { console.error(e); }
+
+    if (!tabIds && db && currentCompany) {
+        const userKey = emailKey.replace(/\./g, ',');
+        db.ref(`companies/${currentCompany}/userTabOrders/${userKey}`).once('value')
+            .then(snapshot => {
+                const val = snapshot.val();
+                if (val && Array.isArray(val)) {
+                    try { localStorage.setItem(storageKey, JSON.stringify(val)); } catch (e) {}
+                    reorderTabContainer(container, val);
+                }
+            }).catch(e => console.error(e));
+        return;
+    }
+
+    if (tabIds && Array.isArray(tabIds)) {
+        reorderTabContainer(container, tabIds);
+    }
+}
+
+function reorderTabContainer(container, tabIds) {
+    tabIds.forEach(id => {
+        const tabEl = document.getElementById(id);
+        if (tabEl && tabEl.parentNode === container) {
+            container.appendChild(tabEl);
+        }
+    });
+}
+window.applyUserTabOrder = applyUserTabOrder;
 
 // Initial run
 applyTranslations();

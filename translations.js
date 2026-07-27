@@ -571,7 +571,13 @@ const uiTranslations = {
         "opt-tasks-all": "🌐 All Tasks",
         "opt-tasks-incomplete": "⏳ Not Completed Yet",
         "opt-tasks-completed": "✅ Completed",
-        "opt-workers-all": "👥 All Workers"
+        "opt-workers-all": "👥 All Workers",
+        "btn-edit-layout": "✏️ Edit Layout",
+        "btn-save-layout": "💾 Save Layout",
+        "btn-move-up": "⬆️ Move Up",
+        "btn-move-down": "⬇️ Move Down",
+        "btn-reorder-tabs": "✏️ Reorder Tabs",
+        "btn-save-tab-order": "💾 Save Tab Order"
     },
     ar: {
         "Sunday": "الأحد",
@@ -580,6 +586,12 @@ const uiTranslations = {
         "unassigned-checking": "جاري التحقق من التعيين بشكل مباشر...",
         "btn-check-status": "🔄 إعادة التحقق",
         "unassigned-still-pending": "حسابك لا يزال بانتظار التعيين في شركة من قبل المدير.",
+        "btn-edit-layout": "✏️ تعديل الترتيب",
+        "btn-save-layout": "💾 حفظ الترتيب",
+        "btn-move-up": "⬆️ للأعلى",
+        "btn-move-down": "⬇️ للأسفل",
+        "btn-reorder-tabs": "✏️ تعديل التبويبات",
+        "btn-save-tab-order": "💾 حفظ الترتيب",
         "label-status-filter": "تصفية حسب الحالة:",
         "label-timeframe-filter": "الإطار الزمني:",
         "opt-status-waiting-manager": "⏳ بانتظار موافقة المدير",
