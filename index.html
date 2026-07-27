@@ -2893,25 +2893,42 @@
                         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;" data-i18n="desc-add-reminder">Set a recurring reminder for installments, renewals, or important tasks.</p>
                         
                         <form onsubmit="event.preventDefault(); addReminder();" style="margin:0; padding:0; border:none; background:transparent; box-shadow:none;">
-                            <div class="grid-3-col" style="gap: 16px; margin-bottom: 16px;">
+                            <div class="grid-2-col" style="gap: 16px; margin-bottom: 16px;">
                                 <div class="form-group" style="margin-bottom: 0;">
                                     <label data-i18n="label-reminder-title">Thing to Remind (Title)</label>
                                     <input type="text" id="reminder-title-input" required placeholder="e.g. Car Installment, License Renewal..." data-i18n="[placeholder]placeholder-reminder-title">
                                 </div>
                                 <div class="form-group" style="margin-bottom: 0;">
-                                    <label data-i18n="label-reminder-cycle">Remind Cycle</label>
-                                    <select id="reminder-cycle-select">
-                                        <option value="once" data-i18n="opt-cycle-once">1️⃣ One-Time Only</option>
-                                        <option value="5" data-i18n="opt-cycle-5">🔄 Every 5 Days</option>
-                                        <option value="10" data-i18n="opt-cycle-10">🔄 Every 10 Days</option>
-                                        <option value="30" selected data-i18n="opt-cycle-30">🔄 Every Month (30 Days)</option>
-                                        <option value="90" data-i18n="opt-cycle-90">🔄 Every 3 Months (90 Days)</option>
-                                        <option value="365" data-i18n="opt-cycle-365">🔄 Every Year (365 Days)</option>
-                                    </select>
-                                </div>
-                                <div class="form-group" style="margin-bottom: 0;">
                                     <label data-i18n="label-reminder-deadline">Target Deadline Date & Time</label>
                                     <input type="datetime-local" id="reminder-deadline-input" required style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.9rem; box-sizing: border-box; width: 100%;">
+                                </div>
+                            </div>
+
+                            <div class="form-group" style="margin-bottom: 16px;">
+                                <label style="font-weight: 700; color: var(--text-main); display: block; margin-bottom: 6px;" data-i18n="label-reminder-lead-times">
+                                    🔔 Remind Me Before Deadline (Check all options that apply):
+                                </label>
+                                <div style="display: flex; flex-wrap: wrap; gap: 10px; background: var(--input-bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-main);">
+                                        <input type="checkbox" id="rem-opt-1-2d" class="rem-lead-cb" value="1_2d" checked style="accent-color: var(--primary);">
+                                        <span>🔴 1 & 2 days before</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-main);">
+                                        <input type="checkbox" id="rem-opt-5d" class="rem-lead-cb" value="5d" checked style="accent-color: var(--primary);">
+                                        <span>🟡 5 days before</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-main);">
+                                        <input type="checkbox" id="rem-opt-10d" class="rem-lead-cb" value="10d" checked style="accent-color: var(--primary);">
+                                        <span>🔵 10 days before</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-main);">
+                                        <input type="checkbox" id="rem-opt-15d" class="rem-lead-cb" value="15d" style="accent-color: var(--primary);">
+                                        <span>🔵 15 days before</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-main);">
+                                        <input type="checkbox" id="rem-opt-1m" class="rem-lead-cb" value="1m" style="accent-color: var(--primary);">
+                                        <span>🔵 1 month before</span>
+                                    </label>
                                 </div>
                             </div>
 
@@ -3120,21 +3137,36 @@
                     <input type="text" id="edit-reminder-title" required style="width:100%; padding:10px; border-radius:8px; background:var(--input-bg); color:var(--text-main); border:1px solid var(--border-color); box-sizing:border-box;">
                 </div>
 
-                <div class="grid-2-col" style="gap:12px; margin-bottom:16px;">
-                    <div class="form-group" style="margin-bottom:0;">
-                        <label data-i18n="label-reminder-cycle">Remind Cycle</label>
-                        <select id="edit-reminder-cycle" style="width:100%; padding:10px; border-radius:8px; background:var(--input-bg); color:var(--text-main); border:1px solid var(--border-color);">
-                            <option value="once" data-i18n="opt-cycle-once">1️⃣ One-Time Only</option>
-                            <option value="5" data-i18n="opt-cycle-5">🔄 Every 5 Days</option>
-                            <option value="10" data-i18n="opt-cycle-10">🔄 Every 10 Days</option>
-                            <option value="30" data-i18n="opt-cycle-30">🔄 Every Month (30 Days)</option>
-                            <option value="90" data-i18n="opt-cycle-90">🔄 Every 3 Months (90 Days)</option>
-                            <option value="365" data-i18n="opt-cycle-365">🔄 Every Year (365 Days)</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="margin-bottom:0;">
-                        <label data-i18n="label-reminder-deadline">Target Deadline Date & Time</label>
-                        <input type="datetime-local" id="edit-reminder-deadline" required style="width:100%; padding:10px; border-radius:8px; background:var(--input-bg); color:var(--text-main); border:1px solid var(--border-color); box-sizing:border-box;">
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label data-i18n="label-reminder-deadline">Target Deadline Date & Time</label>
+                    <input type="datetime-local" id="edit-reminder-deadline" required style="width:100%; padding:10px; border-radius:8px; background:var(--input-bg); color:var(--text-main); border:1px solid var(--border-color); box-sizing:border-box;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label style="font-weight: 700; color: var(--text-main); display: block; margin-bottom: 6px;" data-i18n="label-reminder-lead-times">
+                        🔔 Remind Me Before Deadline (Check all options that apply):
+                    </label>
+                    <div style="display: flex; flex-wrap: wrap; gap: 10px; background: var(--input-bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-main);">
+                            <input type="checkbox" id="edit-rem-opt-1-2d" class="edit-rem-lead-cb" value="1_2d" style="accent-color: var(--primary);">
+                            <span>🔴 1 & 2 days before</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-main);">
+                            <input type="checkbox" id="edit-rem-opt-5d" class="edit-rem-lead-cb" value="5d" style="accent-color: var(--primary);">
+                            <span>🟡 5 days before</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-main);">
+                            <input type="checkbox" id="edit-rem-opt-10d" class="edit-rem-lead-cb" value="10d" style="accent-color: var(--primary);">
+                            <span>🔵 10 days before</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-main);">
+                            <input type="checkbox" id="edit-rem-opt-15d" class="edit-rem-lead-cb" value="15d" style="accent-color: var(--primary);">
+                            <span>🔵 15 days before</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-main);">
+                            <input type="checkbox" id="edit-rem-opt-1m" class="edit-rem-lead-cb" value="1m" style="accent-color: var(--primary);">
+                            <span>🔵 1 month before</span>
+                        </label>
                     </div>
                 </div>
 
@@ -3238,7 +3270,7 @@
     </div>
 
     <script defer src="translations.js"></script>
-    <script defer src="app.js?v=76"></script>
+    <script defer src="app.js?v=78"></script>
 </body>
 
 

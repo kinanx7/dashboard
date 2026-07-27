@@ -13130,9 +13130,9 @@ window.convertNoteToTask = convertNoteToTask;
 function addReminder() {
     const isAr = currentAppLang === 'ar';
     const titleVal = document.getElementById('reminder-title-input') ? document.getElementById('reminder-title-input').value.trim() : '';
-    const cycleVal = document.getElementById('reminder-cycle-select') ? document.getElementById('reminder-cycle-select').value : '30';
     const deadlineVal = document.getElementById('reminder-deadline-input') ? document.getElementById('reminder-deadline-input').value : '';
     const noteVal = document.getElementById('reminder-note-input') ? document.getElementById('reminder-note-input').value.trim() : '';
+    const leadTimes = Array.from(document.querySelectorAll('.rem-lead-cb:checked')).map(cb => cb.value);
 
     if (!titleVal) {
         alert(isAr ? 'يرجى إدخال عنوان أو موضوع التذكير.' : 'Please enter a reminder title.');
@@ -13153,10 +13153,10 @@ function addReminder() {
     const reminderObj = {
         id: remId,
         title: titleVal,
-        cycleDays: cycleVal, // 'once', '5', '10', '30', '90', '365'
         deadlineMs: deadlineMs,
         deadlineISO: deadlineVal,
         note: noteVal,
+        leadTimes: leadTimes.length > 0 ? leadTimes : ['1_2d', '5d', '10d', '15d', '1m'],
         createdAt: Date.now(),
         createdBy: currentUser ? (currentUser.email || 'Admin') : 'Admin',
         status: 'active'
@@ -13176,41 +13176,58 @@ function addReminder() {
 }
 window.addReminder = addReminder;
 
-function renderReminders() {
-    const container = document.getElementById('reminders-list-container');
-    if (!container) return;
+function isReminderAlerting(r, now) {
+    const diffMs = (r.deadlineMs || 0) - now;
+    const daysLeft = diffMs / (1000 * 60 * 60 * 24);
+    if (daysLeft <= 0) return true; // Overdue
 
-    const isAr = currentAppLang === 'ar';
-    const companyData = getCompanyData();
-    const remindersObj = companyData.reminders || {};
-    const now = Date.now();
+    const leadTimes = r.leadTimes || ['1_2d', '5d', '10d', '15d', '1m'];
+    if (leadTimes.includes('1_2d') && daysLeft <= 2) return true;
+    if (leadTimes.includes('5d') && daysLeft <= 5) return true;
+    if (leadTimes.includes('10d') && daysLeft <= 10) return true;
+    if (leadTimes.includes('15d') && daysLeft <= 15) return true;
+    if (leadTimes.includes('1m') && daysLeft <= 30) return true;
+    return false;
+}
 
-    const remindersList = Object.values(remindersObj).sort((a, b) => (a.deadlineMs || 0) - (b.deadlineMs || 0));
-
-    const countBadge = document.getElementById('reminders-count-badge');
-    if (countBadge) {
-        countBadge.textContent = `${remindersList.length} ${isAr ? 'تذكير نشط' : 'Active'}`;
+function getReminderColorTheme(daysLeft, isDue, isAr) {
+    if (daysLeft <= 2) {
+        // Red: 0 - 2 days left
+        return {
+            border: '2px solid #dc2626',
+            bg: 'rgba(220, 38, 38, 0.12)',
+            badge: `<span class="badge" style="background:#dc2626; color:white; font-weight:800; animation:notif-bell 1s infinite alternate;">🔴 ${isDue ? (isAr ? 'مستحق الآن!' : 'DUE NOW!') : (isAr ? '0-2 يوم متبقي' : '0-2 Days Left')}</span>`
+        };
+    } else if (daysLeft > 2 && daysLeft <= 5) {
+        // Yellow: 3 - 5 days left
+        return {
+            border: '2px solid #d97706',
+            bg: 'rgba(217, 119, 6, 0.12)',
+            badge: `<span class="badge" style="background:#d97706; color:white; font-weight:800;">🟡 ${isAr ? '3-5 أيام متبقية' : '3-5 Days Left'}</span>`
+        };
+    } else if (daysLeft > 5 && daysLeft <= 9) {
+        // Orange: 6 - 9 days left
+        return {
+            border: '2px solid #ea580c',
+            bg: 'rgba(234, 88, 12, 0.12)',
+            badge: `<span class="badge" style="background:#ea580c; color:white; font-weight:800;">🟠 ${isAr ? '6-9 أيام متبقية' : '6-9 Days Left'}</span>`
+        };
+    } else if (daysLeft > 9 && daysLeft <= 30) {
+        // Blue: 10 - 30 days (1 month) left
+        return {
+            border: '2px solid #0284c7',
+            bg: 'rgba(2, 132, 199, 0.12)',
+            badge: `<span class="badge" style="background:#0284c7; color:white; font-weight:800;">🔵 ${isAr ? '10 أيام - شهر متبقي' : '10 Days - 1 Month Left'}</span>`
+        };
+    } else {
+        // > 30 days left (Upcoming)
+        return {
+            border: '1px solid var(--border-color)',
+            bg: 'var(--card-bg)',
+            badge: `<span class="badge badge-good">⏳ ${isAr ? 'قادم' : 'Upcoming'}</span>`
+        };
     }
-
-    // Check Due Reminders for Alert Banner
-    const dueReminders = remindersList.filter(r => r.deadlineMs && r.deadlineMs <= now);
-    const banner = document.getElementById('reminders-due-banner');
-    const bannerText = document.getElementById('reminders-due-text');
-
-    if (dueReminders.length > 0 && banner && bannerText) {
-        banner.style.display = 'block';
-        const dueTitles = dueReminders.map(r => `• ${r.title}`).join(', ');
-        bannerText.textContent = isAr 
-            ? `لديك (${dueReminders.length}) تذكيرات حان موعد استحقاقها الآن: ${dueTitles}` 
-            : `You have (${dueReminders.length}) reminders due right now: ${dueTitles}`;
-    } else if (banner) {
-        banner.style.display = 'none';
-    }
-
-    if (remindersList.length === 0) {
-        container.innerHTML = `<p style="text-align:center; color:var(--text-muted); padding:30px; font-size:0.9rem;">${isAr ? 'لا توجد تذكيرات مضافة بعد. استخدم النموذج لإضافة تذكير جديد.' : 'No reminders found. Use the form to add a new reminder.'}</p>`;
-        return;
-    }
+}
 
 function formatReminderDate(ms, fallbackIso) {
     if (!ms && !fallbackIso) return 'N/A';
@@ -13227,46 +13244,69 @@ function formatReminderDate(ms, fallbackIso) {
     return `${day}/${month}/${year}, ${hours}:${mins} ${ampm}`;
 }
 
+function renderReminders() {
+    const container = document.getElementById('reminders-list-container');
+    if (!container) return;
+
+    const isAr = currentAppLang === 'ar';
+    const companyData = getCompanyData();
+    const remindersObj = companyData.reminders || {};
+    const now = Date.now();
+
+    const remindersList = Object.values(remindersObj).sort((a, b) => (a.deadlineMs || 0) - (b.deadlineMs || 0));
+
+    const countBadge = document.getElementById('reminders-count-badge');
+    if (countBadge) {
+        countBadge.textContent = `${remindersList.length} ${isAr ? 'تذكير نشط' : 'Active'}`;
+    }
+
+    // Check Due Reminders for Alert Banner based on leadTimes and deadline
+    const dueReminders = remindersList.filter(r => r.deadlineMs && isReminderAlerting(r, now));
+    const banner = document.getElementById('reminders-due-banner');
+    const bannerText = document.getElementById('reminders-due-text');
+
+    if (dueReminders.length > 0 && banner && bannerText) {
+        banner.style.display = 'block';
+        const dueTitles = dueReminders.map(r => `• ${r.title}`).join(', ');
+        bannerText.textContent = isAr 
+            ? `لديك (${dueReminders.length}) تذكيرات حان موعد التنبيه عليها: ${dueTitles}` 
+            : `You have (${dueReminders.length}) reminders with active lead alerts: ${dueTitles}`;
+    } else if (banner) {
+        banner.style.display = 'none';
+    }
+
+    if (remindersList.length === 0) {
+        container.innerHTML = `<p style="text-align:center; color:var(--text-muted); padding:30px; font-size:0.9rem;">${isAr ? 'لا توجد تذكيرات مضافة بعد. استخدم النموذج لإضافة تذكير جديد.' : 'No reminders found. Use the form to add a new reminder.'}</p>`;
+        return;
+    }
+
     container.innerHTML = '';
     remindersList.forEach(r => {
         const isDue = r.deadlineMs <= now;
+        const diffMs = (r.deadlineMs || 0) - now;
+        const daysLeft = diffMs / (1000 * 60 * 60 * 24);
+        const theme = getReminderColorTheme(daysLeft, isDue, isAr);
         const deadlineStr = formatReminderDate(r.deadlineMs, r.deadlineISO);
 
-        let cycleText = '';
-        if (r.cycleDays === 'once') cycleText = isAr ? '1️⃣ مرة واحدة فقط' : '1️⃣ One-Time Only';
-        else if (r.cycleDays === '5') cycleText = isAr ? '🔄 كل 5 أيام' : '🔄 Every 5 Days';
-        else if (r.cycleDays === '10') cycleText = isAr ? '🔄 كل 10 أيام' : '🔄 Every 10 Days';
-        else if (r.cycleDays === '30') cycleText = isAr ? '🔄 كل شهر (30 يوماً)' : '🔄 Every Month (30 Days)';
-        else if (r.cycleDays === '90') cycleText = isAr ? '🔄 كل 3 أشهر (90 يوماً)' : '🔄 Every 3 Months (90 Days)';
-        else if (r.cycleDays === '365') cycleText = isAr ? '🔄 كل سنة (365 يوماً)' : '🔄 Every Year (365 Days)';
-        else cycleText = `🔄 Every ${r.cycleDays} Days`;
-
-        const dueBadge = isDue 
-            ? `<span class="badge" style="background:var(--danger); color:white; font-weight:800; animation:notif-bell 1s infinite alternate;">🚨 ${isAr ? 'مستحق الآن!' : 'DUE NOW!'}</span>`
-            : `<span class="badge badge-good">⏳ ${isAr ? 'قادم' : 'Upcoming'}</span>`;
-
-        const cardBorder = isDue ? '2px solid var(--danger)' : '1px solid var(--border-color)';
-        const cardBg = isDue ? 'var(--danger-bg)' : 'var(--card-bg)';
-
-        const snoozeBtn = (r.cycleDays !== 'once') 
-            ? `<button onclick="snoozeReminderNextCycle('${r.id}')" class="btn-outline-info" style="padding:6px 12px; font-size:0.8rem;" title="${isAr ? 'الانتقال للدورة القادمة' : 'Reset to Next Cycle'}">🔄 ${isAr ? 'الدورة القادمة' : 'Next Cycle'}</button>` 
-            : '';
+        const leadTimes = r.leadTimes || ['1_2d', '5d', '10d', '15d', '1m'];
+        const leadLabels = { '1_2d': '1-2d', '5d': '5d', '10d': '10d', '15d': '15d', '1m': '1m' };
+        const activeLeadStr = leadTimes.map(lt => leadLabels[lt] || lt).join(', ');
 
         const sendTaskBtn = `<button onclick="convertReminderToTask('${r.id}')" class="btn-outline" style="padding:4px 10px; font-size:0.8rem; border-radius:6px; border:1px solid var(--secondary); color:var(--secondary); font-weight:600; cursor:pointer;" title="${isAr ? 'إرسال كمهمة' : 'Send as Task'}">📋 ${isAr ? 'إرسال كمهمة' : 'Send as Task'}</button>`;
 
         container.innerHTML += `
-            <div class="ledger-card" style="border:${cardBorder}; background:${cardBg}; padding:16px; margin-bottom:0; border-radius:12px;">
+            <div class="ledger-card" style="border:${theme.border}; background:${theme.bg}; padding:16px; margin-bottom:0; border-radius:12px; transition: all 0.2s ease;">
                 <div class="flex-between" style="align-items:flex-start;">
                     <div>
                         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                             <strong style="font-size:1.1rem; color:var(--text-main);">${r.title}</strong>
-                            ${dueBadge}
+                            ${theme.badge}
                         </div>
-                        <div style="font-size:0.8rem; color:var(--primary); font-weight:700; margin-top:4px;">
-                            ${cycleText}
-                        </div>
-                        <div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">
+                        <div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">
                             🕒 ${isAr ? 'موعد الاستحقاق:' : 'Deadline:'} <strong>${deadlineStr}</strong>
+                        </div>
+                        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">
+                            🔔 ${isAr ? 'التنبيهات قبل الموعد:' : 'Alert lead times:'} <strong>${activeLeadStr || 'None'}</strong>
                         </div>
                     </div>
                     <div style="display:flex; gap:6px; align-items:center;">
@@ -13277,7 +13317,6 @@ function formatReminderDate(ms, fallbackIso) {
                 ${r.note ? `<div style="font-size:0.85rem; margin-top:8px; padding-top:8px; border-top:1px dashed var(--border-color); color:var(--text-main);">📝 <em>${r.note}</em></div>` : ''}
                 <div style="display:flex; justify-content:flex-end; margin-top:10px; gap:8px; flex-wrap:wrap; align-items:center;">
                     ${sendTaskBtn}
-                    ${snoozeBtn}
                 </div>
             </div>
         `;
@@ -13302,28 +13341,6 @@ function convertReminderToTask(remId) {
 }
 window.convertReminderToTask = convertReminderToTask;
 
-function snoozeReminderNextCycle(remId) {
-    const companyData = getCompanyData();
-    const remindersObj = companyData.reminders || {};
-    const r = remindersObj[remId];
-    if (!r) return;
-
-    const isAr = currentAppLang === 'ar';
-    const cycleDays = parseInt(r.cycleDays) || 30;
-    const currentMs = r.deadlineMs || Date.now();
-    // Add cycleDays * 86400000 ms to the deadline
-    const newDeadlineMs = currentMs + (cycleDays * 24 * 60 * 60 * 1000);
-    const newISO = new Date(newDeadlineMs).toISOString().slice(0, 16);
-
-    db.ref(`companies/${currentCompany}/reminders/${remId}`).update({
-        deadlineMs: newDeadlineMs,
-        deadlineISO: newISO
-    }).then(() => {
-        renderReminders();
-    }).catch(err => console.error("Error advancing reminder cycle:", err));
-}
-window.snoozeReminderNextCycle = snoozeReminderNextCycle;
-
 function deleteReminder(remId) {
     const isAr = currentAppLang === 'ar';
     if (!confirm(isAr ? 'هل أنت تأكد من حذف هذا التذكير؟' : 'Are you sure you want to delete this reminder?')) return;
@@ -13344,7 +13361,6 @@ function openEditReminderModal(remId) {
 
     document.getElementById('edit-reminder-id').value = r.id;
     document.getElementById('edit-reminder-title').value = r.title || '';
-    document.getElementById('edit-reminder-cycle').value = r.cycleDays || '30';
     
     if (r.deadlineISO) {
         document.getElementById('edit-reminder-deadline').value = r.deadlineISO;
@@ -13353,6 +13369,11 @@ function openEditReminderModal(remId) {
     }
 
     document.getElementById('edit-reminder-note').value = r.note || '';
+
+    const leadTimes = r.leadTimes || ['1_2d', '5d', '10d', '15d', '1m'];
+    document.querySelectorAll('.edit-rem-lead-cb').forEach(cb => {
+        cb.checked = leadTimes.includes(cb.value);
+    });
 
     const modal = document.getElementById('edit-reminder-modal');
     if (modal) modal.style.display = 'flex';
@@ -13369,9 +13390,9 @@ function saveEditReminder() {
     const isAr = currentAppLang === 'ar';
     const remId = document.getElementById('edit-reminder-id').value;
     const titleVal = document.getElementById('edit-reminder-title').value.trim();
-    const cycleVal = document.getElementById('edit-reminder-cycle').value;
     const deadlineVal = document.getElementById('edit-reminder-deadline').value;
     const noteVal = document.getElementById('edit-reminder-note').value.trim();
+    const leadTimes = Array.from(document.querySelectorAll('.edit-rem-lead-cb:checked')).map(cb => cb.value);
 
     if (!remId || !titleVal || !deadlineVal) return;
 
@@ -13380,10 +13401,10 @@ function saveEditReminder() {
 
     db.ref(`companies/${currentCompany}/reminders/${remId}`).update({
         title: titleVal,
-        cycleDays: cycleVal,
         deadlineMs: deadlineMs,
         deadlineISO: deadlineVal,
-        note: noteVal
+        note: noteVal,
+        leadTimes: leadTimes.length > 0 ? leadTimes : ['1_2d', '5d', '10d', '15d', '1m']
     }).then(() => {
         closeEditReminderModal();
         renderReminders();
