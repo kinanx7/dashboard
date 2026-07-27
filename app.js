@@ -2526,6 +2526,8 @@ function renderNotes() {
             editBtn = `<button onclick="editManagerNote('${n.id}')" class="btn-outline" style="padding:2px 8px; font-size:0.75rem; border-radius:4px; border:1px solid var(--primary); color:var(--primary); font-weight:600; cursor:pointer; margin-left:6px;" title="${isAr ? 'تعديل الملاحظة' : 'Edit note'}">✏️ ${isAr ? 'تعديل' : 'Edit'}</button>`;
         }
 
+        let convertBtn = n.text ? `<button type="button" onclick="convertNoteToTask('${encodeURIComponent(n.text.replace(/'/g, "\\'"))}')" class="btn-outline" style="padding:2px 8px; font-size:0.75rem; border-radius:4px; border:1px solid var(--secondary); color:var(--secondary); font-weight:600; cursor:pointer; margin-left:6px;" title="${isAr ? 'تحويل إلى مهمة' : 'Convert to Task'}">📋 ${isAr ? 'تحويل إلى مهمة' : 'Convert to Task'}</button>` : '';
+
         let delBtn = (currentUser.role === 'admin') ? `<button onclick="deleteManagerNote('${n.id}')" class="btn-outline-danger" style="padding:4px 10px; font-size:0.8rem; border:none; text-decoration:underline;">Delete Thread</button>` : '';
         let lockIcon = n.isPrivate ? `<span class="badge" style="background:var(--danger); font-size:0.85rem;">🔒 Private Note</span>` : `<span class="badge" style="background:var(--info); font-size:0.85rem;">📢 Public Announcement</span>`;
 
@@ -2624,7 +2626,7 @@ function renderNotes() {
                     <div class="flex-between" style="margin-bottom:12px;">
                         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                             ${lockIcon} <span style="font-size:0.85rem; color:var(--text-muted);">🕒 ${n.date}</span>
-                            ${editBtn}
+                            ${editBtn} ${convertBtn}
                         </div>
                         ${delBtn}
                     </div>
@@ -5154,7 +5156,7 @@ function switchTab(tab) {
         }
     }
 
-    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs'];
+    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders'];
 
     allTabs.forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
@@ -5187,6 +5189,7 @@ function switchTab(tab) {
         costs: { icon: '📉', label: 'Costs' },
         adverts: { icon: '📢', label: 'Ads' },
         notes: { icon: '📝', label: 'Notes' },
+        reminders: { icon: '⏰', label: 'Reminders' },
     };
     const meta = tabMeta[tab] || { icon: '⚙️', label: tab };
     const iconEl = document.getElementById('mob-active-icon');
@@ -5200,6 +5203,9 @@ function switchTab(tab) {
 
     if (!isLocked) {
         renderAll();
+        if (tab === 'reminders' && typeof renderReminders === 'function') {
+            renderReminders();
+        }
         // Fixes Leaflet map rendering bug when switching tabs
         if (tab === 'adverts' && promoMap) {
             setTimeout(() => { promoMap.invalidateSize(); }, 500);
@@ -5805,26 +5811,41 @@ function renderRanksTable() {
 }
 
 
-function addTaskTemplate() {
-    const input = document.getElementById('task-template-input').value.trim();
-    if (!input) return alert("Enter a task template name.");
-    if (!getCompanyData().jobCatalog.includes(input)) {
-        getCompanyData().jobCatalog.push(input);
-        document.getElementById('task-template-input').value = '';
+function fillTaskShortcut(text) {
+    const input = document.getElementById('task-assign-input');
+    if (input) {
+        input.value = text;
+        input.focus();
+    }
+}
+window.fillTaskShortcut = fillTaskShortcut;
 
-        // Targeted write to task templates list
-        db.ref('companies/' + currentCompany + '/jobCatalog').set(getCompanyData().jobCatalog)
+function addTaskTemplate() {
+    const input = document.getElementById('task-template-input');
+    if (!input) return;
+    const val = input.value.trim();
+    if (!val) return alert("Enter a task template name.");
+    const companyData = getCompanyData();
+    if (!companyData.jobCatalog) companyData.jobCatalog = [];
+    if (!companyData.jobCatalog.includes(val)) {
+        companyData.jobCatalog.push(val);
+        input.value = '';
+        db.ref('companies/' + currentCompany + '/jobCatalog').set(companyData.jobCatalog)
+            .then(() => { if (typeof renderTasks === 'function') renderTasks(); })
             .catch(err => console.error("Error adding task template:", err));
     }
 }
+window.addTaskTemplate = addTaskTemplate;
 
 function deleteTaskTemplate(templateName) {
-    getCompanyData().jobCatalog = getCompanyData().jobCatalog.filter(t => t !== templateName);
-
-    // Targeted write to task templates list
-    db.ref('companies/' + currentCompany + '/jobCatalog').set(getCompanyData().jobCatalog)
+    const companyData = getCompanyData();
+    if (!companyData.jobCatalog) return;
+    companyData.jobCatalog = companyData.jobCatalog.filter(t => t !== templateName);
+    db.ref('companies/' + currentCompany + '/jobCatalog').set(companyData.jobCatalog)
+        .then(() => { if (typeof renderTasks === 'function') renderTasks(); })
         .catch(err => console.error("Error deleting task template:", err));
 }
+window.deleteTaskTemplate = deleteTaskTemplate;
 
 function assignTask() {
     const workerId = document.getElementById('task-worker-select').value;
@@ -5897,6 +5918,7 @@ function assignTask() {
         return;
     }
 
+    const activeWorker = getActiveWorker();
     const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
     if (workerIndex === -1) return;
     const worker = getCompanyData().workers[workerIndex];
@@ -5909,7 +5931,10 @@ function assignTask() {
         urgency: urgency,
         deadlineMins: deadlineMins,
         status: 'assigned', // new states: assigned, seen, completed
-        done: false // legacy flag
+        done: false, // legacy flag
+        assignedByEmail: currentUser ? (currentUser.email || '') : '',
+        assignedByName: currentUser ? (currentUser.displayName || currentUser.email || 'Manager') : 'Manager',
+        assignedById: activeWorker ? activeWorker.id : ''
     });
 
     document.getElementById('task-assign-input').value = '';
@@ -6029,18 +6054,54 @@ function getJobTimestamp(j) {
     return 0;
 }
 
+function getVisibleWorkers() {
+    const companyData = getCompanyData();
+    const allWorkers = companyData.workers || [];
+    if (!currentUser) return allWorkers;
+    if (currentUser.role === 'admin') return allWorkers;
+
+    const activeWorker = getActiveWorker();
+    if (!activeWorker) return [];
+
+    // Check if worker has task access (perm-tasks class on body or perms object)
+    const hasTaskAccess = document.body.classList.contains('perm-tasks') || 
+                          (activeWorker.perms && activeWorker.perms.tasks === true);
+    if (hasTaskAccess) {
+        return allWorkers;
+    }
+    return [activeWorker];
+}
+window.getVisibleWorkers = getVisibleWorkers;
+
 function renderTasks() {
     const isAr = currentAppLang === 'ar';
-    // Render Templates
+    // Render Templates & Shortcut Pills
     const tList = document.getElementById('task-template-list');
     const dList = document.getElementById('task-datalist');
-    if (tList && dList) {
-        tList.innerHTML = ''; dList.innerHTML = '';
-        getCompanyData().jobCatalog.forEach(m => {
-            const opt = document.createElement('option'); opt.value = m; dList.appendChild(opt);
-            const div = document.createElement('div'); div.className = "flex-between list-item";
-            div.innerHTML = `<span style="font-size:0.9rem;">${m}</span> <button class="btn-outline-danger" style="padding: 2px 6px; font-size: 0.75rem; border:none;" onclick="deleteTaskTemplate('${m}')">✖</button>`;
-            tList.appendChild(div);
+    const pList = document.getElementById('task-shortcuts-pills');
+    if (tList || dList || pList) {
+        if (tList) tList.innerHTML = '';
+        if (dList) dList.innerHTML = '';
+        if (pList) pList.innerHTML = '';
+        const catalog = getCompanyData().jobCatalog || [];
+        catalog.forEach(m => {
+            if (dList) {
+                const opt = document.createElement('option'); opt.value = m; dList.appendChild(opt);
+            }
+            if (tList) {
+                const div = document.createElement('div'); div.className = "flex-between list-item";
+                div.innerHTML = `<span style="font-size:0.9rem; font-weight:600;">${m}</span> <button type="button" class="btn-outline-danger" style="padding: 2px 6px; font-size: 0.75rem; border:none;" onclick="deleteTaskTemplate('${m}')">✖</button>`;
+                tList.appendChild(div);
+            }
+            if (pList) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'badge';
+                btn.style.cssText = 'background:var(--input-bg); color:var(--primary); border:1px solid var(--border-color); padding:4px 10px; font-size:0.8rem; font-weight:600; cursor:pointer; border-radius:20px; transition:var(--transition);';
+                btn.innerHTML = `⚡ ${m}`;
+                btn.onclick = () => fillTaskShortcut(m);
+                pList.appendChild(btn);
+            }
         });
     }
 
@@ -9801,6 +9862,9 @@ function renderPaymentRequests() {
                         <div class="flex-between">
                             <div>
                                 <strong style="font-size:1.05rem;">${req.workerName}</strong>
+                                <button type="button" class="btn-outline" onclick="showWorkerPaymentHistory('${req.workerEmail || req.workerName}')" style="padding: 2px 8px; font-size: 0.75rem; border-radius: 12px; margin-left: 6px; font-weight: 600;">
+                                    📜 ${isAr ? 'سجل الدفعات' : 'Payment Log'}
+                                </button>
                                 <span style="font-size:0.75rem; color:var(--text-muted); margin-left: 8px;">🕒 ${dateStr}</span>
                             </div>
                             <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
@@ -10060,8 +10124,13 @@ function renderHighMoneyApprovals() {
             <div class="ledger-card" style="border-left: 4px solid ${borderCol}; padding: 14px;">
                 <div class="flex-between" style="align-items: flex-start; flex-wrap: wrap; gap: 8px;">
                     <div>
-                        <strong style="font-size:1.05rem; display:block;">${req.workerName}</strong>
-                        <span style="font-size:0.75rem; color:var(--text-muted);">🕒 Requested: ${dateStr}</span>
+                        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                            <strong style="font-size:1.05rem;">${req.workerName}</strong>
+                            <button type="button" class="btn-outline" onclick="showWorkerPaymentHistory('${req.workerEmail || req.workerName}')" style="padding: 2px 8px; font-size: 0.75rem; border-radius: 12px; font-weight: 600;">
+                                📜 ${isAr ? 'سجل الدفعات' : 'Payment Log'}
+                            </button>
+                        </div>
+                        <span style="font-size:0.75rem; color:var(--text-muted); display:block; margin-top:2px;">🕒 ${isAr ? 'تاريخ الطلب:' : 'Requested:'} ${dateStr}</span>
                         <div style="font-size: 0.85rem; margin-top: 8px; color:var(--text-main);">${isAr ? 'السبب:' : 'Reason:'} <em>${req.reason}</em></div>
                         ${adminNoteText}
                     </div>
@@ -12827,7 +12896,349 @@ function reorderTabContainer(container, tabIds) {
         }
     });
 }
-window.applyUserTabOrder = applyUserTabOrder;
+// =========================================================================
+// WORKER RECEIVED PAYMENT HISTORY LOG ENGINE
+// =========================================================================
+function showWorkerPaymentHistory(identifier) {
+    if (!identifier) return;
+    const isAr = currentAppLang === 'ar';
+    const companyData = getCompanyData();
+    const allRequests = companyData.paymentRequests || {};
+    const reqList = Object.values(allRequests);
+
+    // Filter for this worker's requests where money was received (status given or get_paid)
+    const workerGivenReqs = reqList.filter(r => {
+        const matchesWorker = (r.workerEmail && r.workerEmail.toLowerCase() === identifier.toLowerCase()) ||
+                              (r.workerName && r.workerName.toLowerCase() === identifier.toLowerCase());
+        const isReceived = r.status === 'given' || r.status === 'get_paid';
+        return matchesWorker && isReceived;
+    }).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    // Determine worker name for header
+    let displayWorkerName = identifier;
+    const matchedReq = reqList.find(r => (r.workerEmail && r.workerEmail.toLowerCase() === identifier.toLowerCase()) || (r.workerName && r.workerName.toLowerCase() === identifier.toLowerCase()));
+    if (matchedReq && matchedReq.workerName) {
+        displayWorkerName = matchedReq.workerName;
+    }
+
+    const modalTitle = document.getElementById('payment-log-modal-title');
+    if (modalTitle) {
+        modalTitle.textContent = `${displayWorkerName} - ${isAr ? 'سجل الأموال المستلمة سابقاً' : 'Received Payment History'}`;
+    }
+
+    const summaryBox = document.getElementById('payment-log-summary-box');
+    const historyList = document.getElementById('payment-log-history-list');
+
+    if (!summaryBox || !historyList) return;
+
+    if (workerGivenReqs.length === 0) {
+        summaryBox.innerHTML = `
+            <div style="text-align:center; padding:12px; color:var(--text-muted); font-size:0.9rem;">
+                ⚠️ ${isAr ? 'لم يستلم هذا الموظف أي مبالغ أو سلف سابقة بعد.' : 'This worker has not received any past payment requests yet.'}
+            </div>
+        `;
+        historyList.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.85rem;">${isAr ? 'لا توجد سجلات مستلمة سابقة.' : 'No received records found.'}</p>`;
+    } else {
+        const lastReq = workerGivenReqs[0];
+        const lastDateStr = lastReq.timestamp ? new Date(lastReq.timestamp).toLocaleString() : (lastReq.date || 'N/A');
+        const totalAmount = workerGivenReqs.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
+
+        summaryBox.innerHTML = `
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; text-align:center;">
+                <div style="background:var(--card-bg); padding:12px; border-radius:10px; border:1px solid var(--border-color);">
+                    <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;" data-i18n="label-last-received">⏰ ${isAr ? 'آخر دفعة مستلمة:' : 'Last Received Payment:'}</div>
+                    <div style="font-size:1.1rem; font-weight:800; color:var(--success); margin-top:4px;">SAR ${lastReq.amount}</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">🕒 ${lastDateStr}</div>
+                </div>
+                <div style="background:var(--card-bg); padding:12px; border-radius:10px; border:1px solid var(--border-color);">
+                    <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;" data-i18n="label-total-received">💰 ${isAr ? 'إجمالي المبالغ المستلمة:' : 'Total Received Amount:'}</div>
+                    <div style="font-size:1.1rem; font-weight:800; color:var(--primary); margin-top:4px;">SAR ${totalAmount.toFixed(2)}</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">📊 ${workerGivenReqs.length} ${isAr ? 'دفعة مستلمة' : 'payments'}</div>
+                </div>
+            </div>
+        `;
+
+        historyList.innerHTML = '';
+        workerGivenReqs.forEach(req => {
+            const reqDateStr = req.timestamp ? new Date(req.timestamp).toLocaleString() : (req.date || 'N/A');
+            historyList.innerHTML += `
+                <div class="ledger-card" style="border-left:4px solid var(--success); padding:12px 16px; margin-bottom:0; background:var(--card-bg);">
+                    <div class="flex-between">
+                        <div>
+                            <strong style="font-size:1.05rem; color:var(--text-main);">SAR ${req.amount}</strong>
+                            <span class="badge" style="background:#16a34a; color:#fff; font-size:0.75rem; font-weight:700; margin-left:8px; padding:2px 8px; border-radius:4px;">✅ ${isAr ? 'تم الاستلام' : 'Received'}</span>
+                        </div>
+                        <span style="font-size:0.75rem; color:var(--text-muted);">🕒 ${reqDateStr}</span>
+                    </div>
+                    <div style="font-size:0.85rem; margin-top:6px; color:var(--text-main);">${isAr ? 'السبب:' : 'Reason:'} <em>${req.reason || '-'}</em></div>
+                    ${req.adminNote ? `<div style="font-size:0.8rem; margin-top:4px; color:var(--secondary);">💬 ${req.adminNote}</div>` : ''}
+                </div>
+            `;
+        });
+    }
+
+    const modal = document.getElementById('worker-payment-log-modal');
+    if (modal) modal.style.display = 'flex';
+}
+window.showWorkerPaymentHistory = showWorkerPaymentHistory;
+
+// =========================================================================
+// CONVERT PRIVATE NOTE TO TASK FUNCTION
+// =========================================================================
+function convertNoteToTask(rawText) {
+    if (!rawText) return;
+    const text = decodeURIComponent(rawText);
+    const isAr = currentAppLang === 'ar';
+    
+    // Switch to tasks tab
+    switchTab('tasks');
+    
+    // Pre-fill task assign input field
+    setTimeout(() => {
+        const input = document.getElementById('task-assign-input');
+        if (input) {
+            input.value = text;
+            input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            input.focus();
+        }
+        const select = document.getElementById('task-worker-select');
+        if (select) {
+            select.focus();
+        }
+    }, 150);
+}
+window.convertNoteToTask = convertNoteToTask;
+
+// =========================================================================
+// ADMIN REMINDERS ENGINE & CYCLES
+// =========================================================================
+function addReminder() {
+    const isAr = currentAppLang === 'ar';
+    const titleVal = document.getElementById('reminder-title-input') ? document.getElementById('reminder-title-input').value.trim() : '';
+    const cycleVal = document.getElementById('reminder-cycle-select') ? document.getElementById('reminder-cycle-select').value : '30';
+    const deadlineVal = document.getElementById('reminder-deadline-input') ? document.getElementById('reminder-deadline-input').value : '';
+    const noteVal = document.getElementById('reminder-note-input') ? document.getElementById('reminder-note-input').value.trim() : '';
+
+    if (!titleVal) {
+        alert(isAr ? 'يرجى إدخال عنوان أو موضوع التذكير.' : 'Please enter a reminder title.');
+        return;
+    }
+    if (!deadlineVal) {
+        alert(isAr ? 'يرجى اختيار موعد التذكير والوقت المستهدف.' : 'Please select the deadline date and time.');
+        return;
+    }
+
+    const deadlineMs = new Date(deadlineVal).getTime();
+    if (isNaN(deadlineMs)) {
+        alert(isAr ? 'تاريخ أو وقت غير صحيح.' : 'Invalid deadline date.');
+        return;
+    }
+
+    const remId = 'rem-' + Date.now();
+    const reminderObj = {
+        id: remId,
+        title: titleVal,
+        cycleDays: cycleVal, // 'once', '5', '10', '30', '90', '365'
+        deadlineMs: deadlineMs,
+        deadlineISO: deadlineVal,
+        note: noteVal,
+        createdAt: Date.now(),
+        createdBy: currentUser ? (currentUser.email || 'Admin') : 'Admin',
+        status: 'active'
+    };
+
+    db.ref(`companies/${currentCompany}/reminders/${remId}`).set(reminderObj)
+        .then(() => {
+            if (document.getElementById('reminder-title-input')) document.getElementById('reminder-title-input').value = '';
+            if (document.getElementById('reminder-deadline-input')) document.getElementById('reminder-deadline-input').value = '';
+            if (document.getElementById('reminder-note-input')) document.getElementById('reminder-note-input').value = '';
+            renderReminders();
+        })
+        .catch(err => {
+            console.error("Error creating reminder:", err);
+            alert("Error: " + err.message);
+        });
+}
+window.addReminder = addReminder;
+
+function renderReminders() {
+    const container = document.getElementById('reminders-list-container');
+    if (!container) return;
+
+    const isAr = currentAppLang === 'ar';
+    const companyData = getCompanyData();
+    const remindersObj = companyData.reminders || {};
+    const remindersList = Object.values(remindersObj).sort((a, b) => (a.deadlineMs || 0) - (b.deadlineMs || 0));
+
+    const countBadge = document.getElementById('reminders-count-badge');
+    if (countBadge) {
+        countBadge.textContent = `${remindersList.length} ${isAr ? 'تذكير نشط' : 'Active'}`;
+    }
+
+    // Check Due Reminders for Alert Banner
+    const now = Date.now();
+    const dueReminders = remindersList.filter(r => r.deadlineMs && r.deadlineMs <= now);
+    const banner = document.getElementById('reminders-due-banner');
+    const bannerText = document.getElementById('reminders-due-text');
+
+    if (dueReminders.length > 0 && banner && bannerText) {
+        banner.style.display = 'block';
+        const dueTitles = dueReminders.map(r => `• ${r.title}`).join(', ');
+        bannerText.textContent = isAr 
+            ? `لديك (${dueReminders.length}) تذكيرات حان موعد استحقاقها الآن: ${dueTitles}` 
+            : `You have (${dueReminders.length}) reminders due right now: ${dueTitles}`;
+    } else if (banner) {
+        banner.style.display = 'none';
+    }
+
+    if (remindersList.length === 0) {
+        container.innerHTML = `<p style="text-align:center; color:var(--text-muted); padding:30px; font-size:0.9rem;">${isAr ? 'لا توجد تذكيرات مضافة بعد. استخدم النموذج لإضافة تذكير جديد.' : 'No reminders found. Use the form to add a new reminder.'}</p>`;
+        return;
+    }
+
+    container.innerHTML = '';
+    remindersList.forEach(r => {
+        const isDue = r.deadlineMs <= now;
+        const deadlineStr = r.deadlineMs ? new Date(r.deadlineMs).toLocaleString() : r.deadlineISO || 'N/A';
+
+        let cycleText = '';
+        if (r.cycleDays === 'once') cycleText = isAr ? '1️⃣ مرة واحدة فقط' : '1️⃣ One-Time Only';
+        else if (r.cycleDays === '5') cycleText = isAr ? '🔄 كل 5 أيام' : '🔄 Every 5 Days';
+        else if (r.cycleDays === '10') cycleText = isAr ? '🔄 كل 10 أيام' : '🔄 Every 10 Days';
+        else if (r.cycleDays === '30') cycleText = isAr ? '🔄 كل شهر (30 يوماً)' : '🔄 Every Month (30 Days)';
+        else if (r.cycleDays === '90') cycleText = isAr ? '🔄 كل 3 أشهر (90 يوماً)' : '🔄 Every 3 Months (90 Days)';
+        else if (r.cycleDays === '365') cycleText = isAr ? '🔄 كل سنة (365 يوماً)' : '🔄 Every Year (365 Days)';
+        else cycleText = `🔄 Every ${r.cycleDays} Days`;
+
+        const dueBadge = isDue 
+            ? `<span class="badge" style="background:var(--danger); color:white; font-weight:800; animation:notif-bell 1s infinite alternate;">🚨 ${isAr ? 'مستحق الآن!' : 'DUE NOW!'}</span>`
+            : `<span class="badge badge-good">⏳ ${isAr ? 'قادم' : 'Upcoming'}</span>`;
+
+        const cardBorder = isDue ? '2px solid var(--danger)' : '1px solid var(--border-color)';
+        const cardBg = isDue ? 'var(--danger-bg)' : 'var(--card-bg)';
+
+        const snoozeBtn = (r.cycleDays !== 'once') 
+            ? `<button onclick="snoozeReminderNextCycle('${r.id}')" class="btn-outline-info" style="padding:6px 12px; font-size:0.8rem;" title="${isAr ? 'الانتقال للدورة القادمة' : 'Reset to Next Cycle'}">🔄 ${isAr ? 'الدورة القادمة' : 'Next Cycle'}</button>` 
+            : '';
+
+        container.innerHTML += `
+            <div class="ledger-card" style="border:${cardBorder}; background:${cardBg}; padding:16px; margin-bottom:0; border-radius:12px;">
+                <div class="flex-between" style="align-items:flex-start;">
+                    <div>
+                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                            <strong style="font-size:1.1rem; color:var(--text-main);">${r.title}</strong>
+                            ${dueBadge}
+                        </div>
+                        <div style="font-size:0.8rem; color:var(--primary); font-weight:700; margin-top:4px;">
+                            ${cycleText}
+                        </div>
+                        <div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">
+                            🕒 ${isAr ? 'موعد الاستحقاق:' : 'Deadline:'} <strong>${deadlineStr}</strong>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <button onclick="openEditReminderModal('${r.id}')" style="background:none; border:none; color:var(--secondary); cursor:pointer; font-size:1.1rem; padding:4px;" title="${isAr ? 'تعديل' : 'Edit'}">✏️</button>
+                        <button onclick="deleteReminder('${r.id}')" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:1.2rem; padding:4px;" title="${isAr ? 'حذف' : 'Delete'}">✖</button>
+                    </div>
+                </div>
+                ${r.note ? `<div style="font-size:0.85rem; margin-top:8px; padding-top:8px; border-top:1px dashed var(--border-color); color:var(--text-main);">📝 <em>${r.note}</em></div>` : ''}
+                <div style="display:flex; justify-content:flex-end; margin-top:10px; gap:8px;">
+                    ${snoozeBtn}
+                </div>
+            </div>
+        `;
+    });
+}
+window.renderReminders = renderReminders;
+
+function snoozeReminderNextCycle(remId) {
+    const companyData = getCompanyData();
+    const remindersObj = companyData.reminders || {};
+    const r = remindersObj[remId];
+    if (!r) return;
+
+    const isAr = currentAppLang === 'ar';
+    const cycleDays = parseInt(r.cycleDays) || 30;
+    const currentMs = r.deadlineMs || Date.now();
+    // Add cycleDays * 86400000 ms to the deadline
+    const newDeadlineMs = currentMs + (cycleDays * 24 * 60 * 60 * 1000);
+    const newISO = new Date(newDeadlineMs).toISOString().slice(0, 16);
+
+    db.ref(`companies/${currentCompany}/reminders/${remId}`).update({
+        deadlineMs: newDeadlineMs,
+        deadlineISO: newISO
+    }).then(() => {
+        renderReminders();
+    }).catch(err => console.error("Error advancing reminder cycle:", err));
+}
+window.snoozeReminderNextCycle = snoozeReminderNextCycle;
+
+function deleteReminder(remId) {
+    const isAr = currentAppLang === 'ar';
+    if (!confirm(isAr ? 'هل أنت تأكد من حذف هذا التذكير؟' : 'Are you sure you want to delete this reminder?')) return;
+
+    db.ref(`companies/${currentCompany}/reminders/${remId}`).remove()
+        .then(() => {
+            renderReminders();
+        })
+        .catch(err => console.error("Error deleting reminder:", err));
+}
+window.deleteReminder = deleteReminder;
+
+function openEditReminderModal(remId) {
+    const companyData = getCompanyData();
+    const remindersObj = companyData.reminders || {};
+    const r = remindersObj[remId];
+    if (!r) return;
+
+    document.getElementById('edit-reminder-id').value = r.id;
+    document.getElementById('edit-reminder-title').value = r.title || '';
+    document.getElementById('edit-reminder-cycle').value = r.cycleDays || '30';
+    
+    if (r.deadlineISO) {
+        document.getElementById('edit-reminder-deadline').value = r.deadlineISO;
+    } else if (r.deadlineMs) {
+        document.getElementById('edit-reminder-deadline').value = new Date(r.deadlineMs).toISOString().slice(0, 16);
+    }
+
+    document.getElementById('edit-reminder-note').value = r.note || '';
+
+    const modal = document.getElementById('edit-reminder-modal');
+    if (modal) modal.style.display = 'flex';
+}
+window.openEditReminderModal = openEditReminderModal;
+
+function closeEditReminderModal() {
+    const modal = document.getElementById('edit-reminder-modal');
+    if (modal) modal.style.display = 'none';
+}
+window.closeEditReminderModal = closeEditReminderModal;
+
+function saveEditReminder() {
+    const isAr = currentAppLang === 'ar';
+    const remId = document.getElementById('edit-reminder-id').value;
+    const titleVal = document.getElementById('edit-reminder-title').value.trim();
+    const cycleVal = document.getElementById('edit-reminder-cycle').value;
+    const deadlineVal = document.getElementById('edit-reminder-deadline').value;
+    const noteVal = document.getElementById('edit-reminder-note').value.trim();
+
+    if (!remId || !titleVal || !deadlineVal) return;
+
+    const deadlineMs = new Date(deadlineVal).getTime();
+    if (isNaN(deadlineMs)) return;
+
+    db.ref(`companies/${currentCompany}/reminders/${remId}`).update({
+        title: titleVal,
+        cycleDays: cycleVal,
+        deadlineMs: deadlineMs,
+        deadlineISO: deadlineVal,
+        note: noteVal
+    }).then(() => {
+        closeEditReminderModal();
+        renderReminders();
+    }).catch(err => console.error("Error updating reminder:", err));
+}
+window.saveEditReminder = saveEditReminder;
 
 // Initial run
 applyTranslations();
