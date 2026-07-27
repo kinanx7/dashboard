@@ -13183,6 +13183,8 @@ function renderReminders() {
     const isAr = currentAppLang === 'ar';
     const companyData = getCompanyData();
     const remindersObj = companyData.reminders || {};
+    const now = Date.now();
+
     const remindersList = Object.values(remindersObj).sort((a, b) => (a.deadlineMs || 0) - (b.deadlineMs || 0));
 
     const countBadge = document.getElementById('reminders-count-badge');
@@ -13191,7 +13193,6 @@ function renderReminders() {
     }
 
     // Check Due Reminders for Alert Banner
-    const now = Date.now();
     const dueReminders = remindersList.filter(r => r.deadlineMs && r.deadlineMs <= now);
     const banner = document.getElementById('reminders-due-banner');
     const bannerText = document.getElementById('reminders-due-text');
@@ -13211,10 +13212,25 @@ function renderReminders() {
         return;
     }
 
+function formatReminderDate(ms, fallbackIso) {
+    if (!ms && !fallbackIso) return 'N/A';
+    const d = ms ? new Date(ms) : new Date(fallbackIso);
+    if (isNaN(d.getTime())) return fallbackIso || 'N/A';
+    const day = d.getDate();
+    const month = d.getMonth() + 1;
+    const year = d.getFullYear();
+    let hours = d.getHours();
+    const mins = String(d.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    return `${day}/${month}/${year}, ${hours}:${mins} ${ampm}`;
+}
+
     container.innerHTML = '';
     remindersList.forEach(r => {
         const isDue = r.deadlineMs <= now;
-        const deadlineStr = r.deadlineMs ? new Date(r.deadlineMs).toLocaleString() : r.deadlineISO || 'N/A';
+        const deadlineStr = formatReminderDate(r.deadlineMs, r.deadlineISO);
 
         let cycleText = '';
         if (r.cycleDays === 'once') cycleText = isAr ? '1️⃣ مرة واحدة فقط' : '1️⃣ One-Time Only';
