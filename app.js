@@ -5909,6 +5909,74 @@ function deleteTaskTemplate(templateName) {
 }
 window.deleteTaskTemplate = deleteTaskTemplate;
 
+function getNextTaskNum() {
+    const data = getCompanyData();
+    let maxNum = 0;
+    if (!data) return 1;
+
+    const rawGenTasks = data.generalTasks || {};
+    const genArray = Array.isArray(rawGenTasks) ? rawGenTasks : Object.values(rawGenTasks);
+    genArray.forEach(gt => {
+        if (gt && typeof gt.taskNum === 'number' && gt.taskNum > maxNum) {
+            maxNum = gt.taskNum;
+        }
+    });
+
+    (data.workers || []).forEach(w => {
+        (w.jobs || []).forEach(j => {
+            if (j && typeof j.taskNum === 'number' && j.taskNum > maxNum) {
+                maxNum = j.taskNum;
+            }
+        });
+    });
+
+    return maxNum + 1;
+}
+window.getNextTaskNum = getNextTaskNum;
+
+function ensureTaskNumbers() {
+    const data = getCompanyData();
+    if (!data) return;
+
+    let allTasks = [];
+
+    const rawGenTasks = data.generalTasks || {};
+    const genArray = Array.isArray(rawGenTasks) ? rawGenTasks : Object.values(rawGenTasks);
+    genArray.forEach(gt => {
+        if (gt && gt.id) allTasks.push(gt);
+    });
+
+    (data.workers || []).forEach(w => {
+        (w.jobs || []).forEach(j => {
+            if (j && j.id) allTasks.push(j);
+        });
+    });
+
+    if (allTasks.length === 0) return;
+
+    allTasks.sort((a, b) => getJobTimestamp(a) - getJobTimestamp(b));
+
+    const takenNums = new Set();
+    allTasks.forEach(t => {
+        if (typeof t.taskNum === 'number' && t.taskNum > 0) {
+            takenNums.add(t.taskNum);
+        }
+    });
+
+    let currentCounter = 1;
+    allTasks.forEach(t => {
+        if (typeof t.taskNum !== 'number' || t.taskNum <= 0) {
+            while (takenNums.has(currentCounter)) {
+                currentCounter++;
+            }
+            t.taskNum = currentCounter;
+            takenNums.add(currentCounter);
+            currentCounter++;
+        }
+    });
+}
+window.ensureTaskNumbers = ensureTaskNumbers;
+
 function assignTask() {
     const workerId = document.getElementById('task-worker-select').value;
     const text = document.getElementById('task-assign-input').value.trim();
@@ -5916,6 +5984,8 @@ function assignTask() {
     const deadlineMins = document.getElementById('task-deadline') ? parseInt(document.getElementById('task-deadline').value) || 0 : 0;
 
     if (!workerId || !text) { alert("Select an employee and describe a task."); return; }
+
+    const assignedTaskNum = getNextTaskNum();
 
     if (workerId.startsWith('group_')) {
         const groupId = workerId.replace('group_', '');
@@ -5926,6 +5996,7 @@ function assignTask() {
 
         const newGroupTask = {
             id: 'gt-' + Date.now().toString(),
+            taskNum: assignedTaskNum,
             title: text,
             date: formatTimestamp(),
             timestamp: Date.now(),
@@ -5941,8 +6012,8 @@ function assignTask() {
 
         db.ref(`companies/${currentCompany}/generalTasks/${newGroupTask.id}`).set(newGroupTask)
             .then(() => {
-                logActivity('task', `group_${groupId}`, group.name, `Created group task for "${group.name}": "${text}"`);
-                alert(currentAppLang === 'ar' ? `تم إسناد المهمة للمجموعة ${group.name} بنجاح!` : `Group task assigned to ${group.name} successfully!`);
+                logActivity('task', `group_${groupId}`, group.name, `Created group task ${assignedTaskNum} for "${group.name}": "${text}"`);
+                alert(currentAppLang === 'ar' ? `تم إسناد المهمة ${assignedTaskNum} للمجموعة ${group.name} بنجاح!` : `Group task ${assignedTaskNum} assigned to ${group.name} successfully!`);
                 document.getElementById('task-assign-input').value = '';
                 if (document.getElementById('task-deadline')) document.getElementById('task-deadline').value = '';
                 if (document.getElementById('task-urgency')) document.getElementById('task-urgency').value = 'normal';
@@ -5956,6 +6027,7 @@ function assignTask() {
     if (workerId === 'general') {
         const newGeneralTask = {
             id: 'gt-' + Date.now().toString(),
+            taskNum: assignedTaskNum,
             title: text,
             date: formatTimestamp(),
             timestamp: Date.now(),
@@ -5969,8 +6041,8 @@ function assignTask() {
 
         db.ref(`companies/${currentCompany}/generalTasks/${newGeneralTask.id}`).set(newGeneralTask)
             .then(() => {
-                logActivity('task', 'general', 'General Pool', `Created general task: "${text}"`);
-                alert("General task created successfully!");
+                logActivity('task', 'general', 'General Pool', `Created general task ${assignedTaskNum}: "${text}"`);
+                alert(currentAppLang === 'ar' ? `تم إنشاء المهمة العامة ${assignedTaskNum} بنجاح!` : `General task ${assignedTaskNum} created successfully!`);
                 document.getElementById('task-assign-input').value = '';
                 if (document.getElementById('task-deadline')) document.getElementById('task-deadline').value = '';
                 if (document.getElementById('task-urgency')) document.getElementById('task-urgency').value = 'normal';
@@ -5987,6 +6059,7 @@ function assignTask() {
     if (!worker.jobs) worker.jobs = [];
     worker.jobs.push({
         id: Date.now().toString(),
+        taskNum: assignedTaskNum,
         title: text,
         date: formatTimestamp(),
         timestamp: Date.now(),
@@ -6006,7 +6079,7 @@ function assignTask() {
     // Targeted write to worker jobs path
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
         .then(() => {
-            logActivity('task', worker.id, worker.name, `Assigned task to ${worker.name}: "${text}"`);
+            logActivity('task', worker.id, worker.name, `Assigned task ${assignedTaskNum} to ${worker.name}: "${text}"`);
         })
         .catch(err => console.error("Error assigning task:", err));
 }
@@ -6235,12 +6308,16 @@ function renderTasks() {
     const isAdmin = currentUser && currentUser.role === 'admin';
     const data = getCompanyData();
 
+    // Ensure all existing & new tasks have assigned task numbers
+    ensureTaskNumbers();
+
     // Gather Filter Values
     const statusFilter = document.getElementById('tasks-filter-status') ? document.getElementById('tasks-filter-status').value : 'all';
     const selectedWorkerId = document.getElementById('tasks-filter-worker') ? document.getElementById('tasks-filter-worker').value : 'all';
     const timeframeFilter = document.getElementById('tasks-filter-timeframe') ? document.getElementById('tasks-filter-timeframe').value : 'all';
     const fromInput = document.getElementById('tasks-from-date') ? document.getElementById('tasks-from-date').value : '';
     const toInput = document.getElementById('tasks-to-date') ? document.getElementById('tasks-to-date').value : '';
+    const searchQuery = document.getElementById('tasks-search-input') ? document.getElementById('tasks-search-input').value.trim().toLowerCase() : '';
 
     const now = Date.now();
     const startOfToday = new Date().setHours(0, 0, 0, 0);
@@ -6258,6 +6335,15 @@ function renderTasks() {
         return true;
     };
 
+    // Helper: Search filter matching (task number 3 or title text)
+    const passesSearchFilter = (task) => {
+        if (!searchQuery) return true;
+        const cleanQuery = searchQuery.replace(/^#/, '');
+        const taskNumStr = String(task.taskNum || '');
+        const titleStr = (task.title || '').toLowerCase();
+        return taskNumStr === cleanQuery || titleStr.includes(searchQuery) || titleStr.includes(cleanQuery);
+    };
+
     // Calculate Statistics across all visible tasks matching date & worker filters
     let totalAssigned = 0;
     let completedCount = 0;
@@ -6271,7 +6357,7 @@ function renderTasks() {
     visibleWorkers.forEach(w => {
         (w.jobs || []).forEach(j => {
             const jTs = getJobTimestamp(j);
-            if (passesDateFilter(jTs)) {
+            if (passesDateFilter(jTs) && passesSearchFilter(j)) {
                 totalAssigned++;
                 const isDone = j.status === 'completed' || j.done;
                 if (isDone) completedCount++;
@@ -6312,6 +6398,7 @@ function renderTasks() {
         let pendingGeneralTasks = generalTasks.filter(gt => {
             if (!gt || gt.status !== 'pending') return false;
             if (!passesDateFilter(getJobTimestamp(gt))) return false;
+            if (!passesSearchFilter(gt)) return false;
             if (hasTaskAccess) return true; // Admin and workers with task access see ALL general tasks!
             if (!gt.targetGroupId) return true; // Available to everyone
 
@@ -6340,6 +6427,7 @@ function renderTasks() {
                 const urgencyBadge = gt.urgency === 'urgent' ? `<span class="badge" style="background:var(--danger); margin-left:8px;">🔴 ${t('opt-urgency-high').replace('🔴 ', '')}</span>` : '';
                 const groupBadge = gt.targetGroupName ? `<span class="badge" style="background:var(--primary); margin-left:8px; color:white;">👥 ${gt.targetGroupName}</span>` : '';
                 const deadlineText = gt.deadlineMins > 0 ? `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">⏱️ ${t('status-time-remaining').replace('⏳ ', '')} ${gt.deadlineMins} mins</div>` : '';
+                const taskNumBadge = `<span class="badge" style="background:#2563eb; color:#ffffff; font-weight:700; font-size:0.85rem; padding:3px 9px; border-radius:6px; margin-right:6px; box-shadow:0 1px 3px rgba(37,99,235,0.25);" title="Task ${gt.taskNum || 1}">${gt.taskNum || 1}</span>`;
 
                 let actionBtn = '';
                 if (!isAdmin) {
@@ -6358,7 +6446,7 @@ function renderTasks() {
                     <div style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
                         <div>
                             <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">Created: ${gt.date || new Date(getJobTimestamp(gt)).toLocaleString()}</div>
-                            <div style="font-size:1.05rem; font-weight:700; color:var(--text-main);">${gt.title} ${urgencyBadge} ${groupBadge}</div>
+                            <div style="font-size:1.05rem; font-weight:700; color:var(--text-main); display:flex; align-items:center; flex-wrap:wrap; gap:6px;">${taskNumBadge} <span>${gt.title}</span> ${urgencyBadge} ${groupBadge}</div>
                             ${deadlineText}
                         </div>
                         <div>
@@ -6391,8 +6479,8 @@ function renderTasks() {
             jobs = jobs.filter(j => j.status !== 'completed' && !j.done);
         }
 
-        // Apply Date Filter
-        jobs = jobs.filter(j => passesDateFilter(getJobTimestamp(j)));
+        // Apply Date Filter & Search Query Filter
+        jobs = jobs.filter(j => passesDateFilter(getJobTimestamp(j)) && passesSearchFilter(j));
 
         if (jobs.length === 0) return;
 
@@ -6444,13 +6532,15 @@ function renderTasks() {
             const doneColor = (status === 'completed' || j.done) ? 'var(--success)' : (j.urgency === 'urgent' ? 'var(--danger)' : 'var(--primary)');
             const doneText = (status === 'completed' || j.done) ? 'line-through' : 'none';
             let isGeneralBadge = j.isGeneral ? `<span class="badge" style="background:var(--info); color:var(--text-light); margin-right:8px; font-size:0.75rem; vertical-align:middle;">🌍 General Task</span>` : '';
+            const taskNumBadge = `<span class="badge" style="background:#2563eb; color:#ffffff; font-weight:700; font-size:0.85rem; padding:3px 9px; border-radius:6px; margin-right:6px; box-shadow:0 1px 3px rgba(37,99,235,0.25);" title="Task ${j.taskNum || 1}">${j.taskNum || 1}</span>`;
 
             return `
                         <div class="mission-item" style="border-left: 4px solid ${doneColor}; display:flex; flex-direction:column; align-items:stretch;">
                             <div class="flex-between" style="margin-bottom:8px; align-items:flex-start;">
                                 <div>
                                     <div style="font-size: 0.75rem; color:var(--text-muted); margin-bottom:4px;">Assigned: ${j.date || new Date(getJobTimestamp(j)).toLocaleString()}</div>
-                                    <div style="display:flex; align-items:center; flex-wrap:wrap; gap:4px;">
+                                    <div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px;">
+                                        ${taskNumBadge}
                                         ${isGeneralBadge}
                                         <span class="mission-text" style="text-decoration: ${doneText}; margin-right:4px;">${j.title}</span>
                                         ${urgencyBadge}
@@ -6659,6 +6749,12 @@ function openEditTaskModal(workerId, taskId, isGeneral = false) {
     document.getElementById('edit-task-title-input').value = taskObj.title || '';
     document.getElementById('edit-task-urgency-select').value = taskObj.urgency || 'normal';
     document.getElementById('edit-task-deadline-input').value = taskObj.deadlineMins || '';
+
+    const titleEl = document.getElementById('edit-task-modal-title');
+    if (titleEl) {
+        const numStr = taskObj.taskNum ? ` ${taskObj.taskNum}` : '';
+        titleEl.textContent = (isAr ? 'تعديل المهمة' : 'Edit Task') + numStr;
+    }
 
     modal.style.display = 'flex';
 }

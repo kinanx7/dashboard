@@ -1318,6 +1318,10 @@
 
                             <!-- Filter Controls Bar -->
                             <div style="background: var(--card-bg); padding: 14px; border-radius: 10px; border: 1px solid var(--border-color); margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+                                <div style="flex: 1; min-width: 150px;">
+                                    <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;" data-i18n="label-search-task">🔍 Search Task Number or Text:</label>
+                                    <input type="text" id="tasks-search-input" oninput="renderTasks()" placeholder="e.g. 3, clean..." data-i18n="[placeholder]placeholder-search-task" style="width: 100%; padding: 8px 10px; font-size: 0.85rem; border-radius: 6px; background: var(--input-bg); color: var(--text-main); border: 1px solid var(--border-color); box-sizing: border-box;">
+                                </div>
                                 <div style="flex: 1; min-width: 140px;">
                                     <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;" data-i18n="label-filter-status">Filter Status:</label>
                                     <select id="tasks-filter-status" onchange="renderTasks()" style="width: 100%; padding: 8px 10px; font-size: 0.85rem; border-radius: 6px;">
@@ -3270,7 +3274,7 @@
     </div>
 
     <script defer src="translations.js"></script>
-    <script defer src="app.js?v=78"></script>
+    <script defer src="app.js?v=80"></script>
 </body>
 
 
