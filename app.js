@@ -10094,15 +10094,38 @@ function renderHighMoneyApprovals() {
     if (!approvalsListDiv) return;
     approvalsListDiv.innerHTML = '';
 
+    // Populate Worker Filter Dropdown
+    const workerFilterSel = document.getElementById('ops-money-worker-filter');
+    if (workerFilterSel) {
+        const oldWorkerVal = workerFilterSel.value;
+        const visibleWorkers = getVisibleWorkers();
+        workerFilterSel.innerHTML = `<option value="all">${isAr ? '👤 جميع الموظفين' : '👤 All Workers'}</option>`;
+        visibleWorkers.forEach(w => {
+            const opt = document.createElement('option');
+            opt.value = w.id;
+            opt.textContent = w.name;
+            workerFilterSel.appendChild(opt);
+        });
+        if (oldWorkerVal && Array.from(workerFilterSel.options).some(o => o.value === oldWorkerVal)) {
+            workerFilterSel.value = oldWorkerVal;
+        }
+    }
+
     const statusFilter = document.getElementById('ops-money-status-filter') ? document.getElementById('ops-money-status-filter').value : 'waiting_manager_approval';
     const timeframeFilter = document.getElementById('ops-money-timeframe-filter') ? document.getElementById('ops-money-timeframe-filter').value : 'all';
+    const selectedWorkerId = document.getElementById('ops-money-worker-filter') ? document.getElementById('ops-money-worker-filter').value : 'all';
 
     // 1. Filter by Status
     if (statusFilter !== 'all') {
         reqList = reqList.filter(r => r.status === statusFilter);
     }
 
-    // 2. Filter by Timeframe / Date
+    // 2. Filter by Worker
+    if (selectedWorkerId !== 'all') {
+        reqList = reqList.filter(r => r.workerId === selectedWorkerId);
+    }
+
+    // 3. Filter by Timeframe / Date
     const now = Date.now();
     if (timeframeFilter === 'today') {
         const startOfToday = new Date().setHours(0, 0, 0, 0);
