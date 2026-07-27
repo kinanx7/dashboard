@@ -2349,27 +2349,62 @@ function postManagerNote() {
         });
 }
 
-function deleteManagerNote(id) {
-    if (!confirm("Delete this note entirely?")) return;
-    getCompanyData().managerNotes = getCompanyData().managerNotes.filter(n => n.id !== id);
+function getNotesArray() {
+    const raw = getCompanyData().managerNotes || {};
+    if (Array.isArray(raw)) return raw;
+    return Object.values(raw);
+}
 
-    // Targeted delete from managerNotes
-    db.ref('companies/' + currentCompany + '/managerNotes/' + id).remove()
+function deleteManagerNote(id) {
+    const isAr = currentAppLang === 'ar';
+    const notes = getNotesArray();
+    const targetStr = String(id);
+    const note = notes.find(n => n && String(n.id) === targetStr);
+    if (!note) return;
+
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    const isAuthor = currentUser && currentUser.email && note.author && (note.author.toLowerCase() === currentUser.email.toLowerCase());
+
+    if (!isAdmin && !isAuthor) {
+        alert(isAr ? 'لا تملك صلاحية حذف هذه الملاحظة.' : 'You do not have permission to delete this note.');
+        return;
+    }
+
+    if (!confirm(isAr ? 'هل أنت متأكد من حذف هذا الموضوع بالكامل؟' : 'Delete this thread entirely?')) return;
+
+    const data = getCompanyData();
+    if (Array.isArray(data.managerNotes)) {
+        data.managerNotes = data.managerNotes.filter(n => n && String(n.id) !== targetStr);
+    } else if (data.managerNotes && typeof data.managerNotes === 'object') {
+        delete data.managerNotes[id];
+        delete data.managerNotes[targetStr];
+    }
+
+    // Render immediately so thread disappears instantly
+    renderNotes();
+
+    // Atomically overwrite managerNotes node in Firebase so it never re-appears
+    db.ref('companies/' + currentCompany + '/managerNotes').set(data.managerNotes)
         .then(() => {
             if (typeof logActivity === 'function') {
                 logActivity('perf_note', 'multiple', 'Workers', `Deleted performance note (ID: ${id})`);
             }
+            renderNotes();
         })
         .catch(error => {
             console.error("Error deleting note:", error);
-            alert("Failed to delete note.");
+            alert(isAr ? "فشل حذف الموضوع." : "Failed to delete thread.");
+            renderNotes();
         });
 }
+window.deleteManagerNote = deleteManagerNote;
+window.editManagerNote = editManagerNote;
+window.postManagerNote = postManagerNote;
 
 function editManagerNote(id) {
     const isAr = currentAppLang === 'ar';
-    const notes = getCompanyData().managerNotes || [];
-    const note = notes.find(n => n.id === id);
+    const notes = getNotesArray();
+    const note = notes.find(n => n && n.id === id);
     if (!note) return;
 
     const now = Date.now();
@@ -2412,13 +2447,15 @@ function editManagerNote(id) {
 
 function addNoteReply(noteId) {
     const input = document.getElementById(`reply-input-${noteId}`);
+    if (!input) return;
     const text = input.value.trim();
     const type = replyAttachmentTypes[noteId] || null;
     const data = replyAttachmentDatas[noteId] || null;
 
     if (!text && !data) return;
 
-    const note = getCompanyData().managerNotes.find(n => n.id === noteId);
+    const notes = getNotesArray();
+    const note = notes.find(n => n && n.id === noteId);
     if (note) {
         if (!note.replies || Array.isArray(note.replies)) {
             const obj = {};
@@ -2432,7 +2469,7 @@ function addNoteReply(noteId) {
 
         const replyId = Date.now().toString();
         const newReply = {
-            author: currentUser.email,
+            author: currentUser ? currentUser.email : 'Unknown',
             text: text,
             date: formatTimestamp(),
             attachmentType: type,
@@ -2445,6 +2482,9 @@ function addNoteReply(noteId) {
 
         // Targeted write to replies subnode using the unique key
         db.ref('companies/' + currentCompany + '/managerNotes/' + noteId + '/replies/' + replyId).set(newReply)
+            .then(() => {
+                renderNotes();
+            })
             .catch(error => {
                 console.error("Error saving reply:", error);
                 alert("Failed to save reply.");
@@ -2453,14 +2493,16 @@ function addNoteReply(noteId) {
 }
 
 function deleteNoteReply(noteId, replyKey) {
-    if (!confirm("Are you sure you want to delete this reply?")) return;
-    const note = getCompanyData().managerNotes.find(n => n.id === noteId);
+    const isAr = currentAppLang === 'ar';
+    if (!confirm(isAr ? "هل أنت متأكد من حذف هذا الرد؟" : "Are you sure you want to delete this reply?")) return;
+    const notes = getNotesArray();
+    const note = notes.find(n => n && n.id === noteId);
     if (note && note.replies && note.replies[replyKey]) {
         const r = note.replies[replyKey];
         const isAdmin = currentUser && currentUser.role === 'admin';
-        const isAuthor = currentUser && r.author === currentUser.email;
+        const isAuthor = currentUser && currentUser.email && r.author && (r.author.toLowerCase() === currentUser.email.toLowerCase());
         if (!isAdmin && !isAuthor) {
-            alert("You don't have permission to delete this reply.");
+            alert(isAr ? "لا تملك صلاحية حذف هذا الرد." : "You don't have permission to delete this reply.");
             return;
         }
 
@@ -2477,6 +2519,8 @@ function deleteNoteReply(noteId, replyKey) {
             });
     }
 }
+window.deleteNoteReply = deleteNoteReply;
+window.addNoteReply = addNoteReply;
 
 function renderNotes() {
     if (currentTab !== 'notes') return;
@@ -2485,7 +2529,7 @@ function renderNotes() {
     const cbContainer = document.getElementById('private-worker-checkboxes');
     if (cbContainer) {
         cbContainer.innerHTML = '';
-        getCompanyData().workers.forEach(w => {
+        (getCompanyData().workers || []).forEach(w => {
             cbContainer.innerHTML += `
                         <label style="display:flex; align-items:center; gap:6px; cursor:pointer; text-transform:none; margin:0; font-size:0.9rem; background:var(--input-bg); padding:8px; border-radius:6px; border:1px solid var(--border-color);">
                             <input type="checkbox" class="private-target-cb" value="${w.id}"> ${w.name} <span style="font-size:0.75rem; color:var(--text-muted); padding-left:4px;">(${w.role})</span>
@@ -2495,8 +2539,9 @@ function renderNotes() {
     }
 
     const feed = document.getElementById('manage-notes-feed');
+    if (!feed) return;
     feed.innerHTML = '';
-    const allNotes = getCompanyData().managerNotes || [];
+    const allNotes = getNotesArray();
 
     const visibleNotes = allNotes.filter(n => {
         if (currentUser.role === 'admin') return true;
@@ -2528,7 +2573,7 @@ function renderNotes() {
 
         let convertBtn = n.text ? `<button type="button" onclick="convertNoteToTask('${encodeURIComponent(n.text.replace(/'/g, "\\'"))}')" class="btn-outline" style="padding:2px 8px; font-size:0.75rem; border-radius:4px; border:1px solid var(--secondary); color:var(--secondary); font-weight:600; cursor:pointer; margin-left:6px;" title="${isAr ? 'تحويل إلى مهمة' : 'Convert to Task'}">📋 ${isAr ? 'تحويل إلى مهمة' : 'Convert to Task'}</button>` : '';
 
-        let delBtn = (currentUser.role === 'admin') ? `<button onclick="deleteManagerNote('${n.id}')" class="btn-outline-danger" style="padding:4px 10px; font-size:0.8rem; border:none; text-decoration:underline;">Delete Thread</button>` : '';
+        let delBtn = (isAdmin || isAuthor) ? `<button onclick="deleteManagerNote('${n.id}')" class="btn-outline-danger" style="padding:4px 10px; font-size:0.8rem; border:none; text-decoration:underline; cursor:pointer;" title="${isAr ? 'حذف الملاحظة' : 'Delete note'}">${isAr ? 'حذف' : 'Delete Thread'}</button>` : '';
         let lockIcon = n.isPrivate ? `<span class="badge" style="background:var(--danger); font-size:0.85rem;">🔒 Private Note</span>` : `<span class="badge" style="background:var(--info); font-size:0.85rem;">📢 Public Announcement</span>`;
 
         let repliesHtml = '';
@@ -6009,12 +6054,16 @@ function toggleTaskDone(workerId, taskId) {
 function deleteTask(workerId, taskId) {
     const isAr = currentAppLang === 'ar';
     if (!confirm(isAr ? "هل أنت تأكد من حذف هذه المهمة؟" : "Delete this task?")) return;
-    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+
+    const workers = getCompanyData().workers || [];
+    const workerIndex = workers.findIndex(w => String(w.id) === String(workerId));
     if (workerIndex === -1) return;
-    const worker = getCompanyData().workers[workerIndex];
+    const worker = workers[workerIndex];
     if (!worker.jobs) worker.jobs = [];
-    const oldTask = worker.jobs.find(j => j && j.id === taskId);
-    worker.jobs = worker.jobs.filter(j => j && j.id !== taskId);
+
+    const targetStr = String(taskId);
+    const oldTask = worker.jobs.find(j => j && String(j.id) === targetStr);
+    worker.jobs = worker.jobs.filter(j => j && String(j.id) !== targetStr);
 
     // Re-render UI immediately to prevent freezing
     renderAll();
@@ -6061,12 +6110,13 @@ function getVisibleWorkers() {
     if (currentUser.role === 'admin') return allWorkers;
 
     const activeWorker = getActiveWorker();
-    if (!activeWorker) return [];
 
-    // Check if worker has task access (perm-tasks class on body or perms object)
+    // Check if worker has task access (perm-tasks class on body or perms object or currentUser perms)
     const hasTaskAccess = document.body.classList.contains('perm-tasks') || 
-                          (activeWorker.perms && activeWorker.perms.tasks === true);
-    if (hasTaskAccess) {
+                          (activeWorker && activeWorker.perms && (activeWorker.perms.tasks === true || activeWorker.perms.tasks === 'true')) ||
+                          (currentUser && currentUser.perms && (currentUser.perms.tasks === true || currentUser.perms.tasks === 'true'));
+
+    if (hasTaskAccess || !activeWorker) {
         return allWorkers;
     }
     return [activeWorker];
@@ -6238,12 +6288,14 @@ function renderTasks() {
 
     // Render General Tasks at top of board (if not filtering for a specific worker)
     if (selectedWorkerId === 'all') {
-        const generalTasks = data.generalTasks || [];
+        const rawGenTasks = data.generalTasks || {};
+        const generalTasks = Array.isArray(rawGenTasks) ? rawGenTasks : Object.values(rawGenTasks);
         const activeWorker = getActiveWorker();
+        const hasTaskAccess = isAdmin || document.body.classList.contains('perm-tasks') || (activeWorker && activeWorker.perms && (activeWorker.perms.tasks === true || activeWorker.perms.tasks === 'true'));
         let pendingGeneralTasks = generalTasks.filter(gt => {
-            if (gt.status !== 'pending') return false;
+            if (!gt || gt.status !== 'pending') return false;
             if (!passesDateFilter(getJobTimestamp(gt))) return false;
-            if (isAdmin) return true; // Admin sees all
+            if (hasTaskAccess) return true; // Admin and workers with task access see ALL general tasks!
             if (!gt.targetGroupId) return true; // Available to everyone
 
             const groups = data.taskGroups || [];
@@ -6272,11 +6324,10 @@ function renderTasks() {
                 const groupBadge = gt.targetGroupName ? `<span class="badge" style="background:var(--primary); margin-left:8px; color:white;">👥 ${gt.targetGroupName}</span>` : '';
                 const deadlineText = gt.deadlineMins > 0 ? `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">⏱️ ${t('status-time-remaining').replace('⏳ ', '')} ${gt.deadlineMins} mins</div>` : '';
 
-                const isWorker = currentUser && currentUser.role === 'worker';
                 let actionBtn = '';
-                if (isWorker) {
+                if (!isAdmin) {
                     actionBtn = `<button onclick="acceptGeneralTask('${gt.id}')" class="btn-warning" style="padding:8px 16px; font-size:0.85rem; min-height: unset; height: auto;">📥 ${t('btn-accept-task')}</button>`;
-                } else if (isAdmin) {
+                } else {
                     const labelText = gt.targetGroupName ? `${t('label-available-all-workers')} (${gt.targetGroupName})` : t('label-available-all-workers');
                     actionBtn = `
                         <div style="display:flex; gap:8px; align-items:center;">
@@ -6419,79 +6470,97 @@ function renderTasks() {
 }
 
 function acceptGeneralTask(taskId) {
-    if (!currentUser || currentUser.role !== 'worker') return;
+    if (!currentUser) return;
+    const isAr = currentAppLang === 'ar';
+    const targetStr = String(taskId);
 
-    // Check if task is already taken/accepted by fetching it fresh from database
-    db.ref(`companies/${currentCompany}/generalTasks/${taskId}`).once('value')
-        .then(snapshot => {
-            const task = snapshot.val();
-            if (!task) return alert("Task not found.");
-            if (task.status !== 'pending') {
-                alert(`This task was already accepted by ${task.acceptedBy || 'another worker'}.`);
-                return;
-            }
+    const data = getCompanyData();
+    const rawGenTasks = data.generalTasks || {};
+    const generalTasks = Array.isArray(rawGenTasks) ? rawGenTasks : Object.values(rawGenTasks);
 
-            // Find current worker
-            const workers = getCompanyData().workers || [];
-            const myIndex = workers.findIndex(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
-            if (myIndex === -1) {
-                alert("Worker profile not found.");
-                return;
-            }
+    // Find task in local or Firebase state with String matching
+    const task = generalTasks.find(gt => gt && String(gt.id) === targetStr);
 
-            const myWorker = workers[myIndex];
-            if (!myWorker.jobs) myWorker.jobs = [];
+    if (!task) {
+        return alert(isAr ? "لم يتم العثور على المهمة. قد تكون تم حذفها أو قبولها من موظف آخر." : "Task not found. It may have been deleted or accepted already.");
+    }
 
-            // Construct new job
-            const newJob = {
-                id: task.id,
-                title: `${task.title} (Accepted by ${myWorker.name})`,
-                isGeneral: true,
-                date: formatTimestamp(),
-                timestamp: Date.now(),
-                urgency: task.urgency,
-                deadlineMins: task.deadlineMins,
-                status: 'seen',
-                seenAt: Date.now(),
-                done: false
-            };
+    if (task.status !== 'pending') {
+        alert(isAr ? `تم قبول هذه المهمة بالفعل بواسطة ${task.acceptedBy || 'موظف آخر'}.` : `This task was already accepted by ${task.acceptedBy || 'another worker'}.`);
+        return;
+    }
 
-            myWorker.jobs.push(newJob);
+    // Find current worker
+    const workers = data.workers || [];
+    let myIndex = workers.findIndex(w => w.email && currentUser.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+    if (myIndex === -1 && typeof getActiveWorker === 'function') {
+        const activeW = getActiveWorker();
+        if (activeW) myIndex = workers.findIndex(w => String(w.id) === String(activeW.id));
+    }
+    if (myIndex === -1) {
+        alert(isAr ? "حسابك غير مرتبط بملف موظف. يرجى التواصل مع الإدارة." : "Worker profile not found. Your account is not linked to an employee record.");
+        return;
+    }
 
-            const updates = {};
-            updates[`companies/${currentCompany}/workers/${myIndex}/jobs`] = myWorker.jobs;
-            updates[`companies/${currentCompany}/generalTasks/${taskId}`] = {
-                ...task,
-                status: 'accepted',
-                acceptedBy: myWorker.name,
-                acceptedById: myWorker.id,
-                acceptedAt: Date.now()
-            };
+    const myWorker = workers[myIndex];
+    if (!myWorker.jobs) myWorker.jobs = [];
 
-            return db.ref().update(updates)
-                .then(() => {
-                    logActivity('task', myWorker.id, myWorker.name, `${myWorker.name} accepted general task: "${task.title}"`);
-                    alert(`Success! You have accepted: "${task.title}"`);
-                });
+    // Construct new job
+    const newJob = {
+        id: task.id,
+        title: `${task.title} (Accepted by ${myWorker.name})`,
+        isGeneral: true,
+        date: formatTimestamp(),
+        timestamp: Date.now(),
+        urgency: task.urgency,
+        deadlineMins: task.deadlineMins,
+        status: 'seen',
+        seenAt: Date.now(),
+        done: false
+    };
+
+    myWorker.jobs.push(newJob);
+    task.status = 'accepted';
+    task.acceptedBy = myWorker.name;
+    task.acceptedById = myWorker.id;
+    task.acceptedAt = Date.now();
+
+    renderAll();
+
+    const updates = {};
+    updates[`companies/${currentCompany}/workers/${myIndex}/jobs`] = myWorker.jobs;
+    updates[`companies/${currentCompany}/generalTasks`] = data.generalTasks;
+
+    db.ref().update(updates)
+        .then(() => {
+            logActivity('task', myWorker.id, myWorker.name, `${myWorker.name} accepted general task: "${task.title}"`);
+            alert(isAr ? `تم قبول المهمة بنجاح: "${task.title}"` : `Success! You have accepted: "${task.title}"`);
+            renderAll();
         })
         .catch(err => {
             console.error("Error accepting task:", err);
-            alert("Failed to accept task. It may have been taken already.");
+            alert(isAr ? "فشل قبول المهمة. ربما تم أخذها بالفعل." : "Failed to accept task. It may have been taken already.");
+            renderAll();
         });
 }
 
 function deleteGeneralTask(taskId) {
     const isAr = currentAppLang === 'ar';
     if (!confirm(isAr ? "هل أنت تأكد من حذف هذه المهمة العامة؟" : "Delete this general task?")) return;
-    const companyData = getCompanyData();
-    if (!companyData.generalTasks) companyData.generalTasks = [];
-    const task = companyData.generalTasks.find(gt => gt && gt.id === taskId);
-    companyData.generalTasks = companyData.generalTasks.filter(gt => gt && gt.id !== taskId);
+
+    const data = getCompanyData();
+    const rawGenTasks = data.generalTasks || {};
+    const genArray = Array.isArray(rawGenTasks) ? rawGenTasks : Object.values(rawGenTasks);
+    const targetStr = String(taskId);
+
+    const task = genArray.find(gt => gt && String(gt.id) === targetStr);
+    data.generalTasks = genArray.filter(gt => gt && String(gt.id) !== targetStr);
 
     // Re-render UI immediately
     renderAll();
 
-    db.ref(`companies/${currentCompany}/generalTasks/${taskId}`).remove()
+    // Atomically set generalTasks node in Firebase so no stale items linger
+    db.ref(`companies/${currentCompany}/generalTasks`).set(data.generalTasks)
         .then(() => {
             if (task) {
                 logActivity('task_delete', 'general', 'General Pool', `Deleted general task: "${task.title}"`);
@@ -12982,6 +13051,12 @@ function showWorkerPaymentHistory(identifier) {
 }
 window.showWorkerPaymentHistory = showWorkerPaymentHistory;
 
+function closeWorkerPaymentLogModal() {
+    const modal = document.getElementById('worker-payment-log-modal');
+    if (modal) modal.style.display = 'none';
+}
+window.closeWorkerPaymentLogModal = closeWorkerPaymentLogModal;
+
 // =========================================================================
 // CONVERT PRIVATE NOTE TO TASK FUNCTION
 // =========================================================================
@@ -13121,6 +13196,8 @@ function renderReminders() {
             ? `<button onclick="snoozeReminderNextCycle('${r.id}')" class="btn-outline-info" style="padding:6px 12px; font-size:0.8rem;" title="${isAr ? 'الانتقال للدورة القادمة' : 'Reset to Next Cycle'}">🔄 ${isAr ? 'الدورة القادمة' : 'Next Cycle'}</button>` 
             : '';
 
+        const sendTaskBtn = `<button onclick="convertReminderToTask('${r.id}')" class="btn-outline" style="padding:4px 10px; font-size:0.8rem; border-radius:6px; border:1px solid var(--secondary); color:var(--secondary); font-weight:600; cursor:pointer;" title="${isAr ? 'إرسال كمهمة' : 'Send as Task'}">📋 ${isAr ? 'إرسال كمهمة' : 'Send as Task'}</button>`;
+
         container.innerHTML += `
             <div class="ledger-card" style="border:${cardBorder}; background:${cardBg}; padding:16px; margin-bottom:0; border-radius:12px;">
                 <div class="flex-between" style="align-items:flex-start;">
@@ -13142,7 +13219,8 @@ function renderReminders() {
                     </div>
                 </div>
                 ${r.note ? `<div style="font-size:0.85rem; margin-top:8px; padding-top:8px; border-top:1px dashed var(--border-color); color:var(--text-main);">📝 <em>${r.note}</em></div>` : ''}
-                <div style="display:flex; justify-content:flex-end; margin-top:10px; gap:8px;">
+                <div style="display:flex; justify-content:flex-end; margin-top:10px; gap:8px; flex-wrap:wrap; align-items:center;">
+                    ${sendTaskBtn}
                     ${snoozeBtn}
                 </div>
             </div>
@@ -13150,6 +13228,23 @@ function renderReminders() {
     });
 }
 window.renderReminders = renderReminders;
+
+function convertReminderToTask(remId) {
+    const companyData = getCompanyData();
+    const remindersObj = companyData.reminders || {};
+    const r = remindersObj[remId];
+    if (!r) return;
+
+    let fullText = r.title || '';
+    if (r.note) {
+        fullText += `: ${r.note}`;
+    }
+
+    if (typeof convertNoteToTask === 'function') {
+        convertNoteToTask(encodeURIComponent(fullText));
+    }
+}
+window.convertReminderToTask = convertReminderToTask;
 
 function snoozeReminderNextCycle(remId) {
     const companyData = getCompanyData();

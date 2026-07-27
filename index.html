@@ -2880,19 +2880,18 @@
                     </div>
                 </div>
 
-                <div class="grid-2-col" style="gap: 24px;">
+                <div style="display: flex; flex-direction: column; gap: 24px; width: 100%;">
                     <!-- Add New Reminder Card -->
-                    <div class="card" style="border-top: 4px solid var(--primary);">
+                    <div class="card" style="border-top: 4px solid var(--primary); width: 100%; box-sizing: border-box;">
                         <h2 class="card-title" data-i18n="title-add-reminder">⏰ Add New Reminder</h2>
                         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;" data-i18n="desc-add-reminder">Set a recurring reminder for installments, renewals, or important tasks.</p>
                         
                         <form onsubmit="event.preventDefault(); addReminder();" style="margin:0; padding:0; border:none; background:transparent; box-shadow:none;">
-                            <div class="form-group">
-                                <label data-i18n="label-reminder-title">Thing to Remind (Title)</label>
-                                <input type="text" id="reminder-title-input" required placeholder="e.g. Car Installment, License Renewal..." data-i18n="[placeholder]placeholder-reminder-title">
-                            </div>
-
-                            <div class="grid-2-col" style="gap: 12px; margin-bottom: 16px;">
+                            <div class="grid-3-col" style="gap: 16px; margin-bottom: 16px;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label data-i18n="label-reminder-title">Thing to Remind (Title)</label>
+                                    <input type="text" id="reminder-title-input" required placeholder="e.g. Car Installment, License Renewal..." data-i18n="[placeholder]placeholder-reminder-title">
+                                </div>
                                 <div class="form-group" style="margin-bottom: 0;">
                                     <label data-i18n="label-reminder-cycle">Remind Cycle</label>
                                     <select id="reminder-cycle-select">
@@ -2910,9 +2909,9 @@
                                 </div>
                             </div>
 
-                            <div class="form-group">
+                            <div class="form-group" style="margin-bottom: 16px;">
                                 <label data-i18n="label-reminder-note">Note / Details</label>
-                                <textarea id="reminder-note-input" rows="3" placeholder="Add specific notes, account info, or instructions..." data-i18n="[placeholder]placeholder-reminder-note" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-family: inherit; font-size: 0.9rem; box-sizing: border-box;"></textarea>
+                                <textarea id="reminder-note-input" rows="2" placeholder="Add specific notes, account info, or instructions..." data-i18n="[placeholder]placeholder-reminder-note" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-family: inherit; font-size: 0.9rem; box-sizing: border-box;"></textarea>
                             </div>
 
                             <button type="submit" class="btn-success" style="width: 100%; padding: 12px; font-weight: 800; font-size: 1rem;" data-i18n="btn-publish-reminder">
@@ -2922,13 +2921,13 @@
                     </div>
 
                     <!-- Active Reminders Board Card -->
-                    <div class="card" style="border-top: 4px solid var(--secondary);">
-                        <div class="flex-between" style="margin-bottom: 16px;">
+                    <div class="card" style="border-top: 4px solid var(--secondary); width: 100%; box-sizing: border-box;">
+                        <div class="flex-between" style="margin-bottom: 20px;">
                             <h2 class="card-title" style="margin: 0; border: none; padding: 0;" data-i18n="title-reminders-board">📋 Active Reminders & Cycles</h2>
                             <span id="reminders-count-badge" class="badge" style="background: var(--primary); color: white; font-weight: 700; font-size: 0.85rem; padding: 4px 10px; border-radius: 20px;">0 Active</span>
                         </div>
 
-                        <div id="reminders-list-container" style="display: flex; flex-direction: column; gap: 12px;">
+                        <div id="reminders-list-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; width: 100%; box-sizing: border-box;">
                             <!-- Dynamically populated -->
                         </div>
                     </div>
@@ -3233,7 +3232,7 @@
     </div>
 
     <script defer src="translations.js"></script>
-    <script defer src="app.js?v=65"></script>
+    <script defer src="app.js?v=71"></script>
 </body>
 
 
