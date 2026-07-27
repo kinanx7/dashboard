@@ -2310,13 +2310,18 @@ function postManagerNote() {
         checkboxes.forEach(cb => targets.push(cb.value));
     }
 
+    const activeWorker = typeof getActiveWorker === 'function' ? getActiveWorker() : null;
+    const worker = (getCompanyData().workers || []).find(w => w.email && currentUser && currentUser.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+    const authorDisplayName = worker ? worker.name : (activeWorker ? activeWorker.name : (currentUser && currentUser.role === 'admin' ? (currentAppLang === 'ar' ? 'المدير' : 'Manager') : (currentUser ? currentUser.email : 'Unknown')));
+
     const nowMs = Date.now();
     const newNote = {
         id: nowMs.toString(),
         timestamp: nowMs,
         text: text,
         date: formatTimestamp(),
-        author: currentUser.email,
+        author: currentUser ? currentUser.email : 'Unknown',
+        authorName: authorDisplayName,
         isPrivate: privacy === 'private',
         targetWorkers: targets,
         replies: [],
@@ -2467,9 +2472,14 @@ function addNoteReply(noteId) {
             note.replies = obj;
         }
 
+        const activeWorker = typeof getActiveWorker === 'function' ? getActiveWorker() : null;
+        const worker = (getCompanyData().workers || []).find(w => w.email && currentUser && currentUser.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+        const authorDisplayName = worker ? worker.name : (activeWorker ? activeWorker.name : (currentUser && currentUser.role === 'admin' ? (currentAppLang === 'ar' ? 'المدير' : 'Manager') : (currentUser ? currentUser.email : 'Unknown')));
+
         const replyId = Date.now().toString();
         const newReply = {
             author: currentUser ? currentUser.email : 'Unknown',
+            authorName: authorDisplayName,
             text: text,
             date: formatTimestamp(),
             attachmentType: type,
@@ -2566,6 +2576,10 @@ function renderNotes() {
         const isAuthor = currentUser && currentUser.email && n.author && (n.author.toLowerCase() === currentUser.email.toLowerCase());
         const isAdmin = currentUser && currentUser.role === 'admin';
 
+        const authorWorker = (getCompanyData().workers || []).find(w => w.email && n.author && w.email.toLowerCase() === n.author.toLowerCase());
+        const authorDisplayName = n.authorName || (authorWorker ? authorWorker.name : n.author || (isAr ? 'المدير' : 'Manager'));
+        const authorBadge = `<span style="font-size:0.85rem; font-weight:700; color:var(--text-main); display:inline-flex; align-items:center; gap:4px; background:var(--input-bg); padding:3px 10px; border-radius:6px; border:1px solid var(--border-color);" title="${isAr ? 'كاتب الملاحظة' : 'Author'}">👤 ${authorDisplayName}</span>`;
+
         let editBtn = '';
         if ((isAuthor || isAdmin) && isWithin2Mins) {
             editBtn = `<button onclick="editManagerNote('${n.id}')" class="btn-outline" style="padding:2px 8px; font-size:0.75rem; border-radius:4px; border:1px solid var(--primary); color:var(--primary); font-weight:600; cursor:pointer; margin-left:6px;" title="${isAr ? 'تعديل الملاحظة' : 'Edit note'}">✏️ ${isAr ? 'تعديل' : 'Edit'}</button>`;
@@ -2602,10 +2616,13 @@ function renderNotes() {
                     deleteReplyBtn = `<button onclick="deleteNoteReply('${n.id}', '${replyKey}')" class="btn-outline-danger" style="border:none; background:none; text-decoration:underline; font-size:0.75rem; padding:0 0 0 8px; cursor:pointer;">Delete</button>`;
                 }
 
+                const replyAuthorWorker = (getCompanyData().workers || []).find(w => w.email && r.author && w.email.toLowerCase() === r.author.toLowerCase());
+                const replyAuthorName = r.authorName || (replyAuthorWorker ? replyAuthorWorker.name : r.author);
+
                 return `
                             <div style="background: var(--bg-color); padding: 12px 16px; border-radius: 8px; margin-top: 10px; border-left: 3px solid var(--border-color);">
                                 <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--text-muted); margin-bottom:6px;">
-                                    <strong>${r.author}</strong> <span>🕒 ${r.date}${deleteReplyBtn}</span>
+                                    <strong>👤 ${replyAuthorName}</strong> <span>🕒 ${r.date}${deleteReplyBtn}</span>
                                 </div>
                                 ${replyTextHtml}
                                 ${replyAttachmentHtml}
@@ -2668,9 +2685,9 @@ function renderNotes() {
         }
 
         div.innerHTML = `
-                    <div class="flex-between" style="margin-bottom:12px;">
-                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                            ${lockIcon} <span style="font-size:0.85rem; color:var(--text-muted);">🕒 ${n.date}</span>
+                    <div class="flex-between" style="margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                            ${authorBadge} ${lockIcon} <span style="font-size:0.85rem; color:var(--text-muted);">🕒 ${n.date}</span>
                             ${editBtn} ${convertBtn}
                         </div>
                         ${delBtn}
