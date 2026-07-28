@@ -618,7 +618,20 @@ const uiTranslations = {
         "opt-cat-all": "🌟 All Products",
         "title-edit-market-product": "✏️ Edit Market Product",
         "btn-save-product": "💾 Save Product Changes",
-        "title-monthly-coin-refill": "🪙 Monthly Coin Refill Value"
+        "title-monthly-coin-refill": "🪙 Monthly Customer Coins Refill",
+        "btn-my-orders": "My Orders",
+        "btn-cart": "Cart",
+        "title-order-receipt": "🧾 Order Receipt",
+        "title-customer-orders": "📦 My Orders & Live Status",
+        "title-admin-market-orders": "📦 Incoming Market Orders Management",
+        "btn-admin-market-orders": "📋 All Orders (Admin)",
+        "btn-cancel-order": "❌ Cancel Order",
+        "btn-delete-order": "🗑️ Delete Order",
+        "label-hide-product": "🙈 Hide Product (Out of Stock)",
+        "status-out-of-stock": "🚫 Out of Stock",
+        "tab-prepare": "👨‍🍳 Prepare",
+        "title-prepare-section": "👨‍🍳 Kitchen & Market Order Preparation",
+        "desc-prepare-section": "Real-time order processing queue across all companies."
     },
     ar: {
         "Sunday": "الأحد",
@@ -1185,8 +1198,16 @@ const uiTranslations = {
         "title-edit-reminder": "✏️ تعديل التذكير",
         "title-reminders-due-alert": "🚨 تنبيه: تذكيرات حان موعد استحقاقها!",
         "btn-convert-task": "📋 تحويل إلى مهمة",
-        "title-monthly-coin-refill": "🪙 قيمة إعادة تعبئة العملات الشهرية",
+        "title-monthly-coin-refill": "🪙 إعادة تعبئة رصيد العملات للعملاء",
         "label-available-balance": "الرصيد المتاح",
-        "unit-coins": "عملات"
+        "unit-coins": "العملات",
+        "btn-my-orders": "طلباتي",
+        "btn-cart": "السلة",
+        "title-order-receipt": "🧾 فاتورة الطلب",
+        "title-customer-orders": "📦 طلباتي وحالة التوصيل",
+        "title-admin-market-orders": "📦 إدارة طلبات السوق الواردة",
+        "tab-prepare": "👨‍🍳 قسم التحضير",
+        "title-prepare-section": "👨‍🍳 قسم تحضير وقائمة الطلبات الواردة",
+        "desc-prepare-section": "متابعة وتحضير طلبات العملاء الواردة لحظياً لجميع الشركات."
     }
 };

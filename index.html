@@ -468,6 +468,8 @@
                         Reminders</button>
                     <button id="tab-market" class="dept-tab" onclick="switchTab('market')" data-i18n="tab-market">🏪
                         Market</button>
+                    <button id="tab-prepare" class="dept-tab" onclick="switchTab('prepare')" data-i18n="tab-prepare">👨‍🍳
+                        Prepare</button>
                 </div>
                 <button type="button" class="btn-outline" id="tab-reorder-btn" onclick="toggleTabReorderMode()"
                     style="padding: 8px 16px; border-radius: 100px; font-weight: 700; font-size: 0.85rem;" data-i18n="btn-reorder-tabs">
@@ -535,6 +537,11 @@
                                 style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
                                 <input type="checkbox" id="perm-tasks" style="width:auto;"> <span
                                     data-i18n="tab-tasks">Tasks</span>
+                            </label>
+                            <label
+                                style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                                <input type="checkbox" id="perm-prepare" style="width:auto;"> <span
+                                    data-i18n="tab-prepare">Prepare</span>
                             </label>
                         </div>
                         <button onclick="saveWorkerPerms()" style="width: 100%;" data-i18n="btn-save-worker-perms">Save
@@ -3032,6 +3039,8 @@
                                 </div>
                             </div>
 
+
+
                             <div class="form-group" style="margin-bottom: 18px;">
                                 <label>🖼️ Product Image (Upload File)</label>
                                 <input type="file" id="market-product-img-file" accept="image/*" onchange="handleMarketImageUpload(event, 'add')" style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.88rem; width: 100%; cursor: pointer;">
@@ -3047,10 +3056,10 @@
                         </form>
                     </div>
 
-                    <!-- Admin Monthly Coin Refill Control Card -->
+                    <!-- Admin Monthly Customer Coin Refill Control Card -->
                     <div class="card admin-only" style="border-top: 4px solid #f59e0b; max-width: 750px; width: 100%; margin: 0 auto 24px auto; box-sizing: border-box; box-shadow: 0 6px 20px rgba(0,0,0,0.06);">
                         <div class="flex-between" style="margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
-                            <h2 class="card-title" style="border: none; padding: 0; margin: 0; font-size: 1.15rem;" data-i18n="title-monthly-coin-refill">🪙 Monthly Coin Refill Value</h2>
+                            <h2 class="card-title" style="border: none; padding: 0; margin: 0; font-size: 1.15rem;" data-i18n="title-monthly-coin-refill">🪙 Monthly Customer Coins Refill</h2>
                             <span class="badge" style="background: rgba(245,158,11,0.15); color: #f59e0b; font-weight: 800; font-size: 0.8rem; border: 1px solid #f59e0b; padding: 4px 12px; border-radius: 100px;">Admin Only</span>
                         </div>
 
@@ -3059,8 +3068,8 @@
                                 <label>Monthly Refill Amount (Coins 🪙)</label>
                                 <input type="number" id="admin-monthly-coins-input" value="500" min="0" placeholder="e.g. 500" style="font-weight: 700; font-size: 1rem;">
                             </div>
-                            <button type="button" onclick="refillMonthlyCoinsForAllWorkers()" class="btn-warning" style="width: 100%; padding: 12px; font-weight: 800; font-size: 0.9rem; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 8px; border: none; cursor: pointer; color: white;">
-                                🔄 Refill All Workers Coins
+                            <button type="button" onclick="refillMonthlyCoinsForAllCustomers()" class="btn-warning" style="width: 100%; padding: 12px; font-weight: 800; font-size: 0.9rem; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 8px; border: none; cursor: pointer; color: white;">
+                                🔄 Refill All Customer Coins
                             </button>
                         </div>
                     </div>
@@ -3096,6 +3105,8 @@
                         </div>
                     </div>
 
+
+
                     <!-- Market Catalog Card (Centered Container) -->
                     <div class="card" style="border-top: 4px solid #ff9900; width: 100%; box-sizing: border-box; box-shadow: 0 6px 20px rgba(0,0,0,0.06);">
                         <div class="flex-between" style="margin-bottom: 20px; flex-wrap: wrap; gap: 12px; align-items: center;">
@@ -3105,19 +3116,43 @@
                             </div>
                             <!-- COIN BALANCE & CART CONTROLS (Top Right of Market Section) -->
                             <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                <button type="button" class="btn-outline admin-only" onclick="addTestCoins(500)" title="Add +500 Coins for Testing" style="background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid #f59e0b; font-weight: 900; font-size: 0.85rem; padding: 7px 14px; border-radius: 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-                                    ➕ 500 🪙
+                                <button type="button" class="adv-hdr-btn adv-btn-coins-add admin-only" onclick="addTestCoins(500)" title="Add +500 Coins for Testing">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                                    <span>500 🪙</span>
                                 </button>
-                                <div id="market-user-coins-badge" style="display: inline-flex; align-items: center; gap: 8px; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 7px 14px;">
+                                <div id="market-user-coins-badge" class="adv-hdr-coins-badge">
                                     <span style="font-size: 1.1rem; line-height: 1;">🪙</span>
                                     <span id="market-user-coins-val" style="font-size: 1rem; font-weight: 900; color: #f59e0b; font-family: monospace, system-ui, -apple-system, sans-serif; line-height: 1;">0</span>
                                 </div>
-                                <button id="market-cart-btn" onclick="openMarketCartModal()" style="background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; font-weight: 800; font-size: 0.9rem; padding: 8px 18px; border-radius: 100px; box-shadow: 0 4px 12px rgba(16,185,129,0.3); display: flex; align-items: center; gap: 6px; cursor: pointer; border: none; transition: transform 0.2s ease;">
-                                    🛒 Cart (<span id="market-cart-count">0</span>)
+                                <button id="market-admin-orders-btn" onclick="openAdminMarketOrdersModal()" class="adv-hdr-btn adv-btn-orders admin-only" style="background: linear-gradient(135deg, #4f46e5, #3730a3); color: #ffffff; border: none; font-weight: 800; display: none;">
+                                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                                        <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+                                        <path d="M9 12h6"/><path d="M9 16h6"/>
+                                    </svg>
+                                    <span data-i18n="btn-admin-market-orders">All Orders (Admin)</span>
                                 </button>
-                                <span id="market-count-badge" class="badge" style="background: #ff9900; color: #111; font-weight: 800; font-size: 0.85rem; padding: 6px 14px; border-radius: 20px;">0 Products</span>
+                                <button id="market-orders-btn" onclick="openCustomerOrdersModal()" class="adv-hdr-btn adv-btn-orders">
+                                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+                                        <path d="m3.3 7 8.7 5 8.7-5"/>
+                                        <path d="M12 22V12"/>
+                                    </svg>
+                                    <span data-i18n="btn-my-orders">My Orders</span>
+                                </button>
+                                <button id="market-cart-btn" onclick="openMarketCartModal()" class="adv-hdr-btn adv-btn-cart">
+                                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/>
+                                        <path d="M3 6h18"/>
+                                        <path d="M16 10a4 4 0 0 1-8 0"/>
+                                    </svg>
+                                    <span data-i18n="btn-cart">Cart</span>
+                                    <span id="market-cart-count" class="cart-count-pill">0</span>
+                                </button>
+                                <span id="market-count-badge" class="adv-hdr-count-badge">0 Products</span>
                             </div>
                         </div>
+
 
                         <!-- Filter Controls Bar -->
                         <div style="display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; align-items: center; justify-content: space-between; background: var(--input-bg); padding: 12px 16px; border-radius: 14px; border: 1px solid var(--border-color);">
@@ -3152,6 +3187,51 @@
 
 
         </div> <!-- End container -->
+
+            <!-- ========================================== -->
+            <!-- VIEW 16: PREPARE DEPARTMENT (👨‍🍳 قسم التحضير) -->
+            <!-- ========================================== -->
+            <div id="view-prepare" class="view-section">
+                <div style="display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 1550px; margin: 0 auto; box-sizing: border-box;">
+                    
+                    <!-- Prepare Hero Banner -->
+                    <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%); color: #ffffff; padding: 28px 36px; border-radius: 20px; text-align: center; border: 1px solid rgba(255,255,255,0.1); width: 100%; box-sizing: border-box; margin-bottom: 24px; position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.25);">
+                        <div style="position: absolute; right: -15px; top: -15px; font-size: 8rem; opacity: 0.06; pointer-events: none; user-select: none;">👨‍🍳</div>
+                        <h1 style="margin: 4px 0 8px 0; font-size: 2rem; font-weight: 900; color: #ffffff; letter-spacing: -0.5px; display: flex; align-items: center; justify-content: center; gap: 12px;" data-i18n="title-prepare-section">
+                            👨‍🍳 Kitchen & Market Preparation Dashboard / قسم التحضير
+                        </h1>
+                        <p style="margin: 0 0 4px 0; font-size: 1rem; color: #cbd5e1; max-width: 750px; margin-left: auto; margin-right: auto;" data-i18n="desc-prepare-section">
+                            Global real-time order queue across all companies. Live updates for kitchen prep workers.
+                        </p>
+                    </div>
+
+                    <!-- Prepare Orders Container Card -->
+                    <div class="card" style="border-top: 4px solid #f59e0b; width: 100%; box-sizing: border-box; box-shadow: 0 8px 30px rgba(0,0,0,0.08); padding: 24px;">
+                        <div class="flex-between" style="margin-bottom: 24px; flex-wrap: wrap; gap: 14px; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 16px;">
+                            <div>
+                                <h2 class="card-title" style="margin: 0; border: none; padding: 0; font-size: 1.35rem; font-weight: 900;">📦 Incoming Order Preparation Queue / قائمة طلبات التحضير</h2>
+                                <p style="font-size: 0.88rem; color: var(--text-muted); margin: 4px 0 0 0;">Update order status live from kitchen to delivery.</p>
+                            </div>
+
+                            <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+                                <select id="prepare-status-filter" onchange="renderPrepareSection()" style="padding: 10px 18px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-weight: 900; font-size: 0.92rem; cursor: pointer; box-shadow: var(--shadow-sm);">
+                                    <option value="all" selected>🌐 All Statuses / جميع الحالات</option>
+                                    <option value="pending">⏳ Pending / قيد الانتظار</option>
+                                    <option value="preparing">👨‍🍳 Preparing / قيد التحضير</option>
+                                    <option value="delivery">🚚 Out for Delivery / خرج للتوصيل</option>
+                                    <option value="delivered">✅ Delivered / تم التوصيل</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Prepare Orders Grid -->
+                        <div id="prepare-orders-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 20px; width: 100%; box-sizing: border-box;">
+                            <!-- Dynamically rendered in app.js -->
+                        </div>
+                    </div>
+
+                </div>
+            </div>
 
         <!-- Locked Department Overlay (shown when a worker taps a restricted tab) -->
         <div id="view-locked" class="view-section">
@@ -3412,6 +3492,13 @@
                     <input type="text" id="edit-market-product-weight" placeholder="e.g. 14 كجم, طازج 100%" style="width:100%; padding:10px; border-radius:8px; background:var(--input-bg); color:var(--text-main); border:1px solid var(--border-color); box-sizing:border-box;">
                 </div>
 
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:800; color:var(--text-main);">
+                        <input type="checkbox" id="edit-market-product-hidden" style="width: 18px; height: 18px; cursor: pointer;">
+                        <span data-i18n="label-hide-product">🙈 Hide Product (Out of Stock)</span>
+                    </label>
+                </div>
+
                 <div class="form-group" style="margin-bottom: 20px;">
                     <label>🖼️ Product Image (Upload File)</label>
                     <input type="file" id="edit-market-product-img-file" accept="image/*" onchange="handleMarketImageUpload(event, 'edit')" style="width:100%; padding:8px 12px; border-radius:8px; background:var(--input-bg); color:var(--text-main); border:1px solid var(--border-color); box-sizing:border-box;">
@@ -3467,6 +3554,180 @@
 
                 <button id="market-cart-submit-btn" type="button" onclick="submitMarketOrder()" class="btn-success" style="width: 100%; padding: 14px; font-weight: 900; font-size: 1.05rem; border-radius: 12px; background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; border: none; cursor: pointer; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);">
                     🛍️ Submit Order / إتمام الطلب
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Receipt Modal (Formal A4 Paper Document Style) -->
+    <div id="market-order-receipt-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 10000; backdrop-filter: blur(6px); align-items: center; justify-content: center; padding: 20px; overflow-y: auto;">
+        <div class="card formal-a4-receipt" style="max-width: 680px; width: 100%; max-height: 92vh; display: flex; flex-direction: column; background: #ffffff !important; color: #0f172a !important; border: 2px solid #0f172a; box-shadow: 0 15px 40px rgba(0,0,0,0.4); border-radius: 12px; overflow: hidden; padding: 0; font-family: 'Inter', system-ui, sans-serif;">
+            
+            <!-- Formal A4 Header -->
+            <div style="padding: 24px 28px 18px 28px; border-bottom: 2px solid #0f172a; background: #f8fafc; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
+                <div>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+                        <span style="font-size: 1.8rem; line-height: 1;">🏪</span>
+                        <h2 style="margin: 0; font-size: 1.4rem; font-weight: 900; color: #0f172a; letter-spacing: -0.5px; text-transform: uppercase;">MVC TEAM MARKET</h2>
+                    </div>
+                    <div style="font-size: 0.92rem; font-weight: 800; color: #334155;">فاتورة طلب رسمية / OFFICIAL ORDER RECEIPT</div>
+                    <div style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">نظام إدارة وتوزيع الطلبات والمنتجات</div>
+                </div>
+
+                <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                    <div style="font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase;">Order Number / رقم الطلب</div>
+                    <div id="receipt-order-num" style="font-size: 1.25rem; font-weight: 900; color: #1e40af; font-family: monospace, system-ui; letter-spacing: 1px; background: #dbeafe; padding: 4px 10px; border-radius: 6px; border: 1px solid #bfdbfe;">#ORD-000000</div>
+                    <div id="receipt-order-date" style="font-size: 0.8rem; font-weight: 700; color: #475569; margin-top: 4px;">-</div>
+                </div>
+            </div>
+
+            <!-- Customer & Order Information Box -->
+            <div style="padding: 16px 28px; background: #ffffff; border-bottom: 1px solid #cbd5e1; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; font-size: 0.88rem;">
+                <div>
+                    <span style="color: #64748b; font-weight: 600;">اسم العميل / Customer:</span>
+                    <div id="receipt-customer-name" style="font-weight: 800; color: #0f172a; font-size: 1rem; margin-top: 2px;">-</div>
+                </div>
+                <div>
+                    <span style="color: #64748b; font-weight: 600;">حالة الطلب / Order Status:</span>
+                    <div style="margin-top: 2px;">
+                        <span id="receipt-order-status-badge" class="badge" style="font-weight: 900; font-size: 0.82rem; padding: 4px 12px; border-radius: 100px; background: #fef3c7; color: #d97706;">Pending</span>
+                    </div>
+                </div>
+                <div>
+                    <span style="color: #64748b; font-weight: 600;">طريقة الدفع / Payment Method:</span>
+                    <div style="font-weight: 800; color: #15803d; margin-top: 2px;">العملات الرقمية (Coins 🪙)</div>
+                </div>
+                <div>
+                    <span style="color: #64748b; font-weight: 600;">الشركة والفرع / Company:</span>
+                    <div id="receipt-company-tag" style="font-weight: 800; color: #0f172a; margin-top: 2px;">MVC Fresh</div>
+                </div>
+            </div>
+
+            <!-- Formal Items Table Container -->
+            <div style="padding: 20px 28px; overflow-y: auto; flex: 1; min-height: 160px;">
+                <h4 style="margin: 0 0 12px 0; font-size: 0.95rem; font-weight: 900; color: #0f172a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>بيانات المنتجات / Order Items Details</span>
+                    <span style="font-size: 0.8rem; font-weight: 700; color: #64748b;">(أصناف محددة)</span>
+                </h4>
+
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem; text-align: left;">
+                    <thead>
+                        <tr style="background: #f1f5f9; color: #1e293b; border-bottom: 2px solid #cbd5e1;">
+                            <th style="padding: 8px 10px; font-weight: 800; width: 40px; text-align: center;">#</th>
+                            <th style="padding: 8px 10px; font-weight: 800;">الصنف / Product Description</th>
+                            <th style="padding: 8px 10px; font-weight: 800; text-align: center; width: 80px;">الكمية</th>
+                            <th style="padding: 8px 10px; font-weight: 800; text-align: right; width: 110px;">سعر الوحدة</th>
+                            <th style="padding: 8px 10px; font-weight: 800; text-align: right; width: 120px;">الإجمالي</th>
+                        </tr>
+                    </thead>
+                    <tbody id="receipt-items-list">
+                        <!-- Dynamically populated in app.js -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Formal Total Box & Stamp Signatures Line -->
+            <div style="padding: 16px 28px; background: #f8fafc; border-top: 2px solid #0f172a; display: flex; flex-direction: column; gap: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #0f172a; color: #ffffff; border-radius: 8px;">
+                    <span style="font-size: 1.05rem; font-weight: 800;">المجموع الكلي المدفوع / Grand Total Paid:</span>
+                    <span id="receipt-total-cost" style="font-size: 1.3rem; font-weight: 900; color: #4ade80; font-family: monospace, system-ui;">0 العملات</span>
+                </div>
+
+                <!-- Signatures / Stamp Verification Footer -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; padding-top: 10px; border-top: 1px dashed #cbd5e1; font-size: 0.8rem; color: #475569;">
+                    <div>
+                        <div>توقيع مسؤول التحضير: ____________________</div>
+                        <div style="margin-top: 4px; font-size: 0.72rem; color: #94a3b8;">توقيع الاستلام والمصادقة على الفاتورة</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div>ختم الاعتماد والموافقة 🔴</div>
+                        <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">MVC Official Seal</div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons (Hidden when printing via CSS .no-print) -->
+                <div class="no-print" style="display: flex; gap: 12px; margin-top: 8px;">
+                    <button type="button" onclick="window.print()" class="btn-outline" style="flex: 1; padding: 11px; font-weight: 800; font-size: 0.92rem; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; background: #ffffff; color: #0f172a; border: 2px solid #0f172a;">
+                        🖨️ طباعة الفاتورة الرسمية (Print A4)
+                    </button>
+                    <button type="button" onclick="closeMarketOrderReceiptModal()" class="btn-primary" style="flex: 1; padding: 11px; font-weight: 800; font-size: 0.92rem; border-radius: 10px; background: #16a34a; color: white; border: none; cursor: pointer;">
+                        ✔ إغلاق / Close
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Customer Orders & Live Status Modal -->
+    <div id="customer-orders-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 9999; backdrop-filter: blur(5px); align-items: center; justify-content: center; padding: 16px;">
+        <div class="card" style="max-width: 650px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; border-top: 4px solid #3b82f6; box-shadow: 0 10px 30px rgba(0,0,0,0.35); border-radius: 20px; overflow: hidden; padding: 0; background: var(--card-bg, #ffffff);">
+            <!-- Modal Header -->
+            <div style="padding: 20px 24px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; background: var(--card-bg);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 1.6rem;">📦</span>
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.25rem; font-weight: 900; color: var(--text-main);" data-i18n="title-customer-orders">My Orders & Live Status / طلباتي وحالة التوصيل</h3>
+                        <p style="margin: 2px 0 0 0; font-size: 0.8rem; color: var(--text-muted);">Track your recent market orders and live status updates</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeCustomerOrdersModal()" class="btn-outline" style="border-radius: 50%; width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer;">✖</button>
+            </div>
+
+            <!-- Orders List Container -->
+            <div id="customer-orders-list" style="padding: 20px 24px; overflow-y: auto; flex: 1; min-height: 200px; max-height: 480px; display: flex; flex-direction: column; gap: 12px;">
+                <!-- Dynamically rendered -->
+            </div>
+
+            <!-- Modal Footer -->
+            <div style="padding: 16px 24px; background: var(--input-bg); border-top: 1px solid var(--border-color); text-align: right;">
+                <button type="button" onclick="closeCustomerOrdersModal()" class="btn-outline" style="padding: 8px 20px; border-radius: 100px; font-weight: 800; font-size: 0.9rem; cursor: pointer;">
+                    إغلاق / Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Market Orders Management Modal -->
+    <div id="admin-market-orders-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 9999; backdrop-filter: blur(5px); align-items: center; justify-content: center; padding: 16px;">
+        <div class="card" style="max-width: 800px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; border-top: 4px solid #4f46e5; box-shadow: 0 12px 36px rgba(0,0,0,0.4); border-radius: 20px; overflow: hidden; padding: 0; background: var(--card-bg, #ffffff);">
+            <!-- Modal Header -->
+            <div style="padding: 20px 24px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; background: var(--card-bg);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 1.6rem;">📋</span>
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.25rem; font-weight: 900; color: var(--text-main);" data-i18n="title-admin-market-orders">Incoming Market Orders Management</h3>
+                        <p style="margin: 2px 0 0 0; font-size: 0.8rem; color: var(--text-muted);">Manage status, cancel with refunds, or delete incoming customer market orders.</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeAdminMarketOrdersModal()" class="btn-outline" style="border-radius: 50%; width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer;">✖</button>
+            </div>
+
+            <!-- Stats Summary HUD -->
+            <div id="admin-orders-stats-hud"></div>
+
+            <!-- Filter Status Bar -->
+            <div style="padding: 12px 24px; background: var(--input-bg); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div style="font-weight: 800; font-size: 0.88rem; color: var(--text-main);" data-i18n="label-filter-status">Filter Status:</div>
+                <select id="admin-modal-orders-status-filter" onchange="renderAdminMarketOrders()" style="padding: 7px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-weight: 800; font-size: 0.88rem; cursor: pointer;">
+                    <option value="all">🌐 All Orders / جميع الطلبات</option>
+                    <option value="pending">⏳ Pending / قيد الانتظار</option>
+                    <option value="preparing">👨‍🍳 Preparing / قيد التحضير</option>
+                    <option value="delivery">🚚 Out for Delivery / خرج للتوصيل</option>
+                    <option value="delivered">✅ Delivered / تم التوصيل</option>
+                    <option value="cancelled">❌ Cancelled / ملغاة</option>
+                </select>
+            </div>
+
+            <!-- Orders List Container -->
+            <div id="admin-market-orders-modal-list" style="padding: 20px 24px; overflow-y: auto; flex: 1; min-height: 200px; max-height: 520px; display: flex; flex-direction: column; gap: 14px;">
+                <!-- Dynamically rendered -->
+            </div>
+
+            <!-- Modal Footer -->
+            <div style="padding: 16px 24px; background: var(--input-bg); border-top: 1px solid var(--border-color); text-align: right;">
+                <button type="button" onclick="closeAdminMarketOrdersModal()" class="btn-outline" style="padding: 8px 20px; border-radius: 100px; font-weight: 800; font-size: 0.9rem; cursor: pointer;">
+                    إغلاق / Close
                 </button>
             </div>
         </div>
@@ -3559,11 +3820,15 @@
                 onclick="switchTab('market'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">🏪</span><span data-i18n="tab-market">Market</span>
             </button>
+            <button class="mob-dept-item mob-sheet-tab" data-tab="prepare"
+                onclick="switchTab('prepare'); closeMobDeptMenu()">
+                <span class="mob-dept-icon">👨‍🍳</span><span data-i18n="tab-prepare">Prepare</span>
+            </button>
         </div>
     </div>
 
     <script defer src="translations.js"></script>
-    <script defer src="app.js?v=126"></script>
+    <script defer src="app.js?v=142"></script>
 </body>
 
 

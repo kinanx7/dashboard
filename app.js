@@ -1180,6 +1180,7 @@ function applyUserRoles() {
         if (wPerms.adverts || deptPrivacy.adverts === 'public') document.body.classList.add('perm-adverts');
         if (wPerms.attendance) document.body.classList.add('perm-attendance');
         if (wPerms.tasks) document.body.classList.add('perm-tasks');
+        if (wPerms.prepare) document.body.classList.add('perm-prepare');
         if (isDriver) document.body.classList.add('is-driver');
         if (typeof checkWorkerSystemViolationAlerts === 'function') {
             checkWorkerSystemViolationAlerts(worker);
@@ -1213,6 +1214,7 @@ function markLockedTabs() {
         activity: isAdmin,
         reminders: isAdmin,
         market: true,
+        prepare: isAdmin || document.body.classList.contains('perm-prepare'),
     };
 
     Object.entries(access).forEach(([tabId, hasAccess]) => {
@@ -1246,7 +1248,7 @@ function ensureArraysExist(data) {
         data.workers = Object.values(data.workers);
     }
     if (!data.workers) data.workers = [];
-    data.workers = data.workers.filter(w => w);
+    data.workers = data.workers.filter(w => w && typeof w === 'object' && w.id && w.name && w.name !== 'undefined' && w.id !== 'undefined' && String(w.name).trim() !== '');
     data.workers.forEach(w => {
         if (!w.jobs) w.jobs = [];
         else if (!Array.isArray(w.jobs)) w.jobs = Object.values(w.jobs);
@@ -1942,6 +1944,7 @@ function loadWorkerPerms() {
     document.getElementById('perm-adverts').checked = !!p.adverts;
     document.getElementById('perm-attendance').checked = !!p.attendance;
     if (document.getElementById('perm-tasks')) document.getElementById('perm-tasks').checked = !!p.tasks;
+    if (document.getElementById('perm-prepare')) document.getElementById('perm-prepare').checked = !!p.prepare;
 }
 
 function saveWorkerPerms() {
@@ -1958,7 +1961,8 @@ function saveWorkerPerms() {
         costs: document.getElementById('perm-costs').checked,
         adverts: document.getElementById('perm-adverts').checked,
         attendance: document.getElementById('perm-attendance').checked,
-        tasks: document.getElementById('perm-tasks') ? document.getElementById('perm-tasks').checked : false
+        tasks: document.getElementById('perm-tasks') ? document.getElementById('perm-tasks').checked : false,
+        prepare: document.getElementById('perm-prepare') ? document.getElementById('perm-prepare').checked : false
     };
 
     // Targeted write to worker permissions path
@@ -5289,7 +5293,7 @@ function switchTab(tab) {
         }
     }
 
-    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market'];
+    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare'];
 
     allTabs.forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
@@ -5324,6 +5328,7 @@ function switchTab(tab) {
         notes: { icon: '📝', label: 'Notes' },
         reminders: { icon: '⏰', label: 'Reminders' },
         market: { icon: '🏪', label: 'Market' },
+        prepare: { icon: '👨‍🍳', label: 'Prepare' },
     };
     const meta = tabMeta[tab] || { icon: '⚙️', label: tab };
     const iconEl = document.getElementById('mob-active-icon');
@@ -5342,6 +5347,9 @@ function switchTab(tab) {
         }
         if (tab === 'market' && typeof renderMarket === 'function') {
             renderMarket();
+        }
+        if (tab === 'prepare' && typeof renderPrepareSection === 'function') {
+            renderPrepareSection();
         }
         // Fixes Leaflet map rendering bug when switching tabs
         if (tab === 'adverts' && promoMap) {
@@ -13656,18 +13664,72 @@ function toggleMarketWishlist(productId) {
 }
 window.toggleMarketWishlist = toggleMarketWishlist;
 
+function getMarketCartKey() {
+    if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && (currentCustomerSession.code || currentCustomerSession.id)) {
+        return 'mvc_market_cart_cust_' + (currentCustomerSession.code || currentCustomerSession.id);
+    }
+    if (typeof currentUser !== 'undefined' && currentUser && (currentUser.uid || currentUser.email)) {
+        const cleanEmail = String(currentUser.email || currentUser.uid).replace(/[^a-zA-Z0-9_-]/g, '_');
+        return 'mvc_market_cart_user_' + cleanEmail;
+    }
+    const workerId = typeof getCurrentWorkerId === 'function' ? getCurrentWorkerId() : null;
+    if (workerId) return 'mvc_market_cart_worker_' + workerId;
+    return 'mvc_market_cart_guest';
+}
+window.getMarketCartKey = getMarketCartKey;
+
+function loadMarketCart() {
+    try {
+        const key = getMarketCartKey();
+        const saved = localStorage.getItem(key);
+        if (saved) {
+            marketCart = JSON.parse(saved);
+        } else {
+            marketCart = [];
+        }
+    } catch (e) {
+        marketCart = [];
+    }
+    return marketCart;
+}
+window.loadMarketCart = loadMarketCart;
+
 function saveMarketCart() {
     try {
-        localStorage.setItem('mvc_market_cart', JSON.stringify(marketCart));
+        const key = getMarketCartKey();
+        localStorage.setItem(key, JSON.stringify(marketCart));
     } catch (e) {}
     updateMarketCartBadges();
 }
+window.saveMarketCart = saveMarketCart;
+
+function isCartItemAvailable(item) {
+    if (!item || !item.productId) return false;
+    const allProds = getAllMarketProducts();
+    const prod = allProds.find(p => p && p.id === item.productId);
+    if (!prod) return false;
+    if (typeof isProductHidden === 'function' && isProductHidden(prod)) return false;
+    return true;
+}
+window.isCartItemAvailable = isCartItemAvailable;
 
 function updateMarketCartBadges() {
+    loadMarketCart();
     const totalQty = marketCart.reduce((sum, item) => sum + (item.qty || 0), 0);
+    const unavailableCount = marketCart.filter(item => !isCartItemAvailable(item)).length;
     const cartCountEl = document.getElementById('market-cart-count');
-    if (cartCountEl) cartCountEl.textContent = totalQty;
+    if (cartCountEl) {
+        cartCountEl.textContent = totalQty;
+        if (unavailableCount > 0) {
+            cartCountEl.style.background = '#ef4444';
+            cartCountEl.title = currentAppLang === 'ar' ? `${unavailableCount} منتج غير متوفر بالسلة` : `${unavailableCount} unavailable items`;
+        } else {
+            cartCountEl.style.background = '';
+            cartCountEl.title = '';
+        }
+    }
 }
+window.updateMarketCartBadges = updateMarketCartBadges;
 
 function getCurrentWorkerId() {
     if (typeof currentWorkerProfile !== 'undefined' && currentWorkerProfile && currentWorkerProfile.id) return currentWorkerProfile.id;
@@ -13680,53 +13742,97 @@ function getUserCoins() {
     if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && typeof currentCustomerSession.coins !== 'undefined') {
         return parseFloat(currentCustomerSession.coins) || 0;
     }
-    const data = getCompanyData();
-    const workers = data.workers || {};
     const workerId = getCurrentWorkerId();
-
-    if (workers[workerId] && typeof workers[workerId].coins !== 'undefined') {
-        return parseFloat(workers[workerId].coins) || 0;
+    const data = getCompanyData();
+    if (data.workers && data.workers[workerId] && typeof data.workers[workerId].coins !== 'undefined') {
+        return parseFloat(data.workers[workerId].coins) || 0;
     }
-    const userCoinsMap = data.userCoins || {};
-    if (typeof userCoinsMap[workerId] !== 'undefined') {
-        return parseFloat(userCoinsMap[workerId]) || 0;
+    if (data.userCoins && typeof data.userCoins[workerId] !== 'undefined') {
+        return parseFloat(data.userCoins[workerId]) || 0;
     }
-    return 1000; // Default coin balance
+    const localCoins = localStorage.getItem('mvc_admin_coins_' + workerId) || localStorage.getItem('mvc_admin_coins');
+    if (localCoins !== null && !isNaN(parseFloat(localCoins))) {
+        return parseFloat(localCoins);
+    }
+    return 1000; // Default balance for Admin testing
 }
 
-function refillMonthlyCoinsForAllWorkers() {
+function refillMonthlyCoinsForAllCustomers() {
     const isAr = currentAppLang === 'ar';
     const amountInput = document.getElementById('admin-monthly-coins-input');
     const amount = parseFloat(amountInput?.value || 500);
 
     if (isNaN(amount) || amount <= 0) {
-        alert(isAr ? 'الرجاء إدخال كمية كوينز صحيحة.' : 'Please enter a valid coin amount.');
+        alert(isAr ? 'الرجاء إدخال كمية من العملات صحيحة.' : 'Please enter a valid coin amount.');
         return;
     }
 
     if (!confirm(isAr 
-        ? `هل تريد تعبئة ${amount} كوينز شهرياً لجميع الموظفين؟` 
-        : `Refill ${amount} monthly coins for all active workers?`)) {
+        ? `هل تريد إعادة تعبئة ${amount.toLocaleString()} من العملات لجميع العملاء المسجلين؟` 
+        : `Refill ${amount.toLocaleString()} coins for all registered customers?`)) {
         return;
     }
 
-    const workers = getVisibleWorkers();
-    const updates = {};
-    workers.forEach(w => {
-        const currentCoins = parseFloat(w.coins || 1000);
-        updates[`companies/${currentCompany}/workers/${w.id}/coins`] = currentCoins + amount;
-        w.coins = currentCoins + amount;
+    // Collect all customer codes from local appData & Firebase
+    const customerMap = {};
+
+    ['mvc', 'mvcfresh', 'burgeroov'].forEach(cKey => {
+        if (appData[cKey] && appData[cKey].customers) {
+            Object.entries(appData[cKey].customers).forEach(([code, cust]) => {
+                if (code && cust) customerMap[code] = cust;
+            });
+        }
     });
 
-    db.ref().update(updates).then(() => {
-        alert(isAr ? `تمت إعادة تعبئة ${amount} كوينز بنجاح لجميع الموظفين! 🪙` : `Refilled ${amount} coins for all workers successfully! 🪙`);
-        renderMarket();
-    }).catch(err => {
-        console.error("Error refilling coins:", err);
-        alert(isAr ? 'حدث خطأ أثناء تعبئة الكوينز.' : 'Error refilling coins.');
-    });
+    if (window.globalCustomerCodes) {
+        Object.entries(window.globalCustomerCodes).forEach(([code, cust]) => {
+            if (code && cust) customerMap[code] = cust;
+        });
+    }
+
+    const performRefill = (valMap) => {
+        const codes = Object.keys(valMap);
+        if (codes.length === 0) {
+            alert(isAr ? 'لا يوجد عملاء مسجلون حالياً لتعبئة أرصدتهم.' : 'No registered customers found to refill.');
+            return;
+        }
+
+        const updates = {};
+        codes.forEach(code => {
+            const cust = valMap[code] || {};
+            const currentCoins = parseFloat((cust && cust.coins) || 0);
+            const newCoins = currentCoins + amount;
+            if (cust) cust.coins = newCoins;
+
+            updates[`publicCustomerCodes/${code}/coins`] = newCoins;
+            updates[`customerCodes/${code}/coins`] = newCoins;
+            updates[`customers/${code}/coins`] = newCoins;
+            ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
+                updates[`companies/${c}/customers/${code}/coins`] = newCoins;
+            });
+        });
+
+        db.ref().update(updates).then(() => {
+            alert(isAr ? `تمت إعادة تعبئة ${amount.toLocaleString()} من العملات بنجاح لجميع العملاء! 🪙` : `Refilled ${amount.toLocaleString()} coins for all customers successfully! 🪙`);
+            renderMarket();
+            renderAdminCustomersList();
+        }).catch(err => {
+            console.error("Error refilling customer coins:", err);
+            alert(isAr ? 'حدث خطأ أثناء تعبئة العملات.' : 'Error refilling coins.');
+        });
+    };
+
+    if (Object.keys(customerMap).length === 0 && typeof db !== 'undefined') {
+        db.ref('publicCustomerCodes').once('value').then(snap => {
+            const val = snap.exists() ? snap.val() : {};
+            performRefill(val);
+        }).catch(() => performRefill(customerMap));
+    } else {
+        performRefill(customerMap);
+    }
 }
-window.refillMonthlyCoinsForAllWorkers = refillMonthlyCoinsForAllWorkers;
+window.refillMonthlyCoinsForAllCustomers = refillMonthlyCoinsForAllCustomers;
+window.refillMonthlyCoinsForAllWorkers = refillMonthlyCoinsForAllCustomers;
 
 function addTestCoins(amount = 500) {
     const isAr = currentAppLang === 'ar';
@@ -13736,7 +13842,12 @@ function addTestCoins(amount = 500) {
 
     if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && currentCustomerSession.code) {
         const custCode = currentCustomerSession.code;
-        updates[`companies/${currentCompany}/customers/${custCode}/coins`] = newCoins;
+        updates[`publicCustomerCodes/${custCode}/coins`] = newCoins;
+        updates[`customerCodes/${custCode}/coins`] = newCoins;
+        updates[`customers/${custCode}/coins`] = newCoins;
+        ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
+            updates[`companies/${c}/customers/${custCode}/coins`] = newCoins;
+        });
         currentCustomerSession.coins = newCoins;
         try {
             localStorage.setItem('mvc_customer_session', JSON.stringify(currentCustomerSession));
@@ -13745,20 +13856,30 @@ function addTestCoins(amount = 500) {
         const workerId = getCurrentWorkerId();
         const data = getCompanyData();
         if (data.workers && data.workers[workerId]) {
-            updates[`companies/${currentCompany}/workers/${workerId}/coins`] = newCoins;
             data.workers[workerId].coins = newCoins;
         }
-        updates[`companies/${currentCompany}/userCoins/${workerId}`] = newCoins;
         if (!data.userCoins) data.userCoins = {};
         data.userCoins[workerId] = newCoins;
+
+        try {
+            localStorage.setItem('mvc_admin_coins_' + workerId, newCoins);
+            localStorage.setItem('mvc_admin_coins', newCoins);
+        } catch(e){}
+
+        updates[`companies/${currentCompany}/workers/${workerId}/coins`] = newCoins;
+        updates[`companies/${currentCompany}/userCoins/${workerId}`] = newCoins;
     }
 
-    db.ref().update(updates).then(() => {
-        renderMarket();
-    }).catch(err => {
-        console.error("Error adding test coins:", err);
-        alert(isAr ? 'حدث خطأ أثناء إضافة الكوينز.' : 'Error adding coins.');
-    });
+    renderMarket();
+
+    if (typeof db !== 'undefined') {
+        db.ref().update(updates).then(() => {
+            renderMarket();
+        }).catch(err => {
+            console.error("Error adding test coins:", err);
+            renderMarket();
+        });
+    }
 }
 window.addTestCoins = addTestCoins;
 
@@ -13775,12 +13896,12 @@ function updateWorkerCoinsIndividual() {
         return;
     }
     if (isNaN(amount) || amount < 0) {
-        alert(isAr ? 'الرجاء إدخال رصيد كوينز صحيح.' : 'Please enter a valid coin balance.');
+        alert(isAr ? 'الرجاء إدخال رصيد عملات صحيح.' : 'Please enter a valid coin balance.');
         return;
     }
 
     db.ref(`companies/${currentCompany}/workers/${workerId}/coins`).set(amount).then(() => {
-        alert(isAr ? 'تم تحديث رصيد الكوينز للموظف بنجاح! 🪙' : 'Worker coins updated successfully! 🪙');
+        alert(isAr ? 'تم تحديث رصيد العملات للموظف بنجاح! 🪙' : 'Worker coins updated successfully! 🪙');
         if (adjustInput) adjustInput.value = '';
         renderMarket();
     }).catch(err => {
@@ -13867,15 +13988,18 @@ function initGlobalMarketProductsListener() {
         db.ref(path).on('value', snapshot => {
             if (snapshot.exists()) {
                 const val = snapshot.val();
-                const list = Array.isArray(val) ? val : Object.values(val);
-                list.forEach(p => {
-                    if (p && p.id) {
-                        window.globalMarketProductsCache[p.id] = p;
-                    }
-                });
-                try {
-                    localStorage.setItem('mvc_cached_market_products', JSON.stringify(window.globalMarketProductsCache));
-                } catch(e){}
+                if (val && typeof val === 'object') {
+                    Object.entries(val).forEach(([key, p]) => {
+                        if (p && typeof p === 'object') {
+                            const pId = p.id || key;
+                            p.id = pId;
+                            window.globalMarketProductsCache[pId] = p;
+                        }
+                    });
+                    try {
+                        localStorage.setItem('mvc_cached_market_products', JSON.stringify(window.globalMarketProductsCache));
+                    } catch(e){}
+                }
             }
             if (typeof renderMarket === 'function') {
                 renderMarket();
@@ -13885,29 +14009,64 @@ function initGlobalMarketProductsListener() {
 }
 window.initGlobalMarketProductsListener = initGlobalMarketProductsListener;
 
+function isProductHidden(p) {
+    if (!p) return false;
+    return (p.isHidden === true || p.isHidden === 'true' || p.hidden === true || p.hidden === 'true');
+}
+window.isProductHidden = isProductHidden;
+
 function getAllMarketProducts() {
     initGlobalMarketProductsListener();
 
-    const map = { ...window.globalMarketProductsCache };
+    const map = {};
+
+    const mergeProduct = (p) => {
+        if (!p || typeof p !== 'object') return;
+        const pId = p.id || p.key || p._id;
+        if (!pId) return;
+        p.id = pId;
+
+        const h = isProductHidden(p);
+        if (!map[pId]) {
+            map[pId] = { ...p, id: pId, isHidden: h, hidden: h };
+        } else {
+            const isHiddenState = isProductHidden(map[pId]) || h;
+            map[pId] = {
+                ...map[pId],
+                ...p,
+                id: pId,
+                isHidden: isHiddenState,
+                hidden: isHiddenState
+            };
+        }
+    };
+
+    if (window.globalMarketProductsCache) {
+        Object.values(window.globalMarketProductsCache).forEach(mergeProduct);
+    }
+
     const data = getCompanyData();
     const rawProds = data.marketProducts || {};
-    const prods = Array.isArray(rawProds) ? rawProds : Object.values(rawProds);
+    if (rawProds && typeof rawProds === 'object') {
+        Object.entries(rawProds).forEach(([key, p]) => {
+            if (p && typeof p === 'object') {
+                mergeProduct({ ...p, id: p.id || key });
+            }
+        });
+    }
 
-    // Collect products from current company
-    prods.forEach(p => {
-        if (p && p.id) map[p.id] = p;
-    });
-
-    // Merge products from all loaded companies in appData so market products never disappear
     if (typeof appData !== 'undefined') {
         const companyKeys = ['mvc', 'mvcfresh', 'burgeroov', ...Object.keys(appData)];
         companyKeys.forEach(cKey => {
             if (appData[cKey] && appData[cKey].marketProducts) {
                 const cMap = appData[cKey].marketProducts;
-                const cList = Array.isArray(cMap) ? cMap : Object.values(cMap);
-                cList.forEach(p => {
-                    if (p && p.id && !map[p.id]) map[p.id] = p;
-                });
+                if (cMap && typeof cMap === 'object') {
+                    Object.entries(cMap).forEach(([key, p]) => {
+                        if (p && typeof p === 'object') {
+                            mergeProduct({ ...p, id: p.id || key });
+                        }
+                    });
+                }
             }
         });
     }
@@ -13933,8 +14092,8 @@ function getAllMarketProducts() {
                     const list = Array.isArray(res) ? res : Object.values(res);
                     list.forEach(p => {
                         if (p && p.id) {
-                            window.globalMarketProductsCache[p.id] = p;
-                            map[p.id] = p;
+                            mergeProduct(p);
+                            window.globalMarketProductsCache[p.id] = map[p.id];
                             foundAny = true;
                         }
                     });
@@ -13953,11 +14112,87 @@ function getAllMarketProducts() {
 }
 window.getAllMarketProducts = getAllMarketProducts;
 
-function addToMarketCart(productId) {
+function triggerPlusOneEffect(clickX, clickY) {
+    // 1. Create floating +1 badge over the clicked button coordinates
+    const badge = document.createElement('div');
+    badge.className = 'cart-plus-one-badge';
+    badge.innerHTML = '+1 🛒';
+
+    if (clickX && clickY && clickX > 0 && clickY > 0) {
+        badge.style.left = `${clickX - 24}px`;
+        badge.style.top = `${clickY - 12}px`;
+    } else {
+        const cartBtn = document.getElementById('market-cart-btn');
+        if (cartBtn) {
+            const r = cartBtn.getBoundingClientRect();
+            badge.style.left = `${r.left + (r.width / 2) - 24}px`;
+            badge.style.top = `${r.top + r.height}px`;
+        } else {
+            badge.style.left = '50%';
+            badge.style.top = '50%';
+        }
+    }
+
+    document.body.appendChild(badge);
+    setTimeout(() => badge.remove(), 850);
+
+    // 2. Trigger bounce pop on top right Cart button
+    const cartBtn = document.getElementById('market-cart-btn');
+    if (cartBtn) {
+        cartBtn.classList.remove('cart-btn-pop');
+        void cartBtn.offsetWidth; // Force reflow
+        cartBtn.classList.add('cart-btn-pop');
+        setTimeout(() => cartBtn.classList.remove('cart-btn-pop'), 450);
+    }
+}
+window.triggerPlusOneEffect = triggerPlusOneEffect;
+
+function addToMarketCart(productId, evt) {
+    // CAPTURE CLICK COORDINATES BEFORE DOM RE-RENDER DESTROYS ELEMENT
+    let clickX = null;
+    let clickY = null;
+
+    if (evt) {
+        if (typeof evt.clientX === 'number' && typeof evt.clientY === 'number' && (evt.clientX > 0 || evt.clientY > 0)) {
+            clickX = evt.clientX;
+            clickY = evt.clientY;
+        } else {
+            const el = evt.currentTarget || evt.target;
+            if (el && typeof el.getBoundingClientRect === 'function') {
+                const r = el.getBoundingClientRect();
+                if (r.width > 0 && r.height > 0) {
+                    clickX = r.left + (r.width / 2);
+                    clickY = r.top;
+                }
+            }
+        }
+    }
+
+    if ((!clickX || clickX <= 0) && productId) {
+        const btn = document.querySelector(`button[onclick*="${productId}"]`);
+        if (btn) {
+            const r = btn.getBoundingClientRect();
+            if (r.width > 0 && r.height > 0) {
+                clickX = r.left + (r.width / 2);
+                clickY = r.top;
+            }
+        }
+    }
+
     const prods = getAllMarketProducts();
     const prod = prods.find(p => p.id === productId);
 
     if (!prod) return;
+
+    const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
+    const isAdmin = !isCustomer && (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.isAdmin));
+    if (isProductHidden(prod) && !isAdmin) {
+        const isAr = currentAppLang === 'ar';
+        alert(isAr ? 'عذراً، هذا المنتج غير متوفر حالياً (تم إخفاؤه من قبل الأدمن).' : 'Sorry, this product is currently unavailable (hidden by admin).');
+        return;
+    }
+
+    loadMarketCart();
 
     const existingIndex = marketCart.findIndex(item => item.productId === productId);
     if (existingIndex > -1) {
@@ -13975,6 +14210,7 @@ function addToMarketCart(productId) {
 
     saveMarketCart();
     renderMarket();
+    triggerPlusOneEffect(clickX, clickY);
 }
 window.addToMarketCart = addToMarketCart;
 
@@ -13992,6 +14228,7 @@ function closeMarketCartModal() {
 window.closeMarketCartModal = closeMarketCartModal;
 
 function updateCartItemQty(productId, delta) {
+    loadMarketCart();
     const index = marketCart.findIndex(item => item.productId === productId);
     if (index === -1) return;
 
@@ -14006,6 +14243,7 @@ function updateCartItemQty(productId, delta) {
 window.updateCartItemQty = updateCartItemQty;
 
 function removeCartItem(productId) {
+    loadMarketCart();
     marketCart = marketCart.filter(item => item.productId !== productId);
     saveMarketCart();
     renderMarketCartItems();
@@ -14014,6 +14252,7 @@ function removeCartItem(productId) {
 window.removeCartItem = removeCartItem;
 
 function renderMarketCartItems() {
+    loadMarketCart();
     const listContainer = document.getElementById('market-cart-items-list');
     const userBalanceEl = document.getElementById('market-cart-user-balance');
     const totalCostEl = document.getElementById('market-cart-total-cost');
@@ -14022,7 +14261,7 @@ function renderMarketCartItems() {
     const isAr = currentAppLang === 'ar';
 
     const userCoins = getUserCoins();
-    if (userBalanceEl) userBalanceEl.textContent = `${userCoins.toLocaleString()} ${isAr ? 'كوينز' : 'Coins'}`;
+    if (userBalanceEl) userBalanceEl.textContent = `${userCoins.toLocaleString()} ${isAr ? 'العملات' : 'Coins'}`;
 
     if (!listContainer) return;
 
@@ -14034,7 +14273,7 @@ function renderMarketCartItems() {
                 <p style="margin: 0; font-size: 0.85rem;">${isAr ? 'تصفح منتجات السوق وأضف المنتجات لسلتك!' : 'Browse market products and add items to your cart!'}</p>
             </div>
         `;
-        if (totalCostEl) totalCostEl.textContent = `0 ${isAr ? 'كوينز' : 'Coins'}`;
+        if (totalCostEl) totalCostEl.textContent = `0 ${isAr ? 'العملات' : 'Coins'}`;
         if (warningEl) warningEl.style.display = 'none';
         if (submitBtn) {
             submitBtn.disabled = true;
@@ -14045,94 +14284,154 @@ function renderMarketCartItems() {
     }
 
     let totalCost = 0;
-    listContainer.innerHTML = marketCart.map(item => {
+    let hasUnavailableItems = false;
+
+    const itemsHTML = marketCart.map(item => {
+        const available = isCartItemAvailable(item);
+        if (!available) {
+            hasUnavailableItems = true;
+        }
+
         const itemTotal = (item.price || 0) * (item.qty || 1);
-        totalCost += itemTotal;
+        if (available) {
+            totalCost += itemTotal;
+        }
 
         const imgTag = item.imageUrl 
-            ? `<img src="${item.imageUrl}" style="width: 54px; height: 54px; border-radius: 10px; object-fit: cover;" />`
-            : `<div style="width: 54px; height: 54px; border-radius: 10px; background: var(--input-bg); display: flex; align-items: center; justify-content: center; font-size: 1.6rem;">🥩</div>`;
+            ? `<img src="${item.imageUrl}" style="width: 54px; height: 54px; border-radius: 10px; object-fit: cover; ${!available ? 'filter: grayscale(80%) opacity(0.5);' : ''}" />`
+            : `<div style="width: 54px; height: 54px; border-radius: 10px; background: var(--input-bg); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; ${!available ? 'opacity: 0.5;' : ''}">🥩</div>`;
+
+        const rowBg = !available 
+            ? 'background: rgba(239, 68, 68, 0.08); border-radius: 12px; margin-bottom: 8px; padding: 10px 12px; border: 1px dashed rgba(239, 68, 68, 0.4);' 
+            : 'padding: 12px 0; border-bottom: 1px dashed var(--border-color);';
 
         return `
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px dashed var(--border-color);">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; ${rowBg}">
                 <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
                     ${imgTag}
                     <div>
-                        <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-main);">${sanitizeMarketText(item.name)}</div>
-                        <div style="font-size: 0.8rem; color: #ef4444; font-weight: 700; margin-top: 2px;">
-                            ${item.price} 🪙 ${isAr ? 'للقطعة' : 'each'}
+                        <div style="font-weight: 800; font-size: 0.95rem; color: ${!available ? '#ef4444' : 'var(--text-main)'};">
+                            ${sanitizeMarketText(item.name)}
                         </div>
+                        ${!available ? `
+                            <div style="display: inline-flex; align-items: center; gap: 4px; background: #ef4444; color: #ffffff; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 900; margin-top: 4px;">
+                                ⚠️ ${isAr ? 'غير متوفر حالياً (تم إخفاؤه من الأدمن)' : 'Not Available (Hidden by Admin)'}
+                            </div>
+                        ` : `
+                            <div style="font-size: 0.8rem; color: #ef4444; font-weight: 700; margin-top: 2px;">
+                                ${item.price} 🪙 ${isAr ? 'للقطعة' : 'each'}
+                            </div>
+                        `}
                     </div>
                 </div>
 
                 <div style="display: flex; align-items: center; gap: 12px;">
                     <!-- Qty Controls -->
-                    <div style="display: flex; align-items: center; background: var(--input-bg); border-radius: 100px; border: 1px solid var(--border-color); padding: 3px 8px; gap: 8px;">
+                    <div style="display: flex; align-items: center; background: var(--input-bg); border-radius: 100px; border: 1px solid var(--border-color); padding: 3px 8px; gap: 8px; ${!available ? 'opacity: 0.3; pointer-events: none;' : ''}">
                         <button type="button" onclick="updateCartItemQty('${item.productId}', -1)" style="border: none; background: transparent; color: var(--text-main); font-weight: 800; cursor: pointer; font-size: 1rem;">-</button>
                         <span style="font-weight: 900; font-size: 0.9rem; min-width: 18px; text-align: center;">${item.qty}</span>
                         <button type="button" onclick="updateCartItemQty('${item.productId}', 1)" style="border: none; background: transparent; color: var(--text-main); font-weight: 800; cursor: pointer; font-size: 1rem;">+</button>
                     </div>
 
                     <!-- Item Total Price -->
-                    <div style="font-weight: 900; font-size: 1rem; color: #ef4444; min-width: 65px; text-align: right;">
+                    <div style="font-weight: 900; font-size: 1rem; color: #ef4444; min-width: 65px; text-align: right; ${!available ? 'text-decoration: line-through; opacity: 0.5;' : ''}">
                         ${itemTotal} 🪙
                     </div>
 
-                    <!-- Remove Button -->
-                    <button type="button" onclick="removeCartItem('${item.productId}')" title="Remove" style="border: none; background: transparent; color: #ef4444; font-size: 1.1rem; cursor: pointer;">🗑️</button>
+                    <!-- Remove Button (Always enabled so customer can remove hidden items) -->
+                    <button type="button" onclick="removeCartItem('${item.productId}')" title="${isAr ? 'إزالة المنتج' : 'Remove'}" style="border: none; background: #ef4444; color: #ffffff; width: 32px; height: 32px; border-radius: 8px; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3);">🗑️</button>
                 </div>
             </div>
         `;
     }).join('');
 
-    if (totalCostEl) totalCostEl.textContent = `${totalCost.toLocaleString()} ${isAr ? 'كوينز' : 'Coins'}`;
+    let noticeBanner = '';
+    if (hasUnavailableItems) {
+        noticeBanner = `
+            <div style="background: rgba(239, 68, 68, 0.12); border: 1.5px solid #ef4444; border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; color: #ef4444; font-weight: 800; font-size: 0.86rem; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.12);">
+                <span style="font-size: 1.4rem;">⚠️</span>
+                <div style="line-height: 1.4;">
+                    ${isAr ? 'تنبيه هام: توجد منتجات غير متوفرة بالسلة (قام الأدمن بإخفائها من المتجر). يجب عليك حذفها من السلة (🗑️) لإتمام عملية الشراء.' : 'Important Notice: Cart contains items hidden by Admin. You must remove them (🗑️) to complete checkout.'}
+                </div>
+            </div>
+        `;
+    }
+
+    listContainer.innerHTML = noticeBanner + itemsHTML;
+
+    if (totalCostEl) totalCostEl.textContent = `${totalCost.toLocaleString()} ${isAr ? 'العملات' : 'Coins'}`;
 
     const isInsufficient = userCoins < totalCost;
     if (warningEl) {
-        warningEl.style.display = isInsufficient ? 'block' : 'none';
-        if (isInsufficient) {
+        if (hasUnavailableItems) {
+            warningEl.style.display = 'block';
+            warningEl.style.color = '#ef4444';
             warningEl.textContent = isAr 
-                ? `⚠️ رصيد الكوينز لديك غير كافٍ! تحتاج إلى ${totalCost - userCoins} كوينز إضافية.`
-                : `⚠️ Insufficient Coins! You need ${totalCost - userCoins} more coins.`;
+                ? `❌ لا يمكنك إتمام الطلب بحضور منتجات غير متوفرة بالسلة. يرجى حذفها أولاً.`
+                : `❌ Cannot checkout with unavailable items. Please remove them first.`;
+        } else {
+            warningEl.style.display = isInsufficient ? 'block' : 'none';
+            if (isInsufficient) {
+                warningEl.textContent = isAr 
+                    ? `⚠️ رصيد العملات لديك غير كافٍ! تحتاج إلى ${totalCost - userCoins} عملة إضافية.`
+                    : `⚠️ Insufficient Coins! You need ${totalCost - userCoins} more coins.`;
+            }
         }
     }
 
     if (submitBtn) {
-        submitBtn.disabled = isInsufficient;
-        submitBtn.style.opacity = isInsufficient ? '0.5' : '1';
-        submitBtn.style.cursor = isInsufficient ? 'not-allowed' : 'pointer';
+        const canSubmit = !hasUnavailableItems && !isInsufficient;
+        submitBtn.disabled = !canSubmit;
+        submitBtn.style.opacity = canSubmit ? '1' : '0.5';
+        submitBtn.style.cursor = canSubmit ? 'pointer' : 'not-allowed';
     }
 }
 
 function submitMarketOrder() {
+    loadMarketCart();
     const isAr = currentAppLang === 'ar';
     if (marketCart.length === 0) return;
+
+    const unavailable = marketCart.filter(item => !isCartItemAvailable(item));
+    if (unavailable.length > 0) {
+        alert(isAr 
+            ? 'عذراً، تحتوي السلة على منتجات غير متوفرة حالياً (قام الأدمن بإخفائها). يرجى إزالتها من السلة أولاً لإكتمال الطلب!' 
+            : 'Sorry, your cart contains unavailable products (hidden by admin). Please remove them first to complete your order!');
+        openMarketCartModal();
+        return;
+    }
 
     const userCoins = getUserCoins();
     const totalCost = marketCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
 
     if (userCoins < totalCost) {
-        alert(isAr ? 'رصيد الكوينز لديك غير كافٍ لإتمام هذا الطلب!' : 'Insufficient coins to complete this order!');
+        alert(isAr ? 'رصيد العملات لديك غير كافٍ لإتمام هذا الطلب!' : 'Insufficient coins to complete this order!');
         return;
     }
 
     const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
-    const workerId = isCustomer ? (currentCustomerSession.code || currentCustomerSession.id) : getCurrentWorkerId();
+    const workerId = isCustomer ? String(currentCustomerSession.code || currentCustomerSession.id).trim() : getCurrentWorkerId();
     const workerName = isCustomer 
         ? (currentCustomerSession.name || 'Customer (' + currentCustomerSession.code + ')') 
         : ((typeof currentWorkerProfile !== 'undefined' && currentWorkerProfile) 
             ? (currentWorkerProfile.name || currentWorkerProfile.email) 
             : ((typeof currentUser !== 'undefined' && currentUser && currentUser.email) ? currentUser.email : 'Worker'));
 
-    const orderId = 'ord_' + Date.now();
+    const now = Date.now();
+    const dateStr = new Date(now).toISOString().slice(2,10).replace(/-/g,'');
+    const randDigits = Math.floor(1000 + Math.random() * 9000);
+    const orderNum = `#ORD-${dateStr}-${randDigits}`;
+    const orderId = 'ord_' + now;
+
     const orderObj = {
         id: orderId,
+        orderNum: orderNum,
         workerId: workerId,
         workerName: workerName,
-        items: marketCart,
+        items: [...marketCart],
         totalCost: totalCost,
         status: 'pending',
-        createdAt: Date.now()
+        createdAt: now
     };
 
     // Deduct coins & save order
@@ -14156,19 +14455,504 @@ function submitMarketOrder() {
     updates[`companies/${currentCompany}/marketOrders/${orderId}`] = orderObj;
 
     db.ref().update(updates).then(() => {
+        const purchasedOrder = { ...orderObj };
         marketCart = [];
         saveMarketCart();
         closeMarketCartModal();
-        alert(isAr 
-            ? `🎉 تم إتمام الطلب بنجاح! تم خصم ${totalCost} كوينز من رصيدك. 🪙` 
-            : `🎉 Order submitted successfully! Deducted ${totalCost} coins from your balance. 🪙`);
         renderMarket();
+        openMarketOrderReceiptModal(purchasedOrder);
     }).catch(err => {
         console.error("Error submitting order:", err);
         alert(isAr ? 'حدث خطأ أثناء إرسال الطلب.' : 'Error submitting order.');
     });
 }
 window.submitMarketOrder = submitMarketOrder;
+
+function getMarketOrderStatusInfo(status) {
+    switch (status) {
+        case 'preparing':
+            return { labelEn: '👨‍🍳 Preparing Order', labelAr: '👨‍🍳 قيد التحضير', bg: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6' };
+        case 'delivery':
+            return { labelEn: '🚚 Out for Delivery', labelAr: '🚚 خرج للتوصيل', bg: 'rgba(139, 92, 246, 0.15)', color: '#8b5cf6' };
+        case 'delivered':
+            return { labelEn: '✅ Delivered', labelAr: '✅ تم التوصيل', bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981' };
+        case 'pending':
+        default:
+            return { labelEn: '⏳ Pending', labelAr: '⏳ قيد الانتظار', bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' };
+    }
+}
+window.getMarketOrderStatusInfo = getMarketOrderStatusInfo;
+
+function openMarketOrderReceiptModal(order) {
+    if (!order) return;
+    const isAr = currentAppLang === 'ar';
+
+    const modal = document.getElementById('market-order-receipt-modal');
+    const orderNumEl = document.getElementById('receipt-order-num');
+    const custNameEl = document.getElementById('receipt-customer-name');
+    const dateEl = document.getElementById('receipt-order-date');
+    const statusBadgeEl = document.getElementById('receipt-order-status-badge');
+    const companyTagEl = document.getElementById('receipt-company-tag');
+    const itemsListEl = document.getElementById('receipt-items-list');
+    const totalCostEl = document.getElementById('receipt-total-cost');
+
+    if (orderNumEl) orderNumEl.textContent = order.orderNum || `#ORD-${(order.id || '').replace('ord_', '')}`;
+    if (custNameEl) custNameEl.textContent = order.workerName || 'Customer';
+    if (dateEl) dateEl.textContent = order.createdAt ? new Date(order.createdAt).toLocaleString() : new Date().toLocaleString();
+    if (companyTagEl) companyTagEl.textContent = (order.companyKey || currentCompany || 'MVC').toUpperCase();
+    if (totalCostEl) totalCostEl.textContent = `${(order.totalCost || 0).toLocaleString()} ${isAr ? 'العملات' : 'Coins'}`;
+
+    if (statusBadgeEl) {
+        const statusInfo = getMarketOrderStatusInfo(order.status);
+        statusBadgeEl.textContent = isAr ? statusInfo.labelAr : statusInfo.labelEn;
+        statusBadgeEl.style.background = statusInfo.bg;
+        statusBadgeEl.style.color = statusInfo.color;
+    }
+
+    if (itemsListEl) {
+        const items = order.items || [];
+        itemsListEl.innerHTML = items.map((item, idx) => `
+            <tr style="background-color: ${idx % 2 === 1 ? '#f8fafc' : '#ffffff'} !important; border-bottom: 1px solid #cbd5e1 !important;">
+                <td style="padding: 12px 10px; text-align: center; font-weight: 800; color: #475569 !important; background-color: inherit !important;">${idx + 1}</td>
+                <td style="padding: 12px 10px; font-weight: 900; color: #000000 !important; font-size: 1rem !important; background-color: inherit !important;">${sanitizeMarketText(item.name)}</td>
+                <td style="padding: 12px 10px; text-align: center; font-weight: 900; color: #0f172a !important; background-color: inherit !important; font-size: 0.95rem !important;">${item.qty || 1}</td>
+                <td style="padding: 12px 10px; text-align: right; font-weight: 800; color: #334155 !important; background-color: inherit !important; font-size: 0.95rem !important;">${(item.price || 0).toLocaleString()}</td>
+                <td style="padding: 12px 10px; text-align: right; font-weight: 900; color: #059669 !important; background-color: inherit !important; font-size: 1rem !important;">${((item.price || 0) * (item.qty || 1)).toLocaleString()} ${isAr ? 'العملات' : 'Coins'}</td>
+            </tr>
+        `).join('');
+    }
+
+    if (modal) modal.style.display = 'flex';
+}
+window.openMarketOrderReceiptModal = openMarketOrderReceiptModal;
+
+function closeMarketOrderReceiptModal() {
+    const modal = document.getElementById('market-order-receipt-modal');
+    if (modal) modal.style.display = 'none';
+}
+window.closeMarketOrderReceiptModal = closeMarketOrderReceiptModal;
+
+function openCustomerOrdersModal() {
+    renderCustomerOrders();
+    const modal = document.getElementById('customer-orders-modal');
+    if (modal) modal.style.display = 'flex';
+}
+window.openCustomerOrdersModal = openCustomerOrdersModal;
+
+function closeCustomerOrdersModal() {
+    const modal = document.getElementById('customer-orders-modal');
+    if (modal) modal.style.display = 'none';
+}
+window.closeCustomerOrdersModal = closeCustomerOrdersModal;
+
+function renderCustomerOrders() {
+    const container = document.getElementById('customer-orders-list');
+    if (!container) return;
+    const isAr = currentAppLang === 'ar';
+
+    const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
+    const myId = isCustomer ? String(currentCustomerSession.code || currentCustomerSession.id).trim() : getCurrentWorkerId();
+
+    const data = getCompanyData();
+    const rawOrders = data.marketOrders || {};
+    let ordersList = Object.values(rawOrders);
+
+    // Filter to current customer/worker orders
+    ordersList = ordersList.filter(o => o && String(o.workerId).trim() === myId);
+    ordersList.sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+    if (ordersList.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px 10px; color: var(--text-muted);">
+                <div style="font-size: 3rem; margin-bottom: 8px;">📦</div>
+                <h4 style="margin: 0 0 4px 0; font-size: 1.1rem; color: var(--text-main); font-weight: 800;">${isAr ? 'لا توجد طلبات سابقة' : 'No Previous Orders'}</h4>
+                <p style="margin: 0; font-size: 0.85rem;">${isAr ? 'ستظهر جميع طلباتك وحالتها فور طلبها من السوق.' : 'All your orders and live delivery statuses will appear here.'}</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = ordersList.map(order => {
+        const orderNum = order.orderNum || `#ORD-${(order.id || '').replace('ord_', '')}`;
+        const dateStr = order.createdAt ? new Date(order.createdAt).toLocaleString() : '';
+        const statusInfo = getMarketOrderStatusInfo(order.status);
+        const itemsSummary = (order.items || []).map(i => `${sanitizeMarketText(i.name)} (x${i.qty})`).join(', ');
+
+        const orderJsonStr = JSON.stringify(order).replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+
+        return `
+            <div class="card" style="margin: 0; padding: 16px; border-radius: 14px; border: 1px solid var(--border-color); background: var(--card-bg); display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <span style="font-weight: 900; font-size: 1.05rem; color: #10b981; font-family: monospace, system-ui, sans-serif;">${orderNum}</span>
+                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">${dateStr}</div>
+                    </div>
+                    <span class="badge" style="background: ${statusInfo.bg}; color: ${statusInfo.color}; font-weight: 900; font-size: 0.82rem; padding: 5px 12px; border-radius: 100px;">
+                        ${isAr ? statusInfo.labelAr : statusInfo.labelEn}
+                    </span>
+                </div>
+
+                <div style="font-size: 0.85rem; color: var(--text-main); background: var(--input-bg); padding: 8px 12px; border-radius: 8px;">
+                    🛒 <b>${isAr ? 'المنتجات:' : 'Items:'}</b> ${itemsSummary}
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                    <div style="font-weight: 900; font-size: 1rem; color: #ef4444;">
+                        ${(order.totalCost || 0).toLocaleString()} 🪙
+                    </div>
+                    <button type="button" onclick='openMarketOrderReceiptModal(${orderJsonStr})' class="btn-outline" style="padding: 5px 12px; font-weight: 800; font-size: 0.8rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                        🧾 ${isAr ? 'عرض الفاتورة' : 'View Receipt'}
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+window.renderCustomerOrders = renderCustomerOrders;
+
+function openAdminMarketOrdersModal() {
+    renderAdminMarketOrders();
+    const modal = document.getElementById('admin-market-orders-modal');
+    if (modal) modal.style.display = 'flex';
+}
+window.openAdminMarketOrdersModal = openAdminMarketOrdersModal;
+
+function closeAdminMarketOrdersModal() {
+    const modal = document.getElementById('admin-market-orders-modal');
+    if (modal) modal.style.display = 'none';
+}
+window.closeAdminMarketOrdersModal = closeAdminMarketOrdersModal;
+
+function renderAdminMarketOrders() {
+    const listEl = document.getElementById('admin-market-orders-list');
+    const modalListEl = document.getElementById('admin-market-orders-modal-list');
+    if (!listEl && !modalListEl) return;
+
+    const isAr = currentAppLang === 'ar';
+    const filterStatusModal = document.getElementById('admin-modal-orders-status-filter')?.value;
+    const filterStatusCard = document.getElementById('admin-orders-status-filter')?.value;
+    const filterStatus = filterStatusModal || filterStatusCard || 'all';
+
+    const data = getCompanyData();
+    const rawOrders = data.marketOrders || {};
+    let allOrders = Object.values(rawOrders);
+    allOrders.sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+    // Calculate Stats for HUD Banner
+    const totalOrdersCount = allOrders.length;
+    const pendingCount = allOrders.filter(o => o && o.status === 'pending').length;
+    const preparingCount = allOrders.filter(o => o && o.status === 'preparing').length;
+    const deliveryCount = allOrders.filter(o => o && o.status === 'delivery').length;
+    const deliveredCount = allOrders.filter(o => o && o.status === 'delivered').length;
+    const cancelledCount = allOrders.filter(o => o && o.status === 'cancelled').length;
+    const totalRevenueCoins = allOrders.reduce((sum, o) => sum + (o && o.status !== 'cancelled' ? (parseFloat(o.totalCost) || 0) : 0), 0);
+
+    const statsHudEl = document.getElementById('admin-orders-stats-hud');
+    if (statsHudEl) {
+        statsHudEl.innerHTML = `
+            <div style="padding: 14px 20px; background: var(--card-bg); border-bottom: 1px solid var(--border-color); display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; text-align: center;">
+                <div style="background: var(--input-bg); padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border-color);">
+                    <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700;">📦 ${isAr ? 'إجمالي الطلبات' : 'Total Orders'}</div>
+                    <div style="font-size: 1.15rem; font-weight: 900; color: var(--text-main);">${totalOrdersCount}</div>
+                </div>
+                <div style="background: var(--input-bg); padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border-color);">
+                    <div style="font-size: 0.72rem; color: #f59e0b; font-weight: 700;">⏳ ${isAr ? 'قيد الانتظار' : 'Pending'}</div>
+                    <div style="font-size: 1.15rem; font-weight: 900; color: #f59e0b;">${pendingCount}</div>
+                </div>
+                <div style="background: var(--input-bg); padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border-color);">
+                    <div style="font-size: 0.72rem; color: #3b82f6; font-weight: 700;">👨‍🍳 ${isAr ? 'قيد التحضير' : 'Preparing'}</div>
+                    <div style="font-size: 1.15rem; font-weight: 900; color: #3b82f6;">${preparingCount}</div>
+                </div>
+                <div style="background: var(--input-bg); padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border-color);">
+                    <div style="font-size: 0.72rem; color: #8b5cf6; font-weight: 700;">🚚 ${isAr ? 'خرج للتوصيل' : 'Delivery'}</div>
+                    <div style="font-size: 1.15rem; font-weight: 900; color: #8b5cf6;">${deliveryCount}</div>
+                </div>
+                <div style="background: var(--input-bg); padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border-color);">
+                    <div style="font-size: 0.72rem; color: #10b981; font-weight: 700;">✅ ${isAr ? 'تم التوصيل' : 'Delivered'}</div>
+                    <div style="font-size: 1.15rem; font-weight: 900; color: #10b981;">${deliveredCount}</div>
+                </div>
+                <div style="background: var(--input-bg); padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border-color);">
+                    <div style="font-size: 0.72rem; color: #ef4444; font-weight: 700;">❌ ${isAr ? 'ملغاة' : 'Cancelled'}</div>
+                    <div style="font-size: 1.15rem; font-weight: 900; color: #ef4444;">${cancelledCount}</div>
+                </div>
+                <div style="background: var(--input-bg); padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border-color);">
+                    <div style="font-size: 0.72rem; color: #f59e0b; font-weight: 700;">🪙 ${isAr ? 'قيمة المبيعات' : 'Coins Revenue'}</div>
+                    <div style="font-size: 1.15rem; font-weight: 900; color: #f59e0b;">${totalRevenueCoins.toLocaleString()}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    let orders = allOrders;
+    if (filterStatus !== 'all') {
+        orders = orders.filter(o => o && o.status === filterStatus);
+    }
+
+    const emptyHTML = `
+        <div style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 0.9rem;">
+            ${isAr ? 'لا توجد طلبات سوق مطابقة.' : 'No matching market orders.'}
+        </div>
+    `;
+
+    if (orders.length === 0) {
+        if (listEl) listEl.innerHTML = emptyHTML;
+        if (modalListEl) modalListEl.innerHTML = emptyHTML;
+        return;
+    }
+
+    const renderedHTML = orders.map(order => {
+        const orderNum = order.orderNum || `#ORD-${(order.id || '').replace('ord_', '')}`;
+        const dateStr = order.createdAt ? new Date(order.createdAt).toLocaleString() : '';
+        const itemsSummary = (order.items || []).map(i => `${sanitizeMarketText(i.name)} (x${i.qty})`).join(', ');
+        const orderJsonStr = JSON.stringify(order).replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+
+        return `
+            <div class="card" style="margin: 0; padding: 14px; border-radius: 14px; border: 1px solid var(--border-color); background: var(--input-bg); display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <span style="font-weight: 900; font-size: 0.98rem; color: #10b981; font-family: monospace, system-ui, sans-serif;">${orderNum}</span>
+                        <span style="font-size: 0.84rem; font-weight: 800; color: var(--text-main); margin-left: 8px;">👤 ${sanitizeMarketText(order.workerName || 'Customer')}</span>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">${dateStr}</div>
+                    </div>
+
+                    <!-- Status Selector Dropdown -->
+                    <select onchange="updateMarketOrderStatus('${order.id}', this.value)" style="padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-color); font-weight: 800; font-size: 0.82rem; background: var(--card-bg); color: var(--text-main); cursor: pointer;">
+                        <option value="pending" ${order.status === 'pending' ? 'selected' : ''}>⏳ Pending / قيد الانتظار</option>
+                        <option value="preparing" ${order.status === 'preparing' ? 'selected' : ''}>👨‍🍳 Preparing / قيد التحضير</option>
+                        <option value="delivery" ${order.status === 'delivery' ? 'selected' : ''}>🚚 Out for Delivery / خرج للتوصيل</option>
+                        <option value="delivered" ${order.status === 'delivered' ? 'selected' : ''}>✅ Delivered / تم التوصيل</option>
+                        <option value="cancelled" ${order.status === 'cancelled' ? 'selected' : ''}>❌ Cancelled / ملغاة</option>
+                    </select>
+                </div>
+
+                <div style="font-size: 0.85rem; color: var(--text-main);">
+                    <b>${isAr ? 'المنتجات:' : 'Items:'}</b> ${itemsSummary}
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; border-top: 1px dashed var(--border-color); padding-top: 8px;">
+                    <span style="font-weight: 900; color: #ef4444; font-size: 0.95rem;">${(order.totalCost || 0).toLocaleString()} 🪙</span>
+                    
+                    <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                        <button type="button" onclick='openMarketOrderReceiptModal(${orderJsonStr})' class="btn-outline" style="padding: 5px 10px; font-weight: 700; font-size: 0.78rem; border-radius: 8px; cursor: pointer;">
+                            🧾 ${isAr ? 'الفاتورة' : 'Receipt'}
+                        </button>
+                        ${order.status !== 'cancelled' ? `
+                            <button type="button" onclick="cancelMarketOrder('${order.id}')" class="btn-outline" style="padding: 5px 10px; font-weight: 700; font-size: 0.78rem; border-radius: 8px; color: #ef4444; border-color: #ef4444; cursor: pointer;">
+                                ❌ ${isAr ? 'إلغاء الطلب' : 'Cancel'}
+                            </button>
+                        ` : ''}
+                        <button type="button" onclick="deleteMarketOrder('${order.id}')" class="btn-danger" style="padding: 5px 10px; font-weight: 700; font-size: 0.78rem; border-radius: 8px; cursor: pointer;">
+                            🗑️ ${isAr ? 'حذف' : 'Delete'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    if (listEl) listEl.innerHTML = renderedHTML;
+    if (modalListEl) modalListEl.innerHTML = renderedHTML;
+}
+window.renderAdminMarketOrders = renderAdminMarketOrders;
+
+function updateMarketOrderStatus(orderId, newStatus) {
+    const isAr = currentAppLang === 'ar';
+    if (!orderId || !newStatus) return;
+
+    if (newStatus === 'cancelled') {
+        cancelMarketOrder(orderId);
+        return;
+    }
+
+    db.ref(`companies/${currentCompany}/marketOrders/${orderId}/status`).set(newStatus).then(() => {
+        renderAdminMarketOrders();
+        renderCustomerOrders();
+        showInAppNotification(isAr ? `تم تحديث حالة الطلب إلى: ${newStatus}` : `Order status updated to: ${newStatus}`);
+    }).catch(err => {
+        console.error("Error updating order status:", err);
+        alert(isAr ? 'حدث خطأ أثناء تحديث حالة الطلب.' : 'Error updating order status.');
+    });
+}
+window.updateMarketOrderStatus = updateMarketOrderStatus;
+
+function cancelMarketOrder(orderId) {
+    const isAr = currentAppLang === 'ar';
+    if (!orderId) return;
+
+    const data = getCompanyData();
+    const rawOrders = data.marketOrders || {};
+    const order = rawOrders[orderId];
+
+    if (!order) {
+        alert(isAr ? 'لم يتم العثور على الطلب.' : 'Order not found.');
+        return;
+    }
+
+    if (order.status === 'cancelled') {
+        alert(isAr ? 'هذا الطلب ملغى بالفعل.' : 'This order is already cancelled.');
+        return;
+    }
+
+    if (!confirm(isAr ? 'هل أنت تأكد من إلغاء هذا الطلب وإعادة القطع النقدية للزبون؟' : 'Are you sure you want to cancel this order and refund coins to customer?')) {
+        return;
+    }
+
+    const totalCost = parseFloat(order.totalCost) || 0;
+    const custCode = String(order.workerId || order.customerCode || '').trim();
+
+    const updates = {};
+    updates[`companies/${currentCompany}/marketOrders/${orderId}/status`] = 'cancelled';
+    updates[`companies/${currentCompany}/marketOrders/${orderId}/cancelledAt`] = Date.now();
+
+    if (totalCost > 0 && custCode) {
+        const isCustSession = (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && String(currentCustomerSession.code || currentCustomerSession.id).trim() === custCode);
+
+        let currentCoins = 0;
+        if (isCustSession && typeof currentCustomerSession.coins !== 'undefined') {
+            currentCoins = parseFloat(currentCustomerSession.coins) || 0;
+        } else {
+            let found = false;
+            ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
+                if (!found && appData[c] && appData[c].customers && appData[c].customers[custCode] && typeof appData[c].customers[custCode].coins !== 'undefined') {
+                    currentCoins = parseFloat(appData[c].customers[custCode].coins) || 0;
+                    found = true;
+                }
+            });
+            if (!found) currentCoins = 1000;
+        }
+
+        const newCoins = currentCoins + totalCost;
+
+        // Refund coins exclusively for customer nodes across database
+        updates[`publicCustomerCodes/${custCode}/coins`] = newCoins;
+        updates[`customerCodes/${custCode}/coins`] = newCoins;
+        updates[`customers/${custCode}/coins`] = newCoins;
+        ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
+            updates[`companies/${c}/customers/${custCode}/coins`] = newCoins;
+            if (appData[c] && appData[c].customers && appData[c].customers[custCode]) {
+                appData[c].customers[custCode].coins = newCoins;
+            }
+        });
+
+        if (isCustSession) {
+            currentCustomerSession.coins = newCoins;
+            try {
+                localStorage.setItem('mvc_customer_session', JSON.stringify(currentCustomerSession));
+            } catch(e){}
+        }
+
+        try {
+            db.ref(`publicCustomerCodes/${custCode}/coins`).transaction(cv => (cv || 0) + totalCost);
+            db.ref(`customerCodes/${custCode}/coins`).transaction(cv => (cv || 0) + totalCost);
+        } catch(e){}
+
+        const refId = 'rf_' + Date.now();
+        updates[`companies/${currentCompany}/coinTransactions/${refId}`] = {
+            id: refId,
+            customerCode: custCode,
+            amount: totalCost,
+            type: 'refund',
+            reason: `Order Cancelled: ${order.orderNum || orderId}`,
+            timestamp: Date.now(),
+            createdBy: (currentUser && currentUser.email) ? currentUser.email : 'Admin'
+        };
+    }
+
+    db.ref().update(updates).then(() => {
+        renderMarket();
+        renderAdminMarketOrders();
+        renderCustomerOrders();
+        showInAppNotification(isAr 
+            ? `تم إلغاء الطلب وإعادة ${totalCost} من العملات للزبون بنجاح!` 
+            : `Order cancelled and ${totalCost} coins refunded to customer successfully!`
+        );
+    }).catch(err => {
+        console.error("Error cancelling order:", err);
+        alert(isAr ? 'حدث خطأ أثناء إلغاء الطلب.' : 'Error cancelling order.');
+    });
+}
+window.cancelMarketOrder = cancelMarketOrder;
+
+function deleteMarketOrder(orderId) {
+    const isAr = currentAppLang === 'ar';
+    if (!orderId) return;
+
+    if (!confirm(isAr ? 'هل أنت تأكد من حذف هذا الطلب نهائياً من النظام؟' : 'Are you sure you want to permanently delete this order?')) {
+        return;
+    }
+
+    db.ref(`companies/${currentCompany}/marketOrders/${orderId}`).remove().then(() => {
+        renderAdminMarketOrders();
+        renderCustomerOrders();
+        showInAppNotification(isAr ? 'تم حذف الطلب بنجاح.' : 'Order deleted successfully.');
+    }).catch(err => {
+        console.error("Error deleting market order:", err);
+        alert(isAr ? 'حدث خطأ أثناء حذف الطلب.' : 'Error deleting order.');
+    });
+}
+window.deleteMarketOrder = deleteMarketOrder;
+
+function toggleMarketProductVisibility(productId) {
+    const isAr = currentAppLang === 'ar';
+    const prods = getAllMarketProducts();
+    const prod = prods.find(p => p.id === productId);
+
+    if (!prod) return;
+
+    const isCurrentlyHidden = isProductHidden(prod);
+    const newHiddenState = !isCurrentlyHidden;
+
+    prod.isHidden = newHiddenState;
+    prod.hidden = newHiddenState;
+
+    if (window.globalMarketProductsCache && window.globalMarketProductsCache[productId]) {
+        window.globalMarketProductsCache[productId].isHidden = newHiddenState;
+        window.globalMarketProductsCache[productId].hidden = newHiddenState;
+        window.globalMarketProductsCache[productId].id = productId;
+        try {
+            localStorage.setItem('mvc_cached_market_products', JSON.stringify(window.globalMarketProductsCache));
+        } catch(e){}
+    }
+
+    const updates = {};
+    updates[`marketProducts/${productId}/id`] = productId;
+    updates[`marketProducts/${productId}/isHidden`] = newHiddenState;
+    updates[`marketProducts/${productId}/hidden`] = newHiddenState;
+    ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
+        updates[`companies/${c}/marketProducts/${productId}/id`] = productId;
+        updates[`companies/${c}/marketProducts/${productId}/isHidden`] = newHiddenState;
+        updates[`companies/${c}/marketProducts/${productId}/hidden`] = newHiddenState;
+        if (appData[c] && appData[c].marketProducts) {
+            if (appData[c].marketProducts[productId]) {
+                appData[c].marketProducts[productId].id = productId;
+                appData[c].marketProducts[productId].isHidden = newHiddenState;
+                appData[c].marketProducts[productId].hidden = newHiddenState;
+            }
+        }
+    });
+
+    renderMarket();
+
+    if (typeof db !== 'undefined') {
+        db.ref().update(updates).then(() => {
+            renderMarket();
+            showInAppNotification(newHiddenState 
+                ? (isAr ? 'تم إخفاء المنتج من المتجر (غير ظاهر للزبائن)' : 'Product hidden from market')
+                : (isAr ? 'تم إظهار المنتج للزبائن' : 'Product is now visible to customers')
+            );
+        }).catch(err => {
+            console.error("Error toggling product visibility:", err);
+            renderMarket();
+        });
+    }
+}
+window.toggleMarketProductVisibility = toggleMarketProductVisibility;
+
+function toggleAdminMarketCustomerPreview() {
+    window.adminMarketCustomerPreview = !window.adminMarketCustomerPreview;
+    renderMarket();
+}
+window.toggleAdminMarketCustomerPreview = toggleAdminMarketCustomerPreview;
 
 function renderMarket() {
     const grid = document.getElementById('market-products-grid');
@@ -14186,8 +14970,20 @@ function renderMarket() {
     if (userCoinsValEl) userCoinsValEl.textContent = userCoins.toLocaleString();
     updateMarketCartBadges();
 
+    const adminOrdersBtn = document.getElementById('market-admin-orders-btn');
+    if (adminOrdersBtn) {
+        adminOrdersBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+    }
+    const testCoinsBtn = document.querySelector('.adv-btn-coins-add');
+    if (testCoinsBtn) {
+        testCoinsBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+    }
+
     let filtered = prods.filter(p => {
         if (!p) return false;
+        const hidden = isProductHidden(p);
+        if (!isAdmin && hidden) return false; // Hide hidden items from customers & non-admins!
+        if (window.adminMarketCustomerPreview && hidden) return false; // Hide if Admin toggles customer preview mode
         if (currentMarketCategoryFilter !== 'all' && p.category !== currentMarketCategoryFilter) return false;
         if (search && !(p.name || '').toLowerCase().includes(search)) return false;
         return true;
@@ -14281,10 +15077,11 @@ function renderMarket() {
         const weightText = p.weightTag || '';
         const cartItem = marketCart.find(item => item.productId === p.id);
         const itemInCartQty = cartItem ? cartItem.qty : 0;
+        const isHidden = isProductHidden(p);
         
         let imageContent = '';
         if (p.imageUrl) {
-            imageContent = `<img src="${p.imageUrl}" alt="${sanitizeMarketText(p.name)}" style="width:100%; height:100%; object-fit:cover; display:block;" />`;
+            imageContent = `<img src="${p.imageUrl}" alt="${sanitizeMarketText(p.name)}" style="width:100%; height:100%; object-fit:cover; display:block; ${isHidden ? 'filter: opacity(0.6) grayscale(40%);' : ''}" />`;
         } else {
             const bannerTitle = isMeat ? 'لحوم فاخرة' : 'خضار وفواكه';
             const bannerSub = isMeat ? 'تقطع حسب الطلب' : 'طازجة قطاف اليوم';
@@ -14294,7 +15091,7 @@ function renderMarket() {
                 : 'linear-gradient(135deg, #065f46 0%, #10b981 50%, #34d399 100%)';
             
             imageContent = `
-                <div style="width:100%; height:100%; background: ${bannerGradient}; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#ffffff; text-align:center; padding:12px; box-sizing:border-box; position:relative;">
+                <div style="width:100%; height:100%; background: ${bannerGradient}; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#ffffff; text-align:center; padding:12px; box-sizing:border-box; position:relative; ${isHidden ? 'filter: opacity(0.6);' : ''}">
                     <div style="font-size: 3.2rem; margin-bottom:4px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));">${catIcon}</div>
                     <div style="font-size: 1.1rem; font-weight:900; letter-spacing:-0.5px; text-shadow:0 2px 4px rgba(0,0,0,0.4);">${bannerTitle}</div>
                     <div style="font-size: 0.75rem; opacity:0.9; font-weight:600;">${bannerSub}</div>
@@ -14304,20 +15101,39 @@ function renderMarket() {
 
         let adminActions = '';
         if (isAdmin) {
+            const hideBtnText = isHidden ? (isAr ? '👁️ إظهار' : '👁️ Show') : (isAr ? '🙈 إخفاء' : '🙈 Hide');
+            const hideBtnStyle = isHidden 
+                ? 'background: #10b981; color: #ffffff; border: none;' 
+                : 'background: #f59e0b; color: #ffffff; border: none;';
+
             adminActions = `
-                <div style="display: flex; gap: 8px; margin-top: 8px; border-top: 1px dashed var(--border-color); padding-top: 8px;">
-                    <button onclick="openEditMarketProductModal('${p.id}')" class="btn-outline" style="flex: 1; padding: 6px; font-size: 0.8rem; font-weight: 700; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap;">✏️ ${isAr ? 'تعديل' : 'Edit'}</button>
-                    <button onclick="deleteMarketProduct('${p.id}')" class="btn-danger" style="flex: 1; padding: 6px; font-size: 0.8rem; font-weight: 700; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap;">✖ ${isAr ? 'حذف' : 'Delete'}</button>
+                <div style="display: flex; gap: 6px; margin-top: 8px; border-top: 1px dashed var(--border-color); padding-top: 8px;">
+                    <button onclick="toggleMarketProductVisibility('${p.id}')" title="${isHidden ? (isAr ? 'إظهار المنتج للزبائن' : 'Show product to customers') : (isAr ? 'إخفاء المنتج من السوق' : 'Hide product from market')}" style="flex: 1; padding: 6px 4px; font-size: 0.76rem; font-weight: 800; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap; ${hideBtnStyle}">
+                        ${hideBtnText}
+                    </button>
+                    <button onclick="openEditMarketProductModal('${p.id}')" class="btn-outline" style="flex: 1; padding: 6px 4px; font-size: 0.76rem; font-weight: 700; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
+                        ✏️ ${isAr ? 'تعديل' : 'Edit'}
+                    </button>
+                    <button onclick="deleteMarketProduct('${p.id}')" class="btn-danger" style="flex: 1; padding: 6px 4px; font-size: 0.76rem; font-weight: 700; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap;">
+                        ✖ ${isAr ? 'حذف' : 'Delete'}
+                    </button>
                 </div>
             `;
         }
 
         return `
-            <div class="card market-store-card" style="margin: 0; border: 1px solid var(--border-color); border-radius: 16px; background: var(--card-bg, #ffffff); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, box-shadow 0.2s ease; box-shadow: 0 4px 14px rgba(0,0,0,0.05); position: relative;">
+            <div class="card market-store-card" style="margin: 0; border: 1px solid ${isHidden ? '#f59e0b' : 'var(--border-color)'}; border-radius: 16px; background: var(--card-bg, #ffffff); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, box-shadow 0.2s ease; box-shadow: 0 4px 14px rgba(0,0,0,0.05); position: relative; ${isHidden ? 'opacity: 0.88;' : ''}">
                 <div>
                     <!-- Top Image Showcase (Square Aspect) -->
                     <div style="width: 100%; aspect-ratio: 1 / 1; position: relative; overflow: hidden; background: #f8fafc; border-bottom: 1px solid var(--border-color);">
                         ${imageContent}
+
+                        <!-- Hidden Badge Overlay for Admin -->
+                        ${isHidden ? `
+                            <div style="position: absolute; top: 10px; right: 10px; background: rgba(239, 68, 68, 0.95); color: #ffffff; font-weight: 900; font-size: 0.72rem; padding: 4px 10px; border-radius: 100px; backdrop-filter: blur(4px); box-shadow: 0 2px 8px rgba(0,0,0,0.25); z-index: 3; display: flex; align-items: center; gap: 4px;">
+                                🙈 ${isAr ? 'مخفي' : 'Hidden'}
+                            </div>
+                        ` : ''}
 
                         <!-- Bottom-Left Weight / Subtitle Tag -->
                         ${weightText ? `
@@ -14329,7 +15145,7 @@ function renderMarket() {
 
                     <!-- Product Body Details -->
                     <div style="padding: 14px 14px 6px 14px; text-align: center;">
-                        <!-- Product Title (Clean, Bold, Black/Dark Text, NO Ratings) -->
+                        <!-- Product Title -->
                         <h3 style="margin: 0 0 4px 0; color: var(--text-main); font-size: 1.05rem; font-weight: 800; line-height: 1.35; height: 2.7rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                             ${sanitizeMarketText(p.name || '')}
                         </h3>
@@ -14343,8 +15159,8 @@ function renderMarket() {
                         <span style="font-size: 1.05rem;">🪙</span>
                     </div>
 
-                    <!-- Full-Width Professional Shopping Cart Button (Royal Blue) -->
-                    <button onclick="addToMarketCart('${p.id}')" title="${isAr ? 'أضف للسلة' : 'Add to Cart'}" style="width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: 10px; border: none; background: #2563eb; color: #ffffff; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28); transition: all 0.2s ease;">
+                    <!-- Full-Width Shopping Cart Button -->
+                    <button onclick="addToMarketCart('${p.id}', event)" title="${isAr ? 'أضف للسلة' : 'Add to Cart'}" style="width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: 10px; border: none; background: #2563eb; color: #ffffff; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28); transition: all 0.2s ease;">
                         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
                         <span style="white-space: nowrap;">${isAr ? 'أضف للسلة' : 'Add to Cart'}</span>
                         ${itemInCartQty > 0 ? `
@@ -14352,6 +15168,7 @@ function renderMarket() {
                                 ${itemInCartQty}
                             </span>
                         ` : ''}
+                    </button>
                     ${adminActions}
                 </div>
             </div>
@@ -14359,6 +15176,8 @@ function renderMarket() {
     }).join('');
 
     renderAdminCustomersList();
+    renderAdminMarketOrders();
+    renderCustomerOrders();
 }
 window.renderMarket = renderMarket;
 
@@ -14377,6 +15196,8 @@ function addMarketProduct() {
     const price = parseFloat(priceEl.value);
     const weightTag = weightEl ? weightEl.value.trim() : '';
     const imageUrl = imageEl ? imageEl.value.trim() : '';
+    const hiddenEl = document.getElementById('market-product-hidden-add');
+    const isHidden = hiddenEl ? hiddenEl.checked : false;
 
     if (!name) {
         alert(isAr ? 'الرجاء إدخال اسم المنتج.' : 'Please enter product name.');
@@ -14396,6 +15217,7 @@ function addMarketProduct() {
         price: price,
         weightTag: weightTag,
         imageUrl: imageUrl,
+        isHidden: isHidden,
         createdAt: Date.now(),
         createdBy: (typeof currentUser !== 'undefined' && currentUser && currentUser.email) ? currentUser.email : 'Admin'
     };
@@ -14438,8 +15260,11 @@ function openEditMarketProductModal(productId) {
     
     const weightEl = document.getElementById('edit-market-product-weight');
     const imageEl = document.getElementById('edit-market-product-image');
+    const hiddenEl = document.getElementById('edit-market-product-hidden');
+
     if (weightEl) weightEl.value = prod.weightTag || '';
     if (imageEl) imageEl.value = prod.imageUrl || '';
+    if (hiddenEl) hiddenEl.checked = !!prod.isHidden;
 
     const previewContainer = document.getElementById('market-img-preview-edit');
     const previewImg = document.getElementById('market-img-preview-edit-src');
@@ -14468,6 +15293,7 @@ function saveEditedMarketProduct() {
     const price = parseFloat(document.getElementById('edit-market-product-price').value);
     const weightTag = document.getElementById('edit-market-product-weight')?.value.trim() || '';
     const imageUrl = document.getElementById('edit-market-product-image')?.value.trim() || '';
+    const isHidden = document.getElementById('edit-market-product-hidden')?.checked || false;
     const isAr = currentAppLang === 'ar';
 
     if (!name || isNaN(price) || price < 0) {
@@ -14481,6 +15307,7 @@ function saveEditedMarketProduct() {
         price: price,
         weightTag: weightTag,
         imageUrl: imageUrl,
+        isHidden: isHidden,
         updatedAt: Date.now()
     };
 
@@ -14514,9 +15341,15 @@ function deleteMarketProduct(productId) {
     updates[`marketProducts/${productId}`] = null;
     ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
         updates[`companies/${c}/marketProducts/${productId}`] = null;
+        if (appData[c] && appData[c].marketProducts) {
+            delete appData[c].marketProducts[productId];
+        }
     });
 
     delete window.globalMarketProductsCache[productId];
+    try {
+        localStorage.setItem('mvc_cached_market_products', JSON.stringify(window.globalMarketProductsCache));
+    } catch(e){}
 
     db.ref().update(updates).then(() => {
         renderMarket();
@@ -14784,7 +15617,7 @@ function applyCustomerModeUI() {
         currentCompany = currentCustomerSession.company;
     }
 
-    // Fetch and listen to market data across ALL companies so products never disappear
+    // Fetch and listen to market data & market orders across ALL companies
     if (typeof db !== 'undefined') {
         const companyList = ['mvc', 'mvcfresh', 'burgeroov'];
         companyList.forEach(cKey => {
@@ -14792,6 +15625,13 @@ function applyCustomerModeUI() {
                 if (!appData[cKey]) appData[cKey] = {};
                 appData[cKey].marketProducts = snapshot.val() || {};
                 renderMarket();
+            });
+            db.ref(`companies/${cKey}/marketOrders`).on('value', snapshot => {
+                if (!appData[cKey]) appData[cKey] = {};
+                appData[cKey].marketOrders = snapshot.val() || {};
+                renderAdminMarketOrders();
+                renderCustomerOrders();
+                renderPrepareSection();
             });
         });
     }
@@ -14981,6 +15821,122 @@ function deleteCustomerCode(code) {
     }).catch(err => console.error("Error deleting customer code:", err));
 }
 window.deleteCustomerCode = deleteCustomerCode;
+
+function renderPrepareSection() {
+    const grid = document.getElementById('prepare-orders-grid');
+    if (!grid) return;
+
+    const isAr = currentAppLang === 'ar';
+    const filterStatus = document.getElementById('prepare-status-filter')?.value || 'all';
+
+    // Collect market orders across ALL loaded companies
+    const companyList = ['mvc', 'mvcfresh', 'burgeroov'];
+    let allOrders = [];
+
+    companyList.forEach(cKey => {
+        const cOrdersObj = appData[cKey]?.marketOrders || {};
+        Object.values(cOrdersObj).forEach(order => {
+            if (order && order.id) {
+                allOrders.push({ ...order, companyKey: cKey });
+            }
+        });
+    });
+
+    // De-duplicate orders by order.id
+    const uniqueMap = {};
+    allOrders.forEach(o => { uniqueMap[o.id] = o; });
+    allOrders = Object.values(uniqueMap);
+
+    allOrders.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+    if (filterStatus !== 'all') {
+        allOrders = allOrders.filter(o => o.status === filterStatus);
+    }
+
+    if (allOrders.length === 0) {
+        grid.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 60px 20px; background: var(--input-bg); border-radius: 20px; border: 2px dashed var(--border-color); max-width: 650px; margin: 0 auto; width: 100%;">
+                <div style="font-size: 4rem; margin-bottom: 14px;">👨‍🍳</div>
+                <h3 style="margin: 0 0 10px 0; color: var(--text-main); font-size: 1.3rem; font-weight: 900;">${isAr ? 'لا توجد طلبات في قائمة التحضير حالياً' : 'No Preparation Orders Found'}</h3>
+                <p style="margin: 0; color: var(--text-muted); font-size: 0.95rem; line-height: 1.6;">${isAr ? 'ستظهر جميع طلبات العملاء المشتراة هنا تلقائياً ولحظياً لمتابعتها وتحضيرها.' : 'Purchased customer orders will appear here automatically in real time for kitchen prep.'}</p>
+            </div>
+        `;
+        return;
+    }
+
+    grid.innerHTML = allOrders.map(order => {
+        const orderNum = order.orderNum || `#ORD-${(order.id || '').replace('ord_', '')}`;
+        const dateStr = order.createdAt ? new Date(order.createdAt).toLocaleString() : '';
+        const companyName = (order.companyKey || 'MVC').toUpperCase();
+        const statusInfo = getMarketOrderStatusInfo(order.status);
+        const orderJsonStr = JSON.stringify(order).replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+
+        const itemsHTML = (order.items || []).map(item => `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--input-bg); border-radius: 12px; font-size: 0.92rem; border: 1px solid var(--border-color);">
+                <span style="font-weight: 900; color: var(--text-main); font-size: 0.95rem;">${sanitizeMarketText(item.name)}</span>
+                <span style="background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #ffffff; font-weight: 900; font-size: 0.85rem; padding: 4px 12px; border-radius: 100px; box-shadow: 0 2px 6px rgba(37,99,235,0.3);">x${item.qty || 1}</span>
+            </div>
+        `).join('');
+
+        return `
+            <div class="card" style="margin: 0; padding: 20px; border-radius: 20px; border: 2px solid ${statusInfo.color}; background: var(--card-bg); display: flex; flex-direction: column; justify-content: space-between; gap: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); transition: transform 0.2s ease;">
+                <div>
+                    <!-- Order Header Box -->
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-weight: 900; font-size: 1.25rem; color: #10b981; font-family: monospace, system-ui, sans-serif; letter-spacing: 0.5px;">${orderNum}</span>
+                            </div>
+                            <div style="font-size: 0.88rem; font-weight: 900; color: var(--text-main); margin-top: 4px;">👤 ${sanitizeMarketText(order.workerName || 'Customer')}</div>
+                            <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 2px;">📅 ${dateStr}</div>
+                        </div>
+                        <span class="badge" style="background: rgba(37,99,235,0.12); color: #2563eb; font-size: 0.8rem; font-weight: 900; padding: 5px 14px; border-radius: 100px; border: 1px solid #2563eb; letter-spacing: 0.5px;">
+                            🏢 ${companyName}
+                        </span>
+                    </div>
+
+                    <!-- Items List -->
+                    <div style="display: flex; flex-direction: column; gap: 8px; margin: 12px 0;">
+                        ${itemsHTML}
+                    </div>
+                </div>
+
+                <!-- Footer Status Selector & A4 Printable Receipt Button -->
+                <div style="border-top: 1px dashed var(--border-color); padding-top: 14px; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                        <select onchange="updatePrepareOrderStatus('${order.companyKey}', '${order.id}', this.value)" style="flex: 1; padding: 10px 14px; border-radius: 10px; border: 1.5px solid var(--border-color); font-weight: 900; font-size: 0.9rem; background: var(--input-bg); color: var(--text-main); cursor: pointer;">
+                            <option value="pending" ${order.status === 'pending' ? 'selected' : ''}>⏳ Pending / قيد الانتظار</option>
+                            <option value="preparing" ${order.status === 'preparing' ? 'selected' : ''}>👨‍🍳 Preparing / قيد التحضير</option>
+                            <option value="delivery" ${order.status === 'delivery' ? 'selected' : ''}>🚚 Out for Delivery / خرج للتوصيل</option>
+                            <option value="delivered" ${order.status === 'delivered' ? 'selected' : ''}>✅ Delivered / تم التوصيل</option>
+                        </select>
+                        <button type="button" onclick='openMarketOrderReceiptModal(${orderJsonStr})' class="btn-outline" style="padding: 10px 16px; font-weight: 900; font-size: 0.88rem; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap; background: var(--input-bg);">
+                            🧾 ${isAr ? 'الفاتورة' : 'Receipt'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+window.renderPrepareSection = renderPrepareSection;
+
+function updatePrepareOrderStatus(companyKey, orderId, newStatus) {
+    const isAr = currentAppLang === 'ar';
+    if (!orderId || !newStatus) return;
+    const targetComp = companyKey || currentCompany;
+
+    db.ref(`companies/${targetComp}/marketOrders/${orderId}/status`).set(newStatus).then(() => {
+        renderPrepareSection();
+        renderAdminMarketOrders();
+        renderCustomerOrders();
+        showInAppNotification(isAr ? `تم تحديث حالة طلب التحضير إلى: ${newStatus}` : `Prepare order status updated: ${newStatus}`);
+    }).catch(err => {
+        console.error("Error updating prepare order status:", err);
+        alert(isAr ? 'حدث خطأ أثناء تحديث الحالة.' : 'Error updating status.');
+    });
+}
+window.updatePrepareOrderStatus = updatePrepareOrderStatus;
 
 // Initial run
 applyTranslations();
