@@ -747,7 +747,9 @@ body {
 #view-tasks.active-view,
 #view-notes.active-view,
 #view-managing.active-view,
-#view-costs.active-view {
+#view-costs.active-view,
+#view-reminders.active-view,
+#view-market.active-view {
     grid-template-columns: 1fr;
 }
 

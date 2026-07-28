@@ -213,6 +213,40 @@ function hideInAppNotification() {
     }
 }
 
+var authMode = 'login';
+window.authMode = authMode;
+
+let currentCustomerSession = null;
+try {
+    const savedCustomer = localStorage.getItem('mvc_customer_session');
+    if (savedCustomer) currentCustomerSession = JSON.parse(savedCustomer);
+} catch(e) {
+    currentCustomerSession = null;
+}
+window.currentCustomerSession = currentCustomerSession;
+
+let localCustomerRegistry = {};
+try {
+    const cachedReg = localStorage.getItem('mvc_global_customer_registry');
+    if (cachedReg) localCustomerRegistry = JSON.parse(cachedReg);
+} catch(e){}
+window.localCustomerRegistry = localCustomerRegistry;
+
+function initPublicCustomerSync() {
+    if (typeof window !== 'undefined' && window.db) {
+        try {
+            window.db.ref('publicCustomerCodes').on('value', snapshot => {
+                if (snapshot.exists()) {
+                    window.localCustomerRegistry = Object.assign({}, window.localCustomerRegistry, snapshot.val() || {});
+                    try {
+                        localStorage.setItem('mvc_global_customer_registry', JSON.stringify(window.localCustomerRegistry));
+                    } catch(e){}
+                }
+            });
+        } catch(e){}
+    }
+}
+
 let notificationListeners = {};
 
 function startGlobalNotificationListeners(email) {
@@ -444,8 +478,11 @@ const firebaseConfig = {
 };
 
 firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.database();
+var auth = firebase.auth();
+var db = firebase.database();
+window.auth = auth;
+window.db = db;
+initPublicCustomerSync();
 
 // --- Auth UI Helpers ---
 function togglePassword() {
@@ -573,12 +610,23 @@ let activeDriverId = null;
 let currentUser = null;
 let isInitialLoad = true;
 
+try {
+    const savedCust = localStorage.getItem('mvc_customer_session');
+    if (savedCust) {
+        currentCustomerSession = JSON.parse(savedCust);
+        if (currentCustomerSession && currentCustomerSession.company) {
+            currentCompany = currentCustomerSession.company;
+        }
+    }
+} catch(e){}
+
 // FEATURE 1: Task tracking state — tracks previously seen task IDs for the current worker
 let previousTaskIds = [];
 
-
-
 function getCompanyData() {
+    if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && currentCustomerSession.company) {
+        currentCompany = currentCustomerSession.company;
+    }
     if (!appData[currentCompany]) {
         appData[currentCompany] = { admins: { "kinan,rahal@hotmail,com": true }, branches: ['Main Branch'], workers: [], violationRules: [], jobCatalog: [], warehouse: [] };
     }
@@ -621,7 +669,9 @@ function selectCompany(companyId) {
     }
 
     let logoSrc = 'burgeroov.png';
-    if (companyId === 'mvc') logoSrc = 'mvc.png';
+    if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession) {
+        logoSrc = 'mvc.png';
+    } else if (companyId === 'mvc') logoSrc = 'mvc.png';
     else if (companyId === 'mvcfresh') logoSrc = 'mvcfresh.png';
 
     const headerLogo = document.getElementById('header-logo');
@@ -699,7 +749,7 @@ window.selectCompany = selectCompany;
 window.showCompanySelectionHUD = showCompanySelectionHUD;
 
 // --- AUTHENTICATION SYSTEM ---
-let authMode = 'login';
+authMode = authMode || 'login';
 
 auth.onAuthStateChanged((user) => {
     const overlay = document.getElementById('auth-overlay');
@@ -709,6 +759,11 @@ auth.onAuthStateChanged((user) => {
     if (launchLoader) launchLoader.style.display = 'none';
 
     if (user) {
+        currentCustomerSession = null;
+        try {
+            localStorage.removeItem('mvc_customer_session');
+            localStorage.removeItem('mvc_customer_code');
+        } catch(e){}
         currentUser = { email: user.email, uid: user.uid };
         document.getElementById('display-user-email').textContent = currentUser.email;
         startGlobalNotificationListeners(user.email);
@@ -860,6 +915,10 @@ auth.onAuthStateChanged((user) => {
         }
     } else {
         currentUser = null;
+        if (currentCustomerSession) {
+            applyCustomerModeUI();
+            return;
+        }
         hideUnassignedOverlay();
         // Stop all notification listeners
         Object.keys(notificationListeners).forEach(companyId => {
@@ -981,7 +1040,8 @@ function checkUnassignedUserAccess(isManualTrigger = false) {
 
 
 function toggleAuthMode() {
-    authMode = authMode === 'login' ? 'signup' : 'login';
+    window.authMode = (window.authMode === 'login' || authMode === 'login') ? 'signup' : 'login';
+    authMode = window.authMode;
     const isAr = currentAppLang === 'ar';
 
     document.getElementById('auth-title').textContent = authMode === 'login' 
@@ -1004,6 +1064,7 @@ function toggleAuthMode() {
 }
 
 function handleAuthSubmit() {
+    const activeAuthMode = typeof authMode !== 'undefined' ? authMode : (window.authMode || 'login');
     const email = document.getElementById('auth-email').value.trim();
     const password = document.getElementById('auth-password').value.trim();
     const errorMsg = document.getElementById('auth-error-msg');
@@ -1016,7 +1077,7 @@ function handleAuthSubmit() {
         errorMsg.style.display = 'block'; return;
     }
 
-    if (authMode === 'signup') {
+    if (activeAuthMode === 'signup') {
         const confirmPassword = document.getElementById('auth-confirm-password').value.trim();
         if (password !== confirmPassword) {
             errorMsg.style.color = "var(--danger)";
@@ -1030,7 +1091,7 @@ function handleAuthSubmit() {
     loader.style.display = 'block';
     errorMsg.style.display = 'none';
 
-    if (authMode === 'login') {
+    if (activeAuthMode === 'login') {
         auth.signInWithEmailAndPassword(email, password)
             .catch(error => {
                 btn.style.display = 'block';
@@ -1054,6 +1115,10 @@ function handleAuthSubmit() {
 function logout() {
     hideUnassignedOverlay();
     localStorage.removeItem('selected_company');
+    if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession) {
+        logoutCustomerSession();
+        return;
+    }
     auth.signOut();
 }
 
@@ -1146,6 +1211,8 @@ function markLockedTabs() {
         costs: isAdmin || document.body.classList.contains('perm-costs'),
         adverts: isAdmin || document.body.classList.contains('perm-adverts'),
         activity: isAdmin,
+        reminders: isAdmin,
+        market: true,
     };
 
     Object.entries(access).forEach(([tabId, hasAccess]) => {
@@ -1294,6 +1361,7 @@ function ensureArraysExist(data) {
     if (!data.attendance) data.attendance = {};
     if (!data.activityLogs) data.activityLogs = {};
     if (!data.generalDeliveries) data.generalDeliveries = {};
+    if (!data.marketProducts) data.marketProducts = {};
     if (!data.incomeSources) data.incomeSources = ['Cash', 'Credit Card'];
     if (!data.disabledSalesMethods) data.disabledSalesMethods = [];
 
@@ -5203,6 +5271,9 @@ function processRestoreFile(event) {
 
 // --- UI NAVIGATION & GLOBALS ---
 function switchTab(tab) {
+    if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && tab !== 'market') {
+        tab = 'market';
+    }
     currentTab = tab;
 
     // --- Check if this tab is locked for the current user ---
@@ -5218,7 +5289,7 @@ function switchTab(tab) {
         }
     }
 
-    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders'];
+    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market'];
 
     allTabs.forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
@@ -5252,6 +5323,7 @@ function switchTab(tab) {
         adverts: { icon: '📢', label: 'Ads' },
         notes: { icon: '📝', label: 'Notes' },
         reminders: { icon: '⏰', label: 'Reminders' },
+        market: { icon: '🏪', label: 'Market' },
     };
     const meta = tabMeta[tab] || { icon: '⚙️', label: tab };
     const iconEl = document.getElementById('mob-active-icon');
@@ -5267,6 +5339,9 @@ function switchTab(tab) {
         renderAll();
         if (tab === 'reminders' && typeof renderReminders === 'function') {
             renderReminders();
+        }
+        if (tab === 'market' && typeof renderMarket === 'function') {
+            renderMarket();
         }
         // Fixes Leaflet map rendering bug when switching tabs
         if (tab === 'adverts' && promoMap) {
@@ -8358,6 +8433,8 @@ function renderAll() {
     else if (currentTab === 'activity') { renderActivityLog(); }
     else if (currentTab === 'managing') { renderManaging(); }
     else if (currentTab === 'costs') { renderCosts(); }
+    else if (currentTab === 'reminders') { if (typeof renderReminders === 'function') renderReminders(); }
+    else if (currentTab === 'market') { if (typeof renderMarket === 'function') renderMarket(); }
 
     renderPaymentRequests();
     renderWorkerCustodyRequests();
@@ -9406,7 +9483,10 @@ function applyTranslations() {
     const langDict = { ...(uiTranslations[currentAppLang] || uiTranslations["en"] || {}) };
 
     // Dynamic translations based on selected company
-    if (currentCompany === 'mvc') {
+    if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession) {
+        langDict['app-title'] = currentAppLang === 'ar' ? 'سوق عملاء MVC' : 'MVC Customer Market';
+        document.title = 'MVC Customer Market';
+    } else if (currentCompany === 'mvc') {
         langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات إم في سي فريش' : 'MVC Fresh Operations Portal';
         langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة تحكم إم في سي فريش' : 'Login to MVC Fresh Dashboard';
         document.title = 'MVC Fresh Management Portal';
@@ -13508,7 +13588,1404 @@ function saveEditReminder() {
 }
 window.saveEditReminder = saveEditReminder;
 
+// ==========================================
+// Market Cart & Coin System State
+let marketCart = [];
+try {
+    const savedCart = localStorage.getItem('mvc_market_cart');
+    if (savedCart) marketCart = JSON.parse(savedCart);
+} catch (e) {
+    marketCart = [];
+}
+
+let currentMarketCategoryFilter = 'all';
+let currentMarketPage = 1;
+let marketPageSize = 12;
+let marketWishlist = new Set();
+try {
+    const savedWishlist = localStorage.getItem('mvc_market_wishlist');
+    if (savedWishlist) marketWishlist = new Set(JSON.parse(savedWishlist));
+} catch (e) {
+    marketWishlist = new Set();
+}
+
+function sanitizeMarketText(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+window.sanitizeMarketText = sanitizeMarketText;
+
+function setMarketCategoryFilter(cat) {
+    currentMarketCategoryFilter = cat;
+    currentMarketPage = 1;
+    
+    const btnAll = document.getElementById('market-cat-all');
+    const btnMeat = document.getElementById('market-cat-meat');
+    const btnVeg = document.getElementById('market-cat-veg-fruit');
+
+    if (btnAll) btnAll.classList.toggle('active', cat === 'all');
+    if (btnMeat) btnMeat.classList.toggle('active', cat === 'meat');
+    if (btnVeg) btnVeg.classList.toggle('active', cat === 'veg_fruit');
+
+    renderMarket();
+}
+window.setMarketCategoryFilter = setMarketCategoryFilter;
+window.filterMarketCategory = setMarketCategoryFilter;
+
+function changeMarketPage(page) {
+    currentMarketPage = page;
+    renderMarket();
+}
+window.changeMarketPage = changeMarketPage;
+
+function toggleMarketWishlist(productId) {
+    if (marketWishlist.has(productId)) {
+        marketWishlist.delete(productId);
+    } else {
+        marketWishlist.add(productId);
+    }
+    try {
+        localStorage.setItem('mvc_market_wishlist', JSON.stringify(Array.from(marketWishlist)));
+    } catch (e) {}
+    renderMarket();
+}
+window.toggleMarketWishlist = toggleMarketWishlist;
+
+function saveMarketCart() {
+    try {
+        localStorage.setItem('mvc_market_cart', JSON.stringify(marketCart));
+    } catch (e) {}
+    updateMarketCartBadges();
+}
+
+function updateMarketCartBadges() {
+    const totalQty = marketCart.reduce((sum, item) => sum + (item.qty || 0), 0);
+    const cartCountEl = document.getElementById('market-cart-count');
+    if (cartCountEl) cartCountEl.textContent = totalQty;
+}
+
+function getCurrentWorkerId() {
+    if (typeof currentWorkerProfile !== 'undefined' && currentWorkerProfile && currentWorkerProfile.id) return currentWorkerProfile.id;
+    if (typeof currentUser !== 'undefined' && currentUser && (currentUser.uid || currentUser.id)) return currentUser.uid || currentUser.id;
+    if (window.currentUser && (window.currentUser.uid || window.currentUser.id)) return window.currentUser.uid || window.currentUser.id;
+    return 'admin_user';
+}
+
+function getUserCoins() {
+    if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && typeof currentCustomerSession.coins !== 'undefined') {
+        return parseFloat(currentCustomerSession.coins) || 0;
+    }
+    const data = getCompanyData();
+    const workers = data.workers || {};
+    const workerId = getCurrentWorkerId();
+
+    if (workers[workerId] && typeof workers[workerId].coins !== 'undefined') {
+        return parseFloat(workers[workerId].coins) || 0;
+    }
+    const userCoinsMap = data.userCoins || {};
+    if (typeof userCoinsMap[workerId] !== 'undefined') {
+        return parseFloat(userCoinsMap[workerId]) || 0;
+    }
+    return 1000; // Default coin balance
+}
+
+function refillMonthlyCoinsForAllWorkers() {
+    const isAr = currentAppLang === 'ar';
+    const amountInput = document.getElementById('admin-monthly-coins-input');
+    const amount = parseFloat(amountInput?.value || 500);
+
+    if (isNaN(amount) || amount <= 0) {
+        alert(isAr ? 'الرجاء إدخال كمية كوينز صحيحة.' : 'Please enter a valid coin amount.');
+        return;
+    }
+
+    if (!confirm(isAr 
+        ? `هل تريد تعبئة ${amount} كوينز شهرياً لجميع الموظفين؟` 
+        : `Refill ${amount} monthly coins for all active workers?`)) {
+        return;
+    }
+
+    const workers = getVisibleWorkers();
+    const updates = {};
+    workers.forEach(w => {
+        const currentCoins = parseFloat(w.coins || 1000);
+        updates[`companies/${currentCompany}/workers/${w.id}/coins`] = currentCoins + amount;
+        w.coins = currentCoins + amount;
+    });
+
+    db.ref().update(updates).then(() => {
+        alert(isAr ? `تمت إعادة تعبئة ${amount} كوينز بنجاح لجميع الموظفين! 🪙` : `Refilled ${amount} coins for all workers successfully! 🪙`);
+        renderMarket();
+    }).catch(err => {
+        console.error("Error refilling coins:", err);
+        alert(isAr ? 'حدث خطأ أثناء تعبئة الكوينز.' : 'Error refilling coins.');
+    });
+}
+window.refillMonthlyCoinsForAllWorkers = refillMonthlyCoinsForAllWorkers;
+
+function addTestCoins(amount = 500) {
+    const isAr = currentAppLang === 'ar';
+    const currentCoins = getUserCoins();
+    const newCoins = currentCoins + amount;
+    const updates = {};
+
+    if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && currentCustomerSession.code) {
+        const custCode = currentCustomerSession.code;
+        updates[`companies/${currentCompany}/customers/${custCode}/coins`] = newCoins;
+        currentCustomerSession.coins = newCoins;
+        try {
+            localStorage.setItem('mvc_customer_session', JSON.stringify(currentCustomerSession));
+        } catch(e){}
+    } else {
+        const workerId = getCurrentWorkerId();
+        const data = getCompanyData();
+        if (data.workers && data.workers[workerId]) {
+            updates[`companies/${currentCompany}/workers/${workerId}/coins`] = newCoins;
+            data.workers[workerId].coins = newCoins;
+        }
+        updates[`companies/${currentCompany}/userCoins/${workerId}`] = newCoins;
+        if (!data.userCoins) data.userCoins = {};
+        data.userCoins[workerId] = newCoins;
+    }
+
+    db.ref().update(updates).then(() => {
+        renderMarket();
+    }).catch(err => {
+        console.error("Error adding test coins:", err);
+        alert(isAr ? 'حدث خطأ أثناء إضافة الكوينز.' : 'Error adding coins.');
+    });
+}
+window.addTestCoins = addTestCoins;
+
+function updateWorkerCoinsIndividual() {
+    const isAr = currentAppLang === 'ar';
+    const workerSelect = document.getElementById('admin-coin-worker-select');
+    const adjustInput = document.getElementById('admin-coin-adjust-input');
+
+    const workerId = workerSelect?.value;
+    const amount = parseFloat(adjustInput?.value);
+
+    if (!workerId) {
+        alert(isAr ? 'الرجاء اختيار موظف.' : 'Please select a worker.');
+        return;
+    }
+    if (isNaN(amount) || amount < 0) {
+        alert(isAr ? 'الرجاء إدخال رصيد كوينز صحيح.' : 'Please enter a valid coin balance.');
+        return;
+    }
+
+    db.ref(`companies/${currentCompany}/workers/${workerId}/coins`).set(amount).then(() => {
+        alert(isAr ? 'تم تحديث رصيد الكوينز للموظف بنجاح! 🪙' : 'Worker coins updated successfully! 🪙');
+        if (adjustInput) adjustInput.value = '';
+        renderMarket();
+    }).catch(err => {
+        console.error("Error updating worker coins:", err);
+        alert(isAr ? 'حدث خطأ أثناء تحديث الرصيد.' : 'Error updating worker coins.');
+    });
+}
+window.updateWorkerCoinsIndividual = updateWorkerCoinsIndividual;
+
+function handleMarketImageUpload(event, mode) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const maxDim = 400;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+                if (width > maxDim) {
+                    height *= maxDim / width;
+                    width = maxDim;
+                }
+            } else {
+                if (height > maxDim) {
+                    width *= maxDim / height;
+                    height = maxDim;
+                }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+
+            if (mode === 'add') {
+                document.getElementById('market-product-image-input').value = compressedBase64;
+                const previewContainer = document.getElementById('market-img-preview-add');
+                const previewImg = document.getElementById('market-img-preview-add-src');
+                if (previewImg) previewImg.src = compressedBase64;
+                if (previewContainer) previewContainer.style.display = 'block';
+            } else if (mode === 'edit') {
+                document.getElementById('edit-market-product-image').value = compressedBase64;
+                const previewContainer = document.getElementById('market-img-preview-edit');
+                const previewImg = document.getElementById('market-img-preview-edit-src');
+                if (previewImg) previewImg.src = compressedBase64;
+                if (previewContainer) previewContainer.style.display = 'block';
+            }
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+window.handleMarketImageUpload = handleMarketImageUpload;
+
+window.globalMarketProductsCache = {};
+try {
+    const savedMarketCache = localStorage.getItem('mvc_cached_market_products');
+    if (savedMarketCache) {
+        window.globalMarketProductsCache = JSON.parse(savedMarketCache) || {};
+    }
+} catch(e) {}
+
+window.hasInitializedGlobalMarketListener = false;
+
+function initGlobalMarketProductsListener() {
+    if (typeof db === 'undefined' || window.hasInitializedGlobalMarketListener) return;
+    window.hasInitializedGlobalMarketListener = true;
+
+    const paths = [
+        'marketProducts',
+        'companies/mvc/marketProducts',
+        'companies/mvcfresh/marketProducts',
+        'companies/burgeroov/marketProducts'
+    ];
+
+    paths.forEach(path => {
+        db.ref(path).on('value', snapshot => {
+            if (snapshot.exists()) {
+                const val = snapshot.val();
+                const list = Array.isArray(val) ? val : Object.values(val);
+                list.forEach(p => {
+                    if (p && p.id) {
+                        window.globalMarketProductsCache[p.id] = p;
+                    }
+                });
+                try {
+                    localStorage.setItem('mvc_cached_market_products', JSON.stringify(window.globalMarketProductsCache));
+                } catch(e){}
+            }
+            if (typeof renderMarket === 'function') {
+                renderMarket();
+            }
+        });
+    });
+}
+window.initGlobalMarketProductsListener = initGlobalMarketProductsListener;
+
+function getAllMarketProducts() {
+    initGlobalMarketProductsListener();
+
+    const map = { ...window.globalMarketProductsCache };
+    const data = getCompanyData();
+    const rawProds = data.marketProducts || {};
+    const prods = Array.isArray(rawProds) ? rawProds : Object.values(rawProds);
+
+    // Collect products from current company
+    prods.forEach(p => {
+        if (p && p.id) map[p.id] = p;
+    });
+
+    // Merge products from all loaded companies in appData so market products never disappear
+    if (typeof appData !== 'undefined') {
+        const companyKeys = ['mvc', 'mvcfresh', 'burgeroov', ...Object.keys(appData)];
+        companyKeys.forEach(cKey => {
+            if (appData[cKey] && appData[cKey].marketProducts) {
+                const cMap = appData[cKey].marketProducts;
+                const cList = Array.isArray(cMap) ? cMap : Object.values(cMap);
+                cList.forEach(p => {
+                    if (p && p.id && !map[p.id]) map[p.id] = p;
+                });
+            }
+        });
+    }
+
+    // Force one-time deep Firebase fetch across explicit market paths if map is empty
+    if (Object.keys(map).length === 0 && typeof db !== 'undefined' && !window.hasDeepFetchedMarketProducts) {
+        window.hasDeepFetchedMarketProducts = true;
+        const marketPaths = [
+            'marketProducts',
+            'companies/mvc/marketProducts',
+            'companies/mvcfresh/marketProducts',
+            'companies/burgeroov/marketProducts'
+        ];
+        const fetchPromises = marketPaths.map(p => 
+            db.ref(p).once('value')
+              .then(snap => snap.exists() ? snap.val() : null)
+              .catch(() => null)
+        );
+        Promise.all(fetchPromises).then(results => {
+            let foundAny = false;
+            results.forEach(res => {
+                if (res) {
+                    const list = Array.isArray(res) ? res : Object.values(res);
+                    list.forEach(p => {
+                        if (p && p.id) {
+                            window.globalMarketProductsCache[p.id] = p;
+                            map[p.id] = p;
+                            foundAny = true;
+                        }
+                    });
+                }
+            });
+            if (foundAny) {
+                try {
+                    localStorage.setItem('mvc_cached_market_products', JSON.stringify(window.globalMarketProductsCache));
+                } catch(e){}
+                if (typeof renderMarket === 'function') renderMarket();
+            }
+        }).catch(err => console.error("Error deep fetching market products:", err));
+    }
+
+    return Object.values(map);
+}
+window.getAllMarketProducts = getAllMarketProducts;
+
+function addToMarketCart(productId) {
+    const prods = getAllMarketProducts();
+    const prod = prods.find(p => p.id === productId);
+
+    if (!prod) return;
+
+    const existingIndex = marketCart.findIndex(item => item.productId === productId);
+    if (existingIndex > -1) {
+        marketCart[existingIndex].qty += 1;
+    } else {
+        marketCart.push({
+            productId: prod.id,
+            name: prod.name,
+            price: prod.price,
+            imageUrl: prod.imageUrl || '',
+            weightTag: prod.weightTag || '',
+            qty: 1
+        });
+    }
+
+    saveMarketCart();
+    renderMarket();
+}
+window.addToMarketCart = addToMarketCart;
+
+function openMarketCartModal() {
+    renderMarketCartItems();
+    const modal = document.getElementById('market-cart-modal');
+    if (modal) modal.style.display = 'flex';
+}
+window.openMarketCartModal = openMarketCartModal;
+
+function closeMarketCartModal() {
+    const modal = document.getElementById('market-cart-modal');
+    if (modal) modal.style.display = 'none';
+}
+window.closeMarketCartModal = closeMarketCartModal;
+
+function updateCartItemQty(productId, delta) {
+    const index = marketCart.findIndex(item => item.productId === productId);
+    if (index === -1) return;
+
+    marketCart[index].qty += delta;
+    if (marketCart[index].qty <= 0) {
+        marketCart.splice(index, 1);
+    }
+    saveMarketCart();
+    renderMarketCartItems();
+    renderMarket();
+}
+window.updateCartItemQty = updateCartItemQty;
+
+function removeCartItem(productId) {
+    marketCart = marketCart.filter(item => item.productId !== productId);
+    saveMarketCart();
+    renderMarketCartItems();
+    renderMarket();
+}
+window.removeCartItem = removeCartItem;
+
+function renderMarketCartItems() {
+    const listContainer = document.getElementById('market-cart-items-list');
+    const userBalanceEl = document.getElementById('market-cart-user-balance');
+    const totalCostEl = document.getElementById('market-cart-total-cost');
+    const warningEl = document.getElementById('market-cart-balance-warning');
+    const submitBtn = document.getElementById('market-cart-submit-btn');
+    const isAr = currentAppLang === 'ar';
+
+    const userCoins = getUserCoins();
+    if (userBalanceEl) userBalanceEl.textContent = `${userCoins.toLocaleString()} ${isAr ? 'كوينز' : 'Coins'}`;
+
+    if (!listContainer) return;
+
+    if (marketCart.length === 0) {
+        listContainer.innerHTML = `
+            <div style="text-align: center; padding: 40px 10px; color: var(--text-muted);">
+                <div style="font-size: 3rem; margin-bottom: 8px;">🛒</div>
+                <h4 style="margin: 0 0 4px 0; font-size: 1.1rem; color: var(--text-main); font-weight: 800;">${isAr ? 'سلة التسوق فارغة' : 'Your Cart is Empty'}</h4>
+                <p style="margin: 0; font-size: 0.85rem;">${isAr ? 'تصفح منتجات السوق وأضف المنتجات لسلتك!' : 'Browse market products and add items to your cart!'}</p>
+            </div>
+        `;
+        if (totalCostEl) totalCostEl.textContent = `0 ${isAr ? 'كوينز' : 'Coins'}`;
+        if (warningEl) warningEl.style.display = 'none';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.style.opacity = '0.5';
+            submitBtn.style.cursor = 'not-allowed';
+        }
+        return;
+    }
+
+    let totalCost = 0;
+    listContainer.innerHTML = marketCart.map(item => {
+        const itemTotal = (item.price || 0) * (item.qty || 1);
+        totalCost += itemTotal;
+
+        const imgTag = item.imageUrl 
+            ? `<img src="${item.imageUrl}" style="width: 54px; height: 54px; border-radius: 10px; object-fit: cover;" />`
+            : `<div style="width: 54px; height: 54px; border-radius: 10px; background: var(--input-bg); display: flex; align-items: center; justify-content: center; font-size: 1.6rem;">🥩</div>`;
+
+        return `
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px dashed var(--border-color);">
+                <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                    ${imgTag}
+                    <div>
+                        <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-main);">${sanitizeMarketText(item.name)}</div>
+                        <div style="font-size: 0.8rem; color: #ef4444; font-weight: 700; margin-top: 2px;">
+                            ${item.price} 🪙 ${isAr ? 'للقطعة' : 'each'}
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <!-- Qty Controls -->
+                    <div style="display: flex; align-items: center; background: var(--input-bg); border-radius: 100px; border: 1px solid var(--border-color); padding: 3px 8px; gap: 8px;">
+                        <button type="button" onclick="updateCartItemQty('${item.productId}', -1)" style="border: none; background: transparent; color: var(--text-main); font-weight: 800; cursor: pointer; font-size: 1rem;">-</button>
+                        <span style="font-weight: 900; font-size: 0.9rem; min-width: 18px; text-align: center;">${item.qty}</span>
+                        <button type="button" onclick="updateCartItemQty('${item.productId}', 1)" style="border: none; background: transparent; color: var(--text-main); font-weight: 800; cursor: pointer; font-size: 1rem;">+</button>
+                    </div>
+
+                    <!-- Item Total Price -->
+                    <div style="font-weight: 900; font-size: 1rem; color: #ef4444; min-width: 65px; text-align: right;">
+                        ${itemTotal} 🪙
+                    </div>
+
+                    <!-- Remove Button -->
+                    <button type="button" onclick="removeCartItem('${item.productId}')" title="Remove" style="border: none; background: transparent; color: #ef4444; font-size: 1.1rem; cursor: pointer;">🗑️</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    if (totalCostEl) totalCostEl.textContent = `${totalCost.toLocaleString()} ${isAr ? 'كوينز' : 'Coins'}`;
+
+    const isInsufficient = userCoins < totalCost;
+    if (warningEl) {
+        warningEl.style.display = isInsufficient ? 'block' : 'none';
+        if (isInsufficient) {
+            warningEl.textContent = isAr 
+                ? `⚠️ رصيد الكوينز لديك غير كافٍ! تحتاج إلى ${totalCost - userCoins} كوينز إضافية.`
+                : `⚠️ Insufficient Coins! You need ${totalCost - userCoins} more coins.`;
+        }
+    }
+
+    if (submitBtn) {
+        submitBtn.disabled = isInsufficient;
+        submitBtn.style.opacity = isInsufficient ? '0.5' : '1';
+        submitBtn.style.cursor = isInsufficient ? 'not-allowed' : 'pointer';
+    }
+}
+
+function submitMarketOrder() {
+    const isAr = currentAppLang === 'ar';
+    if (marketCart.length === 0) return;
+
+    const userCoins = getUserCoins();
+    const totalCost = marketCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+
+    if (userCoins < totalCost) {
+        alert(isAr ? 'رصيد الكوينز لديك غير كافٍ لإتمام هذا الطلب!' : 'Insufficient coins to complete this order!');
+        return;
+    }
+
+    const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
+    const workerId = isCustomer ? (currentCustomerSession.code || currentCustomerSession.id) : getCurrentWorkerId();
+    const workerName = isCustomer 
+        ? (currentCustomerSession.name || 'Customer (' + currentCustomerSession.code + ')') 
+        : ((typeof currentWorkerProfile !== 'undefined' && currentWorkerProfile) 
+            ? (currentWorkerProfile.name || currentWorkerProfile.email) 
+            : ((typeof currentUser !== 'undefined' && currentUser && currentUser.email) ? currentUser.email : 'Worker'));
+
+    const orderId = 'ord_' + Date.now();
+    const orderObj = {
+        id: orderId,
+        workerId: workerId,
+        workerName: workerName,
+        items: marketCart,
+        totalCost: totalCost,
+        status: 'pending',
+        createdAt: Date.now()
+    };
+
+    // Deduct coins & save order
+    const newCoins = userCoins - totalCost;
+    const updates = {};
+    if (isCustomer) {
+        const custCode = String(currentCustomerSession.code).trim();
+        currentCustomerSession.coins = newCoins;
+        updates[`publicCustomerCodes/${custCode}/coins`] = newCoins;
+        updates[`customerCodes/${custCode}/coins`] = newCoins;
+        updates[`customers/${custCode}/coins`] = newCoins;
+        ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
+            updates[`companies/${c}/customers/${custCode}/coins`] = newCoins;
+        });
+        try {
+            localStorage.setItem('mvc_customer_session', JSON.stringify(currentCustomerSession));
+        } catch(e){}
+    } else {
+        updates[`companies/${currentCompany}/workers/${workerId}/coins`] = newCoins;
+    }
+    updates[`companies/${currentCompany}/marketOrders/${orderId}`] = orderObj;
+
+    db.ref().update(updates).then(() => {
+        marketCart = [];
+        saveMarketCart();
+        closeMarketCartModal();
+        alert(isAr 
+            ? `🎉 تم إتمام الطلب بنجاح! تم خصم ${totalCost} كوينز من رصيدك. 🪙` 
+            : `🎉 Order submitted successfully! Deducted ${totalCost} coins from your balance. 🪙`);
+        renderMarket();
+    }).catch(err => {
+        console.error("Error submitting order:", err);
+        alert(isAr ? 'حدث خطأ أثناء إرسال الطلب.' : 'Error submitting order.');
+    });
+}
+window.submitMarketOrder = submitMarketOrder;
+
+function renderMarket() {
+    const grid = document.getElementById('market-products-grid');
+    if (!grid) return;
+
+    const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
+    const prods = getAllMarketProducts();
+    const search = (document.getElementById('market-search-input')?.value || '').trim().toLowerCase();
+    const isAdmin = !isCustomer && (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.isAdmin));
+    const isAr = currentAppLang === 'ar';
+
+    // Update Top Right Coins & Cart Badges
+    const userCoins = getUserCoins();
+    const userCoinsValEl = document.getElementById('market-user-coins-val');
+    if (userCoinsValEl) userCoinsValEl.textContent = userCoins.toLocaleString();
+    updateMarketCartBadges();
+
+    let filtered = prods.filter(p => {
+        if (!p) return false;
+        if (currentMarketCategoryFilter !== 'all' && p.category !== currentMarketCategoryFilter) return false;
+        if (search && !(p.name || '').toLowerCase().includes(search)) return false;
+        return true;
+    });
+
+    filtered.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+    const totalCount = filtered.length;
+    const badge = document.getElementById('market-count-badge');
+    if (badge) {
+        badge.textContent = `${totalCount} ${isAr ? 'منتج' : 'Products'}`;
+    }
+
+    const pagContainer = document.getElementById('market-pagination-container');
+
+    if (totalCount === 0) {
+        grid.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 50px 20px; background: var(--input-bg); border-radius: 18px; border: 1px dashed var(--border-color); max-width: 600px; margin: 0 auto; width: 100%;">
+                <div style="font-size: 3.5rem; margin-bottom: 12px;">🏪</div>
+                <h3 style="margin: 0 0 8px 0; color: var(--text-main); font-size: 1.2rem; font-weight: 800;">${isAr ? 'لا توجد منتجات بالسوق' : 'No Market Products Found'}</h3>
+                <p style="margin: 0; color: var(--text-muted); font-size: 0.9rem;">${isAr ? 'قم بإضافة منتجات لحوم أو خضار وفواكه جديدة لكتالوج المتجر.' : 'Add new meat, vegetable, or fruit products to the market catalog.'}</p>
+            </div>
+        `;
+        if (pagContainer) pagContainer.innerHTML = '';
+        return;
+    }
+
+    // Calculate Pagination Slicing
+    let itemsToRender = filtered;
+    let totalPages = 1;
+    if (marketPageSize !== 'all' && typeof marketPageSize === 'number' && marketPageSize > 0) {
+        totalPages = Math.max(1, Math.ceil(totalCount / marketPageSize));
+        if (currentMarketPage > totalPages) currentMarketPage = totalPages;
+        if (currentMarketPage < 1) currentMarketPage = 1;
+
+        const startIndex = (currentMarketPage - 1) * marketPageSize;
+        itemsToRender = filtered.slice(startIndex, startIndex + marketPageSize);
+    }
+
+    // Render Standard Numbered Pagination Controls (1, 2, 3...)
+    if (pagContainer) {
+        if (marketPageSize === 'all' || totalPages <= 1) {
+            pagContainer.innerHTML = '';
+        } else {
+            let pagHTML = '';
+
+            // Previous Button (◀ Previous / ◀ السابق)
+            if (currentMarketPage > 1) {
+                const prevPage = currentMarketPage - 1;
+                pagHTML += `
+                    <button onclick="changeMarketPage(${prevPage})" class="btn-outline" style="padding: 8px 16px; border-radius: 100px; font-weight: 800; font-size: 0.88rem; background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border-color); cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 4px;">
+                        ${isAr ? '◀ السابق' : '◀ Previous'}
+                    </button>
+                `;
+            }
+
+            // Numeric Page Buttons (1, 2, 3...)
+            for (let i = 1; i <= totalPages; i++) {
+                const isActive = (i === currentMarketPage);
+                if (isActive) {
+                    pagHTML += `
+                        <button style="padding: 8px 18px; border-radius: 100px; font-weight: 900; font-size: 0.92rem; background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; border: none; box-shadow: 0 4px 14px rgba(16,185,129,0.35); cursor: default;">
+                            ${i}
+                        </button>
+                    `;
+                } else {
+                    pagHTML += `
+                        <button onclick="changeMarketPage(${i})" class="btn-outline" style="padding: 8px 16px; border-radius: 100px; font-weight: 800; font-size: 0.88rem; background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border-color); cursor: pointer; transition: all 0.2s ease;">
+                            ${i}
+                        </button>
+                    `;
+                }
+            }
+
+            // Next Button (التالي ▶ / Next ▶)
+            if (currentMarketPage < totalPages) {
+                const nextPage = currentMarketPage + 1;
+                pagHTML += `
+                    <button onclick="changeMarketPage(${nextPage})" class="btn-outline" style="padding: 8px 16px; border-radius: 100px; font-weight: 800; font-size: 0.88rem; background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border-color); cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 4px;">
+                        ${isAr ? 'التالي ▶' : 'Next ▶'}
+                    </button>
+                `;
+            }
+
+            pagContainer.innerHTML = pagHTML;
+        }
+    }
+
+    grid.innerHTML = itemsToRender.map(p => {
+        const isMeat = p.category === 'meat';
+        const weightText = p.weightTag || '';
+        const cartItem = marketCart.find(item => item.productId === p.id);
+        const itemInCartQty = cartItem ? cartItem.qty : 0;
+        
+        let imageContent = '';
+        if (p.imageUrl) {
+            imageContent = `<img src="${p.imageUrl}" alt="${sanitizeMarketText(p.name)}" style="width:100%; height:100%; object-fit:cover; display:block;" />`;
+        } else {
+            const bannerTitle = isMeat ? 'لحوم فاخرة' : 'خضار وفواكه';
+            const bannerSub = isMeat ? 'تقطع حسب الطلب' : 'طازجة قطاف اليوم';
+            const catIcon = isMeat ? '🐏' : '🧺';
+            const bannerGradient = isMeat 
+                ? 'linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #06b6d4 100%)' 
+                : 'linear-gradient(135deg, #065f46 0%, #10b981 50%, #34d399 100%)';
+            
+            imageContent = `
+                <div style="width:100%; height:100%; background: ${bannerGradient}; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#ffffff; text-align:center; padding:12px; box-sizing:border-box; position:relative;">
+                    <div style="font-size: 3.2rem; margin-bottom:4px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));">${catIcon}</div>
+                    <div style="font-size: 1.1rem; font-weight:900; letter-spacing:-0.5px; text-shadow:0 2px 4px rgba(0,0,0,0.4);">${bannerTitle}</div>
+                    <div style="font-size: 0.75rem; opacity:0.9; font-weight:600;">${bannerSub}</div>
+                </div>
+            `;
+        }
+
+        let adminActions = '';
+        if (isAdmin) {
+            adminActions = `
+                <div style="display: flex; gap: 8px; margin-top: 8px; border-top: 1px dashed var(--border-color); padding-top: 8px;">
+                    <button onclick="openEditMarketProductModal('${p.id}')" class="btn-outline" style="flex: 1; padding: 6px; font-size: 0.8rem; font-weight: 700; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap;">✏️ ${isAr ? 'تعديل' : 'Edit'}</button>
+                    <button onclick="deleteMarketProduct('${p.id}')" class="btn-danger" style="flex: 1; padding: 6px; font-size: 0.8rem; font-weight: 700; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap;">✖ ${isAr ? 'حذف' : 'Delete'}</button>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="card market-store-card" style="margin: 0; border: 1px solid var(--border-color); border-radius: 16px; background: var(--card-bg, #ffffff); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, box-shadow 0.2s ease; box-shadow: 0 4px 14px rgba(0,0,0,0.05); position: relative;">
+                <div>
+                    <!-- Top Image Showcase (Square Aspect) -->
+                    <div style="width: 100%; aspect-ratio: 1 / 1; position: relative; overflow: hidden; background: #f8fafc; border-bottom: 1px solid var(--border-color);">
+                        ${imageContent}
+
+                        <!-- Bottom-Left Weight / Subtitle Tag -->
+                        ${weightText ? `
+                            <div style="position: absolute; bottom: 10px; left: 10px; background: rgba(0, 0, 0, 0.65); color: #ffffff; font-weight: 800; font-size: 0.8rem; padding: 4px 10px; border-radius: 8px; backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.25); z-index: 2;">
+                                ${sanitizeMarketText(weightText)}
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <!-- Product Body Details -->
+                    <div style="padding: 14px 14px 6px 14px; text-align: center;">
+                        <!-- Product Title (Clean, Bold, Black/Dark Text, NO Ratings) -->
+                        <h3 style="margin: 0 0 4px 0; color: var(--text-main); font-size: 1.05rem; font-weight: 800; line-height: 1.35; height: 2.7rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                            ${sanitizeMarketText(p.name || '')}
+                        </h3>
+                    </div>
+                </div>
+
+                <div style="padding: 0 14px 14px 14px; display: flex; flex-direction: column; gap: 8px;">
+                    <!-- Price Row (Red Price Tag in Coins) -->
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 4px; color: #ef4444; font-size: 1.3rem; font-weight: 900;">
+                        <span>${p.price || 0}</span>
+                        <span style="font-size: 1.05rem;">🪙</span>
+                    </div>
+
+                    <!-- Full-Width Professional Shopping Cart Button (Royal Blue) -->
+                    <button onclick="addToMarketCart('${p.id}')" title="${isAr ? 'أضف للسلة' : 'Add to Cart'}" style="width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: 10px; border: none; background: #2563eb; color: #ffffff; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28); transition: all 0.2s ease;">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                        <span style="white-space: nowrap;">${isAr ? 'أضف للسلة' : 'Add to Cart'}</span>
+                        ${itemInCartQty > 0 ? `
+                            <span style="background: #ffffff; color: #2563eb; font-size: 0.75rem; font-weight: 900; padding: 2px 8px; border-radius: 100px; line-height: 1; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;">
+                                ${itemInCartQty}
+                            </span>
+                        ` : ''}
+                    ${adminActions}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    renderAdminCustomersList();
+}
+window.renderMarket = renderMarket;
+
+function addMarketProduct() {
+    const nameEl = document.getElementById('market-product-name-input');
+    const catEl = document.getElementById('market-product-category-select');
+    const priceEl = document.getElementById('market-product-price-input');
+    const weightEl = document.getElementById('market-product-weight-input');
+    const imageEl = document.getElementById('market-product-image-input');
+    const isAr = currentAppLang === 'ar';
+
+    if (!nameEl || !catEl || !priceEl) return;
+
+    const name = nameEl.value.trim();
+    const category = catEl.value;
+    const price = parseFloat(priceEl.value);
+    const weightTag = weightEl ? weightEl.value.trim() : '';
+    const imageUrl = imageEl ? imageEl.value.trim() : '';
+
+    if (!name) {
+        alert(isAr ? 'الرجاء إدخال اسم المنتج.' : 'Please enter product name.');
+        return;
+    }
+
+    if (isNaN(price) || price < 0) {
+        alert(isAr ? 'الرجاء إدخال سعر صحيح بالقطع النقدية.' : 'Please enter a valid coin price.');
+        return;
+    }
+
+    const productId = 'mkt_' + Date.now();
+    const productObj = {
+        id: productId,
+        name: name,
+        category: category,
+        price: price,
+        weightTag: weightTag,
+        imageUrl: imageUrl,
+        createdAt: Date.now(),
+        createdBy: (typeof currentUser !== 'undefined' && currentUser && currentUser.email) ? currentUser.email : 'Admin'
+    };
+
+    const updates = {};
+    updates[`marketProducts/${productId}`] = productObj;
+    ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
+        updates[`companies/${c}/marketProducts/${productId}`] = productObj;
+    });
+
+    db.ref().update(updates).then(() => {
+        nameEl.value = '';
+        priceEl.value = '';
+        if (weightEl) weightEl.value = '';
+        if (imageEl) imageEl.value = '';
+        const previewContainer = document.getElementById('market-img-preview-add');
+        if (previewContainer) previewContainer.style.display = 'none';
+        window.globalMarketProductsCache[productId] = productObj;
+        renderMarket();
+    }).catch(err => {
+        console.error("Error adding market product:", err);
+        alert(isAr ? 'حدث خطأ أثناء إضافة المنتج.' : 'Error adding market product.');
+    });
+}
+window.addMarketProduct = addMarketProduct;
+
+function openEditMarketProductModal(productId) {
+    const prods = getAllMarketProducts();
+    const prod = prods.find(p => p.id === productId);
+
+    if (!prod) {
+        alert(currentAppLang === 'ar' ? 'لم يتم العثور على المنتج.' : 'Product not found.');
+        return;
+    }
+
+    document.getElementById('edit-market-product-id').value = prod.id;
+    document.getElementById('edit-market-product-name').value = prod.name || '';
+    document.getElementById('edit-market-product-category').value = prod.category || 'meat';
+    document.getElementById('edit-market-product-price').value = prod.price || 0;
+    
+    const weightEl = document.getElementById('edit-market-product-weight');
+    const imageEl = document.getElementById('edit-market-product-image');
+    if (weightEl) weightEl.value = prod.weightTag || '';
+    if (imageEl) imageEl.value = prod.imageUrl || '';
+
+    const previewContainer = document.getElementById('market-img-preview-edit');
+    const previewImg = document.getElementById('market-img-preview-edit-src');
+    if (prod.imageUrl) {
+        if (previewImg) previewImg.src = prod.imageUrl;
+        if (previewContainer) previewContainer.style.display = 'block';
+    } else {
+        if (previewContainer) previewContainer.style.display = 'none';
+    }
+
+    const modal = document.getElementById('edit-market-product-modal');
+    if (modal) modal.style.display = 'flex';
+}
+window.openEditMarketProductModal = openEditMarketProductModal;
+
+function closeEditMarketProductModal() {
+    const modal = document.getElementById('edit-market-product-modal');
+    if (modal) modal.style.display = 'none';
+}
+window.closeEditMarketProductModal = closeEditMarketProductModal;
+
+function saveEditedMarketProduct() {
+    const id = document.getElementById('edit-market-product-id').value;
+    const name = document.getElementById('edit-market-product-name').value.trim();
+    const category = document.getElementById('edit-market-product-category').value;
+    const price = parseFloat(document.getElementById('edit-market-product-price').value);
+    const weightTag = document.getElementById('edit-market-product-weight')?.value.trim() || '';
+    const imageUrl = document.getElementById('edit-market-product-image')?.value.trim() || '';
+    const isAr = currentAppLang === 'ar';
+
+    if (!name || isNaN(price) || price < 0) {
+        alert(isAr ? 'الرجاء إدخال بيانات صحيحة.' : 'Please enter valid details.');
+        return;
+    }
+
+    const updateObj = {
+        name: name,
+        category: category,
+        price: price,
+        weightTag: weightTag,
+        imageUrl: imageUrl,
+        updatedAt: Date.now()
+    };
+
+    const updates = {};
+    updates[`marketProducts/${id}`] = updateObj;
+    ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
+        updates[`companies/${c}/marketProducts/${id}`] = updateObj;
+    });
+
+    db.ref().update(updates).then(() => {
+        closeEditMarketProductModal();
+        alert(isAr ? 'تم تحديث المنتج بنجاح!' : 'Product updated successfully!');
+        if (window.globalMarketProductsCache[id]) {
+            Object.assign(window.globalMarketProductsCache[id], updateObj);
+        }
+        renderMarket();
+    }).catch(err => {
+        console.error("Error updating market product:", err);
+        alert(isAr ? 'حدث خطأ أثناء التحديث.' : 'Error updating product.');
+    });
+}
+window.saveEditedMarketProduct = saveEditedMarketProduct;
+
+function deleteMarketProduct(productId) {
+    const isAr = currentAppLang === 'ar';
+    if (!confirm(isAr ? 'هل أنت تأكد من حذف هذا المنتج من السوق؟' : 'Are you sure you want to delete this product from the market?')) {
+        return;
+    }
+
+    const updates = {};
+    updates[`marketProducts/${productId}`] = null;
+    ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
+        updates[`companies/${c}/marketProducts/${productId}`] = null;
+    });
+
+    delete window.globalMarketProductsCache[productId];
+
+    db.ref().update(updates).then(() => {
+        renderMarket();
+    }).catch(err => {
+        console.error("Error deleting market product:", err);
+        alert(isAr ? 'حدث خطأ أثناء الحذف.' : 'Error deleting product.');
+    });
+}
+window.deleteMarketProduct = deleteMarketProduct;
+
+// ==========================================
+// CUSTOMER CODE AUTHENTICATION & MANAGEMENT
+// ==========================================
+
+function handleCustomerCodeLogin() {
+    const isAr = currentAppLang === 'ar';
+    const codeInput = document.getElementById('auth-customer-code');
+    if (!codeInput) return;
+
+    const rawCode = codeInput.value.trim();
+    if (!rawCode) {
+        alert(isAr ? 'الرجاء إدخال رمز العميل الخاص بك.' : 'Please enter your customer code.');
+        return;
+    }
+
+    const cleanCode = rawCode.replace(/\s+/g, '');
+
+    function processCustomerLogin(foundCust) {
+        currentCustomerSession = foundCust;
+        if (foundCust.company) currentCompany = foundCust.company;
+
+        try {
+            localStorage.setItem('mvc_customer_session', JSON.stringify(foundCust));
+            localStorage.setItem('mvc_customer_code', cleanCode);
+        } catch(e){}
+
+        const authOverlay = document.getElementById('auth-overlay');
+        if (authOverlay) authOverlay.style.display = 'none';
+
+        const appWrapper = document.getElementById('app-wrapper');
+        if (appWrapper) appWrapper.style.display = 'block';
+
+        window.hasDeepFetchedMarketProducts = false;
+        applyCustomerModeUI();
+        switchTab('market');
+        renderMarket();
+    }
+
+    // 1. Check local customer registry cache
+    if (window.localCustomerRegistry) {
+        if (window.localCustomerRegistry[cleanCode]) {
+            processCustomerLogin(window.localCustomerRegistry[cleanCode]);
+            return;
+        }
+        const match = Object.values(window.localCustomerRegistry).find(c => c && (String(c.code).trim() === cleanCode || c.code == cleanCode));
+        if (match) {
+            processCustomerLogin(match);
+            return;
+        }
+    }
+
+    // 2. Check local appData state across all companies
+    if (typeof appData !== 'undefined') {
+        const cKeys = ['mvc', 'mvcfresh', 'burgeroov', ...Object.keys(appData)];
+        for (const cKey of cKeys) {
+            if (appData[cKey] && appData[cKey].customers) {
+                const cMap = appData[cKey].customers;
+                if (cMap[cleanCode]) {
+                    processCustomerLogin(cMap[cleanCode]);
+                    return;
+                }
+                const match = Object.values(cMap).find(c => c && (String(c.code).trim() === cleanCode || c.code == cleanCode));
+                if (match) {
+                    processCustomerLogin(match);
+                    return;
+                }
+            }
+        }
+    }
+
+    // 3. Query Firebase public & company paths
+    const executeQuery = () => {
+        const fetchPromises = [
+            db.ref(`publicCustomerCodes/${cleanCode}`).once('value').then(s => s.val()).catch(() => null),
+            db.ref(`customerCodes/${cleanCode}`).once('value').then(s => s.val()).catch(() => null),
+            db.ref(`customers/${cleanCode}`).once('value').then(s => s.val()).catch(() => null),
+            db.ref(`companies/mvc/customers/${cleanCode}`).once('value').then(s => s.val()).catch(() => null),
+            db.ref(`companies/mvcfresh/customers/${cleanCode}`).once('value').then(s => s.val()).catch(() => null),
+            db.ref(`companies/burgeroov/customers/${cleanCode}`).once('value').then(s => s.val()).catch(() => null),
+            db.ref(`publicCustomerCodes`).once('value').then(s => s.val()).catch(() => null),
+            db.ref(`customerCodes`).once('value').then(s => s.val()).catch(() => null),
+            db.ref(`customers`).once('value').then(s => s.val()).catch(() => null)
+        ];
+
+        Promise.all(fetchPromises).then(results => {
+            let foundCust = null;
+            for (const res of results) {
+                if (!res) continue;
+                if (res.code && (String(res.code).trim() === cleanCode || res.code == cleanCode)) {
+                    foundCust = res;
+                    break;
+                }
+                if (typeof res === 'object') {
+                    if (res[cleanCode]) {
+                        foundCust = res[cleanCode];
+                        break;
+                    }
+                    const match = Object.values(res).find(c => c && (String(c.code).trim() === cleanCode || c.code == cleanCode));
+                    if (match) {
+                        foundCust = match;
+                        break;
+                    }
+                }
+            }
+
+            if (!foundCust) {
+                alert(isAr ? 'رمز العميل غير صحيح أو غير موجود.' : 'Invalid or non-existent Customer Code.');
+                return;
+            }
+
+            if (!window.localCustomerRegistry) window.localCustomerRegistry = {};
+            window.localCustomerRegistry[cleanCode] = foundCust;
+            try {
+                localStorage.setItem('mvc_global_customer_registry', JSON.stringify(window.localCustomerRegistry));
+            } catch(e){}
+
+            processCustomerLogin(foundCust);
+        }).catch(err => {
+            console.error("Error logging in with customer code:", err);
+            alert(isAr ? 'حدث خطأ أثناء تسجيل الدخول برمز العميل.' : 'Error signing in with Customer Code.');
+        });
+    };
+
+    if (typeof firebase !== 'undefined' && firebase.auth && !firebase.auth().currentUser) {
+        firebase.auth().signInAnonymously().then(() => {
+            executeQuery();
+        }).catch(err => {
+            executeQuery();
+        });
+    } else {
+        executeQuery();
+    }
+}
+window.handleCustomerCodeLogin = handleCustomerCodeLogin;
+
+function logoutCustomerSession() {
+    currentCustomerSession = null;
+    window.currentCustomerSession = null;
+    try {
+        localStorage.removeItem('mvc_customer_session');
+        localStorage.removeItem('mvc_customer_code');
+    } catch(e){}
+    window.location.reload();
+}
+window.logoutCustomerSession = logoutCustomerSession;
+
+function applyCustomerModeUI() {
+    if (!currentCustomerSession) return;
+
+    const overlay = document.getElementById('auth-overlay');
+    const appWrapper = document.getElementById('app-wrapper');
+    const companyOverlay = document.getElementById('company-selection-overlay');
+    const unassignedOverlay = document.getElementById('unassigned-company-overlay');
+
+    if (overlay) overlay.style.display = 'none';
+    if (companyOverlay) companyOverlay.style.display = 'none';
+    if (unassignedOverlay) unassignedOverlay.style.display = 'none';
+    if (appWrapper) appWrapper.style.display = 'block';
+
+    const appHeader = document.getElementById('app-header');
+    if (appHeader) appHeader.style.display = 'flex';
+
+    // Hide top department tab navigation bar completely for customer so no other sections are visible!
+    const deptTabsContainer = document.getElementById('department-tabs-container');
+    if (deptTabsContainer) deptTabsContainer.style.display = 'none';
+
+    // Hide month selector bar & stock alert banners
+    const monthBar = document.querySelector('.month-bar');
+    if (monthBar) monthBar.style.display = 'none';
+
+    const globalAlerts = document.getElementById('global-stock-alerts');
+    if (globalAlerts) globalAlerts.style.display = 'none';
+
+    const workerTimerBanner = document.getElementById('worker-task-timer-banner');
+    if (workerTimerBanner) workerTimerBanner.style.display = 'none';
+
+    const driverTimerBanner = document.getElementById('driver-order-timer-banner');
+    if (driverTimerBanner) driverTimerBanner.style.display = 'none';
+
+    // Hide mobile navigation bars / sheets
+    const mobCompactBar = document.querySelector('.mob-compact-bar');
+    if (mobCompactBar) mobCompactBar.style.display = 'none';
+
+    const mobQuickBar = document.getElementById('mobile-quick-bar');
+    if (mobQuickBar) mobQuickBar.style.display = 'none';
+
+    const companySwapBtn = document.getElementById('company-swap-btn');
+    if (companySwapBtn) companySwapBtn.style.display = 'none';
+
+    const companySwapBtnMob = document.getElementById('company-swap-btn-mob');
+    if (companySwapBtnMob) companySwapBtnMob.style.display = 'none';
+
+    // Hide Reorder Tabs button for customer view
+    const tabReorderBtn = document.getElementById('tab-reorder-btn');
+    if (tabReorderBtn) tabReorderBtn.style.display = 'none';
+
+    // Unlock Market Tab
+    const marketTabBtn = document.getElementById('tab-market');
+    if (marketTabBtn) {
+        marketTabBtn.classList.remove('tab-locked');
+    }
+
+    // Hide standard navbar tabs except Market
+    document.querySelectorAll('.nav-tabs .tab-btn').forEach(btn => {
+        if (btn.id === 'tab-market') {
+            btn.style.display = 'inline-flex';
+            btn.classList.remove('tab-locked');
+        } else {
+            btn.style.display = 'none';
+        }
+    });
+
+    // Hide mobile sheet tab buttons except Market
+    document.querySelectorAll('#mobile-tabs-sheet .mob-sheet-tab').forEach(btn => {
+        if (btn.getAttribute('onclick')?.includes("'market'")) {
+            btn.style.display = 'flex';
+        } else {
+            btn.style.display = 'none';
+        }
+    });
+
+    // Hide admin elements & cards
+    document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+    const adminProdCard = document.getElementById('admin-add-market-product-card');
+    if (adminProdCard) adminProdCard.style.display = 'none';
+
+    // Update Header Profile Badge with Customer name
+    const customerBadgeHtml = `👤 <strong>${currentCustomerSession.name || 'Customer'}</strong>`;
+
+    const emailDisplay = document.getElementById('user-email-display');
+    if (emailDisplay) emailDisplay.innerHTML = customerBadgeHtml;
+
+    const displayUserEmail = document.getElementById('display-user-email');
+    if (displayUserEmail) displayUserEmail.innerHTML = customerBadgeHtml;
+
+    const displayUserRole = document.getElementById('display-user-role');
+    if (displayUserRole) {
+        displayUserRole.style.display = 'none';
+    }
+
+    // Update Header Logo & Title for Customer View
+    const headerLogo = document.getElementById('header-logo');
+    if (headerLogo) {
+        headerLogo.src = 'mvc.png';
+        headerLogo.style.display = 'inline-block';
+    }
+
+    const headerTitle = document.getElementById('header-title');
+    if (headerTitle) {
+        headerTitle.textContent = (currentAppLang === 'ar') ? 'سوق عملاء MVC' : 'MVC Customer Market';
+    }
+
+    // Ensure company target matches customer session
+    if (currentCustomerSession.company) {
+        currentCompany = currentCustomerSession.company;
+    }
+
+    // Fetch and listen to market data across ALL companies so products never disappear
+    if (typeof db !== 'undefined') {
+        const companyList = ['mvc', 'mvcfresh', 'burgeroov'];
+        companyList.forEach(cKey => {
+            db.ref(`companies/${cKey}/marketProducts`).on('value', snapshot => {
+                if (!appData[cKey]) appData[cKey] = {};
+                appData[cKey].marketProducts = snapshot.val() || {};
+                renderMarket();
+            });
+        });
+    }
+
+    switchTab('market');
+    renderMarket();
+}
+window.applyCustomerModeUI = applyCustomerModeUI;
+
+function createCustomerCode() {
+    const isAr = currentAppLang === 'ar';
+    const nameInput = document.getElementById('admin-customer-name-input');
+    const coinsInput = document.getElementById('admin-customer-coins-input');
+
+    if (!nameInput) return;
+    const name = nameInput.value.trim();
+    const coins = parseFloat(coinsInput?.value || 1000);
+
+    if (!name) {
+        alert(isAr ? 'الرجاء إدخال اسم العميل.' : 'Please enter customer name.');
+        return;
+    }
+
+    let code = Math.floor(100000 + Math.random() * 900000).toString();
+    const data = getCompanyData();
+    const customersMap = data.customers || {};
+    while (customersMap[code]) {
+        code = Math.floor(100000 + Math.random() * 900000).toString();
+    }
+
+    const customerObj = {
+        id: 'cust_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        code: code,
+        name: name,
+        coins: isNaN(coins) ? 1000 : coins,
+        company: currentCompany,
+        createdAt: Date.now()
+    };
+
+    const updates = {};
+    updates[`publicCustomerCodes/${code}`] = customerObj;
+    updates[`customerCodes/${code}`] = customerObj;
+    updates[`customers/${code}`] = customerObj;
+    ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
+        updates[`companies/${c}/customers/${code}`] = customerObj;
+    });
+
+    if (!appData[currentCompany]) appData[currentCompany] = {};
+    if (!appData[currentCompany].customers) appData[currentCompany].customers = {};
+    appData[currentCompany].customers[code] = customerObj;
+
+    if (!window.localCustomerRegistry) window.localCustomerRegistry = {};
+    window.localCustomerRegistry[code] = customerObj;
+    try {
+        localStorage.setItem('mvc_global_customer_registry', JSON.stringify(window.localCustomerRegistry));
+    } catch(e){}
+
+    db.ref().update(updates).then(() => {
+        nameInput.value = '';
+        if (coinsInput) coinsInput.value = '1000';
+        alert(isAr 
+            ? `🎉 تم إنشاء حساب العميل بنجاح!\nالاسم: ${name}\nرمز الدخول الخاص به: ${code}` 
+            : `🎉 Customer code generated successfully!\nName: ${name}\nAccess Code: ${code}`);
+        renderMarket();
+        renderAdminCustomersList();
+    }).catch(err => {
+        console.error("Error creating customer code:", err);
+        alert(isAr ? 'حدث خطأ أثناء إنشاء كود العميل.' : 'Error generating customer code.');
+    });
+}
+window.createCustomerCode = createCustomerCode;
+
+function renderAdminCustomersList() {
+    const listContainer = document.getElementById('admin-customers-list');
+    if (!listContainer) return;
+
+    const isAr = currentAppLang === 'ar';
+    const data = getCompanyData();
+    let customersMap = data.customers || {};
+
+    if (Object.keys(customersMap).length === 0 && typeof appData !== 'undefined') {
+        customersMap = {};
+        ['mvc', 'mvcfresh', 'burgeroov'].forEach(cKey => {
+            if (appData[cKey] && appData[cKey].customers) {
+                Object.assign(customersMap, appData[cKey].customers);
+            }
+        });
+    }
+
+    const customers = Object.values(customersMap);
+
+    if (customers.length === 0) {
+        if (typeof db !== 'undefined' && !window.hasFetchedAdminCustomers) {
+            window.hasFetchedAdminCustomers = true;
+            db.ref('publicCustomerCodes').once('value').then(snap => {
+                if (snap.exists()) {
+                    if (!appData[currentCompany]) appData[currentCompany] = {};
+                    appData[currentCompany].customers = snap.val();
+                    renderAdminCustomersList();
+                }
+            }).catch(() => null);
+        }
+
+        listContainer.innerHTML = `
+            <div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 12px 0;">
+                ${isAr ? 'لا يوجد عملاء مسجلون حالياً.' : 'No registered customers yet.'}
+            </div>
+        `;
+        return;
+    }
+
+    listContainer.innerHTML = customers.map(cust => `
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; background: var(--input-bg); border-radius: 10px; border: 1px solid var(--border-color); margin-bottom: 6px;">
+            <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                <span style="font-family: monospace; font-weight: 900; background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid #3b82f6; padding: 3px 8px; border-radius: 6px; font-size: 0.9rem;">
+                    🔑 ${cust.code}
+                </span>
+                <div>
+                    <div style="font-weight: 800; font-size: 0.9rem; color: var(--text-main);">${sanitizeMarketText(cust.name || 'Customer')}</div>
+                    <div style="font-size: 0.78rem; color: #f59e0b; font-weight: 700;">🪙 ${(cust.coins || 0).toLocaleString()} Coins</div>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <button type="button" onclick="addCustomerCoins('${cust.code}', 100)" class="btn-outline" style="padding: 4px 8px; font-size: 0.75rem; font-weight: 800; border-radius: 6px;">+100 🪙</button>
+                <button type="button" onclick="addCustomerCoins('${cust.code}', 500)" class="btn-outline" style="padding: 4px 8px; font-size: 0.75rem; font-weight: 800; border-radius: 6px;">+500 🪙</button>
+                <button type="button" onclick="deleteCustomerCode('${cust.code}')" style="border: none; background: transparent; color: #ef4444; cursor: pointer; font-size: 0.95rem; padding: 4px;" title="Delete Customer">🗑️</button>
+            </div>
+        </div>
+    `).join('');
+}
+window.renderAdminCustomersList = renderAdminCustomersList;
+
+function addCustomerCoins(code, amount) {
+    const isAr = currentAppLang === 'ar';
+    const cleanCode = String(code).trim();
+    const data = getCompanyData();
+    let cust = (data.customers || {})[cleanCode];
+
+    if (!cust && typeof appData !== 'undefined') {
+        ['mvc', 'mvcfresh', 'burgeroov'].forEach(cKey => {
+            if (!cust && appData[cKey] && appData[cKey].customers && appData[cKey].customers[cleanCode]) {
+                cust = appData[cKey].customers[cleanCode];
+            }
+        });
+    }
+
+    const currentCoins = parseFloat((cust && cust.coins) || 0);
+    const newCoins = currentCoins + amount;
+
+    if (cust) cust.coins = newCoins;
+
+    const updates = {};
+    updates[`publicCustomerCodes/${cleanCode}/coins`] = newCoins;
+    updates[`customerCodes/${cleanCode}/coins`] = newCoins;
+    updates[`customers/${cleanCode}/coins`] = newCoins;
+    ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
+        updates[`companies/${c}/customers/${cleanCode}/coins`] = newCoins;
+    });
+
+    db.ref().update(updates).then(() => {
+        renderMarket();
+        renderAdminCustomersList();
+    }).catch(err => console.error("Error adding customer coins:", err));
+}
+window.addCustomerCoins = addCustomerCoins;
+
+function deleteCustomerCode(code) {
+    const isAr = currentAppLang === 'ar';
+    const cleanCode = String(code).trim();
+    if (!confirm(isAr ? 'هل أنت تأكد من حذف هذا العميل؟' : 'Are you sure you want to delete this customer?')) return;
+
+    const updates = {};
+    updates[`publicCustomerCodes/${cleanCode}`] = null;
+    updates[`customerCodes/${cleanCode}`] = null;
+    updates[`customers/${cleanCode}`] = null;
+    ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
+        updates[`companies/${c}/customers/${cleanCode}`] = null;
+    });
+
+    if (appData[currentCompany] && appData[currentCompany].customers) {
+        delete appData[currentCompany].customers[cleanCode];
+    }
+
+    db.ref().update(updates).then(() => {
+        renderMarket();
+        renderAdminCustomersList();
+    }).catch(err => console.error("Error deleting customer code:", err));
+}
+window.deleteCustomerCode = deleteCustomerCode;
+
 // Initial run
 applyTranslations();
+if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession) {
+    applyCustomerModeUI();
+}
 
 

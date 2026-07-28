@@ -599,7 +599,26 @@ const uiTranslations = {
         "title-reminders-board": "⏰ Active Reminders & Recurring Schedule",
         "title-edit-reminder": "✏️ Edit Reminder",
         "title-reminders-due-alert": "🚨 Due Reminders Alert!",
-        "btn-convert-task": "📋 Convert to Task"
+        "btn-convert-task": "📋 Convert to Task",
+
+        // Market Section Translations
+        "tab-market": "🏪 Market",
+        "title-add-market-product": "🛒 Add New Market Product",
+        "desc-add-market-product": "Add meat, vegetables, and fruits products to the family market catalog with prices in Coins (🪙).",
+        "label-product-name": "Product Name",
+        "placeholder-market-product-name": "e.g. Ribeye Steak, Fresh Apples...",
+        "label-product-category": "Category",
+        "opt-cat-meat": "🥩 Meat Products",
+        "opt-cat-veg-fruit": "🥦 Vegetables & Fruits",
+        "label-product-price-coins": "Price (Coins / Points 🪙)",
+        "placeholder-market-price": "e.g. 50",
+        "btn-publish-product": "🪙 Publish Market Product",
+        "title-market-catalog": "🏪 Market Catalog & Products",
+        "desc-market-catalog": "Browse available meat, vegetables, and fruits products.",
+        "opt-cat-all": "🌟 All Products",
+        "title-edit-market-product": "✏️ Edit Market Product",
+        "btn-save-product": "💾 Save Product Changes",
+        "title-monthly-coin-refill": "🪙 Monthly Coin Refill Value"
     },
     ar: {
         "Sunday": "الأحد",
@@ -671,6 +690,8 @@ const uiTranslations = {
         "tab-activity": "📜 سجل الأنشطة",
         "tab-sales": "💰 المبيعات",
         "tab-costs": "📉 التكاليف",
+        "tab-reminders": "⏰ التذكيرات",
+        "tab-market": "🏪 السوق",
 
         // الحضور والغياب
         "perm-attendance-label": "مسؤول الحضور",
@@ -1163,6 +1184,9 @@ const uiTranslations = {
         "title-reminders-board": "⏰ جدول وتذكيرات المواعيد النشطة",
         "title-edit-reminder": "✏️ تعديل التذكير",
         "title-reminders-due-alert": "🚨 تنبيه: تذكيرات حان موعد استحقاقها!",
-        "btn-convert-task": "📋 تحويل إلى مهمة"
+        "btn-convert-task": "📋 تحويل إلى مهمة",
+        "title-monthly-coin-refill": "🪙 قيمة إعادة تعبئة العملات الشهرية",
+        "label-available-balance": "الرصيد المتاح",
+        "unit-coins": "عملات"
     }
 };
