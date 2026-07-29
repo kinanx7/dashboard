@@ -237,10 +237,30 @@ function initPublicCustomerSync() {
         try {
             window.db.ref('publicCustomerCodes').on('value', snapshot => {
                 if (snapshot.exists()) {
-                    window.localCustomerRegistry = Object.assign({}, window.localCustomerRegistry, snapshot.val() || {});
+                    const val = snapshot.val() || {};
+                    window.localCustomerRegistry = Object.assign({}, window.localCustomerRegistry, val);
                     try {
                         localStorage.setItem('mvc_global_customer_registry', JSON.stringify(window.localCustomerRegistry));
                     } catch(e){}
+
+                    // Real-time sync for active customer session
+                    if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && (currentCustomerSession.code || currentCustomerSession.id)) {
+                        const codeKey = String(currentCustomerSession.code || currentCustomerSession.id).trim();
+                        if (val[codeKey] && typeof val[codeKey].coins !== 'undefined') {
+                            const freshCoins = parseFloat(val[codeKey].coins) || 0;
+                            if (currentCustomerSession.coins !== freshCoins) {
+                                currentCustomerSession.coins = freshCoins;
+                                try {
+                                    localStorage.setItem('mvc_customer_session', JSON.stringify(currentCustomerSession));
+                                } catch(e){}
+                                const coinsValEl = document.getElementById('market-user-coins-val');
+                                if (coinsValEl) coinsValEl.textContent = freshCoins.toLocaleString();
+                                if (typeof renderMarket === 'function') renderMarket();
+                                if (typeof renderMarketCartItems === 'function') renderMarketCartItems();
+                                if (typeof renderCustomerOrders === 'function') renderCustomerOrders();
+                            }
+                        }
+                    }
                 }
             });
         } catch(e){}
@@ -1434,7 +1454,27 @@ function ensureArraysExist(data) {
     });
 }
 
+function initGlobalMarketListeners() {
+    if (typeof db === 'undefined' || !db) return;
+    if (window._hasGlobalMarketListeners) return;
+    window._hasGlobalMarketListeners = true;
+
+    const companyList = ['mvc', 'mvcfresh', 'burgeroov'];
+    companyList.forEach(cKey => {
+        db.ref(`companies/${cKey}/marketOrders`).on('value', snapshot => {
+            if (!appData[cKey]) appData[cKey] = {};
+            appData[cKey].marketOrders = snapshot.val() || {};
+            renderAdminMarketOrders();
+            renderCustomerOrders();
+            renderPrepareSection();
+        });
+    });
+}
+window.initGlobalMarketListeners = initGlobalMarketListeners;
+
 function listenToCloudData() {
+    initGlobalMarketListeners();
+
     if (window.companyListenerRef) {
         window.companyListenerRef.off();
     }
@@ -14423,9 +14463,14 @@ function submitMarketOrder() {
     const orderNum = `#ORD-${dateStr}-${randDigits}`;
     const orderId = 'ord_' + now;
 
+    const custCode = isCustomer ? String(currentCustomerSession.code || currentCustomerSession.id).trim() : '';
+
     const orderObj = {
         id: orderId,
         orderNum: orderNum,
+        companyKey: currentCompany,
+        isCustomer: isCustomer,
+        customerCode: custCode,
         workerId: workerId,
         workerName: workerName,
         items: [...marketCart],
@@ -14476,6 +14521,9 @@ function getMarketOrderStatusInfo(status) {
             return { labelEn: '🚚 Out for Delivery', labelAr: '🚚 خرج للتوصيل', bg: 'rgba(139, 92, 246, 0.15)', color: '#8b5cf6' };
         case 'delivered':
             return { labelEn: '✅ Delivered', labelAr: '✅ تم التوصيل', bg: 'rgba(16, 185, 129, 0.15)', color: '#10b981' };
+        case 'cancelled':
+        case 'canceled':
+            return { labelEn: '❌ Cancelled', labelAr: '❌ ملغى', bg: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' };
         case 'pending':
         default:
             return { labelEn: '⏳ Pending', labelAr: '⏳ قيد الانتظار', bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' };
@@ -14545,6 +14593,49 @@ function closeCustomerOrdersModal() {
 }
 window.closeCustomerOrdersModal = closeCustomerOrdersModal;
 
+function findMarketOrderById(orderId) {
+    if (!orderId) return { order: null, companyKey: currentCompany };
+    const companies = ['mvc', 'mvcfresh', 'burgeroov'];
+    for (const cKey of companies) {
+        if (appData[cKey] && appData[cKey].marketOrders && appData[cKey].marketOrders[orderId]) {
+            return { order: appData[cKey].marketOrders[orderId], companyKey: cKey };
+        }
+    }
+    const currentData = getCompanyData();
+    if (currentData.marketOrders && currentData.marketOrders[orderId]) {
+        return { order: currentData.marketOrders[orderId], companyKey: currentCompany };
+    }
+    return { order: null, companyKey: currentCompany };
+}
+window.findMarketOrderById = findMarketOrderById;
+
+function getAllMarketOrders() {
+    const companies = ['mvc', 'mvcfresh', 'burgeroov'];
+    const map = new Map();
+    companies.forEach(cKey => {
+        const companyOrders = (appData[cKey] && appData[cKey].marketOrders) ? appData[cKey].marketOrders : {};
+        Object.values(companyOrders).forEach(o => {
+            if (o && o.id) {
+                if (!map.has(o.id)) {
+                    map.set(o.id, { ...o, companyKey: o.companyKey || cKey });
+                }
+            }
+        });
+    });
+    const curData = getCompanyData();
+    if (curData && curData.marketOrders) {
+        Object.values(curData.marketOrders).forEach(o => {
+            if (o && o.id && !map.has(o.id)) {
+                map.set(o.id, { ...o, companyKey: o.companyKey || currentCompany });
+            }
+        });
+    }
+    const list = Array.from(map.values());
+    list.sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
+    return list;
+}
+window.getAllMarketOrders = getAllMarketOrders;
+
 function renderCustomerOrders() {
     const container = document.getElementById('customer-orders-list');
     if (!container) return;
@@ -14553,13 +14644,15 @@ function renderCustomerOrders() {
     const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
     const myId = isCustomer ? String(currentCustomerSession.code || currentCustomerSession.id).trim() : getCurrentWorkerId();
 
-    const data = getCompanyData();
-    const rawOrders = data.marketOrders || {};
-    let ordersList = Object.values(rawOrders);
+    const allOrders = getAllMarketOrders();
 
-    // Filter to current customer/worker orders
-    ordersList = ordersList.filter(o => o && String(o.workerId).trim() === myId);
-    ordersList.sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
+    // Filter to current customer/worker orders across all companies
+    let ordersList = allOrders.filter(o => {
+        if (!o) return false;
+        const code = String(o.customerCode || o.workerId || '').trim();
+        const wId = String(o.workerId || '').trim();
+        return code === myId || wId === myId;
+    });
 
     if (ordersList.length === 0) {
         container.innerHTML = `
@@ -14633,10 +14726,7 @@ function renderAdminMarketOrders() {
     const filterStatusCard = document.getElementById('admin-orders-status-filter')?.value;
     const filterStatus = filterStatusModal || filterStatusCard || 'all';
 
-    const data = getCompanyData();
-    const rawOrders = data.marketOrders || {};
-    let allOrders = Object.values(rawOrders);
-    allOrders.sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
+    let allOrders = getAllMarketOrders();
 
     // Calculate Stats for HUD Banner
     const totalOrdersCount = allOrders.length;
@@ -14705,6 +14795,7 @@ function renderAdminMarketOrders() {
         const dateStr = order.createdAt ? new Date(order.createdAt).toLocaleString() : '';
         const itemsSummary = (order.items || []).map(i => `${sanitizeMarketText(i.name)} (x${i.qty})`).join(', ');
         const orderJsonStr = JSON.stringify(order).replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+        const orderCompanyKey = order.companyKey || currentCompany;
 
         return `
             <div class="card" style="margin: 0; padding: 14px; border-radius: 14px; border: 1px solid var(--border-color); background: var(--input-bg); display: flex; flex-direction: column; gap: 10px;">
@@ -14716,7 +14807,7 @@ function renderAdminMarketOrders() {
                     </div>
 
                     <!-- Status Selector Dropdown -->
-                    <select onchange="updateMarketOrderStatus('${order.id}', this.value)" style="padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-color); font-weight: 800; font-size: 0.82rem; background: var(--card-bg); color: var(--text-main); cursor: pointer;">
+                    <select onchange="updateMarketOrderStatus('${order.id}', this.value, '${orderCompanyKey}')" style="padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-color); font-weight: 800; font-size: 0.82rem; background: var(--card-bg); color: var(--text-main); cursor: pointer;">
                         <option value="pending" ${order.status === 'pending' ? 'selected' : ''}>⏳ Pending / قيد الانتظار</option>
                         <option value="preparing" ${order.status === 'preparing' ? 'selected' : ''}>👨‍🍳 Preparing / قيد التحضير</option>
                         <option value="delivery" ${order.status === 'delivery' ? 'selected' : ''}>🚚 Out for Delivery / خرج للتوصيل</option>
@@ -14737,11 +14828,11 @@ function renderAdminMarketOrders() {
                             🧾 ${isAr ? 'الفاتورة' : 'Receipt'}
                         </button>
                         ${order.status !== 'cancelled' ? `
-                            <button type="button" onclick="cancelMarketOrder('${order.id}')" class="btn-outline" style="padding: 5px 10px; font-weight: 700; font-size: 0.78rem; border-radius: 8px; color: #ef4444; border-color: #ef4444; cursor: pointer;">
+                            <button type="button" onclick="cancelMarketOrder('${order.id}', '${orderCompanyKey}')" class="btn-outline" style="padding: 5px 10px; font-weight: 700; font-size: 0.78rem; border-radius: 8px; color: #ef4444; border-color: #ef4444; cursor: pointer;">
                                 ❌ ${isAr ? 'إلغاء الطلب' : 'Cancel'}
                             </button>
                         ` : ''}
-                        <button type="button" onclick="deleteMarketOrder('${order.id}')" class="btn-danger" style="padding: 5px 10px; font-weight: 700; font-size: 0.78rem; border-radius: 8px; cursor: pointer;">
+                        <button type="button" onclick="deleteMarketOrder('${order.id}', '${orderCompanyKey}')" class="btn-danger" style="padding: 5px 10px; font-weight: 700; font-size: 0.78rem; border-radius: 8px; cursor: pointer;">
                             🗑️ ${isAr ? 'حذف' : 'Delete'}
                         </button>
                     </div>
@@ -14755,18 +14846,32 @@ function renderAdminMarketOrders() {
 }
 window.renderAdminMarketOrders = renderAdminMarketOrders;
 
-function updateMarketOrderStatus(orderId, newStatus) {
+function updateMarketOrderStatus(orderId, newStatus, optCompanyKey) {
     const isAr = currentAppLang === 'ar';
     if (!orderId || !newStatus) return;
 
+    let targetComp = optCompanyKey;
+    if (!targetComp) {
+        const found = findMarketOrderById(orderId);
+        targetComp = found.companyKey || currentCompany;
+    }
+
     if (newStatus === 'cancelled') {
-        cancelMarketOrder(orderId);
+        cancelMarketOrder(orderId, targetComp);
         return;
     }
 
-    db.ref(`companies/${currentCompany}/marketOrders/${orderId}/status`).set(newStatus).then(() => {
+    // Mutate in memory across all company objects immediately
+    ['mvc', 'mvcfresh', 'burgeroov'].forEach(cKey => {
+        if (appData[cKey] && appData[cKey].marketOrders && appData[cKey].marketOrders[orderId]) {
+            appData[cKey].marketOrders[orderId].status = newStatus;
+        }
+    });
+
+    db.ref(`companies/${targetComp}/marketOrders/${orderId}/status`).set(newStatus).then(() => {
         renderAdminMarketOrders();
         renderCustomerOrders();
+        renderPrepareSection();
         showInAppNotification(isAr ? `تم تحديث حالة الطلب إلى: ${newStatus}` : `Order status updated to: ${newStatus}`);
     }).catch(err => {
         console.error("Error updating order status:", err);
@@ -14775,13 +14880,20 @@ function updateMarketOrderStatus(orderId, newStatus) {
 }
 window.updateMarketOrderStatus = updateMarketOrderStatus;
 
-function cancelMarketOrder(orderId) {
+function cancelMarketOrder(orderId, optCompanyKey) {
     const isAr = currentAppLang === 'ar';
     if (!orderId) return;
 
-    const data = getCompanyData();
-    const rawOrders = data.marketOrders || {};
-    const order = rawOrders[orderId];
+    let targetComp = optCompanyKey;
+    let order = null;
+
+    if (targetComp && appData[targetComp] && appData[targetComp].marketOrders && appData[targetComp].marketOrders[orderId]) {
+        order = appData[targetComp].marketOrders[orderId];
+    } else {
+        const foundInfo = findMarketOrderById(orderId);
+        order = foundInfo.order;
+        targetComp = foundInfo.companyKey || currentCompany;
+    }
 
     if (!order) {
         alert(isAr ? 'لم يتم العثور على الطلب.' : 'Order not found.');
@@ -14793,61 +14905,83 @@ function cancelMarketOrder(orderId) {
         return;
     }
 
-    if (!confirm(isAr ? 'هل أنت تأكد من إلغاء هذا الطلب وإعادة القطع النقدية للزبون؟' : 'Are you sure you want to cancel this order and refund coins to customer?')) {
+    if (!confirm(isAr ? 'هل أنت تأكد من إلغاء هذا الطلب وإعادة العملات للزبون؟' : 'Are you sure you want to cancel this order and refund coins to customer?')) {
         return;
     }
 
     const totalCost = parseFloat(order.totalCost) || 0;
-    const custCode = String(order.workerId || order.customerCode || '').trim();
+    const custCode = String(order.customerCode || order.workerId || '').trim();
+    const isCustomerOrder = order.isCustomer || !!(custCode && (window.localCustomerRegistry?.[custCode] || (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && String(currentCustomerSession.code || currentCustomerSession.id).trim() === custCode)));
+
+    // Mutate status in memory IMMEDIATELY across all companies
+    ['mvc', 'mvcfresh', 'burgeroov'].forEach(cKey => {
+        if (appData[cKey] && appData[cKey].marketOrders && appData[cKey].marketOrders[orderId]) {
+            appData[cKey].marketOrders[orderId].status = 'cancelled';
+            appData[cKey].marketOrders[orderId].cancelledAt = Date.now();
+        }
+    });
 
     const updates = {};
-    updates[`companies/${currentCompany}/marketOrders/${orderId}/status`] = 'cancelled';
-    updates[`companies/${currentCompany}/marketOrders/${orderId}/cancelledAt`] = Date.now();
+    updates[`companies/${targetComp}/marketOrders/${orderId}/status`] = 'cancelled';
+    updates[`companies/${targetComp}/marketOrders/${orderId}/cancelledAt`] = Date.now();
 
     if (totalCost > 0 && custCode) {
-        const isCustSession = (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && String(currentCustomerSession.code || currentCustomerSession.id).trim() === custCode);
+        if (isCustomerOrder) {
+            let currentCoins = 0;
+            if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && String(currentCustomerSession.code || currentCustomerSession.id).trim() === custCode && typeof currentCustomerSession.coins !== 'undefined') {
+                currentCoins = parseFloat(currentCustomerSession.coins) || 0;
+            } else {
+                let maxFound = 0;
+                ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
+                    if (appData[c] && appData[c].customers && appData[c].customers[custCode] && typeof appData[c].customers[custCode].coins !== 'undefined') {
+                        const val = parseFloat(appData[c].customers[custCode].coins) || 0;
+                        if (val > maxFound) maxFound = val;
+                    }
+                });
+                if (window.localCustomerRegistry && window.localCustomerRegistry[custCode] && typeof window.localCustomerRegistry[custCode].coins !== 'undefined') {
+                    const val = parseFloat(window.localCustomerRegistry[custCode].coins) || 0;
+                    if (val > maxFound) maxFound = val;
+                }
+                currentCoins = maxFound;
+            }
 
-        let currentCoins = 0;
-        if (isCustSession && typeof currentCustomerSession.coins !== 'undefined') {
-            currentCoins = parseFloat(currentCustomerSession.coins) || 0;
-        } else {
-            let found = false;
+            const newCoins = currentCoins + totalCost;
+
+            updates[`publicCustomerCodes/${custCode}/coins`] = newCoins;
+            updates[`customerCodes/${custCode}/coins`] = newCoins;
+            updates[`customers/${custCode}/coins`] = newCoins;
             ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
-                if (!found && appData[c] && appData[c].customers && appData[c].customers[custCode] && typeof appData[c].customers[custCode].coins !== 'undefined') {
-                    currentCoins = parseFloat(appData[c].customers[custCode].coins) || 0;
-                    found = true;
+                updates[`companies/${c}/customers/${custCode}/coins`] = newCoins;
+                if (appData[c] && appData[c].customers && appData[c].customers[custCode]) {
+                    appData[c].customers[custCode].coins = newCoins;
                 }
             });
-            if (!found) currentCoins = 1000;
-        }
 
-        const newCoins = currentCoins + totalCost;
-
-        // Refund coins exclusively for customer nodes across database
-        updates[`publicCustomerCodes/${custCode}/coins`] = newCoins;
-        updates[`customerCodes/${custCode}/coins`] = newCoins;
-        updates[`customers/${custCode}/coins`] = newCoins;
-        ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
-            updates[`companies/${c}/customers/${custCode}/coins`] = newCoins;
-            if (appData[c] && appData[c].customers && appData[c].customers[custCode]) {
-                appData[c].customers[custCode].coins = newCoins;
+            if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && String(currentCustomerSession.code || currentCustomerSession.id).trim() === custCode) {
+                currentCustomerSession.coins = newCoins;
+                try {
+                    localStorage.setItem('mvc_customer_session', JSON.stringify(currentCustomerSession));
+                } catch(e){}
             }
-        });
 
-        if (isCustSession) {
-            currentCustomerSession.coins = newCoins;
             try {
-                localStorage.setItem('mvc_customer_session', JSON.stringify(currentCustomerSession));
+                db.ref(`publicCustomerCodes/${custCode}/coins`).transaction(cv => (cv || 0) + totalCost);
+                db.ref(`customerCodes/${custCode}/coins`).transaction(cv => (cv || 0) + totalCost);
             } catch(e){}
+        } else {
+            let workerCoins = 0;
+            if (appData[targetComp] && appData[targetComp].workers && appData[targetComp].workers[custCode] && typeof appData[targetComp].workers[custCode].coins !== 'undefined') {
+                workerCoins = parseFloat(appData[targetComp].workers[custCode].coins) || 0;
+            }
+            const newWorkerCoins = workerCoins + totalCost;
+            updates[`companies/${targetComp}/workers/${custCode}/coins`] = newWorkerCoins;
+            if (appData[targetComp] && appData[targetComp].workers && appData[targetComp].workers[custCode]) {
+                appData[targetComp].workers[custCode].coins = newWorkerCoins;
+            }
         }
-
-        try {
-            db.ref(`publicCustomerCodes/${custCode}/coins`).transaction(cv => (cv || 0) + totalCost);
-            db.ref(`customerCodes/${custCode}/coins`).transaction(cv => (cv || 0) + totalCost);
-        } catch(e){}
 
         const refId = 'rf_' + Date.now();
-        updates[`companies/${currentCompany}/coinTransactions/${refId}`] = {
+        updates[`companies/${targetComp}/coinTransactions/${refId}`] = {
             id: refId,
             customerCode: custCode,
             amount: totalCost,
@@ -14859,9 +14993,15 @@ function cancelMarketOrder(orderId) {
     }
 
     db.ref().update(updates).then(() => {
+        ['mvc', 'mvcfresh', 'burgeroov'].forEach(cKey => {
+            if (appData[cKey] && appData[cKey].marketOrders && appData[cKey].marketOrders[orderId]) {
+                appData[cKey].marketOrders[orderId].status = 'cancelled';
+            }
+        });
         renderMarket();
         renderAdminMarketOrders();
         renderCustomerOrders();
+        renderPrepareSection();
         showInAppNotification(isAr 
             ? `تم إلغاء الطلب وإعادة ${totalCost} من العملات للزبون بنجاح!` 
             : `Order cancelled and ${totalCost} coins refunded to customer successfully!`
@@ -14873,17 +15013,24 @@ function cancelMarketOrder(orderId) {
 }
 window.cancelMarketOrder = cancelMarketOrder;
 
-function deleteMarketOrder(orderId) {
+function deleteMarketOrder(orderId, optCompanyKey) {
     const isAr = currentAppLang === 'ar';
     if (!orderId) return;
+
+    let targetComp = optCompanyKey;
+    if (!targetComp) {
+        const found = findMarketOrderById(orderId);
+        targetComp = found.companyKey || currentCompany;
+    }
 
     if (!confirm(isAr ? 'هل أنت تأكد من حذف هذا الطلب نهائياً من النظام؟' : 'Are you sure you want to permanently delete this order?')) {
         return;
     }
 
-    db.ref(`companies/${currentCompany}/marketOrders/${orderId}`).remove().then(() => {
+    db.ref(`companies/${targetComp}/marketOrders/${orderId}`).remove().then(() => {
         renderAdminMarketOrders();
         renderCustomerOrders();
+        renderPrepareSection();
         showInAppNotification(isAr ? 'تم حذف الطلب بنجاح.' : 'Order deleted successfully.');
     }).catch(err => {
         console.error("Error deleting market order:", err);
@@ -15925,6 +16072,11 @@ function updatePrepareOrderStatus(companyKey, orderId, newStatus) {
     const isAr = currentAppLang === 'ar';
     if (!orderId || !newStatus) return;
     const targetComp = companyKey || currentCompany;
+
+    if (newStatus === 'cancelled') {
+        cancelMarketOrder(orderId, targetComp);
+        return;
+    }
 
     db.ref(`companies/${targetComp}/marketOrders/${orderId}/status`).set(newStatus).then(() => {
         renderPrepareSection();
