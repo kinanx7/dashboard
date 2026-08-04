@@ -14528,7 +14528,27 @@ function addToMarketCart(productId, evt) {
     }
 
     saveMarketCart();
-    renderMarket();
+    updateMarketCartBadges();
+
+    // Fast local button badge update without destructive full grid re-render
+    const btn = (evt && (evt.currentTarget || evt.target)) ? (evt.currentTarget || evt.target).closest('button') : document.querySelector(`button[onclick*="${productId}"]`);
+    if (btn) {
+        const cartItem = marketCart.find(item => item.productId === productId);
+        const qty = cartItem ? cartItem.qty : 0;
+        let badgeEl = btn.querySelector('.cart-btn-qty-badge');
+        if (qty > 0) {
+            if (!badgeEl) {
+                badgeEl = document.createElement('span');
+                badgeEl.className = 'cart-btn-qty-badge';
+                badgeEl.style.cssText = "background: #ffffff; color: #2563eb; font-size: 0.75rem; font-weight: 900; padding: 2px 8px; border-radius: 100px; line-height: 1; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;";
+                btn.appendChild(badgeEl);
+            }
+            badgeEl.textContent = qty;
+        } else if (badgeEl) {
+            badgeEl.remove();
+        }
+    }
+
     triggerPlusOneEffect(clickX, clickY);
 }
 window.addToMarketCart = addToMarketCart;
@@ -14556,8 +14576,26 @@ function updateCartItemQty(productId, delta) {
         marketCart.splice(index, 1);
     }
     saveMarketCart();
+    updateMarketCartBadges();
     renderMarketCartItems();
-    renderMarket();
+
+    const btn = document.querySelector(`button[onclick*="${productId}"]`);
+    if (btn) {
+        const cartItem = marketCart.find(item => item.productId === productId);
+        const qty = cartItem ? cartItem.qty : 0;
+        let badgeEl = btn.querySelector('.cart-btn-qty-badge');
+        if (qty > 0) {
+            if (!badgeEl) {
+                badgeEl = document.createElement('span');
+                badgeEl.className = 'cart-btn-qty-badge';
+                badgeEl.style.cssText = "background: #ffffff; color: #2563eb; font-size: 0.75rem; font-weight: 900; padding: 2px 8px; border-radius: 100px; line-height: 1; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;";
+                btn.appendChild(badgeEl);
+            }
+            badgeEl.textContent = qty;
+        } else if (badgeEl) {
+            badgeEl.remove();
+        }
+    }
 }
 window.updateCartItemQty = updateCartItemQty;
 
@@ -14565,8 +14603,14 @@ function removeCartItem(productId) {
     loadMarketCart();
     marketCart = marketCart.filter(item => item.productId !== productId);
     saveMarketCart();
+    updateMarketCartBadges();
     renderMarketCartItems();
-    renderMarket();
+
+    const btn = document.querySelector(`button[onclick*="${productId}"]`);
+    if (btn) {
+        const badgeEl = btn.querySelector('.cart-btn-qty-badge');
+        if (badgeEl) badgeEl.remove();
+    }
 }
 window.removeCartItem = removeCartItem;
 
@@ -15796,7 +15840,7 @@ function renderMarketProductCard(p) {
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
                     <span style="white-space: nowrap;">${isAr ? 'أضف للسلة' : 'Add to Cart'}</span>
                     ${itemInCartQty > 0 ? `
-                        <span style="background: #ffffff; color: #2563eb; font-size: 0.75rem; font-weight: 900; padding: 2px 8px; border-radius: 100px; line-height: 1; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;">
+                        <span class="cart-btn-qty-badge" style="background: #ffffff; color: #2563eb; font-size: 0.75rem; font-weight: 900; padding: 2px 8px; border-radius: 100px; line-height: 1; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;">
                             ${itemInCartQty}
                         </span>
                     ` : ''}
