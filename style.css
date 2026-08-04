@@ -2936,4 +2936,160 @@ body:not(.role-admin) .task-grid {
     100% {
         transform: scale(1);
     }
+}
+
+/* =============================================
+   VISIBLE CATEGORY SECTION CARDS GRID
+   ============================================= */
+#market-category-tabs-container {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) !important;
+    gap: 8px !important;
+    align-items: stretch !important;
+    padding: 4px 2px 8px 2px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.category-section-card {
+    min-width: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.category-section-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2) !important;
+}
+
+.category-section-card:active {
+    transform: translateY(0);
+}
+
+/* =============================================
+   MOBILE RESPONSIVE MARKET GRID (STRICT 3-COLUMN DISPLAY & MICRO HUD)
+   ============================================= */
+@media (max-width: 768px) {
+    #market-category-tabs-container {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 6px !important;
+    }
+
+    .category-section-card {
+        padding: 6px 8px !important;
+        border-radius: 10px !important;
+    }
+
+    .category-section-card [style*="font-size: 1.5rem"] {
+        font-size: 1.2rem !important;
+    }
+
+    .category-section-card [style*="font-size: 0.8rem"] {
+        font-size: 0.74rem !important;
+    }
+
+    .category-section-card [style*="font-size: 0.7rem"] {
+        font-size: 0.65rem !important;
+    }
+
+    #market-products-grid {
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 6px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .market-store-card {
+        border-radius: 10px !important;
+        margin-bottom: 0 !important;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.06) !important;
+    }
+
+    .market-store-card h3 {
+        font-size: 0.68rem !important;
+        line-height: 1.25 !important;
+        height: auto !important;
+        min-height: 1.8rem !important;
+        max-height: 2.6rem !important;
+        margin: 0 0 2px 0 !important;
+        font-weight: 800 !important;
+        word-break: break-word !important;
+        overflow: hidden !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+    }
+
+    /* Container Padding */
+    .market-store-card [style*="padding: 14px 14px 6px 14px"],
+    .market-store-card div[style*="padding: 14px 14px 6px 14px"] {
+        padding: 5px 4px 2px 4px !important;
+    }
+
+    .market-store-card [style*="padding: 0 14px 14px 14px"],
+    .market-store-card div[style*="padding: 0 14px 14px 14px"] {
+        padding: 0 4px 5px 4px !important;
+        gap: 4px !important;
+    }
+
+    /* Price HUD */
+    .market-store-card [style*="font-size: 1.3rem"] {
+        font-size: 0.85rem !important;
+        gap: 2px !important;
+    }
+
+    .market-store-card [style*="font-size: 1.05rem"] {
+        font-size: 0.72rem !important;
+    }
+
+    /* Add to Cart Button */
+    .market-store-card button[onclick*="addToMarketCart"] {
+        min-height: 28px !important;
+        padding: 4px 2px !important;
+        font-size: 0.66rem !important;
+        border-radius: 6px !important;
+        gap: 2px !important;
+    }
+
+    .market-store-card button[onclick*="addToMarketCart"] svg {
+        width: 11px !important;
+        height: 11px !important;
+    }
+
+    .market-store-card button[onclick*="addToMarketCart"] span {
+        font-size: 0.65rem !important;
+    }
+
+    /* Admin Action HUD (Hide / Edit / Delete) */
+    .market-store-card [style*="border-top: 1px dashed"] {
+        margin-top: 4px !important;
+        padding-top: 4px !important;
+        gap: 4px !important;
+    }
+
+    .market-store-card [onclick*="toggleMarketProductVisibility"] {
+        min-height: 24px !important;
+        padding: 3px 2px !important;
+        font-size: 0.62rem !important;
+        border-radius: 6px !important;
+        gap: 2px !important;
+    }
+
+    .market-store-card [onclick*="openEditMarketProductModal"],
+    .market-store-card [onclick*="deleteMarketProduct"] {
+        min-height: 24px !important;
+        padding: 3px 2px !important;
+        font-size: 0.60rem !important;
+        border-radius: 6px !important;
+        gap: 1px !important;
+        letter-spacing: -0.2px !important;
+    }
+
+    .market-store-card [style*="position: absolute; bottom: 10px; left: 10px"] {
+        bottom: 3px !important;
+        left: 3px !important;
+        padding: 1px 4px !important;
+        font-size: 0.62rem !important;
+        border-radius: 4px !important;
+    }
 }
