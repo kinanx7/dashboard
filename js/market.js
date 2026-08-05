@@ -1017,9 +1017,8 @@ function submitMarketOrder() {
             : ((typeof currentUser !== 'undefined' && currentUser && currentUser.email) ? currentUser.email : 'Worker'));
 
     const now = Date.now();
-    const dateStr = new Date(now).toISOString().slice(2,10).replace(/-/g,'');
-    const randDigits = Math.floor(1000 + Math.random() * 9000);
-    const orderNum = `#ORD-${dateStr}-${randDigits}`;
+    const randDigits = Math.floor(100000 + Math.random() * 900000);
+    const orderNum = `#${randDigits}`;
     const orderId = 'ord_' + now;
 
     const custCode = isCustomer ? String(currentCustomerSession.code || currentCustomerSession.id).trim() : '';
@@ -1086,6 +1085,35 @@ function submitMarketOrder() {
 }
 window.submitMarketOrder = submitMarketOrder;
 
+function formatMarketOrderNum(order) {
+    if (!order) return '#000000';
+    const raw = order.orderNum || order.id || '';
+    const str = String(raw).trim();
+    if (!str) return '#000000';
+
+    if (/^#?\d{3,6}$/.test(str)) {
+        return str.startsWith('#') ? str : `#${str}`;
+    }
+
+    if (str.includes('-')) {
+        const parts = str.split('-').map(p => p.replace(/\D/g, '')).filter(Boolean);
+        const joined = parts.join('');
+        if (joined.length >= 6) {
+            return `#${joined.slice(-6)}`;
+        }
+    }
+
+    const digits = str.replace(/\D/g, '');
+    if (digits.length >= 6) {
+        return `#${digits.slice(-6)}`;
+    } else if (digits.length >= 3) {
+        return `#${digits}`;
+    }
+    
+    return `#${str.replace(/^#?ORD-?/i, '').replace('ord_', '').slice(-6)}`;
+}
+window.formatMarketOrderNum = formatMarketOrderNum;
+
 function getMarketOrderStatusInfo(status) {
     switch (status) {
         case 'preparing':
@@ -1117,7 +1145,7 @@ function openMarketOrderReceiptModal(order) {
     const itemsListEl = document.getElementById('receipt-items-list');
     const totalCostEl = document.getElementById('receipt-total-cost');
 
-    if (orderNumEl) orderNumEl.textContent = order.orderNum || `#ORD-${(order.id || '').replace('ord_', '')}`;
+    if (orderNumEl) orderNumEl.textContent = formatMarketOrderNum(order);
     if (custNameEl) custNameEl.textContent = order.workerName || 'Customer';
     if (dateEl) dateEl.textContent = order.createdAt ? new Date(order.createdAt).toLocaleString() : new Date().toLocaleString();
     if (companyTagEl) companyTagEl.textContent = (order.companyKey || currentCompany || 'MVC').toUpperCase();
@@ -1239,7 +1267,7 @@ function renderCustomerOrders() {
     }
 
     container.innerHTML = ordersList.map(order => {
-        const orderNum = order.orderNum || `#ORD-${(order.id || '').replace('ord_', '')}`;
+        const orderNum = formatMarketOrderNum(order);
         const dateStr = order.createdAt ? new Date(order.createdAt).toLocaleString() : '';
         const statusInfo = getMarketOrderStatusInfo(order.status);
         const itemsSummary = (order.items || []).map(i => `${sanitizeMarketText(i.name)} (x${i.qty})`).join(', ');
@@ -1364,7 +1392,7 @@ function renderAdminMarketOrders() {
     }
 
     const renderedHTML = orders.map(order => {
-        const orderNum = order.orderNum || `#ORD-${(order.id || '').replace('ord_', '')}`;
+        const orderNum = formatMarketOrderNum(order);
         const dateStr = order.createdAt ? new Date(order.createdAt).toLocaleString() : '';
         const itemsSummary = (order.items || []).map(i => `${sanitizeMarketText(i.name)} (x${i.qty})`).join(', ');
         const orderJsonStr = JSON.stringify(order).replace(/'/g, "&#39;").replace(/"/g, "&quot;");

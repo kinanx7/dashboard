@@ -45,7 +45,7 @@ function renderPrepareSection() {
     }
 
     grid.innerHTML = allOrders.map(order => {
-        const orderNum = order.orderNum || `#ORD-${(order.id || '').replace('ord_', '')}`;
+        const orderNum = formatMarketOrderNum(order);
         const dateStr = order.createdAt ? new Date(order.createdAt).toLocaleString() : '';
         const companyName = (order.companyKey || 'MVC').toUpperCase();
         const statusInfo = getMarketOrderStatusInfo(order.status);
