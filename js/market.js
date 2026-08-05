@@ -327,12 +327,12 @@ function refillMonthlyCoinsForAllCustomers() {
         });
 
         db.ref().update(updates).then(() => {
-            alert(isAr ? `تمت إعادة تعبئة ${amount.toLocaleString()} من العملات بنجاح لجميع العملاء! 🪙` : `Refilled ${amount.toLocaleString()} coins for all customers successfully! 🪙`);
+            alert(isAr ? `تمت إعادة تعبئة ${amount.toLocaleString()} ر.س بنجاح لجميع العملاء! 💵` : `Refilled ${amount.toLocaleString()} SR for all customers successfully! 💵`);
             renderMarket();
             renderAdminCustomersList();
         }).catch(err => {
-            console.error("Error refilling customer coins:", err);
-            alert(isAr ? 'حدث خطأ أثناء تعبئة العملات.' : 'Error refilling coins.');
+            console.error("Error refilling customer SR:", err);
+            alert(isAr ? 'حدث خطأ أثناء تعبئة الرصيد.' : 'Error refilling SR balance.');
         });
     };
 
@@ -410,12 +410,12 @@ function updateWorkerCoinsIndividual() {
         return;
     }
     if (isNaN(amount) || amount < 0) {
-        alert(isAr ? 'الرجاء إدخال رصيد عملات صحيح.' : 'Please enter a valid coin balance.');
+        alert(isAr ? 'الرجاء إدخال رصيد صحيح.' : 'Please enter a valid balance.');
         return;
     }
 
     db.ref(`companies/${currentCompany}/workers/${workerId}/coins`).set(amount).then(() => {
-        alert(isAr ? 'تم تحديث رصيد العملات للموظف بنجاح! 🪙' : 'Worker coins updated successfully! 🪙');
+        alert(isAr ? 'تم تحديث رصيد ر.س بنجاح! 💵' : 'Worker SR balance updated successfully! 💵');
         if (adjustInput) adjustInput.value = '';
         renderMarket();
     }).catch(err => {
@@ -860,7 +860,7 @@ function renderMarketCartItems() {
     const isAr = currentAppLang === 'ar';
 
     const userCoins = getUserCoins();
-    if (userBalanceEl) userBalanceEl.textContent = `${userCoins.toLocaleString()} ${isAr ? 'العملات' : 'Coins'}`;
+    if (userBalanceEl) userBalanceEl.textContent = `${userCoins.toLocaleString()} ${isAr ? 'ر.س' : 'SR'} 💵`;
 
     if (!listContainer) return;
 
@@ -872,7 +872,7 @@ function renderMarketCartItems() {
                 <p style="margin: 0; font-size: 0.85rem;">${isAr ? 'تصفح منتجات السوق وأضف المنتجات لسلتك!' : 'Browse market products and add items to your cart!'}</p>
             </div>
         `;
-        if (totalCostEl) totalCostEl.textContent = `0 ${isAr ? 'العملات' : 'Coins'}`;
+        if (totalCostEl) totalCostEl.textContent = `0 ${isAr ? 'ر.س' : 'SR'} 💵`;
         if (warningEl) warningEl.style.display = 'none';
         if (submitBtn) {
             submitBtn.disabled = true;
@@ -918,7 +918,7 @@ function renderMarketCartItems() {
                             </div>
                         ` : `
                             <div style="font-size: 0.8rem; color: #ef4444; font-weight: 700; margin-top: 2px;">
-                                ${item.price} 🪙 ${isAr ? 'للقطعة' : 'each'}
+                                ${item.price} ${isAr ? 'ر.س' : 'SR'} 💵 ${isAr ? 'للقطعة' : 'each'}
                             </div>
                         `}
                     </div>
@@ -934,7 +934,7 @@ function renderMarketCartItems() {
 
                     <!-- Item Total Price -->
                     <div style="font-weight: 900; font-size: 1rem; color: #ef4444; min-width: 65px; text-align: right; ${!available ? 'text-decoration: line-through; opacity: 0.5;' : ''}">
-                        ${itemTotal} 🪙
+                        ${itemTotal} ${isAr ? 'ر.س' : 'SR'} 💵
                     </div>
 
                     <!-- Remove Button (Always enabled so customer can remove hidden items) -->
@@ -958,7 +958,7 @@ function renderMarketCartItems() {
 
     listContainer.innerHTML = noticeBanner + itemsHTML;
 
-    if (totalCostEl) totalCostEl.textContent = `${totalCost.toLocaleString()} ${isAr ? 'العملات' : 'Coins'}`;
+    if (totalCostEl) totalCostEl.textContent = `${totalCost.toLocaleString()} ${isAr ? 'ر.س' : 'SR'} 💵`;
 
     const isInsufficient = userCoins < totalCost;
     if (warningEl) {
@@ -972,8 +972,8 @@ function renderMarketCartItems() {
             warningEl.style.display = isInsufficient ? 'block' : 'none';
             if (isInsufficient) {
                 warningEl.textContent = isAr 
-                    ? `⚠️ رصيد العملات لديك غير كافٍ! تحتاج إلى ${totalCost - userCoins} عملة إضافية.`
-                    : `⚠️ Insufficient Coins! You need ${totalCost - userCoins} more coins.`;
+                    ? `⚠️ رصيد ر.س لديك غير كافٍ! تحتاج إلى ${totalCost - userCoins} ر.س إضافية.`
+                    : `⚠️ Insufficient SR Balance! You need ${totalCost - userCoins} more SR.`;
             }
         }
     }
@@ -1149,7 +1149,7 @@ function openMarketOrderReceiptModal(order) {
     if (custNameEl) custNameEl.textContent = order.workerName || 'Customer';
     if (dateEl) dateEl.textContent = order.createdAt ? new Date(order.createdAt).toLocaleString() : new Date().toLocaleString();
     if (companyTagEl) companyTagEl.textContent = (order.companyKey || currentCompany || 'MVC').toUpperCase();
-    if (totalCostEl) totalCostEl.textContent = `${(order.totalCost || 0).toLocaleString()} ${isAr ? 'العملات' : 'Coins'}`;
+    if (totalCostEl) totalCostEl.textContent = `${(order.totalCost || 0).toLocaleString()} ${isAr ? 'ر.س' : 'SR'} 💵`;
 
     if (statusBadgeEl) {
         const statusInfo = getMarketOrderStatusInfo(order.status);
@@ -1166,7 +1166,7 @@ function openMarketOrderReceiptModal(order) {
                 <td style="padding: 12px 10px; font-weight: 900; color: #000000 !important; font-size: 1rem !important; background-color: inherit !important;">${sanitizeMarketText(item.name)}</td>
                 <td style="padding: 12px 10px; text-align: center; font-weight: 900; color: #0f172a !important; background-color: inherit !important; font-size: 0.95rem !important;">${item.qty || 1}</td>
                 <td style="padding: 12px 10px; text-align: right; font-weight: 800; color: #334155 !important; background-color: inherit !important; font-size: 0.95rem !important;">${(item.price || 0).toLocaleString()}</td>
-                <td style="padding: 12px 10px; text-align: right; font-weight: 900; color: #059669 !important; background-color: inherit !important; font-size: 1rem !important;">${((item.price || 0) * (item.qty || 1)).toLocaleString()} ${isAr ? 'العملات' : 'Coins'}</td>
+                <td style="padding: 12px 10px; text-align: right; font-weight: 900; color: #059669 !important; background-color: inherit !important; font-size: 1rem !important;">${((item.price || 0) * (item.qty || 1)).toLocaleString()} ${isAr ? 'ر.س' : 'SR'} 💵</td>
             </tr>
         `).join('');
     }
@@ -1292,7 +1292,7 @@ function renderCustomerOrders() {
 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
                     <div style="font-weight: 900; font-size: 1rem; color: #ef4444;">
-                        ${(order.totalCost || 0).toLocaleString()} 🪙
+                        ${(order.totalCost || 0).toLocaleString()} ${isAr ? 'ر.س' : 'SR'} 💵
                     </div>
                     <button type="button" onclick='openMarketOrderReceiptModal(${orderJsonStr})' class="btn-outline" style="padding: 5px 12px; font-weight: 800; font-size: 0.8rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
                         🧾 ${isAr ? 'عرض الفاتورة' : 'View Receipt'}
@@ -1367,8 +1367,8 @@ function renderAdminMarketOrders() {
                     <div style="font-size: 1.15rem; font-weight: 900; color: #ef4444;">${cancelledCount}</div>
                 </div>
                 <div style="background: var(--input-bg); padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border-color);">
-                    <div style="font-size: 0.72rem; color: #f59e0b; font-weight: 700;">🪙 ${isAr ? 'قيمة المبيعات' : 'Coins Revenue'}</div>
-                    <div style="font-size: 1.15rem; font-weight: 900; color: #f59e0b;">${totalRevenueCoins.toLocaleString()}</div>
+                    <div style="font-size: 0.72rem; color: #10b981; font-weight: 700;">💵 ${isAr ? 'قيمة المبيعات' : 'SR Revenue'}</div>
+                    <div style="font-size: 1.15rem; font-weight: 900; color: #10b981;">${totalRevenueCoins.toLocaleString()} SR</div>
                 </div>
             </div>
         `;
@@ -1422,7 +1422,7 @@ function renderAdminMarketOrders() {
                 </div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; border-top: 1px dashed var(--border-color); padding-top: 8px;">
-                    <span style="font-weight: 900; color: #ef4444; font-size: 0.95rem;">${(order.totalCost || 0).toLocaleString()} 🪙</span>
+                    <span style="font-weight: 900; color: #ef4444; font-size: 0.95rem;">${(order.totalCost || 0).toLocaleString()} ${isAr ? 'ر.س' : 'SR'} 💵</span>
                     
                     <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
                         <button type="button" onclick='openMarketOrderReceiptModal(${orderJsonStr})' class="btn-outline" style="padding: 5px 10px; font-weight: 700; font-size: 0.78rem; border-radius: 8px; cursor: pointer;">
@@ -1833,7 +1833,8 @@ function renderMarketProductCard(p) {
             <div style="padding: 0 14px 14px 14px; display: flex; flex-direction: column; gap: 8px;">
                 <div style="display: flex; align-items: center; justify-content: center; gap: 4px; color: #ef4444; font-size: 1.3rem; font-weight: 900;">
                     <span>${p.price || 0}</span>
-                    <span style="font-size: 1.05rem;">🪙</span>
+                    <span style="font-size: 0.95rem; font-weight: 800; color: #ef4444;">SR</span>
+                    <span style="font-size: 1.05rem;">💵</span>
                 </div>
 
                 <button onclick="addToMarketCart('${p.id}', event)" title="${isAr ? 'أضف للسلة' : 'Add to Cart'}" style="width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: 10px; border: none; background: #2563eb; color: #ffffff; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28); transition: all 0.2s ease;">
@@ -1973,6 +1974,13 @@ function renderMarket() {
     if (adminOrdersBtn) {
         adminOrdersBtn.style.display = isAdmin ? 'inline-flex' : 'none';
     }
+    const adminFeedbackBtn = document.getElementById('market-admin-feedback-btn');
+    if (adminFeedbackBtn) {
+        adminFeedbackBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+    }
+    if (isAdmin && typeof initAdminMarketFeedbackListener === 'function') {
+        initAdminMarketFeedbackListener();
+    }
     const addProdBtn = document.getElementById('market-add-prod-btn');
     if (addProdBtn) {
         addProdBtn.style.display = isAdmin ? 'inline-flex' : 'none';
@@ -2097,7 +2105,8 @@ function renderMarketProductCard(p) {
             <div style="padding: 0 14px 14px 14px; display: flex; flex-direction: column; gap: 8px;">
                 <div style="display: flex; align-items: center; justify-content: center; gap: 4px; color: #ef4444; font-size: 1.3rem; font-weight: 900;">
                     <span>${p.price || 0}</span>
-                    <span style="font-size: 1.05rem;">🪙</span>
+                    <span style="font-size: 0.95rem; font-weight: 800; color: #ef4444;">SR</span>
+                    <span style="font-size: 1.05rem;">💵</span>
                 </div>
 
                 <button onclick="addToMarketCart('${p.id}', event)" title="${isAr ? 'أضف للسلة' : 'Add to Cart'}" style="width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: 10px; border: none; background: #2563eb; color: #ffffff; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28); transition: all 0.2s ease;">
@@ -2779,12 +2788,12 @@ function renderAdminCustomersList() {
                 </span>
                 <div>
                     <div style="font-weight: 800; font-size: 0.9rem; color: var(--text-main);">${sanitizeMarketText(cust.name || 'Customer')}</div>
-                    <div style="font-size: 0.78rem; color: #f59e0b; font-weight: 700;">🪙 ${(cust.coins || 0).toLocaleString()} Coins</div>
+                    <div style="font-size: 0.78rem; color: #10b981; font-weight: 700;">💵 ${(cust.coins || 0).toLocaleString()} SR</div>
                 </div>
             </div>
             <div style="display: flex; align-items: center; gap: 6px;">
-                <button type="button" onclick="addCustomerCoins('${cust.code}', 100)" class="btn-outline" style="padding: 4px 8px; font-size: 0.75rem; font-weight: 800; border-radius: 6px;">+100 🪙</button>
-                <button type="button" onclick="addCustomerCoins('${cust.code}', 500)" class="btn-outline" style="padding: 4px 8px; font-size: 0.75rem; font-weight: 800; border-radius: 6px;">+500 🪙</button>
+                <button type="button" onclick="addCustomerCoins('${cust.code}', 100)" class="btn-outline" style="padding: 4px 8px; font-size: 0.75rem; font-weight: 800; border-radius: 6px;">+100 SR 💵</button>
+                <button type="button" onclick="addCustomerCoins('${cust.code}', 500)" class="btn-outline" style="padding: 4px 8px; font-size: 0.75rem; font-weight: 800; border-radius: 6px;">+500 SR 💵</button>
                 <button type="button" onclick="deleteCustomerCode('${cust.code}')" style="border: none; background: transparent; color: #ef4444; cursor: pointer; font-size: 0.95rem; padding: 4px;" title="Delete Customer">🗑️</button>
             </div>
         </div>

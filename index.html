@@ -81,7 +81,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=12">
+    <link rel="stylesheet" href="style.css?v=13">
 </head>
 
 <body class="theme-burgeroov">
@@ -470,6 +470,8 @@
                         Market</button>
                     <button id="tab-prepare" class="dept-tab" onclick="switchTab('prepare')" data-i18n="tab-prepare">👨‍🍳
                         Prepare</button>
+                    <button id="tab-ai-assistant" class="dept-tab admin-only" onclick="switchTab('ai-assistant')" data-i18n="tab-ai-assistant">🤖
+                        AI Assistant</button>
                 </div>
                 <button type="button" class="btn-outline" id="tab-reorder-btn" onclick="toggleTabReorderMode()"
                     style="padding: 8px 16px; border-radius: 100px; font-weight: 700; font-size: 0.85rem;" data-i18n="btn-reorder-tabs">
@@ -3014,7 +3016,7 @@
                             🥦 MVC Fresh Team Market
                         </h1>
                         <p style="margin: 0 0 4px 0; font-size: 0.95rem; color: #d1fae5; max-width: 650px; margin-left: auto; margin-right: auto;" data-i18n="desc-market-banner">
-                            Browse fresh catalog products and redeem items directly with your earned coins 🪙.
+                            Browse fresh catalog products and purchase items directly in SR (ر.س) 💵.
                         </p>
                     </div>
 
@@ -3025,11 +3027,11 @@
                                 <h2 class="card-title" style="margin: 0; border: none; padding: 0;" data-i18n="title-market-catalog">🏪 Market Catalog & Store</h2>
                                 <p style="font-size: 0.85rem; color: var(--text-muted); margin: 4px 0 0 0;" data-i18n="desc-market-catalog">Browse available meat, vegetables, and fruits products.</p>
                             </div>
-                            <!-- COIN BALANCE & CART CONTROLS (Top Right of Market Section) -->
+                            <!-- CASH / SR BALANCE & CART CONTROLS (Top Right of Market Section) -->
                             <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                <button type="button" class="adv-hdr-btn adv-btn-coins-add admin-only" onclick="addTestCoins(500)" title="Add +500 Coins for Testing">
+                                <button type="button" class="adv-hdr-btn adv-btn-coins-add admin-only" onclick="addTestCoins(500)" title="Add +500 SR for Testing">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-                                    <span>500 🪙</span>
+                                    <span>500 SR 💵</span>
                                 </button>
                                 <button id="market-add-prod-btn" onclick="openAddMarketProductModal()" class="adv-hdr-btn admin-only" style="background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; border: none; font-weight: 800; display: none; align-items: center; gap: 6px;">
                                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -3037,12 +3039,20 @@
                                 </button>
                                 <button id="market-manage-cust-btn" onclick="openCustomerManagementModal()" class="adv-hdr-btn admin-only" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: #ffffff; border: none; font-weight: 800; display: none; align-items: center; gap: 6px;">
                                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                                    <span data-i18n="btn-manage-customers">🔑 Customers & Codes</span>
+                                    <span data-i18n="btn-manage-customers">🔑 Customers & Access</span>
                                 </button>
                                 <div id="market-user-coins-badge" class="adv-hdr-coins-badge">
-                                    <span style="font-size: 1.1rem; line-height: 1;">🪙</span>
-                                    <span id="market-user-coins-val" style="font-size: 1rem; font-weight: 900; color: #f59e0b; font-family: monospace, system-ui, -apple-system, sans-serif; line-height: 1;">0</span>
+                                    <span style="font-size: 1.1rem; line-height: 1;">💵</span>
+                                    <span id="market-user-coins-val" style="font-size: 1rem; font-weight: 900; color: #10b981; font-family: monospace, system-ui, -apple-system, sans-serif; line-height: 1;">0</span>
+                                    <span style="font-size: 0.8rem; font-weight: 800; color: #10b981;">SR</span>
                                 </div>
+                                <button id="market-admin-feedback-btn" onclick="openAdminMarketFeedbackModal()" class="adv-hdr-btn admin-only" style="background: linear-gradient(135deg, #d97706, #92400e); color: #ffffff; border: none; font-weight: 800; display: none; align-items: center; gap: 6px; position: relative;">
+                                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                    </svg>
+                                    <span>صندوق الشكاوي والاقتراحات</span>
+                                    <span id="market-admin-feedback-unread-badge" class="badge" style="display: none; background: #ef4444; color: white; font-size: 0.72rem; padding: 2px 6px; border-radius: 100px;">0</span>
+                                </button>
                                 <button id="market-admin-orders-btn" onclick="openAdminMarketOrdersModal()" class="adv-hdr-btn adv-btn-orders admin-only" style="background: linear-gradient(135deg, #4f46e5, #3730a3); color: #ffffff; border: none; font-weight: 800; display: none;">
                                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
@@ -3050,6 +3060,12 @@
                                         <path d="M9 12h6"/><path d="M9 16h6"/>
                                     </svg>
                                     <span data-i18n="btn-admin-market-orders">All Orders (Admin)</span>
+                                </button>
+                                <button id="market-feedback-btn" onclick="openMarketFeedbackModal()" class="adv-hdr-btn" style="background: linear-gradient(135deg, #d97706, #b45309); color: #ffffff; border: none; font-weight: 800; display: inline-flex; align-items: center; gap: 6px;">
+                                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                    </svg>
+                                    <span>📩 الشكاوي والاقتراحات</span>
                                 </button>
                                 <button id="market-orders-btn" onclick="openCustomerOrdersModal()" class="adv-hdr-btn adv-btn-orders">
                                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -3071,7 +3087,6 @@
                                 <span id="market-count-badge" class="adv-hdr-count-badge">0 Products</span>
                             </div>
                         </div>
-
 
                         <!-- Filter Controls Bar -->
                         <div style="display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; align-items: center; justify-content: space-between; background: var(--input-bg); padding: 12px 16px; border-radius: 14px; border: 1px solid var(--border-color);">
@@ -3148,6 +3163,104 @@
                         <div id="prepare-orders-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 20px; width: 100%; box-sizing: border-box;">
                             <!-- Dynamically rendered in app.js -->
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- VIEW 17: AI ASSISTANT (ADMIN ONLY)        -->
+            <!-- ========================================== -->
+            <div id="view-ai-assistant" class="view-section" style="grid-template-columns: 1fr;">
+                <div style="display: flex; flex-direction: column; width: 100%; max-width: 1000px; margin: 0 auto; box-sizing: border-box; gap: 20px;">
+                    
+                    <!-- AI Assistant Hero Banner -->
+                    <div style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%); color: #ffffff; padding: 24px 28px; border-radius: 20px; border: 1px solid rgba(99, 102, 241, 0.4); box-shadow: 0 10px 30px rgba(0,0,0,0.25); position: relative; overflow: hidden;">
+                        <div style="position: absolute; right: -10px; top: -10px; font-size: 6.5rem; opacity: 0.08; pointer-events: none; user-select: none;">🤖</div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; position: relative; z-index: 1;">
+                            <div style="display: flex; align-items: center; gap: 14px;">
+                                <div style="width: 52px; height: 52px; border-radius: 16px; background: rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; font-size: 2rem; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 4px 12px rgba(0,0,0,0.2);">🤖</div>
+                                <div>
+                                    <h1 style="margin: 0 0 4px 0; font-size: 1.6rem; font-weight: 900; color: #ffffff; letter-spacing: -0.5px;">
+                                        MVC Smart AI Assistant
+                                    </h1>
+                                    <p style="margin: 0; font-size: 0.88rem; color: #c7d2fe;">
+                                        Powered by Google Gemini 1.5 Flash API — Natural Language Admin Control
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <button type="button" onclick="toggleGeminiSettingsCard()" class="btn-outline" style="padding: 8px 16px; border-radius: 100px; color: #ffffff; border-color: rgba(255,255,255,0.3); font-weight: 800; font-size: 0.85rem; cursor: pointer; background: rgba(255,255,255,0.1); display: flex; align-items: center; gap: 6px;">
+                                ⚙️ Gemini Key Settings
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Collapsible Gemini API Key Settings Box -->
+                    <div id="gemini-key-settings-card" class="card" style="display: none; border-top: 4px solid #6366f1; background: var(--card-bg); border-radius: 16px; padding: 20px;">
+                        <h4 style="margin: 0 0 8px 0; font-size: 1rem; color: var(--text-main); font-weight: 900; display: flex; align-items: center; gap: 8px;">
+                            🔑 Google Gemini API Key Configuration
+                        </h4>
+                        <p style="margin: 0 0 14px 0; font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
+                            Google provides a <strong>100% Free Gemini 1.5 Flash API Key</strong> (1,500 free requests per day). Enter your API key below to enable full conversational AI logic in Arabic & English. If empty, the system uses the built-in local command parser.
+                        </p>
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <input type="password" id="gemini-api-key-input" placeholder="AIzaSy..." style="flex: 1; min-width: 260px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-weight: 700; font-family: monospace;">
+                            <button type="button" onclick="saveGeminiApiKey()" class="btn-primary" style="padding: 10px 20px; border-radius: 10px; font-weight: 800; background: #4f46e5; border: none; color: white; cursor: pointer;">
+                                💾 Save Key
+                            </button>
+                            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" style="font-size: 0.82rem; color: #6366f1; font-weight: 800; text-decoration: underline; margin-left: 4px;">
+                                🔗 Get Free Key (Google AI Studio)
+                            </a>
+                        </div>
+                        <div id="gemini-key-status-msg" style="margin-top: 8px; font-size: 0.8rem; font-weight: 700;"></div>
+                    </div>
+
+                    <!-- AI Chat Window Card -->
+                    <div class="card" style="margin: 0; padding: 0; border-radius: 20px; border: 1px solid var(--border-color); overflow: hidden; background: var(--card-bg); display: flex; flex-direction: column; height: calc(100vh - 250px); min-height: 480px; max-height: 650px; box-shadow: 0 8px 24px rgba(0,0,0,0.08);">
+                        
+                        <!-- Chat Stream Header -->
+                        <div style="padding: 14px 20px; border-bottom: 1px solid var(--border-color); background: var(--input-bg); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 900; font-size: 0.78rem; padding: 4px 10px; border-radius: 100px; display: flex; align-items: center; gap: 5px;">
+                                    <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
+                                    AI Bot Active
+                                </span>
+                                <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 700;">Smart Intent & Action Engine <span style="background:#6366f1; color:white; padding:2px 8px; border-radius:10px; font-size:0.75rem;">v58</span></span>
+                            </div>
+                            <button type="button" onclick="clearAIChatHistory()" class="btn-outline" style="padding: 5px 12px; font-weight: 700; font-size: 0.78rem; border-radius: 8px; cursor: pointer;">
+                                🗑️ Clear Chat
+                            </button>
+                        </div>
+
+                        <!-- Chat Messages Scroll Container (min-height: 0 is CRITICAL for flex child overflow) -->
+                        <div id="ai-chat-history" style="flex: 1; min-height: 0; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; background: var(--card-bg);">
+                            <!-- Initial Greeting -->
+                            <div style="display: flex; gap: 12px; align-items: flex-start;">
+                                <div style="width: 36px; height: 36px; border-radius: 12px; background: linear-gradient(135deg, #4f46e5, #4338ca); display: flex; align-items: center; justify-content: center; color: white; font-size: 1.2rem; flex-shrink: 0; box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);">🤖</div>
+                                <div style="background: var(--input-bg); border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 4px 18px 18px 18px; max-width: 85%; font-size: 0.92rem; color: var(--text-main); line-height: 1.55; box-shadow: var(--shadow-sm);">
+                                    <div style="font-weight: 900; font-size: 0.82rem; color: #6366f1; margin-bottom: 4px;">MVC AI Assistant</div>
+                                    مرحباً بك! أنا مساعدك الذكي لجميع عمليات لوحة التحكم. يمكنك كتابة أي طلب باللغة العربية أو الإنجليزية وسأقوم بتنفيذه فوراً.
+                                    <div style="margin-top: 10px; font-size: 0.82rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px;">
+                                        <span>• <strong>أضف منتجات للسوق:</strong> "أضف منتج لحم نعيمي بسعر 1200 قسم لحوم"</span>
+                                        <span>• <strong>إسناد مهام للموظفين:</strong> "ارسل مهمة للموظف أحمد فحص المستودع"</span>
+                                        <span>• <strong>تعبئة الرصيد:</strong> "شحن 500 ريال للعميل محمد"</span>
+                                        <span>• <strong>التنقل المباشر:</strong> "افتح قسم المطبخ"</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        </div>
+
+                        <!-- Chat Input Form (flex-shrink: 0 ensures it is NEVER hidden or clipped) -->
+                        <form id="ai-chat-form" onsubmit="event.preventDefault(); handleAIChatSubmit();" style="padding: 14px 16px; background: var(--card-bg); border-top: 2px solid var(--border-color); display: flex; gap: 10px; align-items: center; margin: 0; flex-shrink: 0;">
+                            <input type="text" id="ai-chat-input" placeholder="اكتب طلبك هنا للمساعد الذكي... / Type your command..." required autocomplete="off" style="flex: 1; padding: 14px 18px; border-radius: 12px; border: 2px solid #6366f1; background: var(--input-bg); color: var(--text-main); font-size: 0.95rem; font-weight: 700; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.15);">
+                            <button type="submit" id="ai-chat-send-btn" class="btn-primary" style="padding: 14px 24px; border-radius: 12px; font-weight: 900; font-size: 0.92rem; background: linear-gradient(135deg, #4f46e5, #3730a3); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3); flex-shrink: 0;">
+                                <span>إرسال</span>
+                                <span style="font-size: 1.1rem;">🚀</span>
+                            </button>
+                        </form>
+
                     </div>
 
                 </div>
@@ -3418,7 +3531,7 @@
                 </div>
 
                 <div class="form-group" style="margin-bottom: 16px;">
-                    <label data-i18n="label-product-price-coins">Price (Coins / Points 🪙)</label>
+                    <label data-i18n="label-product-price-coins">Price (SR / ر.س 💵)</label>
                     <input type="number" step="any" min="0" id="edit-market-product-price" required style="width:100%; padding:10px; border-radius:8px; background:var(--input-bg); color:#ef4444; border:1px solid var(--border-color); font-weight:700; font-size:1.1rem; box-sizing:border-box;">
                 </div>
 
@@ -3461,7 +3574,7 @@
                     <span style="font-size: 1.6rem;">🛒</span>
                     <div>
                         <h3 style="margin: 0; font-size: 1.25rem; font-weight: 900; color: var(--text-main);">Shopping Cart / سلة التسوق</h3>
-                        <p style="margin: 2px 0 0 0; font-size: 0.8rem; color: var(--text-muted);">Review items, coin cost, and submit order</p>
+                        <p style="margin: 2px 0 0 0; font-size: 0.8rem; color: var(--text-muted);">Review items, total cost, and submit order</p>
                     </div>
                 </div>
                 <button type="button" onclick="closeMarketCartModal()" class="btn-outline" style="border-radius: 50%; width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer;">✖</button>
@@ -3476,15 +3589,15 @@
             <div style="padding: 20px 24px; background: var(--input-bg); border-top: 1px solid var(--border-color);">
                 <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
                     <div style="display: flex; justify-content: space-between; font-size: 0.92rem; color: var(--text-muted);">
-                        <span>🪙 Your Coin Balance:</span>
-                        <span id="market-cart-user-balance" style="font-weight: 800; color: #f59e0b;">0 Coins</span>
+                        <span>💵 Your SR Balance / رصيدك:</span>
+                        <span id="market-cart-user-balance" style="font-weight: 800; color: #10b981;">0 SR 💵</span>
                     </div>
                     <div style="display: flex; justify-content: space-between; font-size: 1.1rem; font-weight: 900; color: var(--text-main);">
-                        <span>🛒 Total Order Cost:</span>
-                        <span id="market-cart-total-cost" style="color: #ef4444;">0 Coins</span>
+                        <span>🛒 Total Order Cost / الإجمالي:</span>
+                        <span id="market-cart-total-cost" style="color: #ef4444;">0 SR 💵</span>
                     </div>
                     <div id="market-cart-balance-warning" style="display: none; padding: 8px 12px; background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; border-radius: 8px; color: #ef4444; font-size: 0.82rem; font-weight: 700; text-align: center;">
-                        ⚠️ Insufficient Coins for this order!
+                        ⚠️ Insufficient SR Balance for this order!
                     </div>
                 </div>
 
@@ -3525,7 +3638,7 @@
 
                 <div class="grid-2-col" style="gap: 16px; margin-bottom: 16px;">
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label data-i18n="label-product-price-coins">Price (Coins / Points 🪙)</label>
+                        <label data-i18n="label-product-price-coins">Price (SR / ر.س 💵)</label>
                         <input type="number" step="any" min="0" id="market-product-price-input" required placeholder="e.g. 1380" data-i18n="[placeholder]placeholder-market-price" style="font-size: 1.1rem; font-weight: 700; color: #ef4444; width: 100%; box-sizing: border-box;">
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
@@ -3544,7 +3657,7 @@
                 </div>
 
                 <button type="submit" class="btn-success" style="width: 100%; padding: 13px; font-weight: 800; font-size: 1rem; background: linear-gradient(135deg, #10b981, #059669); border-radius: 10px; cursor: pointer; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);" data-i18n="btn-publish-product">
-                    🪙 Publish Market Product
+                    💵 Publish Market Product
                 </button>
             </form>
         </div>
@@ -3561,18 +3674,18 @@
             </div>
 
             <!-- Monthly Refill Card -->
-            <div style="background:var(--input-bg); border-top: 4px solid #f59e0b; padding: 16px; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--border-color);">
+            <div style="background:var(--input-bg); border-top: 4px solid #10b981; padding: 16px; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--border-color);">
                 <div class="flex-between" style="margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
-                    <h4 style="margin:0; font-size:1rem; font-weight:800; color:#f59e0b;" data-i18n="title-monthly-coin-refill">🪙 Monthly Customer Coins Refill</h4>
-                    <span class="badge" style="background: rgba(245,158,11,0.15); color: #f59e0b; font-weight: 800; font-size: 0.75rem; padding: 3px 10px; border-radius: 100px;">Admin Only</span>
+                    <h4 style="margin:0; font-size:1rem; font-weight:800; color:#10b981;" data-i18n="title-monthly-coin-refill">💵 Monthly Customer SR Refill</h4>
+                    <span class="badge" style="background: rgba(16,185,129,0.15); color: #10b981; font-weight: 800; font-size: 0.75rem; padding: 3px 10px; border-radius: 100px;">Admin Only</span>
                 </div>
                 <div class="grid-2-col" style="gap: 12px; align-items: end;">
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size:0.85rem;">Refill Amount (Coins 🪙)</label>
+                        <label style="font-size:0.85rem;">Refill Amount (SR 💵)</label>
                         <input type="number" id="admin-monthly-coins-input" value="500" min="0" style="font-weight: 700;">
                     </div>
-                    <button type="button" onclick="refillMonthlyCoinsForAllCustomers()" class="btn-warning" style="padding: 11px; font-weight: 800; font-size: 0.88rem; background: linear-gradient(135deg, #f59e0b, #d97706); border-radius: 8px; border: none; cursor: pointer; color: white;">
-                        🔄 Refill All Customer Coins
+                    <button type="button" onclick="refillMonthlyCoinsForAllCustomers()" class="btn-success" style="padding: 11px; font-weight: 800; font-size: 0.88rem; background: linear-gradient(135deg, #10b981, #059669); border-radius: 8px; border: none; cursor: pointer; color: white;">
+                        🔄 Refill All Customer SR
                     </button>
                 </div>
             </div>
@@ -3586,7 +3699,7 @@
                         <input type="text" id="admin-customer-name-input" required placeholder="e.g. محمد العتيبي" style="font-weight: 700;">
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size:0.85rem;">Initial Coins / الرصيد الأولي 🪙</label>
+                        <label style="font-size:0.85rem;">Initial SR / الرصيد الأولي 💵</label>
                         <input type="number" id="admin-customer-coins-input" value="1000" min="0" placeholder="1000" style="font-weight: 700;">
                     </div>
                 </div>
@@ -3641,7 +3754,7 @@
                 </div>
                 <div>
                     <span style="color: #64748b; font-weight: 600;">طريقة الدفع / Payment Method:</span>
-                    <div style="font-weight: 800; color: #15803d; margin-top: 2px;">العملات الرقمية (Coins 🪙)</div>
+                    <div style="font-weight: 800; color: #15803d; margin-top: 2px;">رصيد النقاط والحوافز (SR 💵)</div>
                 </div>
                 <div>
                     <span style="color: #64748b; font-weight: 600;">الشركة والفرع / Company:</span>
@@ -3779,6 +3892,60 @@
         </div>
     </div>
 
+    <!-- Customer Feedback (Complaints & Suggestions) Modal -->
+    <div id="market-feedback-modal" class="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; backdrop-filter:blur(5px); align-items:center; justify-content:center; padding:16px;">
+        <div class="card" style="max-width:560px; width:100%; border-top:4px solid #d97706; box-shadow:0 12px 36px rgba(0,0,0,0.4); border-radius:20px; overflow:hidden; padding:26px; background:var(--card-bg, #ffffff);">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:14px; margin-bottom:18px;">
+                <h3 style="margin:0; color:#d97706; font-size:1.2rem; font-weight:900; display:flex; align-items:center; gap:8px;">
+                    📩 الشكاوي والاقتراحات / Complaints & Suggestions
+                </h3>
+                <button type="button" onclick="closeMarketFeedbackModal()" style="background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer;">✖</button>
+            </div>
+            
+            <form onsubmit="event.preventDefault(); submitMarketFeedback();" style="margin:0; padding:0; border:none; background:transparent; box-shadow:none;">
+                <p style="margin:0 0 14px 0; font-size:0.9rem; color:var(--text-muted); line-height:1.5;">
+                    يسعدنا تواصلكم ورأيكم! يرجى كتابة ملاحظتك، اقتراحك أو شكواك وسوف ترفع مباشرة لإدارة السوق.
+                </p>
+                
+                <div class="form-group" style="margin-bottom: 18px;">
+                    <label style="font-weight: 800; font-size: 0.9rem; display: block; margin-bottom: 6px;">نص الملاحظة / الشكوى / الاقتراح:</label>
+                    <textarea id="market-feedback-text" rows="5" required placeholder="اكتب اقتراحك أو شكواك هنا بكل تفاصيلها..." style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-family:inherit; font-size:0.95rem; box-sizing:border-box;"></textarea>
+                </div>
+
+                <button type="submit" class="btn-success" style="width:100%; padding:13px; font-weight:800; font-size:1rem; background:linear-gradient(135deg, #d97706, #b45309); border-radius:10px; cursor:pointer; color:white; border:none; box-shadow:0 4px 12px rgba(217, 119, 6, 0.3);">
+                    🚀 إرسال / Submit Feedback
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Admin Market Feedback (Complaints & Suggestions) Box Modal -->
+    <div id="admin-market-feedback-modal" class="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:9999; backdrop-filter:blur(5px); align-items:center; justify-content:center; padding:16px;">
+        <div class="card" style="max-width:850px; width:100%; max-height:90vh; display:flex; flex-direction:column; border-top:4px solid #d97706; box-shadow:0 12px 36px rgba(0,0,0,0.4); border-radius:20px; overflow:hidden; padding:24px; background:var(--card-bg, #ffffff);">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:14px; margin-bottom:18px; flex-shrink:0;">
+                <div>
+                    <h3 style="margin:0; color:#d97706; font-size:1.25rem; font-weight:900; display:flex; align-items:center; gap:8px;">
+                        📩 صندوق الشكاوي والاقتراحات / Customer Feedback & Complaints Box
+                    </h3>
+                    <p style="margin:4px 0 0 0; font-size:0.85rem; color:var(--text-muted);">عرض الملاحظات والشكاوي والاقتراحات المرسلة من العملاء للمتجر.</p>
+                </div>
+                <button type="button" onclick="closeAdminMarketFeedbackModal()" class="btn-outline" style="border-radius: 50%; width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer;">✖</button>
+            </div>
+            
+            <!-- Feedback List Scrollable Container -->
+            <div id="admin-market-feedback-list" style="overflow-y:auto; flex:1; min-height: 220px; max-height: 520px; display:flex; flex-direction:column; gap:14px; padding-right:4px;">
+                <!-- Dynamically rendered -->
+            </div>
+
+            <!-- Modal Footer -->
+            <div style="padding: 14px 0 0 0; border-top: 1px solid var(--border-color); text-align: right; margin-top: 14px;">
+                <button type="button" onclick="closeAdminMarketFeedbackModal()" class="btn-outline" style="padding: 8px 20px; border-radius: 100px; font-weight: 800; font-size: 0.9rem; cursor: pointer;">
+                    إغلاق / Close
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Mobile Compact Bottom Bar (visible on phones only via CSS) -->
     <nav id="mobile-bottom-nav" role="navigation" aria-label="Mobile navigation">
         <!-- Left: Current active tab indicator -->
@@ -3870,22 +4037,26 @@
                 onclick="switchTab('prepare'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">👨‍🍳</span><span data-i18n="tab-prepare">Prepare</span>
             </button>
+            <button class="mob-dept-item mob-sheet-tab admin-only" data-tab="ai-assistant"
+                onclick="switchTab('ai-assistant'); closeMobDeptMenu()">
+                <span class="mob-dept-icon">🤖</span><span data-i18n="tab-ai-assistant">AI Assistant</span>
+            </button>
         </div>
     </div>
 
     <script defer src="translations.js"></script>
     <!-- Modularized Core & Feature Scripts -->
-    <script defer src="js/core.js?v=19"></script>
-    <script defer src="js/auth.js?v=19"></script>
-    <script defer src="js/adverts_notes.js?v=19"></script>
-    <script defer src="js/sales_costs.js?v=19"></script>
-    <script defer src="js/warehouse.js?v=19"></script>
-    <script defer src="js/tasks.js?v=19"></script>
-    <script defer src="js/drivers.js?v=19"></script>
-    <script defer src="js/ops.js?v=19"></script>
-    <script defer src="js/finance.js?v=19"></script>
-    <script defer src="js/market.js?v=19"></script>
-    <script defer src="js/prepare.js?v=19"></script>
+    <script defer src="js/core.js?v=58"></script>
+    <script defer src="js/auth.js?v=58"></script>
+    <script defer src="js/adverts_notes.js?v=58"></script>
+    <script defer src="js/sales_costs.js?v=58"></script>
+    <script defer src="js/warehouse.js?v=58"></script>
+    <script defer src="js/tasks.js?v=58"></script>
+    <script defer src="js/drivers.js?v=58"></script>
+    <script defer src="js/ops.js?v=58"></script>
+    <script defer src="js/finance.js?v=58"></script>
+    <script defer src="js/market.js?v=58"></script>
+    <script defer src="js/prepare.js?v=58"></script>
 </body>
 
 

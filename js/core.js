@@ -1239,6 +1239,7 @@ function markLockedTabs() {
         reminders: isAdmin,
         market: isAdmin || isCustomer,
         prepare: isAdmin || document.body.classList.contains('perm-prepare'),
+        'ai-assistant': isAdmin,
     };
 
     Object.entries(access).forEach(([tabId, hasAccess]) => {
@@ -1855,7 +1856,7 @@ function switchTab(tab) {
         }
     }
 
-    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare'];
+    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant'];
 
     allTabs.forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
@@ -2070,7 +2071,7 @@ function switchTab(tab) {
         }
     }
 
-    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare'];
+    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant'];
 
     allTabs.forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
@@ -2199,6 +2200,7 @@ function renderAll() {
     else if (currentTab === 'costs') { if (typeof renderCosts === 'function') renderCosts(); }
     else if (currentTab === 'reminders') { if (typeof renderReminders === 'function') renderReminders(); }
     else if (currentTab === 'market') { if (typeof renderMarket === 'function') renderMarket(); }
+    else if (currentTab === 'ai-assistant') { if (typeof renderAIAssistant === 'function') renderAIAssistant(); }
 
     if (typeof renderPaymentRequests === 'function') renderPaymentRequests();
     if (typeof renderWorkerCustodyRequests === 'function') renderWorkerCustodyRequests();
