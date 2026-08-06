@@ -242,7 +242,7 @@ let currentCustomerSession = null;
 try {
     const savedCustomer = localStorage.getItem('mvc_customer_session');
     if (savedCustomer) currentCustomerSession = JSON.parse(savedCustomer);
-} catch(e) {
+} catch (e) {
     currentCustomerSession = null;
 }
 window.currentCustomerSession = currentCustomerSession;
@@ -251,7 +251,7 @@ let localCustomerRegistry = {};
 try {
     const cachedReg = localStorage.getItem('mvc_global_customer_registry');
     if (cachedReg) localCustomerRegistry = JSON.parse(cachedReg);
-} catch(e){}
+} catch (e) { }
 window.localCustomerRegistry = localCustomerRegistry;
 
 function initPublicCustomerSync() {
@@ -263,7 +263,7 @@ function initPublicCustomerSync() {
                     window.localCustomerRegistry = Object.assign({}, window.localCustomerRegistry, val);
                     try {
                         localStorage.setItem('mvc_global_customer_registry', JSON.stringify(window.localCustomerRegistry));
-                    } catch(e){}
+                    } catch (e) { }
 
                     // Real-time sync for active customer session
                     if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && (currentCustomerSession.code || currentCustomerSession.id)) {
@@ -274,7 +274,7 @@ function initPublicCustomerSync() {
                                 currentCustomerSession.coins = freshCoins;
                                 try {
                                     localStorage.setItem('mvc_customer_session', JSON.stringify(currentCustomerSession));
-                                } catch(e){}
+                                } catch (e) { }
                                 const coinsValEl = document.getElementById('market-user-coins-val');
                                 if (coinsValEl) coinsValEl.textContent = freshCoins.toLocaleString();
                                 if (typeof renderMarket === 'function') renderMarket();
@@ -285,7 +285,7 @@ function initPublicCustomerSync() {
                     }
                 }
             });
-        } catch(e){}
+        } catch (e) { }
     }
 }
 
@@ -511,7 +511,7 @@ function startGlobalNotificationListeners(email) {
 function _cfgSecret(str) {
     try {
         return atob(str);
-    } catch(e) {
+    } catch (e) {
         return '';
     }
 }
@@ -668,7 +668,7 @@ try {
             currentCompany = currentCustomerSession.company;
         }
     }
-} catch(e){}
+} catch (e) { }
 
 // FEATURE 1: Task tracking state — tracks previously seen task IDs for the current worker
 let previousTaskIds = [];
@@ -688,9 +688,103 @@ function showCompanySelectionHUD(event) {
     const launchLoader = document.getElementById('launch-loader-overlay');
     if (launchLoader) launchLoader.style.display = 'none';
     if (typeof hideUnassignedOverlay === 'function') hideUnassignedOverlay();
+
+    const cardBurgeroov = document.querySelector('.burgeroov-card');
+    const cardMvc = document.querySelector('.mvc-card');
+    const cardMvcFresh = document.querySelector('.mvcfresh-card');
+
+    if (currentUser && currentUser.email === 'kinan.rahal@hotmail.com') {
+        if (cardBurgeroov) cardBurgeroov.style.display = 'block';
+        if (cardMvc) cardMvc.style.display = 'block';
+        if (cardMvcFresh) cardMvcFresh.style.display = 'block';
+    } else if (window.userActiveCompanies && Array.isArray(window.userActiveCompanies)) {
+        if (cardBurgeroov) cardBurgeroov.style.display = window.userActiveCompanies.includes('burgeroov') ? 'block' : 'none';
+        if (cardMvc) cardMvc.style.display = window.userActiveCompanies.includes('mvc') ? 'block' : 'none';
+        if (cardMvcFresh) cardMvcFresh.style.display = window.userActiveCompanies.includes('mvcfresh') ? 'block' : 'none';
+    }
+
     document.getElementById('company-selection-overlay').style.display = 'flex';
     document.getElementById('app-wrapper').style.display = 'none';
 }
+
+function findMatchingWorker(workersList, userEmail, targetWorkerId) {
+    if (!workersList || !Array.isArray(workersList) || workersList.length === 0) return null;
+    if (!userEmail) return null;
+
+    const cleanEmail = String(userEmail).trim().toLowerCase();
+    const emailKey = cleanEmail.replace(/\./g, ',');
+
+    // 0. Match by explicit targetWorkerId or cached worker ID
+    let knownId = targetWorkerId || (typeof localStorage !== 'undefined' ? localStorage.getItem('mvc_worker_id_' + emailKey) : null);
+    if (knownId) {
+        let matched = workersList.find(w => w && String(w.id) === String(knownId));
+        if (matched) {
+            matched.email = cleanEmail;
+            matched.email_key = emailKey;
+            return matched;
+        }
+    }
+
+    // 1. Direct email match (trimmed, case-insensitive)
+    let matched = workersList.find(w => w && w.email && String(w.email).trim().toLowerCase() === cleanEmail);
+    if (matched) {
+        if (!matched.email_key) matched.email_key = emailKey;
+        return matched;
+    }
+
+    // 2. Email key match
+    matched = workersList.find(w => w && (
+        (w.email_key && w.email_key === emailKey) ||
+        (w.email && String(w.email).trim().toLowerCase().replace(/\./g, ',') === emailKey)
+    ));
+    if (matched) {
+        matched.email = cleanEmail;
+        return matched;
+    }
+
+    // 3. Worker Credentials / Password mapping check
+    if (typeof appData !== 'undefined') {
+        const companyKeys = ['burgeroov', 'mvc', 'mvcfresh', (typeof currentCompany !== 'undefined' ? currentCompany : '')].filter(Boolean);
+        for (const cKey of companyKeys) {
+            const data = appData[cKey];
+            if (data && data.workerPasswords && data.workerPasswords[emailKey]) {
+                const mappedId = data.workerPasswords[emailKey].workerId;
+                if (mappedId) {
+                    matched = workersList.find(w => w && String(w.id) === String(mappedId));
+                    if (matched) {
+                        matched.email = cleanEmail;
+                        matched.email_key = emailKey;
+                        return matched;
+                    }
+                }
+            }
+        }
+    }
+
+    // 4. Fallback match by password if available
+    if (typeof window !== 'undefined' && window.lastAttemptedLoginPassword) {
+        matched = workersList.find(w => w && (w.password === window.lastAttemptedLoginPassword || w.oldPassword === window.lastAttemptedLoginPassword));
+        if (matched) {
+            matched.email = cleanEmail;
+            matched.email_key = emailKey;
+            return matched;
+        }
+    }
+
+    // 5. Fallback match if user email username matches worker name (e.g., sinan.rahal -> Sinan)
+    const namePart = cleanEmail.split('@')[0].split('.')[0];
+    if (namePart && namePart.length > 2) {
+        matched = workersList.find(w => w && w.name && w.name.toLowerCase().includes(namePart));
+        if (matched) {
+            matched.email = cleanEmail;
+            matched.email_key = emailKey;
+            return matched;
+        }
+    }
+
+    return null;
+}
+window.findMatchingWorker = findMatchingWorker;
 
 function selectCompany(companyId) {
     currentCompany = companyId;
@@ -744,18 +838,18 @@ function selectCompany(companyId) {
     // Fetch credentials to pre-register UID to prevent database connection error (permission denied)
     if (currentUser && currentUser.uid) {
         const email = currentUser.email.toLowerCase();
-        
+
         Promise.all([
             db.ref(`companies/${companyId}/admins`).once('value').catch(() => null),
             db.ref(`companies/${companyId}/workers`).once('value').catch(() => null)
         ]).then(([adminsSnap, workersSnap]) => {
             const admins = parseAdminsSnap(adminsSnap);
             const workers = parseWorkersSnap(workersSnap);
-            
+
             const sanitizedEmail = email.replace(/\./g, ',');
             const isCompanyAdmin = email === 'kinan.rahal@hotmail.com' || admins[sanitizedEmail] !== undefined;
             const worker = workers.find(w => w.email && w.email.toLowerCase() === email);
-            
+
             if (email === 'kinan.rahal@hotmail.com') {
                 return db.ref(`companies/${companyId}/users_by_uid/${currentUser.uid}`).set({
                     email: email,
@@ -798,166 +892,197 @@ function selectCompany(companyId) {
 window.selectCompany = selectCompany;
 window.showCompanySelectionHUD = showCompanySelectionHUD;
 
-async function processLoggedInUser(userEmail) {
-    if (!userEmail) return;
-    const email = userEmail.toLowerCase();
-    const emailKey = email.replace(/\./g, ',');
+// --- AUTHENTICATION SYSTEM ---
+authMode = authMode || 'login';
 
-    currentCustomerSession = null;
-    try {
-        localStorage.removeItem('mvc_customer_session');
-        localStorage.removeItem('mvc_customer_code');
-    } catch(e){}
-
-    currentUser = { email: email, uid: (auth.currentUser ? auth.currentUser.uid : 'worker_' + emailKey) };
-    const displayEmailElem = document.getElementById('display-user-email');
-    if (displayEmailElem) displayEmailElem.textContent = currentUser.email;
-
-    if (typeof startGlobalNotificationListeners === 'function') {
-        startGlobalNotificationListeners(email);
-    }
-
+auth.onAuthStateChanged((user) => {
     const overlay = document.getElementById('auth-overlay');
-    const authLoader = document.getElementById('auth-loader');
-    const authBtn = document.getElementById('auth-btn');
-
-    if (email === 'kinan.rahal@hotmail.com') {
-        if (authLoader) authLoader.style.display = 'none';
-        if (authBtn) authBtn.style.display = 'block';
-        if (overlay) overlay.style.display = 'none';
-
-        const cardBurgeroov = document.querySelector('.burgeroov-card');
-        const cardMvc = document.querySelector('.mvc-card');
-        const cardMvcFresh = document.querySelector('.mvcfresh-card');
-        if (cardBurgeroov) cardBurgeroov.style.display = 'block';
-        if (cardMvc) cardMvc.style.display = 'block';
-        if (cardMvcFresh) cardMvcFresh.style.display = 'block';
-
-        window.isMultiCompany = true;
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const queryCompany = urlParams.get('companyId');
-        const queryTab = urlParams.get('tab');
-
-        if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc' || queryCompany === 'mvcfresh')) {
-            selectCompany(queryCompany);
-            if (queryTab) {
-                setTimeout(() => {
-                    switchTab(queryTab);
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                }, 500);
-            } else {
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }
-        } else {
-            const savedCompany = localStorage.getItem('selected_company');
-            if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
-                selectCompany(savedCompany);
-            } else {
-                showCompanySelectionHUD();
-            }
-        }
-        return;
-    }
-
-    // Check databases for worker / admin membership across all 3 companies
-    try {
-        const [bgAdmins, bgWorkers, mvcAdmins, mvcWorkers, freshAdmins, freshWorkers] = await Promise.all([
-            db.ref('companies/burgeroov/admins').once('value').catch(() => null),
-            db.ref('companies/burgeroov/workers').once('value').catch(() => null),
-            db.ref('companies/mvc/admins').once('value').catch(() => null),
-            db.ref('companies/mvc/workers').once('value').catch(() => null),
-            db.ref('companies/mvcfresh/admins').once('value').catch(() => null),
-            db.ref('companies/mvcfresh/workers').once('value').catch(() => null)
-        ]);
-
-        if (authLoader) authLoader.style.display = 'none';
-        if (authBtn) authBtn.style.display = 'block';
-
-        const burgeroovAdmins = parseAdminsSnap(bgAdmins);
-        const burgeroovWorkers = parseWorkersSnap(bgWorkers);
-        const mvcAdminsList = parseAdminsSnap(mvcAdmins);
-        const mvcWorkersList = parseWorkersSnap(mvcWorkers);
-        const mvcfreshAdminsList = parseAdminsSnap(freshAdmins);
-        const mvcfreshWorkersList = parseWorkersSnap(freshWorkers);
-
-        const sanitizedEmail = email.replace(/\./g, ',');
-        const inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
-            burgeroovWorkers.some(w => w && w.email && w.email.toLowerCase() === email);
-        const inMvc = mvcAdminsList[sanitizedEmail] === true ||
-            mvcWorkersList.some(w => w && w.email && w.email.toLowerCase() === email);
-        const inMvcFresh = mvcfreshAdminsList[sanitizedEmail] === true ||
-            mvcfreshWorkersList.some(w => w && w.email && w.email.toLowerCase() === email);
-
-        const cardBurgeroov = document.querySelector('.burgeroov-card');
-        const cardMvc = document.querySelector('.mvc-card');
-        const cardMvcFresh = document.querySelector('.mvcfresh-card');
-
-        if (cardBurgeroov) cardBurgeroov.style.display = inBurgeroov ? 'block' : 'none';
-        if (cardMvc) cardMvc.style.display = inMvc ? 'block' : 'none';
-        if (cardMvcFresh) cardMvcFresh.style.display = inMvcFresh ? 'block' : 'none';
-
-        if (overlay) overlay.style.display = 'none';
-
-        const activeCompanies = [];
-        if (inBurgeroov) activeCompanies.push('burgeroov');
-        if (inMvc) activeCompanies.push('mvc');
-        if (inMvcFresh) activeCompanies.push('mvcfresh');
-
-        window.isMultiCompany = activeCompanies.length > 1;
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const queryCompany = urlParams.get('companyId');
-        const queryTab = urlParams.get('tab');
-
-        let chosenCompany = null;
-        if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc' || queryCompany === 'mvcfresh')) {
-            if ((queryCompany === 'mvc' && inMvc) ||
-                (queryCompany === 'burgeroov' && inBurgeroov) ||
-                (queryCompany === 'mvcfresh' && inMvcFresh)) {
-                chosenCompany = queryCompany;
-            }
-        }
-
-        if (chosenCompany) {
-            selectCompany(chosenCompany);
-            if (queryTab) {
-                setTimeout(() => {
-                    switchTab(queryTab);
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                }, 500);
-            } else {
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }
-        } else {
-            const savedCompany = localStorage.getItem('selected_company');
-            if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
-                if ((savedCompany === 'mvc' && inMvc) ||
-                    (savedCompany === 'burgeroov' && inBurgeroov) ||
-                    (savedCompany === 'mvcfresh' && inMvcFresh)) {
-                    selectCompany(savedCompany);
-                    return;
-                }
-            }
-            if (activeCompanies.length > 1) {
-                showCompanySelectionHUD();
-            } else if (activeCompanies.length === 1) {
-                selectCompany(activeCompanies[0]);
-            } else {
-                showUnassignedOverlay(email);
-            }
-        }
-    } catch (error) {
-        console.error("Error processing logged in user companies:", error);
-    }
-}
-
-auth.onAuthStateChanged(async (user) => {
+    const appWrapper = document.getElementById('app-wrapper');
     const launchLoader = document.getElementById('launch-loader-overlay');
+
     if (launchLoader) launchLoader.style.display = 'none';
 
     if (user) {
-        processLoggedInUser(user.email);
+        currentCustomerSession = null;
+        try {
+            localStorage.removeItem('mvc_customer_session');
+            localStorage.removeItem('mvc_customer_code');
+        } catch (e) { }
+        currentUser = { email: user.email, uid: user.uid };
+        document.getElementById('display-user-email').textContent = currentUser.email;
+        startGlobalNotificationListeners(user.email);
+
+        document.getElementById('auth-loader').style.display = 'block';
+        document.getElementById('auth-btn').style.display = 'none';
+
+        const email = user.email.toLowerCase();
+
+        if (email === 'kinan.rahal@hotmail.com') {
+            document.getElementById('auth-loader').style.display = 'none';
+            document.getElementById('auth-btn').style.display = 'block';
+            overlay.style.display = 'none';
+
+            // Show all cards in selection overlay for super admin
+            const cardBurgeroov = document.querySelector('.burgeroov-card');
+            const cardMvc = document.querySelector('.mvc-card');
+            const cardMvcFresh = document.querySelector('.mvcfresh-card');
+            if (cardBurgeroov) cardBurgeroov.style.display = 'block';
+            if (cardMvc) cardMvc.style.display = 'block';
+            if (cardMvcFresh) cardMvcFresh.style.display = 'block';
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const queryCompany = urlParams.get('companyId');
+            const queryTab = urlParams.get('tab');
+
+            if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc' || queryCompany === 'mvcfresh')) {
+                selectCompany(queryCompany);
+                if (queryTab) {
+                    setTimeout(() => {
+                        switchTab(queryTab);
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }, 500);
+                } else {
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+            } else {
+                const savedCompany = localStorage.getItem('selected_company');
+                if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
+                    selectCompany(savedCompany);
+                } else {
+                    showCompanySelectionHUD();
+                }
+            }
+        } else {
+            // Check databases for worker membership
+            const sanitizedEmail = email.replace(/\./g, ',');
+            Promise.all([
+                db.ref('companies/burgeroov/admins').once('value').catch(() => null),
+                db.ref('companies/burgeroov/workers').once('value').catch(() => null),
+                db.ref('companies/mvc/admins').once('value').catch(() => null),
+                db.ref('companies/mvc/workers').once('value').catch(() => null),
+                db.ref('companies/mvcfresh/admins').once('value').catch(() => null),
+                db.ref('companies/mvcfresh/workers').once('value').catch(() => null),
+                db.ref(`customerCodes/workerPasswords/${sanitizedEmail}`).once('value').catch(() => null),
+                db.ref(`customerCodes/workerAccess/${sanitizedEmail}`).once('value').catch(() => null)
+            ]).then(([bgAdmins, bgWorkers, mvcAdmins, mvcWorkers, freshAdmins, freshWorkers, pwdSnap, accessSnap]) => {
+                document.getElementById('auth-loader').style.display = 'none';
+                document.getElementById('auth-btn').style.display = 'block';
+
+                const burgeroovAdmins = parseAdminsSnap(bgAdmins);
+                const burgeroovWorkers = parseWorkersSnap(bgWorkers);
+
+                const mvcAdminsList = parseAdminsSnap(mvcAdmins);
+                const mvcWorkersList = parseWorkersSnap(mvcWorkers);
+
+                const mvcfreshAdminsList = parseAdminsSnap(freshAdmins);
+                const mvcfreshWorkersList = parseWorkersSnap(freshWorkers);
+
+                let targetWorkerId = null;
+                if (pwdSnap && pwdSnap.exists() && pwdSnap.val()) {
+                    const pwdVal = pwdSnap.val();
+                    if (pwdVal.workerId) {
+                        targetWorkerId = pwdVal.workerId;
+                        try { localStorage.setItem('mvc_worker_id_' + sanitizedEmail, targetWorkerId); } catch (e) { }
+                    }
+                }
+                if (!targetWorkerId && typeof localStorage !== 'undefined') {
+                    targetWorkerId = localStorage.getItem('mvc_worker_id_' + sanitizedEmail);
+                }
+
+                let inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
+                    (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(burgeroovWorkers, email, targetWorkerId) : burgeroovWorkers.some(w => w && w.email && w.email.toLowerCase() === email));
+
+                let inMvc = mvcAdminsList[sanitizedEmail] === true ||
+                    (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(mvcWorkersList, email, targetWorkerId) : mvcWorkersList.some(w => w && w.email && w.email.toLowerCase() === email));
+
+                let inMvcFresh = mvcfreshAdminsList[sanitizedEmail] === true ||
+                    (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(mvcfreshWorkersList, email, targetWorkerId) : mvcfreshWorkersList.some(w => w && w.email && w.email.toLowerCase() === email));
+
+                if (accessSnap && accessSnap.exists() && accessSnap.val()) {
+                    const acc = accessSnap.val();
+                    if (acc.burgeroov === true) inBurgeroov = true;
+                    if (acc.mvc === true) inMvc = true;
+                    if (acc.mvcfresh === true) inMvcFresh = true;
+                }
+
+                if (pwdSnap && pwdSnap.exists() && pwdSnap.val() && pwdSnap.val().company) {
+                    const assignedComp = pwdSnap.val().company;
+                    if (assignedComp === 'burgeroov') inBurgeroov = true;
+                    if (assignedComp === 'mvc') inMvc = true;
+                    if (assignedComp === 'mvcfresh') inMvcFresh = true;
+                }
+
+                // Update selector cards display based on assigned status
+                const cardBurgeroov = document.querySelector('.burgeroov-card');
+                const cardMvc = document.querySelector('.mvc-card');
+                const cardMvcFresh = document.querySelector('.mvcfresh-card');
+
+                if (cardBurgeroov) cardBurgeroov.style.display = inBurgeroov ? 'block' : 'none';
+                if (cardMvc) cardMvc.style.display = inMvc ? 'block' : 'none';
+                if (cardMvcFresh) cardMvcFresh.style.display = inMvcFresh ? 'block' : 'none';
+
+                overlay.style.display = 'none';
+
+                const activeCompanies = [];
+                if (inBurgeroov) activeCompanies.push('burgeroov');
+                if (inMvc) activeCompanies.push('mvc');
+                if (inMvcFresh) activeCompanies.push('mvcfresh');
+
+                window.userActiveCompanies = activeCompanies;
+                window.isMultiCompany = activeCompanies.length > 1;
+
+                const locationSearch = (typeof window !== 'undefined' && window.location && window.location.search) ? window.location.search : '';
+                const urlParams = new URLSearchParams(locationSearch);
+                const queryCompany = urlParams.get('companyId');
+                const queryTab = urlParams.get('tab');
+
+                let chosenCompany = null;
+                if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc' || queryCompany === 'mvcfresh')) {
+                    if ((queryCompany === 'mvc' && inMvc) ||
+                        (queryCompany === 'burgeroov' && inBurgeroov) ||
+                        (queryCompany === 'mvcfresh' && inMvcFresh)) {
+                        chosenCompany = queryCompany;
+                    }
+                }
+
+                if (chosenCompany) {
+                    selectCompany(chosenCompany);
+                    if (queryTab) {
+                        setTimeout(() => {
+                            switchTab(queryTab);
+                            window.history.replaceState({}, document.title, window.location.pathname);
+                        }, 500);
+                    } else {
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                } else {
+                    const savedCompany = localStorage.getItem('selected_company');
+                    if (savedCompany && activeCompanies.includes(savedCompany)) {
+                        selectCompany(savedCompany);
+                        return;
+                    }
+                    if (activeCompanies.length > 1) {
+                        showCompanySelectionHUD();
+                    } else if (activeCompanies.length === 1) {
+                        selectCompany(activeCompanies[0]);
+                    } else {
+                        showUnassignedOverlay(user.email);
+                    }
+                }
+            }).catch((error) => {
+                console.error("Error checking company access:", error);
+                document.getElementById('auth-loader').style.display = 'none';
+                document.getElementById('auth-btn').style.display = 'block';
+
+                overlay.style.display = 'none';
+                const savedCompany = localStorage.getItem('selected_company');
+                if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
+                    selectCompany(savedCompany);
+                } else {
+                    showCompanySelectionHUD();
+                }
+            });
+        }
     } else {
         currentUser = null;
         if (currentCustomerSession) {
@@ -977,17 +1102,11 @@ auth.onAuthStateChanged(async (user) => {
         });
         notificationListeners = {};
 
-        const overlay = document.getElementById('auth-overlay');
-        const appWrapper = document.getElementById('app-wrapper');
-        const loader = document.getElementById('auth-loader');
-        const btn = document.getElementById('auth-btn');
-        const compOverlay = document.getElementById('company-selection-overlay');
-
-        if (loader) loader.style.display = 'none';
-        if (btn) btn.style.display = 'block';
-        if (overlay) overlay.style.display = 'flex';
-        if (appWrapper) appWrapper.style.display = 'none';
-        if (compOverlay) compOverlay.style.display = 'none';
+        document.getElementById('auth-loader').style.display = 'none';
+        document.getElementById('auth-btn').style.display = 'block';
+        overlay.style.display = 'flex';
+        appWrapper.style.display = 'none';
+        document.getElementById('company-selection-overlay').style.display = 'none';
 
         if (window.companyListenerRef) {
             window.companyListenerRef.off();
@@ -1044,8 +1163,10 @@ function checkUnassignedUserAccess(isManualTrigger = false) {
         db.ref('companies/mvc/admins').once('value').catch(() => null),
         db.ref('companies/mvc/workers').once('value').catch(() => null),
         db.ref('companies/mvcfresh/admins').once('value').catch(() => null),
-        db.ref('companies/mvcfresh/workers').once('value').catch(() => null)
-    ]).then(([bgAdmins, bgWorkers, mvcAdmins, mvcWorkers, freshAdmins, freshWorkers]) => {
+        db.ref('companies/mvcfresh/workers').once('value').catch(() => null),
+        db.ref(`customerCodes/workerPasswords/${sanitizedEmail}`).once('value').catch(() => null),
+        db.ref(`customerCodes/workerAccess/${sanitizedEmail}`).once('value').catch(() => null)
+    ]).then(([bgAdmins, bgWorkers, mvcAdmins, mvcWorkers, freshAdmins, freshWorkers, pwdSnap, accessSnap]) => {
         const burgeroovAdmins = parseAdminsSnap(bgAdmins);
         const burgeroovWorkers = parseWorkersSnap(bgWorkers);
 
@@ -1055,19 +1176,47 @@ function checkUnassignedUserAccess(isManualTrigger = false) {
         const mvcfreshAdminsList = parseAdminsSnap(freshAdmins);
         const mvcfreshWorkersList = parseWorkersSnap(freshWorkers);
 
-        const inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
-            burgeroovWorkers.some(w => w && w.email && w.email.toLowerCase() === email);
+        let targetWorkerId = null;
+        if (pwdSnap && pwdSnap.exists() && pwdSnap.val()) {
+            const pwdVal = pwdSnap.val();
+            if (pwdVal.workerId) {
+                targetWorkerId = pwdVal.workerId;
+                try { localStorage.setItem('mvc_worker_id_' + sanitizedEmail, targetWorkerId); } catch (e) { }
+            }
+        }
+        if (!targetWorkerId && typeof localStorage !== 'undefined') {
+            targetWorkerId = localStorage.getItem('mvc_worker_id_' + sanitizedEmail);
+        }
 
-        const inMvc = mvcAdminsList[sanitizedEmail] === true ||
-            mvcWorkersList.some(w => w && w.email && w.email.toLowerCase() === email);
+        let inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
+            (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(burgeroovWorkers, email, targetWorkerId) : burgeroovWorkers.some(w => w && w.email && w.email.toLowerCase() === email));
 
-        const inMvcFresh = mvcfreshAdminsList[sanitizedEmail] === true ||
-            mvcfreshWorkersList.some(w => w && w.email && w.email.toLowerCase() === email);
+        let inMvc = mvcAdminsList[sanitizedEmail] === true ||
+            (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(mvcWorkersList, email, targetWorkerId) : mvcWorkersList.some(w => w && w.email && w.email.toLowerCase() === email));
+
+        let inMvcFresh = mvcfreshAdminsList[sanitizedEmail] === true ||
+            (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(mvcfreshWorkersList, email, targetWorkerId) : mvcfreshWorkersList.some(w => w && w.email && w.email.toLowerCase() === email));
+
+        if (accessSnap && accessSnap.exists() && accessSnap.val()) {
+            const acc = accessSnap.val();
+            if (acc.burgeroov === true) inBurgeroov = true;
+            if (acc.mvc === true) inMvc = true;
+            if (acc.mvcfresh === true) inMvcFresh = true;
+        }
+
+        if (pwdSnap && pwdSnap.exists() && pwdSnap.val() && pwdSnap.val().company) {
+            const assignedComp = pwdSnap.val().company;
+            if (assignedComp === 'burgeroov') inBurgeroov = true;
+            if (assignedComp === 'mvc') inMvc = true;
+            if (assignedComp === 'mvcfresh') inMvcFresh = true;
+        }
 
         const activeCompanies = [];
         if (inBurgeroov) activeCompanies.push('burgeroov');
         if (inMvc) activeCompanies.push('mvc');
         if (inMvcFresh) activeCompanies.push('mvcfresh');
+
+        window.userActiveCompanies = activeCompanies;
 
         if (activeCompanies.length > 0) {
             hideUnassignedOverlay();
@@ -1099,16 +1248,16 @@ function toggleAuthMode() {
     authMode = window.authMode;
     const isAr = currentAppLang === 'ar';
 
-    document.getElementById('auth-title').textContent = authMode === 'login' 
-        ? (t('auth-title-login') || 'Login to Dashboard') 
+    document.getElementById('auth-title').textContent = authMode === 'login'
+        ? (t('auth-title-login') || 'Login to Dashboard')
         : (t('auth-title-signup') || 'Create Viewer Account');
-        
-    document.getElementById('auth-btn').textContent = authMode === 'login' 
-        ? (t('btn-signin') || 'Sign In') 
+
+    document.getElementById('auth-btn').textContent = authMode === 'login'
+        ? (t('btn-signin') || 'Sign In')
         : (t('btn-signup') || 'Sign Up');
 
-    document.getElementById('auth-toggle-text').textContent = authMode === 'login' 
-        ? (t('link-signup') || 'Sign Up') 
+    document.getElementById('auth-toggle-text').textContent = authMode === 'login'
+        ? (t('link-signup') || 'Sign Up')
         : (t('btn-signin') || 'Sign In');
 
     const confirmWrapper = document.getElementById('auth-confirm-password-wrapper');
@@ -1118,15 +1267,15 @@ function toggleAuthMode() {
     document.getElementById('auth-error-msg').style.display = 'none';
 }
 
-async function handleAuthSubmit() {
+function handleAuthSubmit() {
     const activeAuthMode = typeof authMode !== 'undefined' ? authMode : (window.authMode || 'login');
-    const emailInput = document.getElementById('auth-email').value.trim().toLowerCase();
-    const passwordInput = document.getElementById('auth-password').value.trim();
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value.trim();
     const errorMsg = document.getElementById('auth-error-msg');
     const btn = document.getElementById('auth-btn');
     const loader = document.getElementById('auth-loader');
 
-    if (!emailInput || !passwordInput) {
+    if (!email || !password) {
         errorMsg.style.color = "var(--danger)";
         errorMsg.textContent = currentAppLang === 'ar' ? "الرجاء إدخال البريد الإلكتروني وكلمة المرور." : "Please enter email and password.";
         errorMsg.style.display = 'block'; return;
@@ -1134,7 +1283,7 @@ async function handleAuthSubmit() {
 
     if (activeAuthMode === 'signup') {
         const confirmPassword = document.getElementById('auth-confirm-password').value.trim();
-        if (passwordInput !== confirmPassword) {
+        if (password !== confirmPassword) {
             errorMsg.style.color = "var(--danger)";
             errorMsg.textContent = currentAppLang === 'ar' ? "كلمتا المرور غير متطابقتين." : "Passwords do not match.";
             errorMsg.style.display = 'block';
@@ -1146,108 +1295,9 @@ async function handleAuthSubmit() {
     loader.style.display = 'block';
     errorMsg.style.display = 'none';
 
-    window.lastAttemptedLoginPassword = passwordInput;
-    window.lastAttemptedLoginEmail = emailInput;
-
     if (activeAuthMode === 'login') {
-        const emailKey = emailInput.replace(/\./g, ',');
-        let customWorkerPassword = null;
-
-        // Step 1: Check customerCodes workerPasswords node (publicly readable per Firebase Rules)
-        if (typeof db !== 'undefined' && db) {
-            try {
-                const snap = await db.ref(`customerCodes/workerPasswords/${emailKey}`).once('value');
-                if (snap.exists() && snap.val() && snap.val().password) {
-                    customWorkerPassword = snap.val().password;
-                }
-            } catch(e){}
-        }
-
-        // Step 2: Check localStorage cache
-        if (!customWorkerPassword) {
-            try {
-                const cachedPwd = localStorage.getItem('mvc_worker_pwd_' + emailKey);
-                if (cachedPwd) customWorkerPassword = cachedPwd;
-            } catch(e){}
-        }
-
-        // Step 3: Check globalWorkerPasswords node
-        if (!customWorkerPassword && typeof db !== 'undefined' && db) {
-            try {
-                const snap = await db.ref(`globalWorkerPasswords/${emailKey}`).once('value');
-                if (snap.exists() && snap.val() && snap.val().password) {
-                    customWorkerPassword = snap.val().password;
-                    try { localStorage.setItem('mvc_worker_pwd_' + emailKey, customWorkerPassword); } catch(e){}
-                }
-            } catch(e){}
-        }
-
-        // Step 3: Check companies nodes
-        if (!customWorkerPassword && typeof db !== 'undefined' && db) {
-            try {
-                const companyKeys = ['burgeroov', 'mvc', 'mvcfresh'];
-                for (const cKey of companyKeys) {
-                    const snap = await db.ref(`companies/${cKey}/workerPasswords/${emailKey}`).once('value');
-                    if (snap.exists() && snap.val() && snap.val().password) {
-                        customWorkerPassword = snap.val().password;
-                        try { localStorage.setItem('mvc_worker_pwd_' + emailKey, customWorkerPassword); } catch(e){}
-                        break;
-                    }
-                }
-            } catch(e){}
-        }
-
-        // Step 4: Check in-memory workers array if available
-        if (!customWorkerPassword && typeof getCompanyData === 'function') {
-            try {
-                const companyData = getCompanyData();
-                if (companyData && companyData.workers) {
-                    const w = companyData.workers.find(w => w && w.email && w.email.toLowerCase() === emailInput);
-                    if (w && w.password) {
-                        customWorkerPassword = w.password;
-                    }
-                }
-            } catch(e){}
-        }
-
-        // CRITICAL SECURITY ENFORCEMENT:
-        // If an Admin password exists for this account, ONLY ACCEPT the matching custom password!
-        if (customWorkerPassword) {
-            if (passwordInput !== customWorkerPassword) {
-                btn.style.display = 'block';
-                loader.style.display = 'none';
-                errorMsg.style.color = "var(--danger)";
-                errorMsg.textContent = currentAppLang === 'ar' 
-                    ? "❌ كلمة المرور غير صحيحة. قام المدير بتغيير كلمة المرور الخاصة بحسابك، يرجى استخدام كلمة المرور الجديدة." 
-                    : "❌ Incorrect password. Admin has updated the password for your account. Please use the new password.";
-                errorMsg.style.display = 'block';
-                return; // STOP EXECUTION IMMEDIATELY! Do NOT call Firebase Auth!
-            }
-        }
-
-        // Attempt Firebase Auth sign-in
-        auth.signInWithEmailAndPassword(emailInput, passwordInput)
-            .catch(async (error) => {
-                // If worker entered the correct Admin-assigned password despite Firebase Auth rejecting or rate-limiting
-                let isWorkerAuthorized = false;
-                if (customWorkerPassword && passwordInput === customWorkerPassword) {
-                    isWorkerAuthorized = true;
-                }
-
-                if (isWorkerAuthorized) {
-                    // Try creating Firebase Auth user if account doesn't exist
-                    try {
-                        const createRes = await auth.createUserWithEmailAndPassword(emailInput, passwordInput);
-                        if (createRes && createRes.user) return;
-                    } catch(createErr) {}
-
-                    // Fallback: process user companies, permissions and UI cleanly
-                    processLoggedInUser(emailInput);
-                    btn.style.display = 'block';
-                    loader.style.display = 'none';
-                    return;
-                }
-
+        auth.signInWithEmailAndPassword(email, password)
+            .catch(error => {
                 btn.style.display = 'block';
                 loader.style.display = 'none';
                 errorMsg.style.color = "var(--danger)";
@@ -1255,7 +1305,7 @@ async function handleAuthSubmit() {
                 errorMsg.style.display = 'block';
             });
     } else {
-        auth.createUserWithEmailAndPassword(emailInput, passwordInput)
+        auth.createUserWithEmailAndPassword(email, password)
             .catch(error => {
                 btn.style.display = 'block';
                 loader.style.display = 'none';
@@ -1269,40 +1319,11 @@ async function handleAuthSubmit() {
 function logout() {
     hideUnassignedOverlay();
     localStorage.removeItem('selected_company');
-    localStorage.removeItem('mvc_user_email');
-    localStorage.removeItem('mvc_user_role');
-    window.currentAppUser = null;
-    currentUser = null;
-
     if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession) {
         logoutCustomerSession();
+        return;
     }
-    try {
-        if (auth && typeof auth.signOut === 'function') {
-            auth.signOut();
-        }
-    } catch(e){}
-
-    const overlay = document.getElementById('auth-overlay');
-    if (overlay) overlay.style.display = 'flex';
-
-    const authContainer = document.getElementById('auth-container');
-    if (authContainer) authContainer.style.display = 'block';
-    
-    const mainDashboard = document.getElementById('main-dashboard');
-    if (mainDashboard) mainDashboard.style.display = 'none';
-
-    const companyHud = document.getElementById('company-selection-hud');
-    if (companyHud) companyHud.style.display = 'none';
-
-    const pwdInput = document.getElementById('password');
-    if (pwdInput) pwdInput.value = '';
-
-    const authLoader = document.getElementById('auth-loader');
-    if (authLoader) authLoader.style.display = 'none';
-
-    const authBtn = document.getElementById('auth-btn');
-    if (authBtn) authBtn.style.display = 'block';
+    auth.signOut();
 }
 
 // --- ROLE BASED ACCESS CONTROL (RBAC) ---
@@ -1688,7 +1709,8 @@ function listenToCloudData() {
         renderAll();
         checkStockAlerts();
     }, (error) => {
-        console.warn("Database listener notice (Rules / Permission):", error);
+        console.error("Error listening to database:", error);
+        alert("Database connection error. Ensure your Firebase Rules are set to true.");
     });
 }
 
@@ -5160,6 +5182,9 @@ function checkStockAlerts() {
 }
 
 function renderWarehouse() {
+    if (typeof checkStockAlerts === 'function') {
+        checkStockAlerts();
+    }
     renderWhFolders(); // Render the folder manager UI first
 
     const list = document.getElementById('warehouse-list'); list.innerHTML = '';
@@ -5596,15 +5621,15 @@ document.addEventListener('keydown', function (e) {
 function getMonthlyStats(worker, monthStr) {
     if (!worker.monthlyStats) worker.monthlyStats = {};
     if (!worker.monthlyStats[monthStr]) {
-        worker.monthlyStats[monthStr] = { 
-            custodyList: [], 
-            violationsList: [], 
-            rewardsList: [], 
-            costs: 0, 
-            paymentsList: [], 
-            deliveriesList: [], 
+        worker.monthlyStats[monthStr] = {
+            custodyList: [],
+            violationsList: [],
+            rewardsList: [],
+            costs: 0,
+            paymentsList: [],
+            deliveriesList: [],
             legacyDeliveries: 0,
-            overtimeList: [] 
+            overtimeList: []
         };
     } else if (!worker.monthlyStats[monthStr].overtimeList) {
         worker.monthlyStats[monthStr].overtimeList = [];
@@ -6495,9 +6520,9 @@ function getVisibleWorkers() {
     const activeWorker = getActiveWorker();
 
     // Check if worker has task access (perm-tasks class on body or perms object or currentUser perms)
-    const hasTaskAccess = document.body.classList.contains('perm-tasks') || 
-                          (activeWorker && activeWorker.perms && (activeWorker.perms.tasks === true || activeWorker.perms.tasks === 'true')) ||
-                          (currentUser && currentUser.perms && (currentUser.perms.tasks === true || currentUser.perms.tasks === 'true'));
+    const hasTaskAccess = document.body.classList.contains('perm-tasks') ||
+        (activeWorker && activeWorker.perms && (activeWorker.perms.tasks === true || activeWorker.perms.tasks === 'true')) ||
+        (currentUser && currentUser.perms && (currentUser.perms.tasks === true || currentUser.perms.tasks === 'true'));
 
     if (hasTaskAccess || !activeWorker) {
         return allWorkers;
@@ -8639,9 +8664,6 @@ function renderAll() {
         if (typeof renderSelectedWorkerSysViolations === 'function') {
             renderSelectedWorkerSysViolations();
         }
-        if (typeof renderWorkerLoginTable === 'function') {
-            renderWorkerLoginTable();
-        }
     }
     else if (currentTab === 'ranks') { renderRanksTable(); }
     else if (currentTab === 'attendance') { renderAttendance(); }
@@ -8756,10 +8778,10 @@ function renderWorkerViolationPanel() {
 }
 
 function renderBranches() {
-    const list = document.getElementById('branches-list'); 
+    const list = document.getElementById('branches-list');
     const select = document.getElementById('w-branch');
     const editSelect = document.getElementById('ops-edit-branch');
-    list.innerHTML = ''; 
+    list.innerHTML = '';
     select.innerHTML = '';
     if (editSelect) editSelect.innerHTML = '';
     getCompanyData().branches.forEach(branch => {
@@ -8767,7 +8789,7 @@ function renderBranches() {
         li.innerHTML = `<span style="font-weight: 500; color: var(--text-main);">${branch}</span> <button class="btn-outline-danger admin-only" style="padding: 4px 10px; font-size: 0.75rem;" onclick="deleteBranch('${branch}')">Remove</button>`;
         list.appendChild(li);
         const option = document.createElement('option'); option.value = branch; option.textContent = branch; select.appendChild(option);
-        
+
         if (editSelect) {
             const editOption = document.createElement('option');
             editOption.value = branch;
@@ -8889,7 +8911,7 @@ function renderOpsDetails() {
                 const div = document.createElement('div');
                 div.className = 'flex-between list-item';
                 div.style.cssText = 'background:var(--input-bg); padding:10px; border-radius:8px; border:1px solid var(--border-color);';
-                
+
                 let statusText = '';
                 if (s.dayOfWeek) {
                     statusText = `<span class="badge" style="background:#f59e0b; color:white; margin:0;">${isAr ? translateDynamicTerm(s.dayOfWeek) : 'Override: ' + s.dayOfWeek}</span>`;
@@ -8899,7 +8921,7 @@ function renderOpsDetails() {
                     statusText = s.active ? `<span class="badge badge-good" style="margin:0;">Active</span>` : `<button onclick="activateWorkerShift('${s.id}')" class="btn-outline-info" style="padding:4px 8px; font-size:0.75rem;">Activate</button>`;
                 }
                 let delBtn = `<button onclick="deleteWorkerShift('${s.id}')" class="btn-outline-danger" style="padding:4px 8px; font-size:0.75rem; border:none; text-decoration:underline;">Delete</button>`;
-                
+
                 div.innerHTML = `
                     <div>
                         <strong style="color:var(--text-main);">🕒 ${s.startTime} - ${s.endTime}</strong>
@@ -8920,7 +8942,7 @@ function renderOpsDetails() {
     const duration = getShiftDurationHours(worker.startTime, worker.endTime);
     const baseIncome = parseFloat(worker.income) || 0;
     const hourlyRate = baseIncome / (30 * duration);
-    
+
     if (durationEl) durationEl.textContent = `${duration.toFixed(1)} hrs`;
     if (hourlyRateEl) hourlyRateEl.textContent = `SAR ${hourlyRate.toFixed(2)}/hr`;
 
@@ -8937,7 +8959,7 @@ function renderOpsDetails() {
                 const div = document.createElement('div');
                 div.className = 'flex-between list-item';
                 div.style.cssText = 'background:var(--input-bg); padding:10px; border-radius:8px; border:1px solid var(--border-color);';
-                
+
                 div.innerHTML = `
                     <div>
                         <strong style="color:var(--text-main);">🕒 ${o.hours} hr (x${o.multiplier})</strong><br>
@@ -9093,7 +9115,7 @@ function renderFinDetails() {
     document.getElementById('fin-display-summary-custody').textContent = totalCustody.toLocaleString();
     document.getElementById('fin-display-custody').textContent = totalCustody.toLocaleString();
     document.getElementById('fin-display-total-viol').textContent = totalViolations.toLocaleString();
-    
+
     const displayOvertime = document.getElementById('fin-display-overtime');
     if (displayOvertime) displayOvertime.textContent = totalOvertime.toLocaleString();
 
@@ -9523,7 +9545,7 @@ function renderSummaryTable() {
             });
         }
         const outstandingCustody = custodyTaken - custodyReturned;
-        const custodyStatusHtml = outstandingCustody > 0 
+        const custodyStatusHtml = outstandingCustody > 0
             ? `<div style="color:#b45309; font-weight:700; font-size:0.85rem; text-align:center; background:#fffbeb; border:1px solid #fef3c7; padding:6px; border-radius:6px; margin-bottom:12px;">⏳ ${isAr ? 'مستحق الإرجاع:' : 'Outstanding to Return:'} SAR ${outstandingCustody.toLocaleString()}</div>`
             : `<div style="color:var(--success); font-weight:700; font-size:0.85rem; text-align:center; background:var(--success-bg); border:1px solid var(--success-border); padding:6px; border-radius:6px; margin-bottom:12px;">✅ ${isAr ? 'تمت إعادة الجميع' : 'All Returned'}</div>`;
 
@@ -9994,8 +10016,8 @@ function submitPaymentRequest() {
             const remainingDays = Math.floor(remainingMs / (24 * 60 * 60 * 1000));
             const remainingHours = Math.floor((remainingMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
             const timeMsg = isAr ? `${remainingDays} يوم و ${remainingHours} ساعة` : `${remainingDays}d ${remainingHours}h`;
-            alert(isAr 
-                ? `عذراً، يجب الانتظار لمدة أسبوع واحد (7 أيام) بين كل طلب دفع وآخر. الوقت المتبقي: ${timeMsg}.` 
+            alert(isAr
+                ? `عذراً، يجب الانتظار لمدة أسبوع واحد (7 أيام) بين كل طلب دفع وآخر. الوقت المتبقي: ${timeMsg}.`
                 : `Sorry, you must wait 1 week (7 days) between payment requests. Time remaining: ${timeMsg}.`);
             return;
         }
@@ -10487,7 +10509,7 @@ function renderHighMoneyApprovals() {
     const pRequests = companyData.paymentRequests || {};
     let reqList = Object.values(pRequests).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     const approvalsListDiv = document.getElementById('high-money-approvals-list');
-    
+
     if (!approvalsListDiv) return;
     approvalsListDiv.innerHTML = '';
 
@@ -10984,27 +11006,27 @@ function setWorkerVacationStatus(markActive) {
             lateness: '',
             timestamp: Date.now()
         })
-        .then(() => {
-            logActivity('attendance', workerId, worker.name, `Marked attendance as VACATION for ${worker.name} on ${dateStr}`);
-            const mainDatePicker = document.getElementById('attendance-date-picker');
-            if (mainDatePicker && mainDatePicker.value === dateStr) {
-                renderAttendance();
-            }
-            alert(currentAppLang === 'ar' ? `تم تسجيل ${worker.name} في إجازة بنجاح!` : `Successfully marked ${worker.name} as on vacation!`);
-        })
-        .catch(err => console.error("Error setting attendance vacation:", err));
-    } else {
-        if (confirm(currentAppLang === 'ar' ? `هل تريد إزالة حالة الإجازة لـ ${worker.name} في ${dateStr}؟` : `Do you want to remove vacation status for ${worker.name} on ${dateStr}?`)) {
-            db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}`).remove()
             .then(() => {
-                logActivity('attendance_clear', workerId, worker.name, `Cleared attendance/vacation record for ${worker.name} on ${dateStr}`);
+                logActivity('attendance', workerId, worker.name, `Marked attendance as VACATION for ${worker.name} on ${dateStr}`);
                 const mainDatePicker = document.getElementById('attendance-date-picker');
                 if (mainDatePicker && mainDatePicker.value === dateStr) {
                     renderAttendance();
                 }
-                alert(currentAppLang === 'ar' ? 'تمت إزالة الإجازة بنجاح!' : 'Vacation status removed successfully!');
+                alert(currentAppLang === 'ar' ? `تم تسجيل ${worker.name} في إجازة بنجاح!` : `Successfully marked ${worker.name} as on vacation!`);
             })
-            .catch(err => console.error("Error clearing attendance vacation:", err));
+            .catch(err => console.error("Error setting attendance vacation:", err));
+    } else {
+        if (confirm(currentAppLang === 'ar' ? `هل تريد إزالة حالة الإجازة لـ ${worker.name} في ${dateStr}؟` : `Do you want to remove vacation status for ${worker.name} on ${dateStr}?`)) {
+            db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}`).remove()
+                .then(() => {
+                    logActivity('attendance_clear', workerId, worker.name, `Cleared attendance/vacation record for ${worker.name} on ${dateStr}`);
+                    const mainDatePicker = document.getElementById('attendance-date-picker');
+                    if (mainDatePicker && mainDatePicker.value === dateStr) {
+                        renderAttendance();
+                    }
+                    alert(currentAppLang === 'ar' ? 'تمت إزالة الإجازة بنجاح!' : 'Vacation status removed successfully!');
+                })
+                .catch(err => console.error("Error clearing attendance vacation:", err));
         }
     }
 }
@@ -11123,7 +11145,7 @@ function renderAttendance() {
             } else if (req.status === 'rejected') {
                 exitHtml = `<div style="font-size:0.75rem; color:#dc2626; font-weight:600; margin-top:4px;">🚪 Exit Rejected</div>`;
             } else if (req.status === 'returned') {
-                const retTimeStr = new Date(req.returnedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                const retTimeStr = new Date(req.returnedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 exitHtml = `<div style="font-size:0.75rem; color:var(--info); font-weight:600; margin-top:4px;">🚪 Out: ${req.time} - Back: ${retTimeStr}</div>`;
             }
         }
@@ -11199,24 +11221,24 @@ function renderAttendance() {
                 let statusText = '';
                 let statusColor = '';
                 if (req.status === 'pending') {
-                    statusText = isAr 
-                        ? `⏳ قيد الانتظار: طلب الخروج في ${req.time} (السبب: ${req.reason})` 
+                    statusText = isAr
+                        ? `⏳ قيد الانتظار: طلب الخروج في ${req.time} (السبب: ${req.reason})`
                         : `⏳ Pending: Exit requested for ${req.time} (Reason: ${req.reason})`;
                     statusColor = '#d97706';
                 } else if (req.status === 'approved') {
-                    statusText = isAr 
-                        ? `🟢 تمت الموافقة: يمكنك الخروج الآن. وقت الخروج المعتمد: ${req.time}` 
+                    statusText = isAr
+                        ? `🟢 تمت الموافقة: يمكنك الخروج الآن. وقت الخروج المعتمد: ${req.time}`
                         : `🟢 Approved: You may exit now. Out since ${req.time}`;
                     statusColor = 'var(--success)';
                 } else if (req.status === 'rejected') {
-                    statusText = isAr 
-                        ? `❌ تم الرفض: تم رفض طلب الخروج` 
+                    statusText = isAr
+                        ? `❌ تم الرفض: تم رفض طلب الخروج`
                         : `❌ Rejected: Exit request was rejected`;
                     statusColor = 'var(--danger)';
                 } else if (req.status === 'returned') {
-                    const retTimeStr = new Date(req.returnedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                    statusText = isAr 
-                        ? `✅ تمت العودة: عدت إلى العمل في ${retTimeStr}` 
+                    const retTimeStr = new Date(req.returnedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    statusText = isAr
+                        ? `✅ تمت العودة: عدت إلى العمل في ${retTimeStr}`
                         : `✅ Returned: Checked back in at ${retTimeStr}`;
                     statusColor = 'var(--info)';
                 }
@@ -12133,7 +12155,7 @@ function addNewWorkerShift() {
         document.getElementById('ops-new-shift-start').value = '';
         document.getElementById('ops-new-shift-end').value = '';
         if (document.getElementById('ops-new-shift-day')) document.getElementById('ops-new-shift-day').value = '';
-        const activityMsg = dayOfWeek 
+        const activityMsg = dayOfWeek
             ? `Added new override shift for ${dayOfWeek} (${startTime} - ${endTime}) for ${worker.name}`
             : `Added new shift (${startTime} - ${endTime}) for ${worker.name}`;
         logActivity('ops', worker.id, worker.name, activityMsg);
@@ -12408,7 +12430,7 @@ function releaseCustodyRequest(reqId) {
             const worker = getCompanyData().workers[workerIndex];
             const stats = getMonthlyStats(worker, currentGlobalMonth);
             if (!stats.custodyList) stats.custodyList = [];
-            
+
             stats.custodyList.unshift({
                 id: 'cust-' + Date.now(),
                 date: formatTimestamp(),
@@ -12739,10 +12761,10 @@ function renderAttendanceOvertimeDetails() {
 
     const baseIncome = parseFloat(worker.income) || 0;
     const duration = getShiftDurationHours(worker.startTime, worker.endTime);
-    
+
     const durationEl = document.getElementById('att-ov-shift-duration');
     const hourlyRateEl = document.getElementById('att-ov-hourly-rate');
-    
+
     const hourlyRate = baseIncome / (30 * duration);
 
     if (durationEl) durationEl.textContent = `${duration.toFixed(1)} hrs`;
@@ -12864,7 +12886,7 @@ function addLateRule() {
 
     const companyData = getCompanyData();
     const rules = companyData.lateRules || [];
-    
+
     // Add rule and sort ascending by minutes
     rules.push({ mins, penalty });
     rules.sort((a, b) => a.mins - b.mins);
@@ -12974,15 +12996,15 @@ function markWorkerSelfAttendance() {
         lateness: lateness || '',
         timestamp: Date.now()
     })
-    .then(() => {
-        logActivity('attendance', worker.id, worker.name, `Worker Self Checked-In as PRESENT on ${dateStr} at ${checkTime} (Lateness: ${lateness || 'None'})`);
-        alert(currentAppLang === 'ar' ? 'تم تسجيل حضورك بنجاح!' : 'You have checked in successfully!');
-        renderAll();
-    })
-    .catch(err => {
-        console.error("Error during self check-in:", err);
-        alert("Error: " + err.message);
-    });
+        .then(() => {
+            logActivity('attendance', worker.id, worker.name, `Worker Self Checked-In as PRESENT on ${dateStr} at ${checkTime} (Lateness: ${lateness || 'None'})`);
+            alert(currentAppLang === 'ar' ? 'تم تسجيل حضورك بنجاح!' : 'You have checked in successfully!');
+            renderAll();
+        })
+        .catch(err => {
+            console.error("Error during self check-in:", err);
+            alert("Error: " + err.message);
+        });
 }
 
 function renderTaskGroups() {
@@ -13003,7 +13025,7 @@ function renderTaskGroups() {
     groups.forEach((group, idx) => {
         // Find current members of this group
         const groupMembers = (group.members || []).map(mId => workers.find(w => w.id === mId)).filter(Boolean);
-        
+
         let membersHtml = '';
         if (groupMembers.length === 0) {
             membersHtml = `<div style="font-size:0.75rem; color:var(--text-muted); padding: 4px 0;">${isAr ? 'لا يوجد أعضاء' : 'No members'}</div>`;
@@ -13061,7 +13083,7 @@ function createTaskGroup() {
 
     const companyData = getCompanyData();
     const groups = companyData.taskGroups || [];
-    
+
     // Check if group already exists
     if (groups.some(g => g.name.toLowerCase() === name.toLowerCase())) {
         alert(currentAppLang === 'ar' ? 'هذه المجموعة موجودة بالفعل!' : 'Group already exists!');
@@ -13180,7 +13202,7 @@ function switchSalesForm(formId) {
     containers.forEach(id => {
         const el = document.getElementById(`form-${id}-container`);
         if (el) el.style.display = 'none';
-        
+
         const btn = document.getElementById(`btn-sales-tab-${id}`);
         if (btn) {
             btn.classList.remove('active');
@@ -13382,7 +13404,7 @@ function applyUserTabOrder() {
             .then(snapshot => {
                 const val = snapshot.val();
                 if (val && Array.isArray(val)) {
-                    try { localStorage.setItem(storageKey, JSON.stringify(val)); } catch (e) {}
+                    try { localStorage.setItem(storageKey, JSON.stringify(val)); } catch (e) { }
                     reorderTabContainer(container, val);
                 }
             }).catch(e => console.error(e));
@@ -13415,7 +13437,7 @@ function showWorkerPaymentHistory(identifier) {
     // Filter for this worker's requests where money was received (status given or get_paid)
     const workerGivenReqs = reqList.filter(r => {
         const matchesWorker = (r.workerEmail && r.workerEmail.toLowerCase() === identifier.toLowerCase()) ||
-                              (r.workerName && r.workerName.toLowerCase() === identifier.toLowerCase());
+            (r.workerName && r.workerName.toLowerCase() === identifier.toLowerCase());
         const isReceived = r.status === 'given' || r.status === 'get_paid';
         return matchesWorker && isReceived;
     }).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
@@ -13501,10 +13523,10 @@ function convertNoteToTask(rawText) {
     if (!rawText) return;
     const text = decodeURIComponent(rawText);
     const isAr = currentAppLang === 'ar';
-    
+
     // Switch to tasks tab
     switchTab('tasks');
-    
+
     // Pre-fill task assign input field
     setTimeout(() => {
         const input = document.getElementById('task-assign-input');
@@ -13683,8 +13705,8 @@ function renderReminders() {
     if (dueReminders.length > 0 && banner && bannerText) {
         banner.style.display = 'block';
         const dueTitles = dueReminders.map(r => `• ${r.title}`).join(', ');
-        bannerText.textContent = isAr 
-            ? `لديك (${dueReminders.length}) تذكيرات حان موعد التنبيه عليها: ${dueTitles}` 
+        bannerText.textContent = isAr
+            ? `لديك (${dueReminders.length}) تذكيرات حان موعد التنبيه عليها: ${dueTitles}`
             : `You have (${dueReminders.length}) reminders with active lead alerts: ${dueTitles}`;
     } else if (banner) {
         banner.style.display = 'none';
@@ -13815,8 +13837,8 @@ function completeReminderCycle(remId) {
     return db.ref(`companies/${currentCompany}/reminders/${remId}`).update(updates)
         .then(() => {
             const nextFormatted = formatReminderDate(nextDeadlineMs, nextDeadlineISO);
-            const msg = isAr 
-                ? `🎉 تم إنجاز الدورة بنجاح! الموعد القادم: ${nextFormatted}` 
+            const msg = isAr
+                ? `🎉 تم إنجاز الدورة بنجاح! الموعد القادم: ${nextFormatted}`
                 : `🎉 Cycle finished! Next reminder due: ${nextFormatted}`;
             if (typeof showInAppNotification === 'function') {
                 showInAppNotification(msg);
@@ -13867,7 +13889,7 @@ function openEditReminderModal(remId) {
 
     document.getElementById('edit-reminder-id').value = r.id;
     document.getElementById('edit-reminder-title').value = r.title || '';
-    
+
     if (r.deadlineISO) {
         document.getElementById('edit-reminder-deadline').value = r.deadlineISO;
     } else if (r.deadlineMs) {
@@ -14105,7 +14127,7 @@ function toggleMarketWishlist(productId) {
     }
     try {
         localStorage.setItem('mvc_market_wishlist', JSON.stringify(Array.from(marketWishlist)));
-    } catch (e) {}
+    } catch (e) { }
     renderMarket();
 }
 window.toggleMarketWishlist = toggleMarketWishlist;
@@ -14144,7 +14166,7 @@ function saveMarketCart() {
     try {
         const key = getMarketCartKey();
         localStorage.setItem(key, JSON.stringify(marketCart));
-    } catch (e) {}
+    } catch (e) { }
     updateMarketCartBadges();
 }
 window.saveMarketCart = saveMarketCart;
@@ -14213,8 +14235,8 @@ function refillMonthlyCoinsForAllCustomers() {
         return;
     }
 
-    if (!confirm(isAr 
-        ? `هل تريد إعادة تعبئة ${amount.toLocaleString()} من العملات لجميع العملاء المسجلين؟` 
+    if (!confirm(isAr
+        ? `هل تريد إعادة تعبئة ${amount.toLocaleString()} من العملات لجميع العملاء المسجلين؟`
         : `Refill ${amount.toLocaleString()} coins for all registered customers?`)) {
         return;
     }
@@ -14297,7 +14319,7 @@ function addTestCoins(amount = 500) {
         currentCustomerSession.coins = newCoins;
         try {
             localStorage.setItem('mvc_customer_session', JSON.stringify(currentCustomerSession));
-        } catch(e){}
+        } catch (e) { }
     } else {
         const workerId = getCurrentWorkerId();
         const data = getCompanyData();
@@ -14310,7 +14332,7 @@ function addTestCoins(amount = 500) {
         try {
             localStorage.setItem('mvc_admin_coins_' + workerId, newCoins);
             localStorage.setItem('mvc_admin_coins', newCoins);
-        } catch(e){}
+        } catch (e) { }
 
         updates[`companies/${currentCompany}/workers/${workerId}/coins`] = newCoins;
         updates[`companies/${currentCompany}/userCoins/${workerId}`] = newCoins;
@@ -14362,9 +14384,9 @@ function handleMarketImageUpload(event, mode) {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = function (e) {
         const img = new Image();
-        img.onload = function() {
+        img.onload = function () {
             const canvas = document.createElement('canvas');
             const maxDim = 400;
             let width = img.width;
@@ -14415,7 +14437,7 @@ try {
     if (savedMarketCache) {
         window.globalMarketProductsCache = JSON.parse(savedMarketCache) || {};
     }
-} catch(e) {}
+} catch (e) { }
 
 window.hasInitializedGlobalMarketListener = false;
 
@@ -14486,7 +14508,7 @@ function initGlobalMarketProductsListener() {
 
             try {
                 localStorage.setItem('mvc_cached_market_products', JSON.stringify(window.globalMarketProductsCache));
-            } catch(e){}
+            } catch (e) { }
 
             if (typeof renderMarket === 'function') {
                 renderMarket();
@@ -14567,10 +14589,10 @@ function getAllMarketProducts() {
             'companies/mvcfresh/marketProducts',
             'companies/burgeroov/marketProducts'
         ];
-        const fetchPromises = marketPaths.map(p => 
+        const fetchPromises = marketPaths.map(p =>
             db.ref(p).once('value')
-              .then(snap => snap.exists() ? snap.val() : null)
-              .catch(() => null)
+                .then(snap => snap.exists() ? snap.val() : null)
+                .catch(() => null)
         );
         Promise.all(fetchPromises).then(results => {
             let foundAny = false;
@@ -14589,7 +14611,7 @@ function getAllMarketProducts() {
             if (foundAny) {
                 try {
                     localStorage.setItem('mvc_cached_market_products', JSON.stringify(window.globalMarketProductsCache));
-                } catch(e){}
+                } catch (e) { }
                 if (typeof renderMarket === 'function') renderMarket();
             }
         }).catch(err => console.error("Error deep fetching market products:", err));
@@ -14828,12 +14850,12 @@ function renderMarketCartItems() {
             totalCost += itemTotal;
         }
 
-        const imgTag = item.imageUrl 
+        const imgTag = item.imageUrl
             ? `<img src="${item.imageUrl}" style="width: 54px; height: 54px; border-radius: 10px; object-fit: cover; ${!available ? 'filter: grayscale(80%) opacity(0.5);' : ''}" />`
             : `<div style="width: 54px; height: 54px; border-radius: 10px; background: var(--input-bg); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; ${!available ? 'opacity: 0.5;' : ''}">🥩</div>`;
 
-        const rowBg = !available 
-            ? 'background: rgba(239, 68, 68, 0.08); border-radius: 12px; margin-bottom: 8px; padding: 10px 12px; border: 1px dashed rgba(239, 68, 68, 0.4);' 
+        const rowBg = !available
+            ? 'background: rgba(239, 68, 68, 0.08); border-radius: 12px; margin-bottom: 8px; padding: 10px 12px; border: 1px dashed rgba(239, 68, 68, 0.4);'
             : 'padding: 12px 0; border-bottom: 1px dashed var(--border-color);';
 
         return `
@@ -14897,13 +14919,13 @@ function renderMarketCartItems() {
         if (hasUnavailableItems) {
             warningEl.style.display = 'block';
             warningEl.style.color = '#ef4444';
-            warningEl.textContent = isAr 
+            warningEl.textContent = isAr
                 ? `❌ لا يمكنك إتمام الطلب بحضور منتجات غير متوفرة بالسلة. يرجى حذفها أولاً.`
                 : `❌ Cannot checkout with unavailable items. Please remove them first.`;
         } else {
             warningEl.style.display = isInsufficient ? 'block' : 'none';
             if (isInsufficient) {
-                warningEl.textContent = isAr 
+                warningEl.textContent = isAr
                     ? `⚠️ رصيد ر.س لديك غير كافٍ! تحتاج إلى ${totalCost - userCoins} ر.س إضافية.`
                     : `⚠️ Insufficient SR Balance! You need ${totalCost - userCoins} more SR.`;
             }
@@ -14925,8 +14947,8 @@ function submitMarketOrder() {
 
     const unavailable = marketCart.filter(item => !isCartItemAvailable(item));
     if (unavailable.length > 0) {
-        alert(isAr 
-            ? 'عذراً، تحتوي السلة على منتجات غير متوفرة حالياً (قام الأدمن بإخفائها). يرجى إزالتها من السلة أولاً لإكتمال الطلب!' 
+        alert(isAr
+            ? 'عذراً، تحتوي السلة على منتجات غير متوفرة حالياً (قام الأدمن بإخفائها). يرجى إزالتها من السلة أولاً لإكتمال الطلب!'
             : 'Sorry, your cart contains unavailable products (hidden by admin). Please remove them first to complete your order!');
         openMarketCartModal();
         return;
@@ -14942,10 +14964,10 @@ function submitMarketOrder() {
 
     const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
     const workerId = isCustomer ? String(currentCustomerSession.code || currentCustomerSession.id).trim() : getCurrentWorkerId();
-    const workerName = isCustomer 
-        ? (currentCustomerSession.name || 'Customer (' + currentCustomerSession.code + ')') 
-        : ((typeof currentWorkerProfile !== 'undefined' && currentWorkerProfile) 
-            ? (currentWorkerProfile.name || currentWorkerProfile.email) 
+    const workerName = isCustomer
+        ? (currentCustomerSession.name || 'Customer (' + currentCustomerSession.code + ')')
+        : ((typeof currentWorkerProfile !== 'undefined' && currentWorkerProfile)
+            ? (currentWorkerProfile.name || currentWorkerProfile.email)
             : ((typeof currentUser !== 'undefined' && currentUser && currentUser.email) ? currentUser.email : 'Worker'));
 
     const now = Date.now();
@@ -14983,7 +15005,7 @@ function submitMarketOrder() {
         });
         try {
             localStorage.setItem('mvc_customer_session', JSON.stringify(currentCustomerSession));
-        } catch(e){}
+        } catch (e) { }
     } else {
         const data = getCompanyData();
         if (data && data.workers && data.workers[workerId]) {
@@ -14996,7 +15018,7 @@ function submitMarketOrder() {
         try {
             localStorage.setItem('mvc_admin_coins_' + workerId, newCoins);
             localStorage.setItem('mvc_admin_coins', newCoins);
-        } catch(e){}
+        } catch (e) { }
 
         updates[`companies/${currentCompany}/workers/${workerId}/coins`] = newCoins;
         updates[`companies/${currentCompany}/userCoins/${workerId}`] = newCoins;
@@ -15041,7 +15063,7 @@ function formatMarketOrderNum(order) {
     } else if (digits.length >= 3) {
         return `#${digits}`;
     }
-    
+
     return `#${str.replace(/^#?ORD-?/i, '').replace('ord_', '').slice(-6)}`;
 }
 window.formatMarketOrderNum = formatMarketOrderNum;
@@ -15164,7 +15186,7 @@ function getAllMarketOrders() {
         });
     }
     const list = Array.from(map.values());
-    list.sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
+    list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     return list;
 }
 window.getAllMarketOrders = getAllMarketOrders;
@@ -15494,13 +15516,13 @@ function cancelMarketOrder(orderId, optCompanyKey) {
                 currentCustomerSession.coins = newCoins;
                 try {
                     localStorage.setItem('mvc_customer_session', JSON.stringify(currentCustomerSession));
-                } catch(e){}
+                } catch (e) { }
             }
 
             try {
                 db.ref(`publicCustomerCodes/${custCode}/coins`).transaction(cv => (cv || 0) + totalCost);
                 db.ref(`customerCodes/${custCode}/coins`).transaction(cv => (cv || 0) + totalCost);
-            } catch(e){}
+            } catch (e) { }
         } else {
             const targetWorkerId = custCode || (order.workerId ? String(order.workerId).trim() : getCurrentWorkerId());
             let workerCoins = 0;
@@ -15536,7 +15558,7 @@ function cancelMarketOrder(orderId, optCompanyKey) {
                     localStorage.setItem('mvc_admin_coins_' + targetWorkerId, newWorkerCoins);
                     localStorage.setItem('mvc_admin_coins_' + currentWId, newWorkerCoins);
                     localStorage.setItem('mvc_admin_coins', newWorkerCoins);
-                } catch(e){}
+                } catch (e) { }
             }
         }
 
@@ -15562,8 +15584,8 @@ function cancelMarketOrder(orderId, optCompanyKey) {
         renderAdminMarketOrders();
         renderCustomerOrders();
         renderPrepareSection();
-        showInAppNotification(isAr 
-            ? `تم إلغاء الطلب وإعادة ${totalCost} من العملات للزبون بنجاح!` 
+        showInAppNotification(isAr
+            ? `تم إلغاء الطلب وإعادة ${totalCost} من العملات للزبون بنجاح!`
             : `Order cancelled and ${totalCost} coins refunded to customer successfully!`
         );
     }).catch(err => {
@@ -15618,7 +15640,7 @@ function toggleMarketProductVisibility(productId) {
         window.globalMarketProductsCache[productId].id = productId;
         try {
             localStorage.setItem('mvc_cached_market_products', JSON.stringify(window.globalMarketProductsCache));
-        } catch(e){}
+        } catch (e) { }
     }
 
     const updates = {};
@@ -15643,7 +15665,7 @@ function toggleMarketProductVisibility(productId) {
     if (typeof db !== 'undefined') {
         db.ref().update(updates).then(() => {
             renderMarket();
-            showInAppNotification(newHiddenState 
+            showInAppNotification(newHiddenState
                 ? (isAr ? 'تم إخفاء المنتج من المتجر (غير ظاهر للزبائن)' : 'Product hidden from market')
                 : (isAr ? 'تم إظهار المنتج للزبائن' : 'Product is now visible to customers')
             );
@@ -15693,7 +15715,7 @@ function renderMarketProductCard(p) {
     const cartItem = marketCart.find(item => item.productId === p.id);
     const itemInCartQty = cartItem ? cartItem.qty : 0;
     const isHidden = isProductHidden(p);
-    
+
     let imageContent = '';
     if (p.imageUrl) {
         imageContent = `<img src="${p.imageUrl}" alt="${sanitizeMarketText(p.name)}" loading="lazy" decoding="async" onclick="showImage('${p.imageUrl}')" title="${isAr ? 'اضغط لتكبير الصورة' : 'Click to enlarge'}" style="width:100%; height:100%; object-fit:cover; display:block; cursor:pointer; transition: transform 0.3s ease; ${isHidden ? 'filter: opacity(0.6) grayscale(40%);' : ''}" class="market-prod-img" />`;
@@ -15702,7 +15724,7 @@ function renderMarketProductCard(p) {
         const bannerTitle = isAr ? meta.labelAr : meta.labelEn;
         const catIcon = meta.icon;
         const bannerGradient = meta.gradient;
-        
+
         imageContent = `
             <div style="width:100%; height:100%; background: ${bannerGradient}; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#ffffff; text-align:center; padding:12px; box-sizing:border-box; position:relative; ${isHidden ? 'filter: opacity(0.6);' : ''}">
                 <div style="font-size: 3.2rem; margin-bottom:4px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));">${catIcon}</div>
@@ -15714,8 +15736,8 @@ function renderMarketProductCard(p) {
     let adminActions = '';
     if (isAdmin) {
         const hideBtnText = isHidden ? (isAr ? '👁️ إظهار المنتج' : '👁️ Show Product') : (isAr ? '🙈 إخفاء المنتج' : '🙈 Hide Product');
-        const hideBtnStyle = isHidden 
-            ? 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid #10b981;' 
+        const hideBtnStyle = isHidden
+            ? 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid #10b981;'
             : 'background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid #f59e0b;';
 
         adminActions = `
@@ -15790,7 +15812,7 @@ let isMarketLoadingMore = false;
 function loadMoreMarketProducts() {
     if (isMarketLoadingMore) return;
     if (!window.currentMarketFilteredProducts || window.currentMarketRenderLimit >= window.currentMarketFilteredProducts.length) return;
-    
+
     const grid = document.getElementById('market-products-grid');
     if (!grid) return;
 
@@ -15801,7 +15823,7 @@ function loadMoreMarketProducts() {
         appendInfiniteScrollTrigger(grid);
         triggerEl = document.getElementById('market-infinite-scroll-trigger');
     }
-    
+
     if (triggerEl) {
         const isAr = currentAppLang === 'ar';
         triggerEl.style.opacity = '1';
@@ -15866,10 +15888,10 @@ function expandCategorySection(catKey) {
     const catContainer = document.getElementById(`cat-grid-container-${catKey}`);
     const sentinel = document.getElementById(`auto-load-cat-sec-${catKey}`);
     if (!catContainer) return;
-    
+
     const catItems = window.currentGroupedCategoryItems[catKey];
     const remainingItems = catItems.slice(12);
-    
+
     if (typeof window.renderProductCardInstance === 'function') {
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = remainingItems.map(window.renderProductCardInstance).join('');
@@ -15956,41 +15978,41 @@ function renderMarket() {
         return;
     }
 
-function renderMarketProductCard(p) {
-    const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
-    const isAdmin = !isCustomer && (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.isAdmin));
-    const isAr = currentAppLang === 'ar';
-    const catKey = getNormalizedProductCategory(p);
-    const weightText = p.weightTag || '';
-    const cartItem = marketCart.find(item => item.productId === p.id);
-    const itemInCartQty = cartItem ? cartItem.qty : 0;
-    const isHidden = isProductHidden(p);
-    
-    let imageContent = '';
-    if (p.imageUrl) {
-        imageContent = `<img src="${p.imageUrl}" alt="${sanitizeMarketText(p.name)}" loading="lazy" decoding="async" onclick="showImage('${p.imageUrl}')" title="${isAr ? 'اضغط لتكبير الصورة' : 'Click to enlarge'}" style="width:100%; height:100%; object-fit:cover; display:block; cursor:pointer; transition: transform 0.3s ease; ${isHidden ? 'filter: opacity(0.6) grayscale(40%);' : ''}" class="market-prod-img" />`;
-    } else {
-        const meta = getMarketCategoryMeta(catKey);
-        const bannerTitle = isAr ? meta.labelAr : meta.labelEn;
-        const catIcon = meta.icon;
-        const bannerGradient = meta.gradient;
-        
-        imageContent = `
+    function renderMarketProductCard(p) {
+        const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
+        const isAdmin = !isCustomer && (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.isAdmin));
+        const isAr = currentAppLang === 'ar';
+        const catKey = getNormalizedProductCategory(p);
+        const weightText = p.weightTag || '';
+        const cartItem = marketCart.find(item => item.productId === p.id);
+        const itemInCartQty = cartItem ? cartItem.qty : 0;
+        const isHidden = isProductHidden(p);
+
+        let imageContent = '';
+        if (p.imageUrl) {
+            imageContent = `<img src="${p.imageUrl}" alt="${sanitizeMarketText(p.name)}" loading="lazy" decoding="async" onclick="showImage('${p.imageUrl}')" title="${isAr ? 'اضغط لتكبير الصورة' : 'Click to enlarge'}" style="width:100%; height:100%; object-fit:cover; display:block; cursor:pointer; transition: transform 0.3s ease; ${isHidden ? 'filter: opacity(0.6) grayscale(40%);' : ''}" class="market-prod-img" />`;
+        } else {
+            const meta = getMarketCategoryMeta(catKey);
+            const bannerTitle = isAr ? meta.labelAr : meta.labelEn;
+            const catIcon = meta.icon;
+            const bannerGradient = meta.gradient;
+
+            imageContent = `
             <div style="width:100%; height:100%; background: ${bannerGradient}; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#ffffff; text-align:center; padding:12px; box-sizing:border-box; position:relative; ${isHidden ? 'filter: opacity(0.6);' : ''}">
                 <div style="font-size: 3.2rem; margin-bottom:4px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));">${catIcon}</div>
                 <div style="font-size: 1.05rem; font-weight:900; letter-spacing:-0.5px; text-shadow:0 2px 4px rgba(0,0,0,0.4);">${bannerTitle}</div>
             </div>
         `;
-    }
+        }
 
-    let adminActions = '';
-    if (isAdmin) {
-        const hideBtnText = isHidden ? (isAr ? '👁️ إظهار المنتج' : '👁️ Show Product') : (isAr ? '🙈 إخفاء المنتج' : '🙈 Hide Product');
-        const hideBtnStyle = isHidden 
-            ? 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid #10b981;' 
-            : 'background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid #f59e0b;';
+        let adminActions = '';
+        if (isAdmin) {
+            const hideBtnText = isHidden ? (isAr ? '👁️ إظهار المنتج' : '👁️ Show Product') : (isAr ? '🙈 إخفاء المنتج' : '🙈 Hide Product');
+            const hideBtnStyle = isHidden
+                ? 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid #10b981;'
+                : 'background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid #f59e0b;';
 
-        adminActions = `
+            adminActions = `
             <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 10px; border-top: 1px dashed var(--border-color); padding-top: 10px; width: 100%; box-sizing: border-box;">
                 <button type="button" onclick="toggleMarketProductVisibility('${p.id}')" title="${isHidden ? (isAr ? 'إظهار المنتج للزبائن' : 'Show product to customers') : (isAr ? 'إخفاء المنتج من السوق' : 'Hide product from market')}" style="width: 100%; padding: 7px 10px; font-size: 0.8rem; font-weight: 800; border-radius: 9px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s ease; ${hideBtnStyle}">
                     ${hideBtnText}
@@ -16005,9 +16027,9 @@ function renderMarketProductCard(p) {
                 </div>
             </div>
         `;
-    }
+        }
 
-    return `
+        return `
         <div class="card market-store-card" style="margin: 0; border: 1px solid ${isHidden ? '#f59e0b' : 'var(--border-color)'}; border-radius: 16px; background: var(--card-bg, #ffffff); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, box-shadow 0.2s ease; box-shadow: 0 4px 14px rgba(0,0,0,0.05); position: relative; ${isHidden ? 'opacity: 0.88;' : ''}">
             <div>
                 <div style="width: 100%; aspect-ratio: 1 / 1; position: relative; overflow: hidden; background: #f8fafc; border-bottom: 1px solid var(--border-color);">
@@ -16054,8 +16076,8 @@ function renderMarketProductCard(p) {
             </div>
         </div>
     `;
-}
-window.renderMarketProductCard = renderMarketProductCard;
+    }
+    window.renderMarketProductCard = renderMarketProductCard;
 
 
 
@@ -16176,7 +16198,7 @@ function openEditMarketProductModal(productId) {
     if (catSelect) {
         const isAr = currentAppLang === 'ar';
         const knownCategories = new Set(['meat', 'veg_fruit', 'fish']);
-        
+
         prods.forEach(p => {
             const cat = getNormalizedProductCategory(p);
             if (cat) knownCategories.add(cat);
@@ -16205,7 +16227,7 @@ function openEditMarketProductModal(productId) {
     document.getElementById('edit-market-product-id').value = prod.id;
     document.getElementById('edit-market-product-name').value = prod.name || '';
     document.getElementById('edit-market-product-price').value = prod.price || 0;
-    
+
     const weightEl = document.getElementById('edit-market-product-weight');
     const imageEl = document.getElementById('edit-market-product-image');
     const hiddenEl = document.getElementById('edit-market-product-hidden');
@@ -16308,7 +16330,7 @@ function deleteMarketProduct(productId) {
         delete window.globalMarketProductsCache[productId];
         try {
             localStorage.setItem('mvc_cached_market_products', JSON.stringify(window.globalMarketProductsCache));
-        } catch(e){}
+        } catch (e) { }
     }
 
     if (window.currentMarketFilteredProducts) {
@@ -16353,7 +16375,7 @@ function handleCustomerCodeLogin() {
         try {
             localStorage.setItem('mvc_customer_session', JSON.stringify(foundCust));
             localStorage.setItem('mvc_customer_code', cleanCode);
-        } catch(e){}
+        } catch (e) { }
 
         const authOverlay = document.getElementById('auth-overlay');
         if (authOverlay) authOverlay.style.display = 'none';
@@ -16443,7 +16465,7 @@ function handleCustomerCodeLogin() {
             window.localCustomerRegistry[cleanCode] = foundCust;
             try {
                 localStorage.setItem('mvc_global_customer_registry', JSON.stringify(window.localCustomerRegistry));
-            } catch(e){}
+            } catch (e) { }
 
             processCustomerLogin(foundCust);
         }).catch(err => {
@@ -16470,7 +16492,7 @@ function logoutCustomerSession() {
     try {
         localStorage.removeItem('mvc_customer_session');
         localStorage.removeItem('mvc_customer_code');
-    } catch(e){}
+    } catch (e) { }
     window.location.reload();
 }
 window.logoutCustomerSession = logoutCustomerSession;
@@ -16656,13 +16678,13 @@ function createCustomerCode() {
     window.localCustomerRegistry[code] = customerObj;
     try {
         localStorage.setItem('mvc_global_customer_registry', JSON.stringify(window.localCustomerRegistry));
-    } catch(e){}
+    } catch (e) { }
 
     db.ref().update(updates).then(() => {
         nameInput.value = '';
         if (coinsInput) coinsInput.value = '1000';
-        alert(isAr 
-            ? `🎉 تم إنشاء حساب العميل بنجاح!\nالاسم: ${name}\nرمز الدخول الخاص به: ${code}` 
+        alert(isAr
+            ? `🎉 تم إنشاء حساب العميل بنجاح!\nالاسم: ${name}\nرمز الدخول الخاص به: ${code}`
             : `🎉 Customer code generated successfully!\nName: ${name}\nAccess Code: ${code}`);
         renderMarket();
         renderAdminCustomersList();
@@ -16968,10 +16990,10 @@ function submitMarketFeedback() {
 
     const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
     const custCode = isCustomer ? String(currentCustomerSession.code || currentCustomerSession.id).trim() : '';
-    const custName = isCustomer 
-        ? (currentCustomerSession.name || 'Customer (' + custCode + ')') 
-        : ((typeof currentWorkerProfile !== 'undefined' && currentWorkerProfile) 
-            ? (currentWorkerProfile.name || currentWorkerProfile.email) 
+    const custName = isCustomer
+        ? (currentCustomerSession.name || 'Customer (' + custCode + ')')
+        : ((typeof currentWorkerProfile !== 'undefined' && currentWorkerProfile)
+            ? (currentWorkerProfile.name || currentWorkerProfile.email)
             : ((typeof currentUser !== 'undefined' && currentUser && currentUser.email) ? currentUser.email : 'Worker'));
 
     const now = Date.now();
@@ -17503,15 +17525,15 @@ async function getBestGeminiModelName(apiKey) {
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
         const data = await res.json();
         if (data && data.models && Array.isArray(data.models)) {
-            const valid = data.models.filter(m => 
-                m.name && 
+            const valid = data.models.filter(m =>
+                m.name &&
                 m.supportedGenerationMethods?.includes('generateContent') &&
                 !m.name.includes('2.5')
             );
-            const preferred = valid.find(m => m.name.includes('gemini-2.0-flash')) || 
-                              valid.find(m => m.name.includes('gemini-1.5-flash-8b')) ||
-                              valid.find(m => m.name.includes('gemini-1.5-flash-latest')) ||
-                              valid[0];
+            const preferred = valid.find(m => m.name.includes('gemini-2.0-flash')) ||
+                valid.find(m => m.name.includes('gemini-1.5-flash-8b')) ||
+                valid.find(m => m.name.includes('gemini-1.5-flash-latest')) ||
+                valid[0];
             if (preferred) {
                 const cleanName = preferred.name.replace(/^models\//, '');
                 window._cachedGeminiModelName = cleanName;
@@ -17536,7 +17558,7 @@ function getCompanyLiveContextSummary() {
         if (data.workers && Array.isArray(data.workers)) {
             const att = data.attendance || {};
             const todayAtt = att[today] || {};
-            
+
             let lateList = [];
             let vacationList = [];
             let absentList = [];
@@ -17658,7 +17680,7 @@ function getCompanyLiveContextSummary() {
             }
         }
         summary.push(`### ADMIN REMINDERS & NOTIFICATIONS:\n${remText}`);
-    } catch(e) {
+    } catch (e) {
         console.warn("Error building company live context:", e);
     }
     return summary.join('\n\n');
@@ -17745,7 +17767,7 @@ function getTodaySalesSummary() {
             if (typeof currentTab !== 'undefined') currentTab = 'managing';
             renderManaging();
             if (typeof currentTab !== 'undefined') currentTab = savedTab;
-        } catch (e) {}
+        } catch (e) { }
     }
 
     // 2. Read directly from rendered Sales Section DOM elements
@@ -17783,7 +17805,7 @@ function getTodaySalesSummary() {
     if (allLogs && typeof allLogs === 'object' && !Array.isArray(allLogs)) {
         allLogs = Object.values(allLogs);
     }
-    
+
     let posTotal = 0;
     let posCount = 0;
     let posMethodsToday = {};
@@ -17852,13 +17874,13 @@ function getTodaySalesSummary() {
         });
     }
 
-    return { 
-        targetDateStr, 
+    return {
+        targetDateStr,
         todayStr: targetDateStr,
-        total: finalTotal, 
-        posTotal: finalTotal, 
-        marketTotal, 
-        posCount, 
+        total: finalTotal,
+        posTotal: finalTotal,
+        marketTotal,
+        posCount,
         marketCount,
         posMethodsToday
     };
@@ -17900,7 +17922,7 @@ function getSalesForTimeframe(queryStr) {
     const date = now.getDate();
 
     const localTodayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
-    
+
     const yesterdayDate = new Date(year, month, date - 1);
     const yesterdayStr = `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getDate()).padStart(2, '0')}`;
 
@@ -17924,7 +17946,7 @@ function getSalesForTimeframe(queryStr) {
         endTs = startTs + 86400000;
     } else if (lower.includes('last week') || lower.includes('past week') || lower.includes('this week') || lower.includes('week') || lower.includes('أسبوع') || lower.includes('اسبوع')) {
         const startOfWeek = new Date(year, month, date - 7).getTime();
-        timeframeLabel = `Last 7 Days / Week (${new Date(startOfWeek).toISOString().slice(0,10)} to ${localTodayStr})`;
+        timeframeLabel = `Last 7 Days / Week (${new Date(startOfWeek).toISOString().slice(0, 10)} to ${localTodayStr})`;
         startTs = startOfWeek;
         endTs = Date.now() + 86400000;
     } else if (lower.includes('last month') || lower.includes('past month') || lower.includes('this month') || lower.includes('month') || lower.includes('شهر')) {
@@ -18048,8 +18070,8 @@ async function fetchGeneralKnowledge(query, isAr) {
 
     // 1. Try Free AI API (Pollinations.ai Endpoint)
     try {
-        const sysMsg = isAr 
-            ? "أنت مساعد ذكي يعطي إجابات قصيرة ودقيقة ومباشرة لجميع الأسئلة." 
+        const sysMsg = isAr
+            ? "أنت مساعد ذكي يعطي إجابات قصيرة ودقيقة ومباشرة لجميع الأسئلة."
             : "You are a smart executive AI manager. Give a concise, accurate, direct answer to the question.";
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -18061,14 +18083,14 @@ async function fetchGeneralKnowledge(query, isAr) {
                 return text.trim();
             }
         }
-    } catch(e) {}
+    } catch (e) { }
 
     // 2. Try Wikipedia Knowledge Summary API
     try {
         let topic = query.replace(/what|how|tall|high|big|is|the|of|a|an|where|who|when|tell|me|about/gi, '').trim();
         if (/khalifa|خليفة/i.test(query)) topic = 'Burj_Khalifa';
         if (/sudan|سودان/i.test(query)) topic = 'Khartoum';
-        
+
         if (topic && topic.length >= 2) {
             const lang = isAr ? 'ar' : 'en';
             const controller = new AbortController();
@@ -18082,13 +18104,153 @@ async function fetchGeneralKnowledge(query, isAr) {
                 }
             }
         }
-    } catch(e) {}
+    } catch (e) { }
 
     return null;
 }
 window.fetchGeneralKnowledge = fetchGeneralKnowledge;
 
+// --- AI CHATBOT VOICE SPEECH RECOGNITION (ARABIC & ENGLISH) ---
+let aiChatSpeechRecognition = null;
+let isAIChatListening = false;
+let aiChatVoiceLang = 'auto'; // 'auto', 'ar-SA', 'en-US'
+
+function toggleAIChatVoiceInput() {
+    const input = document.getElementById('ai-chat-input');
+    const micBtn = document.getElementById('ai-chat-mic-btn');
+    const micIcon = document.getElementById('ai-chat-mic-icon');
+    const langBadge = document.getElementById('ai-chat-mic-lang-badge');
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+        alert(isAr 
+            ? "خاصية التعرف على الصوت غير مدعومة في هذا المتصفح. يرجى استخدام متصفح Google Chrome أو Edge أو Safari." 
+            : "Voice recognition is not supported in this browser. Please use Google Chrome, Microsoft Edge, or Safari.");
+        return;
+    }
+
+    if (isAIChatListening && aiChatSpeechRecognition) {
+        try { aiChatSpeechRecognition.stop(); } catch(e){}
+        isAIChatListening = false;
+        resetAIChatMicUI();
+        return;
+    }
+
+    try {
+        aiChatSpeechRecognition = new SpeechRecognition();
+    } catch(err) {
+        console.error("SpeechRecognition initialization error:", err);
+        alert(isAr ? "تعذر تشغيل الميكروفون." : "Unable to initialize microphone.");
+        return;
+    }
+
+    aiChatSpeechRecognition.continuous = false;
+    aiChatSpeechRecognition.interimResults = true;
+
+    // Detect target language for speech recognition (supports Arabic & English)
+    let targetLang = isAr ? 'ar-SA' : 'en-US';
+    if (aiChatVoiceLang && aiChatVoiceLang !== 'auto') {
+        targetLang = aiChatVoiceLang;
+    } else if (input && input.value) {
+        const hasArabic = /[\u0600-\u06FF]/.test(input.value);
+        if (hasArabic) targetLang = 'ar-SA';
+        else if (/[a-zA-Z]/.test(input.value)) targetLang = 'en-US';
+    }
+    aiChatSpeechRecognition.lang = targetLang;
+
+    aiChatSpeechRecognition.onstart = () => {
+        isAIChatListening = true;
+        if (micBtn) {
+            micBtn.style.background = '#ef4444';
+            micBtn.style.color = '#ffffff';
+            micBtn.style.borderColor = '#ef4444';
+            micBtn.style.boxShadow = '0 0 16px rgba(239, 68, 68, 0.7)';
+        }
+        if (micIcon) {
+            micIcon.textContent = '🎙️';
+        }
+        if (langBadge) {
+            langBadge.style.background = 'rgba(255, 255, 255, 0.3)';
+            langBadge.style.color = '#ffffff';
+            langBadge.textContent = targetLang.startsWith('ar') ? 'عربي' : 'EN';
+        }
+        if (input) {
+            input.placeholder = isAr ? '🎙️ جاري الاستماع... تحدّث الآن باللغة العربية أو الإنجليزية' : '🎙️ Listening... Speak now in Arabic or English...';
+        }
+    };
+
+    aiChatSpeechRecognition.onresult = (event) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            transcript += event.results[i][0].transcript;
+        }
+        if (input && transcript) {
+            input.value = transcript;
+        }
+    };
+
+    aiChatSpeechRecognition.onerror = (event) => {
+        console.warn("Speech recognition error:", event.error);
+        isAIChatListening = false;
+        resetAIChatMicUI();
+        if (event.error === 'not-allowed') {
+            alert(isAr 
+                ? "تم رفض إذن استخدام الميكروفون. يرجى تفعيل إذن الميكروفون في إعدادات المتصفح." 
+                : "Microphone permission was denied. Please allow microphone access in your browser settings.");
+        }
+    };
+
+    aiChatSpeechRecognition.onend = () => {
+        isAIChatListening = false;
+        resetAIChatMicUI();
+    };
+
+    try {
+        aiChatSpeechRecognition.start();
+    } catch(err) {
+        console.error("Failed to start SpeechRecognition:", err);
+        isAIChatListening = false;
+        resetAIChatMicUI();
+    }
+}
+
+function resetAIChatMicUI() {
+    const input = document.getElementById('ai-chat-input');
+    const micBtn = document.getElementById('ai-chat-mic-btn');
+    const micIcon = document.getElementById('ai-chat-mic-icon');
+    const langBadge = document.getElementById('ai-chat-mic-lang-badge');
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    if (micBtn) {
+        micBtn.style.background = 'var(--input-bg)';
+        micBtn.style.color = '#6366f1';
+        micBtn.style.borderColor = '#6366f1';
+        micBtn.style.boxShadow = 'none';
+    }
+    if (micIcon) {
+        micIcon.textContent = '🎤';
+    }
+    if (langBadge) {
+        langBadge.style.background = 'rgba(99, 102, 241, 0.15)';
+        langBadge.style.color = '#6366f1';
+        langBadge.textContent = 'AR/EN';
+    }
+    if (input) {
+        input.placeholder = isAr ? 'اكتب طلبك هنا للمساعد الذكي... / Type your command...' : 'Type your command here for AI Assistant...';
+    }
+}
+
+window.toggleAIChatVoiceInput = toggleAIChatVoiceInput;
+window.resetAIChatMicUI = resetAIChatMicUI;
+
 async function handleAIChatSubmit() {
+    if (isAIChatListening && aiChatSpeechRecognition) {
+        try { aiChatSpeechRecognition.stop(); } catch(e){}
+        isAIChatListening = false;
+        resetAIChatMicUI();
+    }
     const input = document.getElementById('ai-chat-input');
     const userText = input?.value?.trim() || '';
     if (!userText) return;
@@ -18194,7 +18356,7 @@ ${liveContext}`;
                         data = resJson;
                         break;
                     }
-                } catch (e) {}
+                } catch (e) { }
             }
 
             // Attempt 2: Fallback without tools declaration (pure conversational mode with history)
@@ -18214,7 +18376,7 @@ ${liveContext}`;
                             data = resJson;
                             break;
                         }
-                    } catch (e) {}
+                    } catch (e) { }
                 }
             }
 
@@ -18236,7 +18398,7 @@ ${liveContext}`;
                             data = resJson;
                             break;
                         }
-                    } catch (e) {}
+                    } catch (e) { }
                 }
             }
 
@@ -18274,75 +18436,75 @@ ${liveContext}`;
             window._aiChatHistory.push({ role: 'model', parts: [{ text: generalAns }] });
             return;
         }
-    } catch(e) {}
+    } catch (e) { }
 
-function extractProductInfo(text) {
-    let rawText = text;
+    function extractProductInfo(text) {
+        let rawText = text;
 
-    // 1. Extract Weight (e.g. 500 g, 500g, 14 kg, 500 جرام, 1 كجم)
-    let weight = '';
-    const weightMatch = text.match(/(\d+(?:\.\d+)?\s*(?:kg|g|gm|kgm|كجم|جم|جرام|غرام))/i);
-    if (weightMatch) {
-        weight = weightMatch[1].trim();
-        text = text.replace(weightMatch[0], ' ');
+        // 1. Extract Weight (e.g. 500 g, 500g, 14 kg, 500 جرام, 1 كجم)
+        let weight = '';
+        const weightMatch = text.match(/(\d+(?:\.\d+)?\s*(?:kg|g|gm|kgm|كجم|جم|جرام|غرام))/i);
+        if (weightMatch) {
+            weight = weightMatch[1].trim();
+            text = text.replace(weightMatch[0], ' ');
+        }
+
+        // 2. Extract Price
+        let price = 50;
+        const priceMatch = text.match(/(\d+(?:\.\d+)?)/);
+        if (priceMatch) {
+            price = parseFloat(priceMatch[1]);
+            text = text.replace(priceMatch[0], ' ');
+        }
+
+        // 3. Category Detection
+        let category = 'meat';
+        if (/خضار|فواكه|تفاح|برتقال|موز|طماطم|veg|fruit/i.test(rawText)) {
+            category = 'veg_fruit';
+        } else if (/سمك|أسماك|ربيان|جمبري|هامور|fish/i.test(rawText)) {
+            category = 'fish';
+        }
+
+        // 4. Clean Product Name (whole word replacements ONLY)
+        let cleanName = text
+            .replace(/\b(add|product|products|create|new|price|cost|sr|riyal|category|dept|department|the|name|to|for|in|veggie|veg|fruit|fish|market|store|with|weight|waight|and|a|an)\b/gi, ' ')
+            .replace(/(?:^|\s)(أضف|اضف|تنزيل|نزل|جديد|منتج|منتجات|بسعر|سعر|بكمية|كمية|ريال|ر\.س|SR|في|إلى|قسم|أقسام|اللحوم|لحوم|الخضار|خضار|فواكه|الأسماك|أسماك|سمك|اسم|صنف|عنصر|سوق|بالسوق|الماركت|متجر|وزن)(?=\s|$)/gi, ' ')
+            .replace(/[:"']/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        if (!cleanName || cleanName.length < 2) {
+            cleanName = category === 'meat' ? 'لحم طازج' : (category === 'veg_fruit' ? 'خضار طازجة' : 'سمك طازج');
+        }
+
+        return { name: cleanName, price, category, weight };
     }
 
-    // 2. Extract Price
-    let price = 50;
-    const priceMatch = text.match(/(\d+(?:\.\d+)?)/);
-    if (priceMatch) {
-        price = parseFloat(priceMatch[1]);
-        text = text.replace(priceMatch[0], ' ');
+    function extractTaskInfo(text) {
+        let workerName = '';
+        const workerMatch = text.match(/(?:للموظف|للعامل|لـ|إلى|to worker|to)\s+([\u0600-\u06FFa-zA-Z]+)/i);
+        if (workerMatch && workerMatch[1]) {
+            workerName = workerMatch[1].trim();
+        }
+
+        let cleanTitle = text
+            .replace(/ارسل|أرسل|إرسال|مهمة|مهمه|جديدة|جديده|واجب|إنشاء|أضف|اضف/gi, '')
+            .replace(/للموظف|للعامل|لـ|إلى|للعمال/gi, '')
+            .replace(/\b(send|task|assignment|create|add|to|worker|employee|for)\b/gi, '')
+            .replace(/[:"']/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        if (workerName) {
+            cleanTitle = cleanTitle.replace(new RegExp(workerName, 'gi'), '').replace(/\s+/g, ' ').trim();
+        }
+
+        if (!cleanTitle || cleanTitle.length < 2) {
+            cleanTitle = text.trim();
+        }
+
+        return { worker_name: workerName || 'عمومي', title: cleanTitle };
     }
-
-    // 3. Category Detection
-    let category = 'meat';
-    if (/خضار|فواكه|تفاح|برتقال|موز|طماطم|veg|fruit/i.test(rawText)) {
-        category = 'veg_fruit';
-    } else if (/سمك|أسماك|ربيان|جمبري|هامور|fish/i.test(rawText)) {
-        category = 'fish';
-    }
-
-    // 4. Clean Product Name (whole word replacements ONLY)
-    let cleanName = text
-        .replace(/\b(add|product|products|create|new|price|cost|sr|riyal|category|dept|department|the|name|to|for|in|veggie|veg|fruit|fish|market|store|with|weight|waight|and|a|an)\b/gi, ' ')
-        .replace(/(?:^|\s)(أضف|اضف|تنزيل|نزل|جديد|منتج|منتجات|بسعر|سعر|بكمية|كمية|ريال|ر\.س|SR|في|إلى|قسم|أقسام|اللحوم|لحوم|الخضار|خضار|فواكه|الأسماك|أسماك|سمك|اسم|صنف|عنصر|سوق|بالسوق|الماركت|متجر|وزن)(?=\s|$)/gi, ' ')
-        .replace(/[:"']/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-    if (!cleanName || cleanName.length < 2) {
-        cleanName = category === 'meat' ? 'لحم طازج' : (category === 'veg_fruit' ? 'خضار طازجة' : 'سمك طازج');
-    }
-
-    return { name: cleanName, price, category, weight };
-}
-
-function extractTaskInfo(text) {
-    let workerName = '';
-    const workerMatch = text.match(/(?:للموظف|للعامل|لـ|إلى|to worker|to)\s+([\u0600-\u06FFa-zA-Z]+)/i);
-    if (workerMatch && workerMatch[1]) {
-        workerName = workerMatch[1].trim();
-    }
-
-    let cleanTitle = text
-        .replace(/ارسل|أرسل|إرسال|مهمة|مهمه|جديدة|جديده|واجب|إنشاء|أضف|اضف/gi, '')
-        .replace(/للموظف|للعامل|لـ|إلى|للعمال/gi, '')
-        .replace(/\b(send|task|assignment|create|add|to|worker|employee|for)\b/gi, '')
-        .replace(/[:"']/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-    if (workerName) {
-        cleanTitle = cleanTitle.replace(new RegExp(workerName, 'gi'), '').replace(/\s+/g, ' ').trim();
-    }
-
-    if (!cleanTitle || cleanTitle.length < 2) {
-        cleanTitle = text.trim();
-    }
-
-    return { worker_name: workerName || 'عمومي', title: cleanTitle };
-}
 
     // Smart Fallback Parser (Local Conversational & Action Engine)
     const lower = userText.toLowerCase();
@@ -18355,8 +18517,8 @@ function extractTaskInfo(text) {
 
     // 1.2 General Knowledge Riddles (e.g. Who came first: egg or chicken?)
     if (lower.includes('egg') || lower.includes('chicken') || lower.includes('بيضة') || lower.includes('دجاجة') || lower.includes('البيضة') || lower.includes('الدجاجة')) {
-        renderAIChatMessage('bot', isAr 
-            ? 'سؤال علمي وفلسفي رائع! 🥚🐓\nعلمياً، **البيضة سبقت الدجاجة** بحوالي ملايين السنين! لأن الكائنات البياضة كالديناصورات والزواحف القديمة كانت تضع بيضاً قشرياً قبل ظهور الدجاج الحديث على كوكب الأرض بأجيال طوال!' 
+        renderAIChatMessage('bot', isAr
+            ? 'سؤال علمي وفلسفي رائع! 🥚🐓\nعلمياً، **البيضة سبقت الدجاجة** بحوالي ملايين السنين! لأن الكائنات البياضة كالديناصورات والزواحف القديمة كانت تضع بيضاً قشرياً قبل ظهور الدجاج الحديث على كوكب الأرض بأجيال طوال!'
             : 'A classic scientific riddle! 🥚🐓\nScientifically, **the egg came first**! Egg-laying creatures like dinosaurs existed millions of years before modern chickens evolved on Earth!');
         return;
     }
@@ -18404,7 +18566,7 @@ function extractTaskInfo(text) {
             const mathResult = Function('"use strict";return (' + mathMatch[1] + ')')();
             renderAIChatMessage('bot', isAr ? `نتيجة العملية الحسابية (${mathMatch[1]}) تساوي **${mathResult}**.` : `The result of (${mathMatch[1]}) is **${mathResult}**.`);
             return;
-        } catch(e) {}
+        } catch (e) { }
     }
 
     // 1.25 Admin Reminders Query Handler (Red Alert / Due Reminders)
@@ -18416,13 +18578,13 @@ function extractTaskInfo(text) {
         } else {
             if (remSummary.redDueReminders.length > 0) {
                 const list = remSummary.redDueReminders.map(r => {
-                    const statusTag = r.isOverdue 
-                        ? (isAr ? '🔴 متأخر جداً (مستحق)' : '🔴 OVERDUE / DUE NOW') 
+                    const statusTag = r.isOverdue
+                        ? (isAr ? '🔴 متأخر جداً (مستحق)' : '🔴 OVERDUE / DUE NOW')
                         : (r.deadlineDateStr === remSummary.todayStr ? (isAr ? '🔴 مستحق اليوم' : '🔴 DUE TODAY') : (isAr ? '🚨 تنبيه عاجل (0-2 يوم متبقي)' : '🚨 Urgent (0-2 Days Left)'));
                     return `• ${statusTag}: **${r.title}** ${r.amount ? `(${r.amount} SR)` : ''} - Deadline: ${r.deadlineDateStr || 'Today'} (Category: ${r.category || 'General'})`;
                 }).join('\n');
-                resp = isAr 
-                    ? `🚨 **التذكيرات الحمراء والمستحقة اليوم (${remSummary.todayStr})**:\n${list}` 
+                resp = isAr
+                    ? `🚨 **التذكيرات الحمراء والمستحقة اليوم (${remSummary.todayStr})**:\n${list}`
                     : `🚨 **Red Alerts & Reminders Due Today (${remSummary.todayStr})**:\n${list}`;
             } else {
                 const upcoming = remSummary.upcomingReminders.slice(0, 5).map(r => `• ⏰ **${r.title}** (Deadline: ${r.deadlineDateStr || 'Soon'}) ${r.amount ? `(${r.amount} SR)` : ''}`).join('\n');
@@ -18436,9 +18598,9 @@ function extractTaskInfo(text) {
     }
 
     // 1.3 Sales Handler (Today, Yesterday, Last Week, Last Month, Specific Date)
-    const isSalesQuery = /(sales|sles|sls|sals|saales|revenue|income|made|earned|turnover|مبيعات|مبعات|المبيعات|مبيعاتي|دخل|الدخل|أرباح|ارباح|كسبنا|طلعت|طلعنا|عملنا|جبنا|ربحنا)/i.test(lower) || 
-                         (lower.includes('today') && (lower.includes('how much') || lower.includes('total') || lower.includes('money'))) ||
-                         (lower.includes('اليوم') && (lower.includes('كم') || lower.includes('إجمالي') || lower.includes('اجمالي') || lower.includes('مجموع')));
+    const isSalesQuery = /(sales|sles|sls|sals|saales|revenue|income|made|earned|turnover|مبيعات|مبعات|المبيعات|مبيعاتي|دخل|الدخل|أرباح|ارباح|كسبنا|طلعت|طلعنا|عملنا|جبنا|ربحنا)/i.test(lower) ||
+        (lower.includes('today') && (lower.includes('how much') || lower.includes('total') || lower.includes('money'))) ||
+        (lower.includes('اليوم') && (lower.includes('كم') || lower.includes('إجمالي') || lower.includes('اجمالي') || lower.includes('مجموع')));
 
     if (isSalesQuery) {
         const isYesterday = lower.includes('yesterday') || lower.includes('أمس') || lower.includes('امس') || lower.includes('البارحة');
@@ -18449,7 +18611,7 @@ function extractTaskInfo(text) {
         if (isYesterday || isWeek || isMonth || specificDateMatch) {
             const histData = getSalesForTimeframe(userText);
             const formattedNum = histData.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const msg = isAr 
+            const msg = isAr
                 ? `مبيعاتك لـ ${histData.timeframeLabel} - هي (${formattedNum} ر.س)`
                 : `Your sales for ${histData.timeframeLabel} - is (${formattedNum} SR)`;
             renderAIChatMessage('bot', msg);
@@ -18457,7 +18619,7 @@ function extractTaskInfo(text) {
         } else {
             const salesData = getTodaySalesSummary();
             const formattedNum = salesData.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const msg = isAr 
+            const msg = isAr
                 ? `مبيعاتك اليوم - (${salesData.todayStr}) - هي (${formattedNum} ر.س)`
                 : `Your sales today - (${salesData.todayStr}) - is (${formattedNum} SR)`;
             renderAIChatMessage('bot', msg);
@@ -18498,8 +18660,8 @@ function extractTaskInfo(text) {
         }
 
         const liveSummary = getCompanyLiveContextSummary();
-        renderAIChatMessage('bot', isAr 
-            ? `إليك تقرير البيانات المباشر للشركة والنظام:\n\n${liveSummary}` 
+        renderAIChatMessage('bot', isAr
+            ? `إليك تقرير البيانات المباشر للشركة والنظام:\n\n${liveSummary}`
             : `Here is the live real-time system & payroll analytics report:\n\n${liveSummary}`);
         return;
     }
@@ -18553,464 +18715,24 @@ function extractTaskInfo(text) {
 
     // 6. Smart General Conversational Handler (Jokes, Science, Riddles, Advice, Chit-Chat)
     if (lower.includes('نكتة') || lower.includes('دعابة') || lower.includes('joke')) {
-        renderAIChatMessage('bot', isAr 
-            ? '😀 لماذا لا تكذب الأسماك؟ لأن الجميع يمكنهم رُؤية شفاهها تحت الماء! 🐟' 
+        renderAIChatMessage('bot', isAr
+            ? '😀 لماذا لا تكذب الأسماك؟ لأن الجميع يمكنهم رُؤية شفاهها تحت الماء! 🐟'
             : '😀 Why don\'t scientists trust atoms? Because they make up everything!');
         return;
     }
 
     if (lower.includes('من انت') || lower.includes('من أنت') || lower.includes('who are you') || lower.includes('ما هو اسمك') || lower.includes('اسمك')) {
-        renderAIChatMessage('bot', isAr 
-            ? 'أنا مساعدك الذكي المعتمد على ذكاء Gemini! يمكنني إجابة أسئلتك العامة والتحليلية، ومساعدتك في إدارة المبيعات، العمال، التذكيرات، والمنتجات.' 
+        renderAIChatMessage('bot', isAr
+            ? 'أنا مساعدك الذكي المعتمد على ذكاء Gemini! يمكنني إجابة أسئلتك العامة والتحليلية، ومساعدتك في إدارة المبيعات، العمال، التذكيرات، والمنتجات.'
             : 'I am your Smart Executive Manager powered by Gemini AI! I can answer general and analytical questions, and help you manage sales, staff, reminders, and market products.');
         return;
     }
 
-    renderAIChatMessage('bot', isAr 
-        ? `أهلاً بك! بالنسبة لـ "${userText}": أعمل كمساعد تنفيذي متصل بـ Gemini. يمكنك استفساري عن المبيعات، التذكيرات الحمراء، حسابات العمال، أو استخدام مفتاح Gemini API المجاني للإجابة عن المعارف العامة العميقة!` 
+    renderAIChatMessage('bot', isAr
+        ? `أهلاً بك! بالنسبة لـ "${userText}": أعمل كمساعد تنفيذي متصل بـ Gemini. يمكنك استفساري عن المبيعات، التذكيرات الحمراء، حسابات العمال، أو استخدام مفتاح Gemini API المجاني للإجابة عن المعارف العامة العميقة!`
         : `Welcome! Regarding "${userText}": I am your Executive AI Manager connected to Gemini. You can ask me about sales history, red reminders, staff reports, or input your free Gemini API Key for unrestricted general answers!`);
 }
 window.handleAIChatSubmit = handleAIChatSubmit;
-
-// =============================================
-// AI CHATBOT SPEECH RECOGNITION (VOICE TO TEXT)
-// =============================================
-let aiSpeechRecognitionInstance = null;
-let isAISpeechRecording = false;
-
-function toggleAIChatVoiceInput() {
-    const voiceBtn = document.getElementById('ai-chat-voice-btn');
-    const input = document.getElementById('ai-chat-input');
-    if (!voiceBtn || !input) return;
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        alert(typeof currentAppLang !== 'undefined' && currentAppLang === 'ar' 
-            ? 'خاصية التعرف على الصوت غير مدعومة في هذا المتصفح. يرجى استخدام متصفح Chrome أو Edge.' 
-            : 'Speech recognition is not supported on this browser. Please use Chrome or Edge.');
-        return;
-    }
-
-    if (isAISpeechRecording) {
-        if (aiSpeechRecognitionInstance) {
-            try { aiSpeechRecognitionInstance.stop(); } catch(e){}
-        }
-        stopAISpeechVoiceUI();
-        return;
-    }
-
-    try {
-        const recognition = new SpeechRecognition();
-        aiSpeechRecognitionInstance = recognition;
-        
-        const isAr = (typeof currentAppLang !== 'undefined' ? currentAppLang : localStorage.getItem("burgeroov_lang")) === 'ar';
-        recognition.lang = isAr ? 'ar-SA' : 'en-US';
-        recognition.continuous = false;
-        recognition.interimResults = true;
-
-        recognition.onstart = function() {
-            isAISpeechRecording = true;
-            voiceBtn.style.background = '#ef4444';
-            voiceBtn.style.color = '#ffffff';
-            voiceBtn.style.borderColor = '#ef4444';
-            voiceBtn.innerHTML = `<span style="font-size: 1.1rem;">🔴</span><span style="font-size: 0.82rem; font-weight: 900;">${isAr ? 'استماع...' : 'Listening...'}</span>`;
-            voiceBtn.style.boxShadow = '0 0 16px rgba(239, 68, 68, 0.6)';
-            input.placeholder = isAr ? 'تحدث الآن... وسأقوم بالإرسال فوراً' : 'Speak now... will send automatically';
-        };
-
-        recognition.onresult = function(event) {
-            let interimTranscript = '';
-            let finalTranscript = '';
-
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (event.results[i].isFinal) {
-                    finalTranscript += event.results[i][0].transcript;
-                } else {
-                    interimTranscript += event.results[i][0].transcript;
-                }
-            }
-
-            const currentText = finalTranscript || interimTranscript;
-            if (currentText) {
-                input.value = currentText;
-            }
-        };
-
-        recognition.onerror = function(event) {
-            console.warn("AI Speech Recognition Error:", event.error);
-            stopAISpeechVoiceUI();
-        };
-
-        recognition.onend = function() {
-            stopAISpeechVoiceUI();
-            const transcribedText = input.value ? input.value.trim() : '';
-            if (transcribedText) {
-                // Automatically send text immediately after user finishes talking!
-                setTimeout(() => {
-                    if (typeof handleAIChatSubmit === 'function') {
-                        handleAIChatSubmit();
-                    }
-                }, 350);
-            }
-        };
-
-        recognition.start();
-    } catch(err) {
-        console.error("Speech Recognition launch error:", err);
-        stopAISpeechVoiceUI();
-    }
-}
-
-function stopAISpeechVoiceUI() {
-    isAISpeechRecording = false;
-    const voiceBtn = document.getElementById('ai-chat-voice-btn');
-    const input = document.getElementById('ai-chat-input');
-    const isAr = (typeof currentAppLang !== 'undefined' ? currentAppLang : localStorage.getItem("burgeroov_lang")) === 'ar';
-
-    if (voiceBtn) {
-        voiceBtn.style.background = 'var(--input-bg)';
-        voiceBtn.style.color = '#6366f1';
-        voiceBtn.style.borderColor = '#6366f1';
-        voiceBtn.style.boxShadow = 'none';
-        voiceBtn.innerHTML = `<span>🎤</span>`;
-    }
-    if (input && !input.value) {
-        input.placeholder = isAr 
-            ? 'اكتب طلبك هنا أو تحدث بالمايك... / Type or speak command...' 
-            : 'Type or speak command...';
-    }
-}
-
-window.toggleAIChatVoiceInput = toggleAIChatVoiceInput;
-
-// =============================================
-// WORKER LOGIN INFO & PASSWORD MANAGEMENT MODULE
-// =============================================
-let hiddenPasswordStates = {};
-
-function renderWorkerLoginTable() {
-    const tbody = document.getElementById('ops-worker-login-tbody');
-    if (!tbody) return;
-
-    const companyData = getCompanyData();
-    let workers = companyData.workers || [];
-
-    const countBadge = document.getElementById('ops-worker-count-badge');
-    if (countBadge) {
-        countBadge.textContent = `${workers.length} Worker${workers.length === 1 ? '' : 's'}`;
-    }
-
-    const searchInput = document.getElementById('ops-worker-login-search');
-    const q = searchInput ? searchInput.value.toLowerCase().trim() : '';
-
-    if (q) {
-        workers = workers.filter(w => {
-            if (!w) return false;
-            const name = (w.name || '').toLowerCase();
-            const email = (w.email || '').toLowerCase();
-            const role = (w.role || '').toLowerCase();
-            return name.includes(q) || email.includes(q) || role.includes(q);
-        });
-    }
-
-    if (workers.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="5" style="text-align: center; padding: 24px; color: var(--text-muted); font-weight: 700;">
-                    ${q ? 'No employees match your search.' : 'No registered employees found. Register employees using the form below.'}
-                </td>
-            </tr>
-        `;
-        return;
-    }
-
-    tbody.innerHTML = workers.map(w => {
-        const safeName = typeof escapeHtml === 'function' ? escapeHtml(w.name) : (w.name || 'Worker');
-        const safeEmail = typeof escapeHtml === 'function' ? escapeHtml(w.email) : (w.email || 'No Email');
-        const safeRole = typeof escapeHtml === 'function' ? escapeHtml(w.role) : (w.role || 'Staff');
-        const isPwdRevealed = !!hiddenPasswordStates[w.id];
-        const displayPassword = w.password 
-            ? (isPwdRevealed ? (typeof escapeHtml === 'function' ? escapeHtml(w.password) : w.password) : '••••••••') 
-            : '<span style="color: var(--text-muted); font-style: italic;">Firebase Auth Default</span>';
-
-        return `
-            <tr style="border-bottom: 1px solid var(--border-color);">
-                <td style="padding: 12px 16px; font-weight: 800; color: var(--text-main);">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="font-size: 1.1rem;">👤</span>
-                        <div>
-                            <div>${safeName}</div>
-                            <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Branch: ${typeof escapeHtml === 'function' ? escapeHtml(w.branch || 'Main') : (w.branch || 'Main')}</div>
-                        </div>
-                    </div>
-                </td>
-                <td style="padding: 12px 16px; font-weight: 700; color: var(--text-main);">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <span>${safeEmail}</span>
-                        <button type="button" onclick="if(typeof copyToClipboard==='function') copyToClipboard('${safeEmail}')" title="Copy Email" style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 2px 6px; font-size: 0.74rem; cursor: pointer;">📋</button>
-                    </div>
-                </td>
-                <td style="padding: 12px 16px;">
-                    <span class="badge" style="background: rgba(99, 102, 241, 0.12); color: #6366f1; border: 1px solid rgba(99, 102, 241, 0.25); font-weight: 800; font-size: 0.78rem; padding: 4px 10px; border-radius: 12px;">
-                        ${safeRole}
-                    </span>
-                </td>
-                <td style="padding: 12px 16px; font-weight: 800; font-family: monospace;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span>${displayPassword}</span>
-                        ${w.password ? `
-                            <button type="button" onclick="toggleWorkerPasswordReveal('${w.id}')" title="Toggle Password Reveal" style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 2px 6px; font-size: 0.74rem; cursor: pointer;">
-                                ${isPwdRevealed ? '🙈' : '👁️'}
-                            </button>
-                        ` : ''}
-                    </div>
-                </td>
-                <td style="padding: 12px 16px; text-align: center;">
-                    <div style="display: flex; gap: 6px; justify-content: center;">
-                        <button type="button" onclick="openWorkerResetPasswordModal('${w.id}')" class="btn-primary" style="padding: 6px 14px; font-size: 0.8rem; font-weight: 800; border-radius: 8px; background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-                            🔑 Reset Password
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        `;
-    }).join('');
-}
-
-function toggleWorkerPasswordReveal(workerId) {
-    hiddenPasswordStates[workerId] = !hiddenPasswordStates[workerId];
-    renderWorkerLoginTable();
-}
-
-function openWorkerResetPasswordModal(workerId) {
-    const companyData = getCompanyData();
-    const worker = (companyData.workers || []).find(w => w.id === workerId);
-    if (!worker) return;
-
-    document.getElementById('reset-pwd-worker-id').value = worker.id;
-    document.getElementById('reset-pwd-worker-name').textContent = `Worker: ${worker.name} (${worker.email})`;
-    document.getElementById('reset-pwd-input').value = '';
-    document.getElementById('reset-pwd-confirm-input').value = '';
-    document.getElementById('reset-pwd-show-toggle').checked = false;
-    toggleResetPwdVisibility();
-
-    const modal = document.getElementById('worker-reset-password-modal');
-    if (modal) modal.style.display = 'flex';
-}
-
-function closeWorkerResetPasswordModal() {
-    const modal = document.getElementById('worker-reset-password-modal');
-    if (modal) modal.style.display = 'none';
-}
-
-function toggleResetPwdVisibility() {
-    const show = document.getElementById('reset-pwd-show-toggle').checked;
-    document.getElementById('reset-pwd-input').type = show ? 'text' : 'password';
-    document.getElementById('reset-pwd-confirm-input').type = show ? 'text' : 'password';
-}
-
-function submitWorkerPasswordReset() {
-    const workerId = document.getElementById('reset-pwd-worker-id').value;
-    const newPwd = document.getElementById('reset-pwd-input').value.trim();
-    const confirmPwd = document.getElementById('reset-pwd-confirm-input').value.trim();
-
-    if (!newPwd) {
-        alert("Please enter a new password.");
-        return;
-    }
-    if (newPwd.length < 6) {
-        alert("Password must be at least 6 characters long.");
-        return;
-    }
-    if (newPwd !== confirmPwd) {
-        alert("Passwords do not match.");
-        return;
-    }
-
-    const companyData = getCompanyData();
-    const worker = (companyData.workers || []).find(w => w.id === workerId);
-    if (!worker) {
-        alert("Worker record not found.");
-        return;
-    }
-
-    const oldPwd = worker.password || '';
-    // Save custom password to worker record
-    worker.password = newPwd;
-    worker.oldPassword = oldPwd;
-    worker.passwordLastReset = Date.now();
-
-    const emailKey = worker.email.toLowerCase().replace(/\./g, ',');
-    const pwdPayload = {
-        email: worker.email.toLowerCase(),
-        password: newPwd,
-        workerId: worker.id,
-        updatedAt: Date.now()
-    };
-
-    // Save to localStorage cache for instant local client lookup
-    try {
-        localStorage.setItem('mvc_worker_pwd_' + emailKey, newPwd);
-    } catch(e){}
-
-    // Save to customerCodes/workerPasswords node (public read/write permitted by Firebase Rules)
-    if (typeof db !== 'undefined' && db) {
-        db.ref(`customerCodes/workerPasswords/${emailKey}`).set(pwdPayload)
-            .catch(e => console.error("Error setting customerCodes workerPasswords:", e));
-    }
-
-    // Save to globalWorkerPasswords root node (public read across all logins)
-    if (typeof db !== 'undefined' && db) {
-        db.ref(`globalWorkerPasswords/${emailKey}`).set(pwdPayload)
-            .catch(e => console.error("Error setting globalWorkerPasswords:", e));
-    }
-
-    const companyKeys = ['burgeroov', 'mvc', 'mvcfresh', currentCompany];
-    companyKeys.forEach(cKey => {
-        if (cKey && typeof db !== 'undefined' && db) {
-            db.ref(`companies/${cKey}/workerPasswords/${emailKey}`).set(pwdPayload)
-                .catch(e => console.error("Error setting workerPasswords mapping:", e));
-        }
-    });
-
-    // Persist targeted updates to Firebase Realtime Database
-    db.ref('companies/' + currentCompany + '/workers').set(companyData.workers)
-        .then(() => {
-            // Also store under flat workerCredentials for lookup
-            db.ref(`companies/${currentCompany}/workerCredentials/${worker.id}`).set({
-                email: worker.email.toLowerCase(),
-                password: newPwd,
-                updatedAt: Date.now()
-            }).catch(e => console.error("Error setting workerCredentials:", e));
-
-            closeWorkerResetPasswordModal();
-            renderWorkerLoginTable();
-
-            // Sync password directly to Firebase Auth via secondary app instance
-            syncWorkerPasswordToFirebaseAuth(worker.email, newPwd, oldPwd);
-
-            const msg = currentAppLang === 'ar'
-                ? `✅ تم تغيير كلمة المرور لـ ${worker.name} (${worker.email}) بنجاح إلى:\n\n🔑 ${newPwd}\n\nيجب على الموظف استخدام كلمة المرور الجديدة هذه لتسجيل الدخول.`
-                : `✅ Password for ${worker.name} (${worker.email}) successfully updated to:\n\n🔑 ${newPwd}\n\nThe worker must use this new password to log in.`;
-            alert(msg);
-        })
-        .catch(err => {
-            console.error("Error resetting worker password:", err);
-            alert("Error updating password in Firebase: " + err.message);
-        });
-}
-
-async function syncWorkerPasswordToFirebaseAuth(workerEmail, newPwd, oldPwd) {
-    if (!workerEmail || !newPwd) return;
-    try {
-        let secApp;
-        try {
-            secApp = firebase.app("WorkerPwdSync");
-        } catch(e) {
-            secApp = firebase.initializeApp(firebaseConfig, "WorkerPwdSync");
-        }
-        const secAuth = secApp.auth();
-
-        try {
-            const createRes = await secAuth.createUserWithEmailAndPassword(workerEmail, newPwd);
-            if (createRes && createRes.user) {
-                console.log("Created worker in Firebase Auth via Secondary App.");
-                await secAuth.signOut();
-                return;
-            }
-        } catch (createErr) {
-            if (createErr.code === 'auth/email-already-in-use') {
-                if (oldPwd && oldPwd !== newPwd) {
-                    try {
-                        const oldSignIn = await secAuth.signInWithEmailAndPassword(workerEmail, oldPwd);
-                        if (oldSignIn && oldSignIn.user) {
-                            await oldSignIn.user.updatePassword(newPwd);
-                            console.log("Updated worker password in Firebase Auth via Secondary App.");
-                            await secAuth.signOut();
-                            return;
-                        }
-                    } catch(e) {
-                        console.warn("Could not sign in with old password on secondary auth app:", e);
-                    }
-                }
-            }
-        }
-    } catch(err) {
-        console.error("Secondary Auth Sync Error:", err);
-    }
-}
-
-window.renderWorkerLoginTable = renderWorkerLoginTable;
-window.toggleWorkerPasswordReveal = toggleWorkerPasswordReveal;
-window.openWorkerResetPasswordModal = openWorkerResetPasswordModal;
-window.closeWorkerResetPasswordModal = closeWorkerResetPasswordModal;
-window.toggleResetPwdVisibility = toggleResetPwdVisibility;
-window.submitWorkerPasswordReset = submitWorkerPasswordReset;
-
-function resolveWorkerUserLogin(email) {
-    const overlay = document.getElementById('auth-overlay');
-    const authLoader = document.getElementById('auth-loader');
-    const authBtn = document.getElementById('auth-btn');
-
-    if (authLoader) authLoader.style.display = 'none';
-    if (authBtn) authBtn.style.display = 'block';
-
-    const parseAdminsSnap = (snap) => (snap && snap.exists()) ? (snap.val() || {}) : {};
-    const parseWorkersSnap = (snap) => (snap && snap.exists() && Array.isArray(snap.val())) ? snap.val() : [];
-
-    Promise.all([
-        db.ref('companies/burgeroov/admins').once('value').catch(() => null),
-        db.ref('companies/burgeroov/workers').once('value').catch(() => null),
-        db.ref('companies/mvc/admins').once('value').catch(() => null),
-        db.ref('companies/mvc/workers').once('value').catch(() => null),
-        db.ref('companies/mvcfresh/admins').once('value').catch(() => null),
-        db.ref('companies/mvcfresh/workers').once('value').catch(() => null)
-    ]).then(([bgAdmins, bgWorkers, mvcAdmins, mvcWorkers, freshAdmins, freshWorkers]) => {
-        const burgeroovAdmins = parseAdminsSnap(bgAdmins);
-        const burgeroovWorkers = parseWorkersSnap(bgWorkers);
-        const mvcAdminsList = parseAdminsSnap(mvcAdmins);
-        const mvcWorkersList = parseWorkersSnap(mvcWorkers);
-        const mvcfreshAdminsList = parseAdminsSnap(freshAdmins);
-        const mvcfreshWorkersList = parseWorkersSnap(freshWorkers);
-
-        const sanitizedEmail = email.toLowerCase().replace(/\./g, ',');
-        const inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
-            burgeroovWorkers.some(w => w && w.email && w.email.toLowerCase() === email.toLowerCase());
-
-        const inMvc = mvcAdminsList[sanitizedEmail] === true ||
-            mvcWorkersList.some(w => w && w.email && w.email.toLowerCase() === email.toLowerCase());
-
-        const inMvcFresh = mvcfreshAdminsList[sanitizedEmail] === true ||
-            mvcfreshWorkersList.some(w => w && w.email && w.email.toLowerCase() === email.toLowerCase());
-
-        if (overlay) overlay.style.display = 'none';
-
-        const activeCompanies = [];
-        if (inBurgeroov) activeCompanies.push('burgeroov');
-        if (inMvc) activeCompanies.push('mvc');
-        if (inMvcFresh) activeCompanies.push('mvcfresh');
-
-        window.isMultiCompany = activeCompanies.length > 1;
-
-        const savedCompany = localStorage.getItem('selected_company');
-        if (savedCompany && activeCompanies.includes(savedCompany)) {
-            selectCompany(savedCompany);
-        } else if (activeCompanies.length === 1) {
-            selectCompany(activeCompanies[0]);
-        } else if (activeCompanies.length > 1) {
-            showCompanySelectionHUD();
-        } else {
-            const defaultCompany = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
-            selectCompany(defaultCompany);
-        }
-    }).catch(err => {
-        console.error("Error in resolveWorkerUserLogin:", err);
-        if (overlay) overlay.style.display = 'none';
-        const defaultCompany = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
-        selectCompany(defaultCompany);
-    });
-}
-window.resolveWorkerUserLogin = resolveWorkerUserLogin;
 
 // =============================================
 // ADMIN INFORMATION & DOCUMENT VAULT MODULE
@@ -19048,9 +18770,9 @@ function handleVaultImagePreview(event) {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = function (e) {
         const img = new Image();
-        img.onload = function() {
+        img.onload = function () {
             const canvas = document.createElement('canvas');
             const maxDim = 1200;
             let width = img.width;

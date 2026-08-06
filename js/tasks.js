@@ -5,15 +5,15 @@
 function getMonthlyStats(worker, monthStr) {
     if (!worker.monthlyStats) worker.monthlyStats = {};
     if (!worker.monthlyStats[monthStr]) {
-        worker.monthlyStats[monthStr] = { 
-            custodyList: [], 
-            violationsList: [], 
-            rewardsList: [], 
-            costs: 0, 
-            paymentsList: [], 
-            deliveriesList: [], 
+        worker.monthlyStats[monthStr] = {
+            custodyList: [],
+            violationsList: [],
+            rewardsList: [],
+            costs: 0,
+            paymentsList: [],
+            deliveriesList: [],
             legacyDeliveries: 0,
-            overtimeList: [] 
+            overtimeList: []
         };
     } else if (!worker.monthlyStats[monthStr].overtimeList) {
         worker.monthlyStats[monthStr].overtimeList = [];
@@ -904,9 +904,9 @@ function getVisibleWorkers() {
     const activeWorker = getActiveWorker();
 
     // Check if worker has task access (perm-tasks class on body or perms object or currentUser perms)
-    const hasTaskAccess = document.body.classList.contains('perm-tasks') || 
-                          (activeWorker && activeWorker.perms && (activeWorker.perms.tasks === true || activeWorker.perms.tasks === 'true')) ||
-                          (currentUser && currentUser.perms && (currentUser.perms.tasks === true || currentUser.perms.tasks === 'true'));
+    const hasTaskAccess = document.body.classList.contains('perm-tasks') ||
+        (activeWorker && activeWorker.perms && (activeWorker.perms.tasks === true || activeWorker.perms.tasks === 'true')) ||
+        (currentUser && currentUser.perms && (currentUser.perms.tasks === true || currentUser.perms.tasks === 'true'));
 
     if (hasTaskAccess || !activeWorker) {
         return allWorkers;

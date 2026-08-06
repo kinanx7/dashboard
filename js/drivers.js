@@ -1416,9 +1416,6 @@ function renderAll() {
         if (typeof renderSelectedWorkerSysViolations === 'function') {
             renderSelectedWorkerSysViolations();
         }
-        if (typeof renderWorkerLoginTable === 'function') {
-            renderWorkerLoginTable();
-        }
     }
     else if (currentTab === 'ranks') { renderRanksTable(); }
     else if (currentTab === 'attendance') { renderAttendance(); }

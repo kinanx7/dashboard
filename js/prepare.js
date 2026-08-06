@@ -179,10 +179,10 @@ function submitMarketFeedback() {
 
     const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
     const custCode = isCustomer ? String(currentCustomerSession.code || currentCustomerSession.id).trim() : '';
-    const custName = isCustomer 
-        ? (currentCustomerSession.name || 'Customer (' + custCode + ')') 
-        : ((typeof currentWorkerProfile !== 'undefined' && currentWorkerProfile) 
-            ? (currentWorkerProfile.name || currentWorkerProfile.email) 
+    const custName = isCustomer
+        ? (currentCustomerSession.name || 'Customer (' + custCode + ')')
+        : ((typeof currentWorkerProfile !== 'undefined' && currentWorkerProfile)
+            ? (currentWorkerProfile.name || currentWorkerProfile.email)
             : ((typeof currentUser !== 'undefined' && currentUser && currentUser.email) ? currentUser.email : 'Worker'));
 
     const now = Date.now();
@@ -714,15 +714,15 @@ async function getBestGeminiModelName(apiKey) {
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
         const data = await res.json();
         if (data && data.models && Array.isArray(data.models)) {
-            const valid = data.models.filter(m => 
-                m.name && 
+            const valid = data.models.filter(m =>
+                m.name &&
                 m.supportedGenerationMethods?.includes('generateContent') &&
                 !m.name.includes('2.5')
             );
-            const preferred = valid.find(m => m.name.includes('gemini-2.0-flash')) || 
-                              valid.find(m => m.name.includes('gemini-1.5-flash-8b')) ||
-                              valid.find(m => m.name.includes('gemini-1.5-flash-latest')) ||
-                              valid[0];
+            const preferred = valid.find(m => m.name.includes('gemini-2.0-flash')) ||
+                valid.find(m => m.name.includes('gemini-1.5-flash-8b')) ||
+                valid.find(m => m.name.includes('gemini-1.5-flash-latest')) ||
+                valid[0];
             if (preferred) {
                 const cleanName = preferred.name.replace(/^models\//, '');
                 window._cachedGeminiModelName = cleanName;
@@ -747,7 +747,7 @@ function getCompanyLiveContextSummary() {
         if (data.workers && Array.isArray(data.workers)) {
             const att = data.attendance || {};
             const todayAtt = att[today] || {};
-            
+
             let lateList = [];
             let vacationList = [];
             let absentList = [];
@@ -869,7 +869,7 @@ function getCompanyLiveContextSummary() {
             }
         }
         summary.push(`### ADMIN REMINDERS & NOTIFICATIONS:\n${remText}`);
-    } catch(e) {
+    } catch (e) {
         console.warn("Error building company live context:", e);
     }
     return summary.join('\n\n');
@@ -956,7 +956,7 @@ function getTodaySalesSummary() {
             if (typeof currentTab !== 'undefined') currentTab = 'managing';
             renderManaging();
             if (typeof currentTab !== 'undefined') currentTab = savedTab;
-        } catch (e) {}
+        } catch (e) { }
     }
 
     // 2. Read directly from rendered Sales Section DOM elements
@@ -994,7 +994,7 @@ function getTodaySalesSummary() {
     if (allLogs && typeof allLogs === 'object' && !Array.isArray(allLogs)) {
         allLogs = Object.values(allLogs);
     }
-    
+
     let posTotal = 0;
     let posCount = 0;
     let posMethodsToday = {};
@@ -1063,13 +1063,13 @@ function getTodaySalesSummary() {
         });
     }
 
-    return { 
-        targetDateStr, 
+    return {
+        targetDateStr,
         todayStr: targetDateStr,
-        total: finalTotal, 
-        posTotal: finalTotal, 
-        marketTotal, 
-        posCount, 
+        total: finalTotal,
+        posTotal: finalTotal,
+        marketTotal,
+        posCount,
         marketCount,
         posMethodsToday
     };
@@ -1111,7 +1111,7 @@ function getSalesForTimeframe(queryStr) {
     const date = now.getDate();
 
     const localTodayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
-    
+
     const yesterdayDate = new Date(year, month, date - 1);
     const yesterdayStr = `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getDate()).padStart(2, '0')}`;
 
@@ -1135,7 +1135,7 @@ function getSalesForTimeframe(queryStr) {
         endTs = startTs + 86400000;
     } else if (lower.includes('last week') || lower.includes('past week') || lower.includes('this week') || lower.includes('week') || lower.includes('أسبوع') || lower.includes('اسبوع')) {
         const startOfWeek = new Date(year, month, date - 7).getTime();
-        timeframeLabel = `Last 7 Days / Week (${new Date(startOfWeek).toISOString().slice(0,10)} to ${localTodayStr})`;
+        timeframeLabel = `Last 7 Days / Week (${new Date(startOfWeek).toISOString().slice(0, 10)} to ${localTodayStr})`;
         startTs = startOfWeek;
         endTs = Date.now() + 86400000;
     } else if (lower.includes('last month') || lower.includes('past month') || lower.includes('this month') || lower.includes('month') || lower.includes('شهر')) {
@@ -1259,8 +1259,8 @@ async function fetchGeneralKnowledge(query, isAr) {
 
     // 1. Try Free AI API (Pollinations.ai Endpoint)
     try {
-        const sysMsg = isAr 
-            ? "أنت مساعد ذكي يعطي إجابات قصيرة ودقيقة ومباشرة لجميع الأسئلة." 
+        const sysMsg = isAr
+            ? "أنت مساعد ذكي يعطي إجابات قصيرة ودقيقة ومباشرة لجميع الأسئلة."
             : "You are a smart executive AI manager. Give a concise, accurate, direct answer to the question.";
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -1272,14 +1272,14 @@ async function fetchGeneralKnowledge(query, isAr) {
                 return text.trim();
             }
         }
-    } catch(e) {}
+    } catch (e) { }
 
     // 2. Try Wikipedia Knowledge Summary API
     try {
         let topic = query.replace(/what|how|tall|high|big|is|the|of|a|an|where|who|when|tell|me|about/gi, '').trim();
         if (/khalifa|خليفة/i.test(query)) topic = 'Burj_Khalifa';
         if (/sudan|سودان/i.test(query)) topic = 'Khartoum';
-        
+
         if (topic && topic.length >= 2) {
             const lang = isAr ? 'ar' : 'en';
             const controller = new AbortController();
@@ -1293,13 +1293,153 @@ async function fetchGeneralKnowledge(query, isAr) {
                 }
             }
         }
-    } catch(e) {}
+    } catch (e) { }
 
     return null;
 }
 window.fetchGeneralKnowledge = fetchGeneralKnowledge;
 
+// --- AI CHATBOT VOICE SPEECH RECOGNITION (ARABIC & ENGLISH) ---
+let aiChatSpeechRecognition = null;
+let isAIChatListening = false;
+let aiChatVoiceLang = 'auto'; // 'auto', 'ar-SA', 'en-US'
+
+function toggleAIChatVoiceInput() {
+    const input = document.getElementById('ai-chat-input');
+    const micBtn = document.getElementById('ai-chat-mic-btn');
+    const micIcon = document.getElementById('ai-chat-mic-icon');
+    const langBadge = document.getElementById('ai-chat-mic-lang-badge');
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+        alert(isAr 
+            ? "خاصية التعرف على الصوت غير مدعومة في هذا المتصفح. يرجى استخدام متصفح Google Chrome أو Edge أو Safari." 
+            : "Voice recognition is not supported in this browser. Please use Google Chrome, Microsoft Edge, or Safari.");
+        return;
+    }
+
+    if (isAIChatListening && aiChatSpeechRecognition) {
+        try { aiChatSpeechRecognition.stop(); } catch(e){}
+        isAIChatListening = false;
+        resetAIChatMicUI();
+        return;
+    }
+
+    try {
+        aiChatSpeechRecognition = new SpeechRecognition();
+    } catch(err) {
+        console.error("SpeechRecognition initialization error:", err);
+        alert(isAr ? "تعذر تشغيل الميكروفون." : "Unable to initialize microphone.");
+        return;
+    }
+
+    aiChatSpeechRecognition.continuous = false;
+    aiChatSpeechRecognition.interimResults = true;
+
+    // Detect target language for speech recognition (supports Arabic & English)
+    let targetLang = isAr ? 'ar-SA' : 'en-US';
+    if (aiChatVoiceLang && aiChatVoiceLang !== 'auto') {
+        targetLang = aiChatVoiceLang;
+    } else if (input && input.value) {
+        const hasArabic = /[\u0600-\u06FF]/.test(input.value);
+        if (hasArabic) targetLang = 'ar-SA';
+        else if (/[a-zA-Z]/.test(input.value)) targetLang = 'en-US';
+    }
+    aiChatSpeechRecognition.lang = targetLang;
+
+    aiChatSpeechRecognition.onstart = () => {
+        isAIChatListening = true;
+        if (micBtn) {
+            micBtn.style.background = '#ef4444';
+            micBtn.style.color = '#ffffff';
+            micBtn.style.borderColor = '#ef4444';
+            micBtn.style.boxShadow = '0 0 16px rgba(239, 68, 68, 0.7)';
+        }
+        if (micIcon) {
+            micIcon.textContent = '🎙️';
+        }
+        if (langBadge) {
+            langBadge.style.background = 'rgba(255, 255, 255, 0.3)';
+            langBadge.style.color = '#ffffff';
+            langBadge.textContent = targetLang.startsWith('ar') ? 'عربي' : 'EN';
+        }
+        if (input) {
+            input.placeholder = isAr ? '🎙️ جاري الاستماع... تحدّث الآن باللغة العربية أو الإنجليزية' : '🎙️ Listening... Speak now in Arabic or English...';
+        }
+    };
+
+    aiChatSpeechRecognition.onresult = (event) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            transcript += event.results[i][0].transcript;
+        }
+        if (input && transcript) {
+            input.value = transcript;
+        }
+    };
+
+    aiChatSpeechRecognition.onerror = (event) => {
+        console.warn("Speech recognition error:", event.error);
+        isAIChatListening = false;
+        resetAIChatMicUI();
+        if (event.error === 'not-allowed') {
+            alert(isAr 
+                ? "تم رفض إذن استخدام الميكروفون. يرجى تفعيل إذن الميكروفون في إعدادات المتصفح." 
+                : "Microphone permission was denied. Please allow microphone access in your browser settings.");
+        }
+    };
+
+    aiChatSpeechRecognition.onend = () => {
+        isAIChatListening = false;
+        resetAIChatMicUI();
+    };
+
+    try {
+        aiChatSpeechRecognition.start();
+    } catch(err) {
+        console.error("Failed to start SpeechRecognition:", err);
+        isAIChatListening = false;
+        resetAIChatMicUI();
+    }
+}
+
+function resetAIChatMicUI() {
+    const input = document.getElementById('ai-chat-input');
+    const micBtn = document.getElementById('ai-chat-mic-btn');
+    const micIcon = document.getElementById('ai-chat-mic-icon');
+    const langBadge = document.getElementById('ai-chat-mic-lang-badge');
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    if (micBtn) {
+        micBtn.style.background = 'var(--input-bg)';
+        micBtn.style.color = '#6366f1';
+        micBtn.style.borderColor = '#6366f1';
+        micBtn.style.boxShadow = 'none';
+    }
+    if (micIcon) {
+        micIcon.textContent = '🎤';
+    }
+    if (langBadge) {
+        langBadge.style.background = 'rgba(99, 102, 241, 0.15)';
+        langBadge.style.color = '#6366f1';
+        langBadge.textContent = 'AR/EN';
+    }
+    if (input) {
+        input.placeholder = isAr ? 'اكتب طلبك هنا للمساعد الذكي... / Type your command...' : 'Type your command here for AI Assistant...';
+    }
+}
+
+window.toggleAIChatVoiceInput = toggleAIChatVoiceInput;
+window.resetAIChatMicUI = resetAIChatMicUI;
+
 async function handleAIChatSubmit() {
+    if (isAIChatListening && aiChatSpeechRecognition) {
+        try { aiChatSpeechRecognition.stop(); } catch(e){}
+        isAIChatListening = false;
+        resetAIChatMicUI();
+    }
     const input = document.getElementById('ai-chat-input');
     const userText = input?.value?.trim() || '';
     if (!userText) return;
@@ -1405,7 +1545,7 @@ ${liveContext}`;
                         data = resJson;
                         break;
                     }
-                } catch (e) {}
+                } catch (e) { }
             }
 
             // Attempt 2: Fallback without tools declaration (pure conversational mode with history)
@@ -1425,7 +1565,7 @@ ${liveContext}`;
                             data = resJson;
                             break;
                         }
-                    } catch (e) {}
+                    } catch (e) { }
                 }
             }
 
@@ -1447,7 +1587,7 @@ ${liveContext}`;
                             data = resJson;
                             break;
                         }
-                    } catch (e) {}
+                    } catch (e) { }
                 }
             }
 
@@ -1485,75 +1625,75 @@ ${liveContext}`;
             window._aiChatHistory.push({ role: 'model', parts: [{ text: generalAns }] });
             return;
         }
-    } catch(e) {}
+    } catch (e) { }
 
-function extractProductInfo(text) {
-    let rawText = text;
+    function extractProductInfo(text) {
+        let rawText = text;
 
-    // 1. Extract Weight (e.g. 500 g, 500g, 14 kg, 500 جرام, 1 كجم)
-    let weight = '';
-    const weightMatch = text.match(/(\d+(?:\.\d+)?\s*(?:kg|g|gm|kgm|كجم|جم|جرام|غرام))/i);
-    if (weightMatch) {
-        weight = weightMatch[1].trim();
-        text = text.replace(weightMatch[0], ' ');
+        // 1. Extract Weight (e.g. 500 g, 500g, 14 kg, 500 جرام, 1 كجم)
+        let weight = '';
+        const weightMatch = text.match(/(\d+(?:\.\d+)?\s*(?:kg|g|gm|kgm|كجم|جم|جرام|غرام))/i);
+        if (weightMatch) {
+            weight = weightMatch[1].trim();
+            text = text.replace(weightMatch[0], ' ');
+        }
+
+        // 2. Extract Price
+        let price = 50;
+        const priceMatch = text.match(/(\d+(?:\.\d+)?)/);
+        if (priceMatch) {
+            price = parseFloat(priceMatch[1]);
+            text = text.replace(priceMatch[0], ' ');
+        }
+
+        // 3. Category Detection
+        let category = 'meat';
+        if (/خضار|فواكه|تفاح|برتقال|موز|طماطم|veg|fruit/i.test(rawText)) {
+            category = 'veg_fruit';
+        } else if (/سمك|أسماك|ربيان|جمبري|هامور|fish/i.test(rawText)) {
+            category = 'fish';
+        }
+
+        // 4. Clean Product Name (whole word replacements ONLY)
+        let cleanName = text
+            .replace(/\b(add|product|products|create|new|price|cost|sr|riyal|category|dept|department|the|name|to|for|in|veggie|veg|fruit|fish|market|store|with|weight|waight|and|a|an)\b/gi, ' ')
+            .replace(/(?:^|\s)(أضف|اضف|تنزيل|نزل|جديد|منتج|منتجات|بسعر|سعر|بكمية|كمية|ريال|ر\.س|SR|في|إلى|قسم|أقسام|اللحوم|لحوم|الخضار|خضار|فواكه|الأسماك|أسماك|سمك|اسم|صنف|عنصر|سوق|بالسوق|الماركت|متجر|وزن)(?=\s|$)/gi, ' ')
+            .replace(/[:"']/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        if (!cleanName || cleanName.length < 2) {
+            cleanName = category === 'meat' ? 'لحم طازج' : (category === 'veg_fruit' ? 'خضار طازجة' : 'سمك طازج');
+        }
+
+        return { name: cleanName, price, category, weight };
     }
 
-    // 2. Extract Price
-    let price = 50;
-    const priceMatch = text.match(/(\d+(?:\.\d+)?)/);
-    if (priceMatch) {
-        price = parseFloat(priceMatch[1]);
-        text = text.replace(priceMatch[0], ' ');
+    function extractTaskInfo(text) {
+        let workerName = '';
+        const workerMatch = text.match(/(?:للموظف|للعامل|لـ|إلى|to worker|to)\s+([\u0600-\u06FFa-zA-Z]+)/i);
+        if (workerMatch && workerMatch[1]) {
+            workerName = workerMatch[1].trim();
+        }
+
+        let cleanTitle = text
+            .replace(/ارسل|أرسل|إرسال|مهمة|مهمه|جديدة|جديده|واجب|إنشاء|أضف|اضف/gi, '')
+            .replace(/للموظف|للعامل|لـ|إلى|للعمال/gi, '')
+            .replace(/\b(send|task|assignment|create|add|to|worker|employee|for)\b/gi, '')
+            .replace(/[:"']/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        if (workerName) {
+            cleanTitle = cleanTitle.replace(new RegExp(workerName, 'gi'), '').replace(/\s+/g, ' ').trim();
+        }
+
+        if (!cleanTitle || cleanTitle.length < 2) {
+            cleanTitle = text.trim();
+        }
+
+        return { worker_name: workerName || 'عمومي', title: cleanTitle };
     }
-
-    // 3. Category Detection
-    let category = 'meat';
-    if (/خضار|فواكه|تفاح|برتقال|موز|طماطم|veg|fruit/i.test(rawText)) {
-        category = 'veg_fruit';
-    } else if (/سمك|أسماك|ربيان|جمبري|هامور|fish/i.test(rawText)) {
-        category = 'fish';
-    }
-
-    // 4. Clean Product Name (whole word replacements ONLY)
-    let cleanName = text
-        .replace(/\b(add|product|products|create|new|price|cost|sr|riyal|category|dept|department|the|name|to|for|in|veggie|veg|fruit|fish|market|store|with|weight|waight|and|a|an)\b/gi, ' ')
-        .replace(/(?:^|\s)(أضف|اضف|تنزيل|نزل|جديد|منتج|منتجات|بسعر|سعر|بكمية|كمية|ريال|ر\.س|SR|في|إلى|قسم|أقسام|اللحوم|لحوم|الخضار|خضار|فواكه|الأسماك|أسماك|سمك|اسم|صنف|عنصر|سوق|بالسوق|الماركت|متجر|وزن)(?=\s|$)/gi, ' ')
-        .replace(/[:"']/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-    if (!cleanName || cleanName.length < 2) {
-        cleanName = category === 'meat' ? 'لحم طازج' : (category === 'veg_fruit' ? 'خضار طازجة' : 'سمك طازج');
-    }
-
-    return { name: cleanName, price, category, weight };
-}
-
-function extractTaskInfo(text) {
-    let workerName = '';
-    const workerMatch = text.match(/(?:للموظف|للعامل|لـ|إلى|to worker|to)\s+([\u0600-\u06FFa-zA-Z]+)/i);
-    if (workerMatch && workerMatch[1]) {
-        workerName = workerMatch[1].trim();
-    }
-
-    let cleanTitle = text
-        .replace(/ارسل|أرسل|إرسال|مهمة|مهمه|جديدة|جديده|واجب|إنشاء|أضف|اضف/gi, '')
-        .replace(/للموظف|للعامل|لـ|إلى|للعمال/gi, '')
-        .replace(/\b(send|task|assignment|create|add|to|worker|employee|for)\b/gi, '')
-        .replace(/[:"']/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-    if (workerName) {
-        cleanTitle = cleanTitle.replace(new RegExp(workerName, 'gi'), '').replace(/\s+/g, ' ').trim();
-    }
-
-    if (!cleanTitle || cleanTitle.length < 2) {
-        cleanTitle = text.trim();
-    }
-
-    return { worker_name: workerName || 'عمومي', title: cleanTitle };
-}
 
     // Smart Fallback Parser (Local Conversational & Action Engine)
     const lower = userText.toLowerCase();
@@ -1566,8 +1706,8 @@ function extractTaskInfo(text) {
 
     // 1.2 General Knowledge Riddles (e.g. Who came first: egg or chicken?)
     if (lower.includes('egg') || lower.includes('chicken') || lower.includes('بيضة') || lower.includes('دجاجة') || lower.includes('البيضة') || lower.includes('الدجاجة')) {
-        renderAIChatMessage('bot', isAr 
-            ? 'سؤال علمي وفلسفي رائع! 🥚🐓\nعلمياً، **البيضة سبقت الدجاجة** بحوالي ملايين السنين! لأن الكائنات البياضة كالديناصورات والزواحف القديمة كانت تضع بيضاً قشرياً قبل ظهور الدجاج الحديث على كوكب الأرض بأجيال طوال!' 
+        renderAIChatMessage('bot', isAr
+            ? 'سؤال علمي وفلسفي رائع! 🥚🐓\nعلمياً، **البيضة سبقت الدجاجة** بحوالي ملايين السنين! لأن الكائنات البياضة كالديناصورات والزواحف القديمة كانت تضع بيضاً قشرياً قبل ظهور الدجاج الحديث على كوكب الأرض بأجيال طوال!'
             : 'A classic scientific riddle! 🥚🐓\nScientifically, **the egg came first**! Egg-laying creatures like dinosaurs existed millions of years before modern chickens evolved on Earth!');
         return;
     }
@@ -1615,7 +1755,7 @@ function extractTaskInfo(text) {
             const mathResult = Function('"use strict";return (' + mathMatch[1] + ')')();
             renderAIChatMessage('bot', isAr ? `نتيجة العملية الحسابية (${mathMatch[1]}) تساوي **${mathResult}**.` : `The result of (${mathMatch[1]}) is **${mathResult}**.`);
             return;
-        } catch(e) {}
+        } catch (e) { }
     }
 
     // 1.25 Admin Reminders Query Handler (Red Alert / Due Reminders)
@@ -1627,13 +1767,13 @@ function extractTaskInfo(text) {
         } else {
             if (remSummary.redDueReminders.length > 0) {
                 const list = remSummary.redDueReminders.map(r => {
-                    const statusTag = r.isOverdue 
-                        ? (isAr ? '🔴 متأخر جداً (مستحق)' : '🔴 OVERDUE / DUE NOW') 
+                    const statusTag = r.isOverdue
+                        ? (isAr ? '🔴 متأخر جداً (مستحق)' : '🔴 OVERDUE / DUE NOW')
                         : (r.deadlineDateStr === remSummary.todayStr ? (isAr ? '🔴 مستحق اليوم' : '🔴 DUE TODAY') : (isAr ? '🚨 تنبيه عاجل (0-2 يوم متبقي)' : '🚨 Urgent (0-2 Days Left)'));
                     return `• ${statusTag}: **${r.title}** ${r.amount ? `(${r.amount} SR)` : ''} - Deadline: ${r.deadlineDateStr || 'Today'} (Category: ${r.category || 'General'})`;
                 }).join('\n');
-                resp = isAr 
-                    ? `🚨 **التذكيرات الحمراء والمستحقة اليوم (${remSummary.todayStr})**:\n${list}` 
+                resp = isAr
+                    ? `🚨 **التذكيرات الحمراء والمستحقة اليوم (${remSummary.todayStr})**:\n${list}`
                     : `🚨 **Red Alerts & Reminders Due Today (${remSummary.todayStr})**:\n${list}`;
             } else {
                 const upcoming = remSummary.upcomingReminders.slice(0, 5).map(r => `• ⏰ **${r.title}** (Deadline: ${r.deadlineDateStr || 'Soon'}) ${r.amount ? `(${r.amount} SR)` : ''}`).join('\n');
@@ -1647,9 +1787,9 @@ function extractTaskInfo(text) {
     }
 
     // 1.3 Sales Handler (Today, Yesterday, Last Week, Last Month, Specific Date)
-    const isSalesQuery = /(sales|sles|sls|sals|saales|revenue|income|made|earned|turnover|مبيعات|مبعات|المبيعات|مبيعاتي|دخل|الدخل|أرباح|ارباح|كسبنا|طلعت|طلعنا|عملنا|جبنا|ربحنا)/i.test(lower) || 
-                         (lower.includes('today') && (lower.includes('how much') || lower.includes('total') || lower.includes('money'))) ||
-                         (lower.includes('اليوم') && (lower.includes('كم') || lower.includes('إجمالي') || lower.includes('اجمالي') || lower.includes('مجموع')));
+    const isSalesQuery = /(sales|sles|sls|sals|saales|revenue|income|made|earned|turnover|مبيعات|مبعات|المبيعات|مبيعاتي|دخل|الدخل|أرباح|ارباح|كسبنا|طلعت|طلعنا|عملنا|جبنا|ربحنا)/i.test(lower) ||
+        (lower.includes('today') && (lower.includes('how much') || lower.includes('total') || lower.includes('money'))) ||
+        (lower.includes('اليوم') && (lower.includes('كم') || lower.includes('إجمالي') || lower.includes('اجمالي') || lower.includes('مجموع')));
 
     if (isSalesQuery) {
         const isYesterday = lower.includes('yesterday') || lower.includes('أمس') || lower.includes('امس') || lower.includes('البارحة');
@@ -1660,7 +1800,7 @@ function extractTaskInfo(text) {
         if (isYesterday || isWeek || isMonth || specificDateMatch) {
             const histData = getSalesForTimeframe(userText);
             const formattedNum = histData.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const msg = isAr 
+            const msg = isAr
                 ? `مبيعاتك لـ ${histData.timeframeLabel} - هي (${formattedNum} ر.س)`
                 : `Your sales for ${histData.timeframeLabel} - is (${formattedNum} SR)`;
             renderAIChatMessage('bot', msg);
@@ -1668,7 +1808,7 @@ function extractTaskInfo(text) {
         } else {
             const salesData = getTodaySalesSummary();
             const formattedNum = salesData.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const msg = isAr 
+            const msg = isAr
                 ? `مبيعاتك اليوم - (${salesData.todayStr}) - هي (${formattedNum} ر.س)`
                 : `Your sales today - (${salesData.todayStr}) - is (${formattedNum} SR)`;
             renderAIChatMessage('bot', msg);
@@ -1709,8 +1849,8 @@ function extractTaskInfo(text) {
         }
 
         const liveSummary = getCompanyLiveContextSummary();
-        renderAIChatMessage('bot', isAr 
-            ? `إليك تقرير البيانات المباشر للشركة والنظام:\n\n${liveSummary}` 
+        renderAIChatMessage('bot', isAr
+            ? `إليك تقرير البيانات المباشر للشركة والنظام:\n\n${liveSummary}`
             : `Here is the live real-time system & payroll analytics report:\n\n${liveSummary}`);
         return;
     }
@@ -1764,464 +1904,24 @@ function extractTaskInfo(text) {
 
     // 6. Smart General Conversational Handler (Jokes, Science, Riddles, Advice, Chit-Chat)
     if (lower.includes('نكتة') || lower.includes('دعابة') || lower.includes('joke')) {
-        renderAIChatMessage('bot', isAr 
-            ? '😀 لماذا لا تكذب الأسماك؟ لأن الجميع يمكنهم رُؤية شفاهها تحت الماء! 🐟' 
+        renderAIChatMessage('bot', isAr
+            ? '😀 لماذا لا تكذب الأسماك؟ لأن الجميع يمكنهم رُؤية شفاهها تحت الماء! 🐟'
             : '😀 Why don\'t scientists trust atoms? Because they make up everything!');
         return;
     }
 
     if (lower.includes('من انت') || lower.includes('من أنت') || lower.includes('who are you') || lower.includes('ما هو اسمك') || lower.includes('اسمك')) {
-        renderAIChatMessage('bot', isAr 
-            ? 'أنا مساعدك الذكي المعتمد على ذكاء Gemini! يمكنني إجابة أسئلتك العامة والتحليلية، ومساعدتك في إدارة المبيعات، العمال، التذكيرات، والمنتجات.' 
+        renderAIChatMessage('bot', isAr
+            ? 'أنا مساعدك الذكي المعتمد على ذكاء Gemini! يمكنني إجابة أسئلتك العامة والتحليلية، ومساعدتك في إدارة المبيعات، العمال، التذكيرات، والمنتجات.'
             : 'I am your Smart Executive Manager powered by Gemini AI! I can answer general and analytical questions, and help you manage sales, staff, reminders, and market products.');
         return;
     }
 
-    renderAIChatMessage('bot', isAr 
-        ? `أهلاً بك! بالنسبة لـ "${userText}": أعمل كمساعد تنفيذي متصل بـ Gemini. يمكنك استفساري عن المبيعات، التذكيرات الحمراء، حسابات العمال، أو استخدام مفتاح Gemini API المجاني للإجابة عن المعارف العامة العميقة!` 
+    renderAIChatMessage('bot', isAr
+        ? `أهلاً بك! بالنسبة لـ "${userText}": أعمل كمساعد تنفيذي متصل بـ Gemini. يمكنك استفساري عن المبيعات، التذكيرات الحمراء، حسابات العمال، أو استخدام مفتاح Gemini API المجاني للإجابة عن المعارف العامة العميقة!`
         : `Welcome! Regarding "${userText}": I am your Executive AI Manager connected to Gemini. You can ask me about sales history, red reminders, staff reports, or input your free Gemini API Key for unrestricted general answers!`);
 }
 window.handleAIChatSubmit = handleAIChatSubmit;
-
-// =============================================
-// AI CHATBOT SPEECH RECOGNITION (VOICE TO TEXT)
-// =============================================
-let aiSpeechRecognitionInstance = null;
-let isAISpeechRecording = false;
-
-function toggleAIChatVoiceInput() {
-    const voiceBtn = document.getElementById('ai-chat-voice-btn');
-    const input = document.getElementById('ai-chat-input');
-    if (!voiceBtn || !input) return;
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        alert(typeof currentAppLang !== 'undefined' && currentAppLang === 'ar' 
-            ? 'خاصية التعرف على الصوت غير مدعومة في هذا المتصفح. يرجى استخدام متصفح Chrome أو Edge.' 
-            : 'Speech recognition is not supported on this browser. Please use Chrome or Edge.');
-        return;
-    }
-
-    if (isAISpeechRecording) {
-        if (aiSpeechRecognitionInstance) {
-            try { aiSpeechRecognitionInstance.stop(); } catch(e){}
-        }
-        stopAISpeechVoiceUI();
-        return;
-    }
-
-    try {
-        const recognition = new SpeechRecognition();
-        aiSpeechRecognitionInstance = recognition;
-        
-        const isAr = (typeof currentAppLang !== 'undefined' ? currentAppLang : localStorage.getItem("burgeroov_lang")) === 'ar';
-        recognition.lang = isAr ? 'ar-SA' : 'en-US';
-        recognition.continuous = false;
-        recognition.interimResults = true;
-
-        recognition.onstart = function() {
-            isAISpeechRecording = true;
-            voiceBtn.style.background = '#ef4444';
-            voiceBtn.style.color = '#ffffff';
-            voiceBtn.style.borderColor = '#ef4444';
-            voiceBtn.innerHTML = `<span style="font-size: 1.1rem;">🔴</span><span style="font-size: 0.82rem; font-weight: 900;">${isAr ? 'استماع...' : 'Listening...'}</span>`;
-            voiceBtn.style.boxShadow = '0 0 16px rgba(239, 68, 68, 0.6)';
-            input.placeholder = isAr ? 'تحدث الآن... وسأقوم بالإرسال فوراً' : 'Speak now... will send automatically';
-        };
-
-        recognition.onresult = function(event) {
-            let interimTranscript = '';
-            let finalTranscript = '';
-
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (event.results[i].isFinal) {
-                    finalTranscript += event.results[i][0].transcript;
-                } else {
-                    interimTranscript += event.results[i][0].transcript;
-                }
-            }
-
-            const currentText = finalTranscript || interimTranscript;
-            if (currentText) {
-                input.value = currentText;
-            }
-        };
-
-        recognition.onerror = function(event) {
-            console.warn("AI Speech Recognition Error:", event.error);
-            stopAISpeechVoiceUI();
-        };
-
-        recognition.onend = function() {
-            stopAISpeechVoiceUI();
-            const transcribedText = input.value ? input.value.trim() : '';
-            if (transcribedText) {
-                // Automatically send text immediately after user finishes talking!
-                setTimeout(() => {
-                    if (typeof handleAIChatSubmit === 'function') {
-                        handleAIChatSubmit();
-                    }
-                }, 350);
-            }
-        };
-
-        recognition.start();
-    } catch(err) {
-        console.error("Speech Recognition launch error:", err);
-        stopAISpeechVoiceUI();
-    }
-}
-
-function stopAISpeechVoiceUI() {
-    isAISpeechRecording = false;
-    const voiceBtn = document.getElementById('ai-chat-voice-btn');
-    const input = document.getElementById('ai-chat-input');
-    const isAr = (typeof currentAppLang !== 'undefined' ? currentAppLang : localStorage.getItem("burgeroov_lang")) === 'ar';
-
-    if (voiceBtn) {
-        voiceBtn.style.background = 'var(--input-bg)';
-        voiceBtn.style.color = '#6366f1';
-        voiceBtn.style.borderColor = '#6366f1';
-        voiceBtn.style.boxShadow = 'none';
-        voiceBtn.innerHTML = `<span>🎤</span>`;
-    }
-    if (input && !input.value) {
-        input.placeholder = isAr 
-            ? 'اكتب طلبك هنا أو تحدث بالمايك... / Type or speak command...' 
-            : 'Type or speak command...';
-    }
-}
-
-window.toggleAIChatVoiceInput = toggleAIChatVoiceInput;
-
-// =============================================
-// WORKER LOGIN INFO & PASSWORD MANAGEMENT MODULE
-// =============================================
-let hiddenPasswordStates = {};
-
-function renderWorkerLoginTable() {
-    const tbody = document.getElementById('ops-worker-login-tbody');
-    if (!tbody) return;
-
-    const companyData = getCompanyData();
-    let workers = companyData.workers || [];
-
-    const countBadge = document.getElementById('ops-worker-count-badge');
-    if (countBadge) {
-        countBadge.textContent = `${workers.length} Worker${workers.length === 1 ? '' : 's'}`;
-    }
-
-    const searchInput = document.getElementById('ops-worker-login-search');
-    const q = searchInput ? searchInput.value.toLowerCase().trim() : '';
-
-    if (q) {
-        workers = workers.filter(w => {
-            if (!w) return false;
-            const name = (w.name || '').toLowerCase();
-            const email = (w.email || '').toLowerCase();
-            const role = (w.role || '').toLowerCase();
-            return name.includes(q) || email.includes(q) || role.includes(q);
-        });
-    }
-
-    if (workers.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="5" style="text-align: center; padding: 24px; color: var(--text-muted); font-weight: 700;">
-                    ${q ? 'No employees match your search.' : 'No registered employees found. Register employees using the form below.'}
-                </td>
-            </tr>
-        `;
-        return;
-    }
-
-    tbody.innerHTML = workers.map(w => {
-        const safeName = typeof escapeHtml === 'function' ? escapeHtml(w.name) : (w.name || 'Worker');
-        const safeEmail = typeof escapeHtml === 'function' ? escapeHtml(w.email) : (w.email || 'No Email');
-        const safeRole = typeof escapeHtml === 'function' ? escapeHtml(w.role) : (w.role || 'Staff');
-        const isPwdRevealed = !!hiddenPasswordStates[w.id];
-        const displayPassword = w.password 
-            ? (isPwdRevealed ? (typeof escapeHtml === 'function' ? escapeHtml(w.password) : w.password) : '••••••••') 
-            : '<span style="color: var(--text-muted); font-style: italic;">Firebase Auth Default</span>';
-
-        return `
-            <tr style="border-bottom: 1px solid var(--border-color);">
-                <td style="padding: 12px 16px; font-weight: 800; color: var(--text-main);">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="font-size: 1.1rem;">👤</span>
-                        <div>
-                            <div>${safeName}</div>
-                            <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Branch: ${typeof escapeHtml === 'function' ? escapeHtml(w.branch || 'Main') : (w.branch || 'Main')}</div>
-                        </div>
-                    </div>
-                </td>
-                <td style="padding: 12px 16px; font-weight: 700; color: var(--text-main);">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <span>${safeEmail}</span>
-                        <button type="button" onclick="if(typeof copyToClipboard==='function') copyToClipboard('${safeEmail}')" title="Copy Email" style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 2px 6px; font-size: 0.74rem; cursor: pointer;">📋</button>
-                    </div>
-                </td>
-                <td style="padding: 12px 16px;">
-                    <span class="badge" style="background: rgba(99, 102, 241, 0.12); color: #6366f1; border: 1px solid rgba(99, 102, 241, 0.25); font-weight: 800; font-size: 0.78rem; padding: 4px 10px; border-radius: 12px;">
-                        ${safeRole}
-                    </span>
-                </td>
-                <td style="padding: 12px 16px; font-weight: 800; font-family: monospace;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span>${displayPassword}</span>
-                        ${w.password ? `
-                            <button type="button" onclick="toggleWorkerPasswordReveal('${w.id}')" title="Toggle Password Reveal" style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 2px 6px; font-size: 0.74rem; cursor: pointer;">
-                                ${isPwdRevealed ? '🙈' : '👁️'}
-                            </button>
-                        ` : ''}
-                    </div>
-                </td>
-                <td style="padding: 12px 16px; text-align: center;">
-                    <div style="display: flex; gap: 6px; justify-content: center;">
-                        <button type="button" onclick="openWorkerResetPasswordModal('${w.id}')" class="btn-primary" style="padding: 6px 14px; font-size: 0.8rem; font-weight: 800; border-radius: 8px; background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-                            🔑 Reset Password
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        `;
-    }).join('');
-}
-
-function toggleWorkerPasswordReveal(workerId) {
-    hiddenPasswordStates[workerId] = !hiddenPasswordStates[workerId];
-    renderWorkerLoginTable();
-}
-
-function openWorkerResetPasswordModal(workerId) {
-    const companyData = getCompanyData();
-    const worker = (companyData.workers || []).find(w => w.id === workerId);
-    if (!worker) return;
-
-    document.getElementById('reset-pwd-worker-id').value = worker.id;
-    document.getElementById('reset-pwd-worker-name').textContent = `Worker: ${worker.name} (${worker.email})`;
-    document.getElementById('reset-pwd-input').value = '';
-    document.getElementById('reset-pwd-confirm-input').value = '';
-    document.getElementById('reset-pwd-show-toggle').checked = false;
-    toggleResetPwdVisibility();
-
-    const modal = document.getElementById('worker-reset-password-modal');
-    if (modal) modal.style.display = 'flex';
-}
-
-function closeWorkerResetPasswordModal() {
-    const modal = document.getElementById('worker-reset-password-modal');
-    if (modal) modal.style.display = 'none';
-}
-
-function toggleResetPwdVisibility() {
-    const show = document.getElementById('reset-pwd-show-toggle').checked;
-    document.getElementById('reset-pwd-input').type = show ? 'text' : 'password';
-    document.getElementById('reset-pwd-confirm-input').type = show ? 'text' : 'password';
-}
-
-function submitWorkerPasswordReset() {
-    const workerId = document.getElementById('reset-pwd-worker-id').value;
-    const newPwd = document.getElementById('reset-pwd-input').value.trim();
-    const confirmPwd = document.getElementById('reset-pwd-confirm-input').value.trim();
-
-    if (!newPwd) {
-        alert("Please enter a new password.");
-        return;
-    }
-    if (newPwd.length < 6) {
-        alert("Password must be at least 6 characters long.");
-        return;
-    }
-    if (newPwd !== confirmPwd) {
-        alert("Passwords do not match.");
-        return;
-    }
-
-    const companyData = getCompanyData();
-    const worker = (companyData.workers || []).find(w => w.id === workerId);
-    if (!worker) {
-        alert("Worker record not found.");
-        return;
-    }
-
-    const oldPwd = worker.password || '';
-    // Save custom password to worker record
-    worker.password = newPwd;
-    worker.oldPassword = oldPwd;
-    worker.passwordLastReset = Date.now();
-
-    const emailKey = worker.email.toLowerCase().replace(/\./g, ',');
-    const pwdPayload = {
-        email: worker.email.toLowerCase(),
-        password: newPwd,
-        workerId: worker.id,
-        updatedAt: Date.now()
-    };
-
-    // Save to localStorage cache for instant local client lookup
-    try {
-        localStorage.setItem('mvc_worker_pwd_' + emailKey, newPwd);
-    } catch(e){}
-
-    // Save to customerCodes/workerPasswords node (public read/write permitted by Firebase Rules)
-    if (typeof db !== 'undefined' && db) {
-        db.ref(`customerCodes/workerPasswords/${emailKey}`).set(pwdPayload)
-            .catch(e => console.error("Error setting customerCodes workerPasswords:", e));
-    }
-
-    // Save to globalWorkerPasswords root node (public read across all logins)
-    if (typeof db !== 'undefined' && db) {
-        db.ref(`globalWorkerPasswords/${emailKey}`).set(pwdPayload)
-            .catch(e => console.error("Error setting globalWorkerPasswords:", e));
-    }
-
-    const companyKeys = ['burgeroov', 'mvc', 'mvcfresh', currentCompany];
-    companyKeys.forEach(cKey => {
-        if (cKey && typeof db !== 'undefined' && db) {
-            db.ref(`companies/${cKey}/workerPasswords/${emailKey}`).set(pwdPayload)
-                .catch(e => console.error("Error setting workerPasswords mapping:", e));
-        }
-    });
-
-    // Persist targeted updates to Firebase Realtime Database
-    db.ref('companies/' + currentCompany + '/workers').set(companyData.workers)
-        .then(() => {
-            // Also store under flat workerCredentials for lookup
-            db.ref(`companies/${currentCompany}/workerCredentials/${worker.id}`).set({
-                email: worker.email.toLowerCase(),
-                password: newPwd,
-                updatedAt: Date.now()
-            }).catch(e => console.error("Error setting workerCredentials:", e));
-
-            closeWorkerResetPasswordModal();
-            renderWorkerLoginTable();
-
-            // Sync password directly to Firebase Auth via secondary app instance
-            syncWorkerPasswordToFirebaseAuth(worker.email, newPwd, oldPwd);
-
-            const msg = currentAppLang === 'ar'
-                ? `✅ تم تغيير كلمة المرور لـ ${worker.name} (${worker.email}) بنجاح إلى:\n\n🔑 ${newPwd}\n\nيجب على الموظف استخدام كلمة المرور الجديدة هذه لتسجيل الدخول.`
-                : `✅ Password for ${worker.name} (${worker.email}) successfully updated to:\n\n🔑 ${newPwd}\n\nThe worker must use this new password to log in.`;
-            alert(msg);
-        })
-        .catch(err => {
-            console.error("Error resetting worker password:", err);
-            alert("Error updating password in Firebase: " + err.message);
-        });
-}
-
-async function syncWorkerPasswordToFirebaseAuth(workerEmail, newPwd, oldPwd) {
-    if (!workerEmail || !newPwd) return;
-    try {
-        let secApp;
-        try {
-            secApp = firebase.app("WorkerPwdSync");
-        } catch(e) {
-            secApp = firebase.initializeApp(firebaseConfig, "WorkerPwdSync");
-        }
-        const secAuth = secApp.auth();
-
-        try {
-            const createRes = await secAuth.createUserWithEmailAndPassword(workerEmail, newPwd);
-            if (createRes && createRes.user) {
-                console.log("Created worker in Firebase Auth via Secondary App.");
-                await secAuth.signOut();
-                return;
-            }
-        } catch (createErr) {
-            if (createErr.code === 'auth/email-already-in-use') {
-                if (oldPwd && oldPwd !== newPwd) {
-                    try {
-                        const oldSignIn = await secAuth.signInWithEmailAndPassword(workerEmail, oldPwd);
-                        if (oldSignIn && oldSignIn.user) {
-                            await oldSignIn.user.updatePassword(newPwd);
-                            console.log("Updated worker password in Firebase Auth via Secondary App.");
-                            await secAuth.signOut();
-                            return;
-                        }
-                    } catch(e) {
-                        console.warn("Could not sign in with old password on secondary auth app:", e);
-                    }
-                }
-            }
-        }
-    } catch(err) {
-        console.error("Secondary Auth Sync Error:", err);
-    }
-}
-
-window.renderWorkerLoginTable = renderWorkerLoginTable;
-window.toggleWorkerPasswordReveal = toggleWorkerPasswordReveal;
-window.openWorkerResetPasswordModal = openWorkerResetPasswordModal;
-window.closeWorkerResetPasswordModal = closeWorkerResetPasswordModal;
-window.toggleResetPwdVisibility = toggleResetPwdVisibility;
-window.submitWorkerPasswordReset = submitWorkerPasswordReset;
-
-function resolveWorkerUserLogin(email) {
-    const overlay = document.getElementById('auth-overlay');
-    const authLoader = document.getElementById('auth-loader');
-    const authBtn = document.getElementById('auth-btn');
-
-    if (authLoader) authLoader.style.display = 'none';
-    if (authBtn) authBtn.style.display = 'block';
-
-    const parseAdminsSnap = (snap) => (snap && snap.exists()) ? (snap.val() || {}) : {};
-    const parseWorkersSnap = (snap) => (snap && snap.exists() && Array.isArray(snap.val())) ? snap.val() : [];
-
-    Promise.all([
-        db.ref('companies/burgeroov/admins').once('value').catch(() => null),
-        db.ref('companies/burgeroov/workers').once('value').catch(() => null),
-        db.ref('companies/mvc/admins').once('value').catch(() => null),
-        db.ref('companies/mvc/workers').once('value').catch(() => null),
-        db.ref('companies/mvcfresh/admins').once('value').catch(() => null),
-        db.ref('companies/mvcfresh/workers').once('value').catch(() => null)
-    ]).then(([bgAdmins, bgWorkers, mvcAdmins, mvcWorkers, freshAdmins, freshWorkers]) => {
-        const burgeroovAdmins = parseAdminsSnap(bgAdmins);
-        const burgeroovWorkers = parseWorkersSnap(bgWorkers);
-        const mvcAdminsList = parseAdminsSnap(mvcAdmins);
-        const mvcWorkersList = parseWorkersSnap(mvcWorkers);
-        const mvcfreshAdminsList = parseAdminsSnap(freshAdmins);
-        const mvcfreshWorkersList = parseWorkersSnap(freshWorkers);
-
-        const sanitizedEmail = email.toLowerCase().replace(/\./g, ',');
-        const inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
-            burgeroovWorkers.some(w => w && w.email && w.email.toLowerCase() === email.toLowerCase());
-
-        const inMvc = mvcAdminsList[sanitizedEmail] === true ||
-            mvcWorkersList.some(w => w && w.email && w.email.toLowerCase() === email.toLowerCase());
-
-        const inMvcFresh = mvcfreshAdminsList[sanitizedEmail] === true ||
-            mvcfreshWorkersList.some(w => w && w.email && w.email.toLowerCase() === email.toLowerCase());
-
-        if (overlay) overlay.style.display = 'none';
-
-        const activeCompanies = [];
-        if (inBurgeroov) activeCompanies.push('burgeroov');
-        if (inMvc) activeCompanies.push('mvc');
-        if (inMvcFresh) activeCompanies.push('mvcfresh');
-
-        window.isMultiCompany = activeCompanies.length > 1;
-
-        const savedCompany = localStorage.getItem('selected_company');
-        if (savedCompany && activeCompanies.includes(savedCompany)) {
-            selectCompany(savedCompany);
-        } else if (activeCompanies.length === 1) {
-            selectCompany(activeCompanies[0]);
-        } else if (activeCompanies.length > 1) {
-            showCompanySelectionHUD();
-        } else {
-            const defaultCompany = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
-            selectCompany(defaultCompany);
-        }
-    }).catch(err => {
-        console.error("Error in resolveWorkerUserLogin:", err);
-        if (overlay) overlay.style.display = 'none';
-        const defaultCompany = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
-        selectCompany(defaultCompany);
-    });
-}
-window.resolveWorkerUserLogin = resolveWorkerUserLogin;
 
 // =============================================
 // ADMIN INFORMATION & DOCUMENT VAULT MODULE
@@ -2259,9 +1959,9 @@ function handleVaultImagePreview(event) {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = function (e) {
         const img = new Image();
-        img.onload = function() {
+        img.onload = function () {
             const canvas = document.createElement('canvas');
             const maxDim = 1200;
             let width = img.width;
@@ -2576,5 +2276,3 @@ if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession) {
 // --- AUTOMATIC IN-SCOPE WINDOW EXPORTS ---
 if (typeof _getSecureFallbackAIKey === 'function') window._getSecureFallbackAIKey = _getSecureFallbackAIKey;
 if (typeof getBestGeminiModelName === 'function') window.getBestGeminiModelName = getBestGeminiModelName;
-if (typeof stopAISpeechVoiceUI === 'function') window.stopAISpeechVoiceUI = stopAISpeechVoiceUI;
-if (typeof syncWorkerPasswordToFirebaseAuth === 'function') window.syncWorkerPasswordToFirebaseAuth = syncWorkerPasswordToFirebaseAuth;

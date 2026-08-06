@@ -173,7 +173,7 @@ function toggleMarketWishlist(productId) {
     }
     try {
         localStorage.setItem('mvc_market_wishlist', JSON.stringify(Array.from(marketWishlist)));
-    } catch (e) {}
+    } catch (e) { }
     renderMarket();
 }
 window.toggleMarketWishlist = toggleMarketWishlist;
@@ -212,7 +212,7 @@ function saveMarketCart() {
     try {
         const key = getMarketCartKey();
         localStorage.setItem(key, JSON.stringify(marketCart));
-    } catch (e) {}
+    } catch (e) { }
     updateMarketCartBadges();
 }
 window.saveMarketCart = saveMarketCart;
@@ -281,8 +281,8 @@ function refillMonthlyCoinsForAllCustomers() {
         return;
     }
 
-    if (!confirm(isAr 
-        ? `هل تريد إعادة تعبئة ${amount.toLocaleString()} من العملات لجميع العملاء المسجلين؟` 
+    if (!confirm(isAr
+        ? `هل تريد إعادة تعبئة ${amount.toLocaleString()} من العملات لجميع العملاء المسجلين؟`
         : `Refill ${amount.toLocaleString()} coins for all registered customers?`)) {
         return;
     }
@@ -365,7 +365,7 @@ function addTestCoins(amount = 500) {
         currentCustomerSession.coins = newCoins;
         try {
             localStorage.setItem('mvc_customer_session', JSON.stringify(currentCustomerSession));
-        } catch(e){}
+        } catch (e) { }
     } else {
         const workerId = getCurrentWorkerId();
         const data = getCompanyData();
@@ -378,7 +378,7 @@ function addTestCoins(amount = 500) {
         try {
             localStorage.setItem('mvc_admin_coins_' + workerId, newCoins);
             localStorage.setItem('mvc_admin_coins', newCoins);
-        } catch(e){}
+        } catch (e) { }
 
         updates[`companies/${currentCompany}/workers/${workerId}/coins`] = newCoins;
         updates[`companies/${currentCompany}/userCoins/${workerId}`] = newCoins;
@@ -430,9 +430,9 @@ function handleMarketImageUpload(event, mode) {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = function (e) {
         const img = new Image();
-        img.onload = function() {
+        img.onload = function () {
             const canvas = document.createElement('canvas');
             const maxDim = 400;
             let width = img.width;
@@ -483,7 +483,7 @@ try {
     if (savedMarketCache) {
         window.globalMarketProductsCache = JSON.parse(savedMarketCache) || {};
     }
-} catch(e) {}
+} catch (e) { }
 
 window.hasInitializedGlobalMarketListener = false;
 
@@ -554,7 +554,7 @@ function initGlobalMarketProductsListener() {
 
             try {
                 localStorage.setItem('mvc_cached_market_products', JSON.stringify(window.globalMarketProductsCache));
-            } catch(e){}
+            } catch (e) { }
 
             if (typeof renderMarket === 'function') {
                 renderMarket();
@@ -635,10 +635,10 @@ function getAllMarketProducts() {
             'companies/mvcfresh/marketProducts',
             'companies/burgeroov/marketProducts'
         ];
-        const fetchPromises = marketPaths.map(p => 
+        const fetchPromises = marketPaths.map(p =>
             db.ref(p).once('value')
-              .then(snap => snap.exists() ? snap.val() : null)
-              .catch(() => null)
+                .then(snap => snap.exists() ? snap.val() : null)
+                .catch(() => null)
         );
         Promise.all(fetchPromises).then(results => {
             let foundAny = false;
@@ -657,7 +657,7 @@ function getAllMarketProducts() {
             if (foundAny) {
                 try {
                     localStorage.setItem('mvc_cached_market_products', JSON.stringify(window.globalMarketProductsCache));
-                } catch(e){}
+                } catch (e) { }
                 if (typeof renderMarket === 'function') renderMarket();
             }
         }).catch(err => console.error("Error deep fetching market products:", err));
@@ -896,12 +896,12 @@ function renderMarketCartItems() {
             totalCost += itemTotal;
         }
 
-        const imgTag = item.imageUrl 
+        const imgTag = item.imageUrl
             ? `<img src="${item.imageUrl}" style="width: 54px; height: 54px; border-radius: 10px; object-fit: cover; ${!available ? 'filter: grayscale(80%) opacity(0.5);' : ''}" />`
             : `<div style="width: 54px; height: 54px; border-radius: 10px; background: var(--input-bg); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; ${!available ? 'opacity: 0.5;' : ''}">🥩</div>`;
 
-        const rowBg = !available 
-            ? 'background: rgba(239, 68, 68, 0.08); border-radius: 12px; margin-bottom: 8px; padding: 10px 12px; border: 1px dashed rgba(239, 68, 68, 0.4);' 
+        const rowBg = !available
+            ? 'background: rgba(239, 68, 68, 0.08); border-radius: 12px; margin-bottom: 8px; padding: 10px 12px; border: 1px dashed rgba(239, 68, 68, 0.4);'
             : 'padding: 12px 0; border-bottom: 1px dashed var(--border-color);';
 
         return `
@@ -965,13 +965,13 @@ function renderMarketCartItems() {
         if (hasUnavailableItems) {
             warningEl.style.display = 'block';
             warningEl.style.color = '#ef4444';
-            warningEl.textContent = isAr 
+            warningEl.textContent = isAr
                 ? `❌ لا يمكنك إتمام الطلب بحضور منتجات غير متوفرة بالسلة. يرجى حذفها أولاً.`
                 : `❌ Cannot checkout with unavailable items. Please remove them first.`;
         } else {
             warningEl.style.display = isInsufficient ? 'block' : 'none';
             if (isInsufficient) {
-                warningEl.textContent = isAr 
+                warningEl.textContent = isAr
                     ? `⚠️ رصيد ر.س لديك غير كافٍ! تحتاج إلى ${totalCost - userCoins} ر.س إضافية.`
                     : `⚠️ Insufficient SR Balance! You need ${totalCost - userCoins} more SR.`;
             }
@@ -993,8 +993,8 @@ function submitMarketOrder() {
 
     const unavailable = marketCart.filter(item => !isCartItemAvailable(item));
     if (unavailable.length > 0) {
-        alert(isAr 
-            ? 'عذراً، تحتوي السلة على منتجات غير متوفرة حالياً (قام الأدمن بإخفائها). يرجى إزالتها من السلة أولاً لإكتمال الطلب!' 
+        alert(isAr
+            ? 'عذراً، تحتوي السلة على منتجات غير متوفرة حالياً (قام الأدمن بإخفائها). يرجى إزالتها من السلة أولاً لإكتمال الطلب!'
             : 'Sorry, your cart contains unavailable products (hidden by admin). Please remove them first to complete your order!');
         openMarketCartModal();
         return;
@@ -1010,10 +1010,10 @@ function submitMarketOrder() {
 
     const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
     const workerId = isCustomer ? String(currentCustomerSession.code || currentCustomerSession.id).trim() : getCurrentWorkerId();
-    const workerName = isCustomer 
-        ? (currentCustomerSession.name || 'Customer (' + currentCustomerSession.code + ')') 
-        : ((typeof currentWorkerProfile !== 'undefined' && currentWorkerProfile) 
-            ? (currentWorkerProfile.name || currentWorkerProfile.email) 
+    const workerName = isCustomer
+        ? (currentCustomerSession.name || 'Customer (' + currentCustomerSession.code + ')')
+        : ((typeof currentWorkerProfile !== 'undefined' && currentWorkerProfile)
+            ? (currentWorkerProfile.name || currentWorkerProfile.email)
             : ((typeof currentUser !== 'undefined' && currentUser && currentUser.email) ? currentUser.email : 'Worker'));
 
     const now = Date.now();
@@ -1051,7 +1051,7 @@ function submitMarketOrder() {
         });
         try {
             localStorage.setItem('mvc_customer_session', JSON.stringify(currentCustomerSession));
-        } catch(e){}
+        } catch (e) { }
     } else {
         const data = getCompanyData();
         if (data && data.workers && data.workers[workerId]) {
@@ -1064,7 +1064,7 @@ function submitMarketOrder() {
         try {
             localStorage.setItem('mvc_admin_coins_' + workerId, newCoins);
             localStorage.setItem('mvc_admin_coins', newCoins);
-        } catch(e){}
+        } catch (e) { }
 
         updates[`companies/${currentCompany}/workers/${workerId}/coins`] = newCoins;
         updates[`companies/${currentCompany}/userCoins/${workerId}`] = newCoins;
@@ -1109,7 +1109,7 @@ function formatMarketOrderNum(order) {
     } else if (digits.length >= 3) {
         return `#${digits}`;
     }
-    
+
     return `#${str.replace(/^#?ORD-?/i, '').replace('ord_', '').slice(-6)}`;
 }
 window.formatMarketOrderNum = formatMarketOrderNum;
@@ -1232,7 +1232,7 @@ function getAllMarketOrders() {
         });
     }
     const list = Array.from(map.values());
-    list.sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
+    list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     return list;
 }
 window.getAllMarketOrders = getAllMarketOrders;
@@ -1562,13 +1562,13 @@ function cancelMarketOrder(orderId, optCompanyKey) {
                 currentCustomerSession.coins = newCoins;
                 try {
                     localStorage.setItem('mvc_customer_session', JSON.stringify(currentCustomerSession));
-                } catch(e){}
+                } catch (e) { }
             }
 
             try {
                 db.ref(`publicCustomerCodes/${custCode}/coins`).transaction(cv => (cv || 0) + totalCost);
                 db.ref(`customerCodes/${custCode}/coins`).transaction(cv => (cv || 0) + totalCost);
-            } catch(e){}
+            } catch (e) { }
         } else {
             const targetWorkerId = custCode || (order.workerId ? String(order.workerId).trim() : getCurrentWorkerId());
             let workerCoins = 0;
@@ -1604,7 +1604,7 @@ function cancelMarketOrder(orderId, optCompanyKey) {
                     localStorage.setItem('mvc_admin_coins_' + targetWorkerId, newWorkerCoins);
                     localStorage.setItem('mvc_admin_coins_' + currentWId, newWorkerCoins);
                     localStorage.setItem('mvc_admin_coins', newWorkerCoins);
-                } catch(e){}
+                } catch (e) { }
             }
         }
 
@@ -1630,8 +1630,8 @@ function cancelMarketOrder(orderId, optCompanyKey) {
         renderAdminMarketOrders();
         renderCustomerOrders();
         renderPrepareSection();
-        showInAppNotification(isAr 
-            ? `تم إلغاء الطلب وإعادة ${totalCost} من العملات للزبون بنجاح!` 
+        showInAppNotification(isAr
+            ? `تم إلغاء الطلب وإعادة ${totalCost} من العملات للزبون بنجاح!`
             : `Order cancelled and ${totalCost} coins refunded to customer successfully!`
         );
     }).catch(err => {
@@ -1686,7 +1686,7 @@ function toggleMarketProductVisibility(productId) {
         window.globalMarketProductsCache[productId].id = productId;
         try {
             localStorage.setItem('mvc_cached_market_products', JSON.stringify(window.globalMarketProductsCache));
-        } catch(e){}
+        } catch (e) { }
     }
 
     const updates = {};
@@ -1711,7 +1711,7 @@ function toggleMarketProductVisibility(productId) {
     if (typeof db !== 'undefined') {
         db.ref().update(updates).then(() => {
             renderMarket();
-            showInAppNotification(newHiddenState 
+            showInAppNotification(newHiddenState
                 ? (isAr ? 'تم إخفاء المنتج من المتجر (غير ظاهر للزبائن)' : 'Product hidden from market')
                 : (isAr ? 'تم إظهار المنتج للزبائن' : 'Product is now visible to customers')
             );
@@ -1761,7 +1761,7 @@ function renderMarketProductCard(p) {
     const cartItem = marketCart.find(item => item.productId === p.id);
     const itemInCartQty = cartItem ? cartItem.qty : 0;
     const isHidden = isProductHidden(p);
-    
+
     let imageContent = '';
     if (p.imageUrl) {
         imageContent = `<img src="${p.imageUrl}" alt="${sanitizeMarketText(p.name)}" loading="lazy" decoding="async" onclick="showImage('${p.imageUrl}')" title="${isAr ? 'اضغط لتكبير الصورة' : 'Click to enlarge'}" style="width:100%; height:100%; object-fit:cover; display:block; cursor:pointer; transition: transform 0.3s ease; ${isHidden ? 'filter: opacity(0.6) grayscale(40%);' : ''}" class="market-prod-img" />`;
@@ -1770,7 +1770,7 @@ function renderMarketProductCard(p) {
         const bannerTitle = isAr ? meta.labelAr : meta.labelEn;
         const catIcon = meta.icon;
         const bannerGradient = meta.gradient;
-        
+
         imageContent = `
             <div style="width:100%; height:100%; background: ${bannerGradient}; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#ffffff; text-align:center; padding:12px; box-sizing:border-box; position:relative; ${isHidden ? 'filter: opacity(0.6);' : ''}">
                 <div style="font-size: 3.2rem; margin-bottom:4px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));">${catIcon}</div>
@@ -1782,8 +1782,8 @@ function renderMarketProductCard(p) {
     let adminActions = '';
     if (isAdmin) {
         const hideBtnText = isHidden ? (isAr ? '👁️ إظهار المنتج' : '👁️ Show Product') : (isAr ? '🙈 إخفاء المنتج' : '🙈 Hide Product');
-        const hideBtnStyle = isHidden 
-            ? 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid #10b981;' 
+        const hideBtnStyle = isHidden
+            ? 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid #10b981;'
             : 'background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid #f59e0b;';
 
         adminActions = `
@@ -1858,7 +1858,7 @@ let isMarketLoadingMore = false;
 function loadMoreMarketProducts() {
     if (isMarketLoadingMore) return;
     if (!window.currentMarketFilteredProducts || window.currentMarketRenderLimit >= window.currentMarketFilteredProducts.length) return;
-    
+
     const grid = document.getElementById('market-products-grid');
     if (!grid) return;
 
@@ -1869,7 +1869,7 @@ function loadMoreMarketProducts() {
         appendInfiniteScrollTrigger(grid);
         triggerEl = document.getElementById('market-infinite-scroll-trigger');
     }
-    
+
     if (triggerEl) {
         const isAr = currentAppLang === 'ar';
         triggerEl.style.opacity = '1';
@@ -1934,10 +1934,10 @@ function expandCategorySection(catKey) {
     const catContainer = document.getElementById(`cat-grid-container-${catKey}`);
     const sentinel = document.getElementById(`auto-load-cat-sec-${catKey}`);
     if (!catContainer) return;
-    
+
     const catItems = window.currentGroupedCategoryItems[catKey];
     const remainingItems = catItems.slice(12);
-    
+
     if (typeof window.renderProductCardInstance === 'function') {
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = remainingItems.map(window.renderProductCardInstance).join('');
@@ -2024,41 +2024,41 @@ function renderMarket() {
         return;
     }
 
-function renderMarketProductCard(p) {
-    const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
-    const isAdmin = !isCustomer && (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.isAdmin));
-    const isAr = currentAppLang === 'ar';
-    const catKey = getNormalizedProductCategory(p);
-    const weightText = p.weightTag || '';
-    const cartItem = marketCart.find(item => item.productId === p.id);
-    const itemInCartQty = cartItem ? cartItem.qty : 0;
-    const isHidden = isProductHidden(p);
-    
-    let imageContent = '';
-    if (p.imageUrl) {
-        imageContent = `<img src="${p.imageUrl}" alt="${sanitizeMarketText(p.name)}" loading="lazy" decoding="async" onclick="showImage('${p.imageUrl}')" title="${isAr ? 'اضغط لتكبير الصورة' : 'Click to enlarge'}" style="width:100%; height:100%; object-fit:cover; display:block; cursor:pointer; transition: transform 0.3s ease; ${isHidden ? 'filter: opacity(0.6) grayscale(40%);' : ''}" class="market-prod-img" />`;
-    } else {
-        const meta = getMarketCategoryMeta(catKey);
-        const bannerTitle = isAr ? meta.labelAr : meta.labelEn;
-        const catIcon = meta.icon;
-        const bannerGradient = meta.gradient;
-        
-        imageContent = `
+    function renderMarketProductCard(p) {
+        const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
+        const isAdmin = !isCustomer && (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.isAdmin));
+        const isAr = currentAppLang === 'ar';
+        const catKey = getNormalizedProductCategory(p);
+        const weightText = p.weightTag || '';
+        const cartItem = marketCart.find(item => item.productId === p.id);
+        const itemInCartQty = cartItem ? cartItem.qty : 0;
+        const isHidden = isProductHidden(p);
+
+        let imageContent = '';
+        if (p.imageUrl) {
+            imageContent = `<img src="${p.imageUrl}" alt="${sanitizeMarketText(p.name)}" loading="lazy" decoding="async" onclick="showImage('${p.imageUrl}')" title="${isAr ? 'اضغط لتكبير الصورة' : 'Click to enlarge'}" style="width:100%; height:100%; object-fit:cover; display:block; cursor:pointer; transition: transform 0.3s ease; ${isHidden ? 'filter: opacity(0.6) grayscale(40%);' : ''}" class="market-prod-img" />`;
+        } else {
+            const meta = getMarketCategoryMeta(catKey);
+            const bannerTitle = isAr ? meta.labelAr : meta.labelEn;
+            const catIcon = meta.icon;
+            const bannerGradient = meta.gradient;
+
+            imageContent = `
             <div style="width:100%; height:100%; background: ${bannerGradient}; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#ffffff; text-align:center; padding:12px; box-sizing:border-box; position:relative; ${isHidden ? 'filter: opacity(0.6);' : ''}">
                 <div style="font-size: 3.2rem; margin-bottom:4px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));">${catIcon}</div>
                 <div style="font-size: 1.05rem; font-weight:900; letter-spacing:-0.5px; text-shadow:0 2px 4px rgba(0,0,0,0.4);">${bannerTitle}</div>
             </div>
         `;
-    }
+        }
 
-    let adminActions = '';
-    if (isAdmin) {
-        const hideBtnText = isHidden ? (isAr ? '👁️ إظهار المنتج' : '👁️ Show Product') : (isAr ? '🙈 إخفاء المنتج' : '🙈 Hide Product');
-        const hideBtnStyle = isHidden 
-            ? 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid #10b981;' 
-            : 'background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid #f59e0b;';
+        let adminActions = '';
+        if (isAdmin) {
+            const hideBtnText = isHidden ? (isAr ? '👁️ إظهار المنتج' : '👁️ Show Product') : (isAr ? '🙈 إخفاء المنتج' : '🙈 Hide Product');
+            const hideBtnStyle = isHidden
+                ? 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid #10b981;'
+                : 'background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid #f59e0b;';
 
-        adminActions = `
+            adminActions = `
             <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 10px; border-top: 1px dashed var(--border-color); padding-top: 10px; width: 100%; box-sizing: border-box;">
                 <button type="button" onclick="toggleMarketProductVisibility('${p.id}')" title="${isHidden ? (isAr ? 'إظهار المنتج للزبائن' : 'Show product to customers') : (isAr ? 'إخفاء المنتج من السوق' : 'Hide product from market')}" style="width: 100%; padding: 7px 10px; font-size: 0.8rem; font-weight: 800; border-radius: 9px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s ease; ${hideBtnStyle}">
                     ${hideBtnText}
@@ -2073,9 +2073,9 @@ function renderMarketProductCard(p) {
                 </div>
             </div>
         `;
-    }
+        }
 
-    return `
+        return `
         <div class="card market-store-card" style="margin: 0; border: 1px solid ${isHidden ? '#f59e0b' : 'var(--border-color)'}; border-radius: 16px; background: var(--card-bg, #ffffff); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, box-shadow 0.2s ease; box-shadow: 0 4px 14px rgba(0,0,0,0.05); position: relative; ${isHidden ? 'opacity: 0.88;' : ''}">
             <div>
                 <div style="width: 100%; aspect-ratio: 1 / 1; position: relative; overflow: hidden; background: #f8fafc; border-bottom: 1px solid var(--border-color);">
@@ -2122,8 +2122,8 @@ function renderMarketProductCard(p) {
             </div>
         </div>
     `;
-}
-window.renderMarketProductCard = renderMarketProductCard;
+    }
+    window.renderMarketProductCard = renderMarketProductCard;
 
 
 
@@ -2244,7 +2244,7 @@ function openEditMarketProductModal(productId) {
     if (catSelect) {
         const isAr = currentAppLang === 'ar';
         const knownCategories = new Set(['meat', 'veg_fruit', 'fish']);
-        
+
         prods.forEach(p => {
             const cat = getNormalizedProductCategory(p);
             if (cat) knownCategories.add(cat);
@@ -2273,7 +2273,7 @@ function openEditMarketProductModal(productId) {
     document.getElementById('edit-market-product-id').value = prod.id;
     document.getElementById('edit-market-product-name').value = prod.name || '';
     document.getElementById('edit-market-product-price').value = prod.price || 0;
-    
+
     const weightEl = document.getElementById('edit-market-product-weight');
     const imageEl = document.getElementById('edit-market-product-image');
     const hiddenEl = document.getElementById('edit-market-product-hidden');
@@ -2376,7 +2376,7 @@ function deleteMarketProduct(productId) {
         delete window.globalMarketProductsCache[productId];
         try {
             localStorage.setItem('mvc_cached_market_products', JSON.stringify(window.globalMarketProductsCache));
-        } catch(e){}
+        } catch (e) { }
     }
 
     if (window.currentMarketFilteredProducts) {
@@ -2421,7 +2421,7 @@ function handleCustomerCodeLogin() {
         try {
             localStorage.setItem('mvc_customer_session', JSON.stringify(foundCust));
             localStorage.setItem('mvc_customer_code', cleanCode);
-        } catch(e){}
+        } catch (e) { }
 
         const authOverlay = document.getElementById('auth-overlay');
         if (authOverlay) authOverlay.style.display = 'none';
@@ -2511,7 +2511,7 @@ function handleCustomerCodeLogin() {
             window.localCustomerRegistry[cleanCode] = foundCust;
             try {
                 localStorage.setItem('mvc_global_customer_registry', JSON.stringify(window.localCustomerRegistry));
-            } catch(e){}
+            } catch (e) { }
 
             processCustomerLogin(foundCust);
         }).catch(err => {
@@ -2538,7 +2538,7 @@ function logoutCustomerSession() {
     try {
         localStorage.removeItem('mvc_customer_session');
         localStorage.removeItem('mvc_customer_code');
-    } catch(e){}
+    } catch (e) { }
     window.location.reload();
 }
 window.logoutCustomerSession = logoutCustomerSession;
@@ -2724,13 +2724,13 @@ function createCustomerCode() {
     window.localCustomerRegistry[code] = customerObj;
     try {
         localStorage.setItem('mvc_global_customer_registry', JSON.stringify(window.localCustomerRegistry));
-    } catch(e){}
+    } catch (e) { }
 
     db.ref().update(updates).then(() => {
         nameInput.value = '';
         if (coinsInput) coinsInput.value = '1000';
-        alert(isAr 
-            ? `🎉 تم إنشاء حساب العميل بنجاح!\nالاسم: ${name}\nرمز الدخول الخاص به: ${code}` 
+        alert(isAr
+            ? `🎉 تم إنشاء حساب العميل بنجاح!\nالاسم: ${name}\nرمز الدخول الخاص به: ${code}`
             : `🎉 Customer code generated successfully!\nName: ${name}\nAccess Code: ${code}`);
         renderMarket();
         renderAdminCustomersList();

@@ -3,6 +3,9 @@
  */
 
 function renderWarehouse() {
+    if (typeof checkStockAlerts === 'function') {
+        checkStockAlerts();
+    }
     renderWhFolders(); // Render the folder manager UI first
 
     const list = document.getElementById('warehouse-list'); list.innerHTML = '';

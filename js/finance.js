@@ -117,7 +117,7 @@ function renderFinDetails() {
     document.getElementById('fin-display-summary-custody').textContent = totalCustody.toLocaleString();
     document.getElementById('fin-display-custody').textContent = totalCustody.toLocaleString();
     document.getElementById('fin-display-total-viol').textContent = totalViolations.toLocaleString();
-    
+
     const displayOvertime = document.getElementById('fin-display-overtime');
     if (displayOvertime) displayOvertime.textContent = totalOvertime.toLocaleString();
 
@@ -547,7 +547,7 @@ function renderSummaryTable() {
             });
         }
         const outstandingCustody = custodyTaken - custodyReturned;
-        const custodyStatusHtml = outstandingCustody > 0 
+        const custodyStatusHtml = outstandingCustody > 0
             ? `<div style="color:#b45309; font-weight:700; font-size:0.85rem; text-align:center; background:#fffbeb; border:1px solid #fef3c7; padding:6px; border-radius:6px; margin-bottom:12px;">⏳ ${isAr ? 'مستحق الإرجاع:' : 'Outstanding to Return:'} SAR ${outstandingCustody.toLocaleString()}</div>`
             : `<div style="color:var(--success); font-weight:700; font-size:0.85rem; text-align:center; background:var(--success-bg); border:1px solid var(--success-border); padding:6px; border-radius:6px; margin-bottom:12px;">✅ ${isAr ? 'تمت إعادة الجميع' : 'All Returned'}</div>`;
 
@@ -944,8 +944,8 @@ function submitPaymentRequest() {
             const remainingDays = Math.floor(remainingMs / (24 * 60 * 60 * 1000));
             const remainingHours = Math.floor((remainingMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
             const timeMsg = isAr ? `${remainingDays} يوم و ${remainingHours} ساعة` : `${remainingDays}d ${remainingHours}h`;
-            alert(isAr 
-                ? `عذراً، يجب الانتظار لمدة أسبوع واحد (7 أيام) بين كل طلب دفع وآخر. الوقت المتبقي: ${timeMsg}.` 
+            alert(isAr
+                ? `عذراً، يجب الانتظار لمدة أسبوع واحد (7 أيام) بين كل طلب دفع وآخر. الوقت المتبقي: ${timeMsg}.`
                 : `Sorry, you must wait 1 week (7 days) between payment requests. Time remaining: ${timeMsg}.`);
             return;
         }
@@ -1437,7 +1437,7 @@ function renderHighMoneyApprovals() {
     const pRequests = companyData.paymentRequests || {};
     let reqList = Object.values(pRequests).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     const approvalsListDiv = document.getElementById('high-money-approvals-list');
-    
+
     if (!approvalsListDiv) return;
     approvalsListDiv.innerHTML = '';
 
@@ -1926,27 +1926,27 @@ function setWorkerVacationStatus(markActive) {
             lateness: '',
             timestamp: Date.now()
         })
-        .then(() => {
-            logActivity('attendance', workerId, worker.name, `Marked attendance as VACATION for ${worker.name} on ${dateStr}`);
-            const mainDatePicker = document.getElementById('attendance-date-picker');
-            if (mainDatePicker && mainDatePicker.value === dateStr) {
-                renderAttendance();
-            }
-            alert(currentAppLang === 'ar' ? `تم تسجيل ${worker.name} في إجازة بنجاح!` : `Successfully marked ${worker.name} as on vacation!`);
-        })
-        .catch(err => console.error("Error setting attendance vacation:", err));
-    } else {
-        if (confirm(currentAppLang === 'ar' ? `هل تريد إزالة حالة الإجازة لـ ${worker.name} في ${dateStr}؟` : `Do you want to remove vacation status for ${worker.name} on ${dateStr}?`)) {
-            db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}`).remove()
             .then(() => {
-                logActivity('attendance_clear', workerId, worker.name, `Cleared attendance/vacation record for ${worker.name} on ${dateStr}`);
+                logActivity('attendance', workerId, worker.name, `Marked attendance as VACATION for ${worker.name} on ${dateStr}`);
                 const mainDatePicker = document.getElementById('attendance-date-picker');
                 if (mainDatePicker && mainDatePicker.value === dateStr) {
                     renderAttendance();
                 }
-                alert(currentAppLang === 'ar' ? 'تمت إزالة الإجازة بنجاح!' : 'Vacation status removed successfully!');
+                alert(currentAppLang === 'ar' ? `تم تسجيل ${worker.name} في إجازة بنجاح!` : `Successfully marked ${worker.name} as on vacation!`);
             })
-            .catch(err => console.error("Error clearing attendance vacation:", err));
+            .catch(err => console.error("Error setting attendance vacation:", err));
+    } else {
+        if (confirm(currentAppLang === 'ar' ? `هل تريد إزالة حالة الإجازة لـ ${worker.name} في ${dateStr}؟` : `Do you want to remove vacation status for ${worker.name} on ${dateStr}?`)) {
+            db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}`).remove()
+                .then(() => {
+                    logActivity('attendance_clear', workerId, worker.name, `Cleared attendance/vacation record for ${worker.name} on ${dateStr}`);
+                    const mainDatePicker = document.getElementById('attendance-date-picker');
+                    if (mainDatePicker && mainDatePicker.value === dateStr) {
+                        renderAttendance();
+                    }
+                    alert(currentAppLang === 'ar' ? 'تمت إزالة الإجازة بنجاح!' : 'Vacation status removed successfully!');
+                })
+                .catch(err => console.error("Error clearing attendance vacation:", err));
         }
     }
 }
@@ -2065,7 +2065,7 @@ function renderAttendance() {
             } else if (req.status === 'rejected') {
                 exitHtml = `<div style="font-size:0.75rem; color:#dc2626; font-weight:600; margin-top:4px;">🚪 Exit Rejected</div>`;
             } else if (req.status === 'returned') {
-                const retTimeStr = new Date(req.returnedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                const retTimeStr = new Date(req.returnedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 exitHtml = `<div style="font-size:0.75rem; color:var(--info); font-weight:600; margin-top:4px;">🚪 Out: ${req.time} - Back: ${retTimeStr}</div>`;
             }
         }
@@ -2141,24 +2141,24 @@ function renderAttendance() {
                 let statusText = '';
                 let statusColor = '';
                 if (req.status === 'pending') {
-                    statusText = isAr 
-                        ? `⏳ قيد الانتظار: طلب الخروج في ${req.time} (السبب: ${req.reason})` 
+                    statusText = isAr
+                        ? `⏳ قيد الانتظار: طلب الخروج في ${req.time} (السبب: ${req.reason})`
                         : `⏳ Pending: Exit requested for ${req.time} (Reason: ${req.reason})`;
                     statusColor = '#d97706';
                 } else if (req.status === 'approved') {
-                    statusText = isAr 
-                        ? `🟢 تمت الموافقة: يمكنك الخروج الآن. وقت الخروج المعتمد: ${req.time}` 
+                    statusText = isAr
+                        ? `🟢 تمت الموافقة: يمكنك الخروج الآن. وقت الخروج المعتمد: ${req.time}`
                         : `🟢 Approved: You may exit now. Out since ${req.time}`;
                     statusColor = 'var(--success)';
                 } else if (req.status === 'rejected') {
-                    statusText = isAr 
-                        ? `❌ تم الرفض: تم رفض طلب الخروج` 
+                    statusText = isAr
+                        ? `❌ تم الرفض: تم رفض طلب الخروج`
                         : `❌ Rejected: Exit request was rejected`;
                     statusColor = 'var(--danger)';
                 } else if (req.status === 'returned') {
-                    const retTimeStr = new Date(req.returnedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                    statusText = isAr 
-                        ? `✅ تمت العودة: عدت إلى العمل في ${retTimeStr}` 
+                    const retTimeStr = new Date(req.returnedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    statusText = isAr
+                        ? `✅ تمت العودة: عدت إلى العمل في ${retTimeStr}`
                         : `✅ Returned: Checked back in at ${retTimeStr}`;
                     statusColor = 'var(--info)';
                 }
@@ -3069,7 +3069,7 @@ function addNewWorkerShift() {
         document.getElementById('ops-new-shift-start').value = '';
         document.getElementById('ops-new-shift-end').value = '';
         if (document.getElementById('ops-new-shift-day')) document.getElementById('ops-new-shift-day').value = '';
-        const activityMsg = dayOfWeek 
+        const activityMsg = dayOfWeek
             ? `Added new override shift for ${dayOfWeek} (${startTime} - ${endTime}) for ${worker.name}`
             : `Added new shift (${startTime} - ${endTime}) for ${worker.name}`;
         logActivity('ops', worker.id, worker.name, activityMsg);
@@ -3344,7 +3344,7 @@ function releaseCustodyRequest(reqId) {
             const worker = getCompanyData().workers[workerIndex];
             const stats = getMonthlyStats(worker, currentGlobalMonth);
             if (!stats.custodyList) stats.custodyList = [];
-            
+
             stats.custodyList.unshift({
                 id: 'cust-' + Date.now(),
                 date: formatTimestamp(),
@@ -3675,10 +3675,10 @@ function renderAttendanceOvertimeDetails() {
 
     const baseIncome = parseFloat(worker.income) || 0;
     const duration = getShiftDurationHours(worker.startTime, worker.endTime);
-    
+
     const durationEl = document.getElementById('att-ov-shift-duration');
     const hourlyRateEl = document.getElementById('att-ov-hourly-rate');
-    
+
     const hourlyRate = baseIncome / (30 * duration);
 
     if (durationEl) durationEl.textContent = `${duration.toFixed(1)} hrs`;
@@ -3800,7 +3800,7 @@ function addLateRule() {
 
     const companyData = getCompanyData();
     const rules = companyData.lateRules || [];
-    
+
     // Add rule and sort ascending by minutes
     rules.push({ mins, penalty });
     rules.sort((a, b) => a.mins - b.mins);
@@ -3910,15 +3910,15 @@ function markWorkerSelfAttendance() {
         lateness: lateness || '',
         timestamp: Date.now()
     })
-    .then(() => {
-        logActivity('attendance', worker.id, worker.name, `Worker Self Checked-In as PRESENT on ${dateStr} at ${checkTime} (Lateness: ${lateness || 'None'})`);
-        alert(currentAppLang === 'ar' ? 'تم تسجيل حضورك بنجاح!' : 'You have checked in successfully!');
-        renderAll();
-    })
-    .catch(err => {
-        console.error("Error during self check-in:", err);
-        alert("Error: " + err.message);
-    });
+        .then(() => {
+            logActivity('attendance', worker.id, worker.name, `Worker Self Checked-In as PRESENT on ${dateStr} at ${checkTime} (Lateness: ${lateness || 'None'})`);
+            alert(currentAppLang === 'ar' ? 'تم تسجيل حضورك بنجاح!' : 'You have checked in successfully!');
+            renderAll();
+        })
+        .catch(err => {
+            console.error("Error during self check-in:", err);
+            alert("Error: " + err.message);
+        });
 }
 
 function renderTaskGroups() {
@@ -3939,7 +3939,7 @@ function renderTaskGroups() {
     groups.forEach((group, idx) => {
         // Find current members of this group
         const groupMembers = (group.members || []).map(mId => workers.find(w => w.id === mId)).filter(Boolean);
-        
+
         let membersHtml = '';
         if (groupMembers.length === 0) {
             membersHtml = `<div style="font-size:0.75rem; color:var(--text-muted); padding: 4px 0;">${isAr ? 'لا يوجد أعضاء' : 'No members'}</div>`;
@@ -3997,7 +3997,7 @@ function createTaskGroup() {
 
     const companyData = getCompanyData();
     const groups = companyData.taskGroups || [];
-    
+
     // Check if group already exists
     if (groups.some(g => g.name.toLowerCase() === name.toLowerCase())) {
         alert(currentAppLang === 'ar' ? 'هذه المجموعة موجودة بالفعل!' : 'Group already exists!');
@@ -4107,7 +4107,7 @@ function switchSalesForm(formId) {
     containers.forEach(id => {
         const el = document.getElementById(`form-${id}-container`);
         if (el) el.style.display = 'none';
-        
+
         const btn = document.getElementById(`btn-sales-tab-${id}`);
         if (btn) {
             btn.classList.remove('active');
@@ -4301,7 +4301,7 @@ function applyUserTabOrder() {
             .then(snapshot => {
                 const val = snapshot.val();
                 if (val && Array.isArray(val)) {
-                    try { localStorage.setItem(storageKey, JSON.stringify(val)); } catch (e) {}
+                    try { localStorage.setItem(storageKey, JSON.stringify(val)); } catch (e) { }
                     reorderTabContainer(container, val);
                 }
             }).catch(e => console.error(e));
@@ -4334,7 +4334,7 @@ function showWorkerPaymentHistory(identifier) {
     // Filter for this worker's requests where money was received (status given or get_paid)
     const workerGivenReqs = reqList.filter(r => {
         const matchesWorker = (r.workerEmail && r.workerEmail.toLowerCase() === identifier.toLowerCase()) ||
-                              (r.workerName && r.workerName.toLowerCase() === identifier.toLowerCase());
+            (r.workerName && r.workerName.toLowerCase() === identifier.toLowerCase());
         const isReceived = r.status === 'given' || r.status === 'get_paid';
         return matchesWorker && isReceived;
     }).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
@@ -4420,10 +4420,10 @@ function convertNoteToTask(rawText) {
     if (!rawText) return;
     const text = decodeURIComponent(rawText);
     const isAr = currentAppLang === 'ar';
-    
+
     // Switch to tasks tab
     switchTab('tasks');
-    
+
     // Pre-fill task assign input field
     setTimeout(() => {
         const input = document.getElementById('task-assign-input');
@@ -4602,8 +4602,8 @@ function renderReminders() {
     if (dueReminders.length > 0 && banner && bannerText) {
         banner.style.display = 'block';
         const dueTitles = dueReminders.map(r => `• ${r.title}`).join(', ');
-        bannerText.textContent = isAr 
-            ? `لديك (${dueReminders.length}) تذكيرات حان موعد التنبيه عليها: ${dueTitles}` 
+        bannerText.textContent = isAr
+            ? `لديك (${dueReminders.length}) تذكيرات حان موعد التنبيه عليها: ${dueTitles}`
             : `You have (${dueReminders.length}) reminders with active lead alerts: ${dueTitles}`;
     } else if (banner) {
         banner.style.display = 'none';
@@ -4734,8 +4734,8 @@ function completeReminderCycle(remId) {
     return db.ref(`companies/${currentCompany}/reminders/${remId}`).update(updates)
         .then(() => {
             const nextFormatted = formatReminderDate(nextDeadlineMs, nextDeadlineISO);
-            const msg = isAr 
-                ? `🎉 تم إنجاز الدورة بنجاح! الموعد القادم: ${nextFormatted}` 
+            const msg = isAr
+                ? `🎉 تم إنجاز الدورة بنجاح! الموعد القادم: ${nextFormatted}`
                 : `🎉 Cycle finished! Next reminder due: ${nextFormatted}`;
             if (typeof showInAppNotification === 'function') {
                 showInAppNotification(msg);
@@ -4786,7 +4786,7 @@ function openEditReminderModal(remId) {
 
     document.getElementById('edit-reminder-id').value = r.id;
     document.getElementById('edit-reminder-title').value = r.title || '';
-    
+
     if (r.deadlineISO) {
         document.getElementById('edit-reminder-deadline').value = r.deadlineISO;
     } else if (r.deadlineMs) {

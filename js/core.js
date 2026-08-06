@@ -245,7 +245,7 @@ let currentCustomerSession = null;
 try {
     const savedCustomer = localStorage.getItem('mvc_customer_session');
     if (savedCustomer) currentCustomerSession = JSON.parse(savedCustomer);
-} catch(e) {
+} catch (e) {
     currentCustomerSession = null;
 }
 
@@ -253,7 +253,7 @@ let localCustomerRegistry = {};
 try {
     const cachedReg = localStorage.getItem('mvc_global_customer_registry');
     if (cachedReg) localCustomerRegistry = JSON.parse(cachedReg);
-} catch(e){}
+} catch (e) { }
 
 function initPublicCustomerSync() {
     if (typeof window !== 'undefined' && window.db) {
@@ -264,7 +264,7 @@ function initPublicCustomerSync() {
                     window.localCustomerRegistry = Object.assign({}, window.localCustomerRegistry, val);
                     try {
                         localStorage.setItem('mvc_global_customer_registry', JSON.stringify(window.localCustomerRegistry));
-                    } catch(e){}
+                    } catch (e) { }
 
                     // Real-time sync for active customer session
                     if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && (currentCustomerSession.code || currentCustomerSession.id)) {
@@ -275,7 +275,7 @@ function initPublicCustomerSync() {
                                 currentCustomerSession.coins = freshCoins;
                                 try {
                                     localStorage.setItem('mvc_customer_session', JSON.stringify(currentCustomerSession));
-                                } catch(e){}
+                                } catch (e) { }
                                 const coinsValEl = document.getElementById('market-user-coins-val');
                                 if (coinsValEl) coinsValEl.textContent = freshCoins.toLocaleString();
                                 if (typeof renderMarket === 'function') renderMarket();
@@ -286,7 +286,7 @@ function initPublicCustomerSync() {
                     }
                 }
             });
-        } catch(e){}
+        } catch (e) { }
     }
 }
 
@@ -512,7 +512,7 @@ function startGlobalNotificationListeners(email) {
 function _cfgSecret(str) {
     try {
         return atob(str);
-    } catch(e) {
+    } catch (e) {
         return '';
     }
 }
@@ -667,7 +667,7 @@ try {
             currentCompany = currentCustomerSession.company;
         }
     }
-} catch(e){}
+} catch (e) { }
 
 // FEATURE 1: Task tracking state — tracks previously seen task IDs for the current worker
 let previousTaskIds = [];
@@ -687,9 +687,103 @@ function showCompanySelectionHUD(event) {
     const launchLoader = document.getElementById('launch-loader-overlay');
     if (launchLoader) launchLoader.style.display = 'none';
     if (typeof hideUnassignedOverlay === 'function') hideUnassignedOverlay();
+
+    const cardBurgeroov = document.querySelector('.burgeroov-card');
+    const cardMvc = document.querySelector('.mvc-card');
+    const cardMvcFresh = document.querySelector('.mvcfresh-card');
+
+    if (currentUser && currentUser.email === 'kinan.rahal@hotmail.com') {
+        if (cardBurgeroov) cardBurgeroov.style.display = 'block';
+        if (cardMvc) cardMvc.style.display = 'block';
+        if (cardMvcFresh) cardMvcFresh.style.display = 'block';
+    } else if (window.userActiveCompanies && Array.isArray(window.userActiveCompanies)) {
+        if (cardBurgeroov) cardBurgeroov.style.display = window.userActiveCompanies.includes('burgeroov') ? 'block' : 'none';
+        if (cardMvc) cardMvc.style.display = window.userActiveCompanies.includes('mvc') ? 'block' : 'none';
+        if (cardMvcFresh) cardMvcFresh.style.display = window.userActiveCompanies.includes('mvcfresh') ? 'block' : 'none';
+    }
+
     document.getElementById('company-selection-overlay').style.display = 'flex';
     document.getElementById('app-wrapper').style.display = 'none';
 }
+
+function findMatchingWorker(workersList, userEmail, targetWorkerId) {
+    if (!workersList || !Array.isArray(workersList) || workersList.length === 0) return null;
+    if (!userEmail) return null;
+
+    const cleanEmail = String(userEmail).trim().toLowerCase();
+    const emailKey = cleanEmail.replace(/\./g, ',');
+
+    // 0. Match by explicit targetWorkerId or cached worker ID
+    let knownId = targetWorkerId || (typeof localStorage !== 'undefined' ? localStorage.getItem('mvc_worker_id_' + emailKey) : null);
+    if (knownId) {
+        let matched = workersList.find(w => w && String(w.id) === String(knownId));
+        if (matched) {
+            matched.email = cleanEmail;
+            matched.email_key = emailKey;
+            return matched;
+        }
+    }
+
+    // 1. Direct email match (trimmed, case-insensitive)
+    let matched = workersList.find(w => w && w.email && String(w.email).trim().toLowerCase() === cleanEmail);
+    if (matched) {
+        if (!matched.email_key) matched.email_key = emailKey;
+        return matched;
+    }
+
+    // 2. Email key match
+    matched = workersList.find(w => w && (
+        (w.email_key && w.email_key === emailKey) ||
+        (w.email && String(w.email).trim().toLowerCase().replace(/\./g, ',') === emailKey)
+    ));
+    if (matched) {
+        matched.email = cleanEmail;
+        return matched;
+    }
+
+    // 3. Worker Credentials / Password mapping check
+    if (typeof appData !== 'undefined') {
+        const companyKeys = ['burgeroov', 'mvc', 'mvcfresh', (typeof currentCompany !== 'undefined' ? currentCompany : '')].filter(Boolean);
+        for (const cKey of companyKeys) {
+            const data = appData[cKey];
+            if (data && data.workerPasswords && data.workerPasswords[emailKey]) {
+                const mappedId = data.workerPasswords[emailKey].workerId;
+                if (mappedId) {
+                    matched = workersList.find(w => w && String(w.id) === String(mappedId));
+                    if (matched) {
+                        matched.email = cleanEmail;
+                        matched.email_key = emailKey;
+                        return matched;
+                    }
+                }
+            }
+        }
+    }
+
+    // 4. Fallback match by password if available
+    if (typeof window !== 'undefined' && window.lastAttemptedLoginPassword) {
+        matched = workersList.find(w => w && (w.password === window.lastAttemptedLoginPassword || w.oldPassword === window.lastAttemptedLoginPassword));
+        if (matched) {
+            matched.email = cleanEmail;
+            matched.email_key = emailKey;
+            return matched;
+        }
+    }
+
+    // 5. Fallback match if user email username matches worker name (e.g., sinan.rahal -> Sinan)
+    const namePart = cleanEmail.split('@')[0].split('.')[0];
+    if (namePart && namePart.length > 2) {
+        matched = workersList.find(w => w && w.name && w.name.toLowerCase().includes(namePart));
+        if (matched) {
+            matched.email = cleanEmail;
+            matched.email_key = emailKey;
+            return matched;
+        }
+    }
+
+    return null;
+}
+window.findMatchingWorker = findMatchingWorker;
 
 function selectCompany(companyId) {
     currentCompany = companyId;
@@ -743,18 +837,18 @@ function selectCompany(companyId) {
     // Fetch credentials to pre-register UID to prevent database connection error (permission denied)
     if (currentUser && currentUser.uid) {
         const email = currentUser.email.toLowerCase();
-        
+
         Promise.all([
             db.ref(`companies/${companyId}/admins`).once('value').catch(() => null),
             db.ref(`companies/${companyId}/workers`).once('value').catch(() => null)
         ]).then(([adminsSnap, workersSnap]) => {
             const admins = parseAdminsSnap(adminsSnap);
             const workers = parseWorkersSnap(workersSnap);
-            
+
             const sanitizedEmail = email.replace(/\./g, ',');
             const isCompanyAdmin = email === 'kinan.rahal@hotmail.com' || admins[sanitizedEmail] !== undefined;
             const worker = workers.find(w => w.email && w.email.toLowerCase() === email);
-            
+
             if (email === 'kinan.rahal@hotmail.com') {
                 return db.ref(`companies/${companyId}/users_by_uid/${currentUser.uid}`).set({
                     email: email,
@@ -797,166 +891,197 @@ function selectCompany(companyId) {
 window.selectCompany = selectCompany;
 window.showCompanySelectionHUD = showCompanySelectionHUD;
 
-async function processLoggedInUser(userEmail) {
-    if (!userEmail) return;
-    const email = userEmail.toLowerCase();
-    const emailKey = email.replace(/\./g, ',');
+// --- AUTHENTICATION SYSTEM ---
+authMode = authMode || 'login';
 
-    currentCustomerSession = null;
-    try {
-        localStorage.removeItem('mvc_customer_session');
-        localStorage.removeItem('mvc_customer_code');
-    } catch(e){}
-
-    currentUser = { email: email, uid: (auth.currentUser ? auth.currentUser.uid : 'worker_' + emailKey) };
-    const displayEmailElem = document.getElementById('display-user-email');
-    if (displayEmailElem) displayEmailElem.textContent = currentUser.email;
-
-    if (typeof startGlobalNotificationListeners === 'function') {
-        startGlobalNotificationListeners(email);
-    }
-
+auth.onAuthStateChanged((user) => {
     const overlay = document.getElementById('auth-overlay');
-    const authLoader = document.getElementById('auth-loader');
-    const authBtn = document.getElementById('auth-btn');
-
-    if (email === 'kinan.rahal@hotmail.com') {
-        if (authLoader) authLoader.style.display = 'none';
-        if (authBtn) authBtn.style.display = 'block';
-        if (overlay) overlay.style.display = 'none';
-
-        const cardBurgeroov = document.querySelector('.burgeroov-card');
-        const cardMvc = document.querySelector('.mvc-card');
-        const cardMvcFresh = document.querySelector('.mvcfresh-card');
-        if (cardBurgeroov) cardBurgeroov.style.display = 'block';
-        if (cardMvc) cardMvc.style.display = 'block';
-        if (cardMvcFresh) cardMvcFresh.style.display = 'block';
-
-        window.isMultiCompany = true;
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const queryCompany = urlParams.get('companyId');
-        const queryTab = urlParams.get('tab');
-
-        if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc' || queryCompany === 'mvcfresh')) {
-            selectCompany(queryCompany);
-            if (queryTab) {
-                setTimeout(() => {
-                    switchTab(queryTab);
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                }, 500);
-            } else {
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }
-        } else {
-            const savedCompany = localStorage.getItem('selected_company');
-            if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
-                selectCompany(savedCompany);
-            } else {
-                showCompanySelectionHUD();
-            }
-        }
-        return;
-    }
-
-    // Check databases for worker / admin membership across all 3 companies
-    try {
-        const [bgAdmins, bgWorkers, mvcAdmins, mvcWorkers, freshAdmins, freshWorkers] = await Promise.all([
-            db.ref('companies/burgeroov/admins').once('value').catch(() => null),
-            db.ref('companies/burgeroov/workers').once('value').catch(() => null),
-            db.ref('companies/mvc/admins').once('value').catch(() => null),
-            db.ref('companies/mvc/workers').once('value').catch(() => null),
-            db.ref('companies/mvcfresh/admins').once('value').catch(() => null),
-            db.ref('companies/mvcfresh/workers').once('value').catch(() => null)
-        ]);
-
-        if (authLoader) authLoader.style.display = 'none';
-        if (authBtn) authBtn.style.display = 'block';
-
-        const burgeroovAdmins = parseAdminsSnap(bgAdmins);
-        const burgeroovWorkers = parseWorkersSnap(bgWorkers);
-        const mvcAdminsList = parseAdminsSnap(mvcAdmins);
-        const mvcWorkersList = parseWorkersSnap(mvcWorkers);
-        const mvcfreshAdminsList = parseAdminsSnap(freshAdmins);
-        const mvcfreshWorkersList = parseWorkersSnap(freshWorkers);
-
-        const sanitizedEmail = email.replace(/\./g, ',');
-        const inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
-            burgeroovWorkers.some(w => w && w.email && w.email.toLowerCase() === email);
-        const inMvc = mvcAdminsList[sanitizedEmail] === true ||
-            mvcWorkersList.some(w => w && w.email && w.email.toLowerCase() === email);
-        const inMvcFresh = mvcfreshAdminsList[sanitizedEmail] === true ||
-            mvcfreshWorkersList.some(w => w && w.email && w.email.toLowerCase() === email);
-
-        const cardBurgeroov = document.querySelector('.burgeroov-card');
-        const cardMvc = document.querySelector('.mvc-card');
-        const cardMvcFresh = document.querySelector('.mvcfresh-card');
-
-        if (cardBurgeroov) cardBurgeroov.style.display = inBurgeroov ? 'block' : 'none';
-        if (cardMvc) cardMvc.style.display = inMvc ? 'block' : 'none';
-        if (cardMvcFresh) cardMvcFresh.style.display = inMvcFresh ? 'block' : 'none';
-
-        if (overlay) overlay.style.display = 'none';
-
-        const activeCompanies = [];
-        if (inBurgeroov) activeCompanies.push('burgeroov');
-        if (inMvc) activeCompanies.push('mvc');
-        if (inMvcFresh) activeCompanies.push('mvcfresh');
-
-        window.isMultiCompany = activeCompanies.length > 1;
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const queryCompany = urlParams.get('companyId');
-        const queryTab = urlParams.get('tab');
-
-        let chosenCompany = null;
-        if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc' || queryCompany === 'mvcfresh')) {
-            if ((queryCompany === 'mvc' && inMvc) ||
-                (queryCompany === 'burgeroov' && inBurgeroov) ||
-                (queryCompany === 'mvcfresh' && inMvcFresh)) {
-                chosenCompany = queryCompany;
-            }
-        }
-
-        if (chosenCompany) {
-            selectCompany(chosenCompany);
-            if (queryTab) {
-                setTimeout(() => {
-                    switchTab(queryTab);
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                }, 500);
-            } else {
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }
-        } else {
-            const savedCompany = localStorage.getItem('selected_company');
-            if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
-                if ((savedCompany === 'mvc' && inMvc) ||
-                    (savedCompany === 'burgeroov' && inBurgeroov) ||
-                    (savedCompany === 'mvcfresh' && inMvcFresh)) {
-                    selectCompany(savedCompany);
-                    return;
-                }
-            }
-            if (activeCompanies.length > 1) {
-                showCompanySelectionHUD();
-            } else if (activeCompanies.length === 1) {
-                selectCompany(activeCompanies[0]);
-            } else {
-                showUnassignedOverlay(email);
-            }
-        }
-    } catch (error) {
-        console.error("Error processing logged in user companies:", error);
-    }
-}
-
-auth.onAuthStateChanged(async (user) => {
+    const appWrapper = document.getElementById('app-wrapper');
     const launchLoader = document.getElementById('launch-loader-overlay');
+
     if (launchLoader) launchLoader.style.display = 'none';
 
     if (user) {
-        processLoggedInUser(user.email);
+        currentCustomerSession = null;
+        try {
+            localStorage.removeItem('mvc_customer_session');
+            localStorage.removeItem('mvc_customer_code');
+        } catch (e) { }
+        currentUser = { email: user.email, uid: user.uid };
+        document.getElementById('display-user-email').textContent = currentUser.email;
+        startGlobalNotificationListeners(user.email);
+
+        document.getElementById('auth-loader').style.display = 'block';
+        document.getElementById('auth-btn').style.display = 'none';
+
+        const email = user.email.toLowerCase();
+
+        if (email === 'kinan.rahal@hotmail.com') {
+            document.getElementById('auth-loader').style.display = 'none';
+            document.getElementById('auth-btn').style.display = 'block';
+            overlay.style.display = 'none';
+
+            // Show all cards in selection overlay for super admin
+            const cardBurgeroov = document.querySelector('.burgeroov-card');
+            const cardMvc = document.querySelector('.mvc-card');
+            const cardMvcFresh = document.querySelector('.mvcfresh-card');
+            if (cardBurgeroov) cardBurgeroov.style.display = 'block';
+            if (cardMvc) cardMvc.style.display = 'block';
+            if (cardMvcFresh) cardMvcFresh.style.display = 'block';
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const queryCompany = urlParams.get('companyId');
+            const queryTab = urlParams.get('tab');
+
+            if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc' || queryCompany === 'mvcfresh')) {
+                selectCompany(queryCompany);
+                if (queryTab) {
+                    setTimeout(() => {
+                        switchTab(queryTab);
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }, 500);
+                } else {
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+            } else {
+                const savedCompany = localStorage.getItem('selected_company');
+                if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
+                    selectCompany(savedCompany);
+                } else {
+                    showCompanySelectionHUD();
+                }
+            }
+        } else {
+            // Check databases for worker membership
+            const sanitizedEmail = email.replace(/\./g, ',');
+            Promise.all([
+                db.ref('companies/burgeroov/admins').once('value').catch(() => null),
+                db.ref('companies/burgeroov/workers').once('value').catch(() => null),
+                db.ref('companies/mvc/admins').once('value').catch(() => null),
+                db.ref('companies/mvc/workers').once('value').catch(() => null),
+                db.ref('companies/mvcfresh/admins').once('value').catch(() => null),
+                db.ref('companies/mvcfresh/workers').once('value').catch(() => null),
+                db.ref(`customerCodes/workerPasswords/${sanitizedEmail}`).once('value').catch(() => null),
+                db.ref(`customerCodes/workerAccess/${sanitizedEmail}`).once('value').catch(() => null)
+            ]).then(([bgAdmins, bgWorkers, mvcAdmins, mvcWorkers, freshAdmins, freshWorkers, pwdSnap, accessSnap]) => {
+                document.getElementById('auth-loader').style.display = 'none';
+                document.getElementById('auth-btn').style.display = 'block';
+
+                const burgeroovAdmins = parseAdminsSnap(bgAdmins);
+                const burgeroovWorkers = parseWorkersSnap(bgWorkers);
+
+                const mvcAdminsList = parseAdminsSnap(mvcAdmins);
+                const mvcWorkersList = parseWorkersSnap(mvcWorkers);
+
+                const mvcfreshAdminsList = parseAdminsSnap(freshAdmins);
+                const mvcfreshWorkersList = parseWorkersSnap(freshWorkers);
+
+                let targetWorkerId = null;
+                if (pwdSnap && pwdSnap.exists() && pwdSnap.val()) {
+                    const pwdVal = pwdSnap.val();
+                    if (pwdVal.workerId) {
+                        targetWorkerId = pwdVal.workerId;
+                        try { localStorage.setItem('mvc_worker_id_' + sanitizedEmail, targetWorkerId); } catch (e) { }
+                    }
+                }
+                if (!targetWorkerId && typeof localStorage !== 'undefined') {
+                    targetWorkerId = localStorage.getItem('mvc_worker_id_' + sanitizedEmail);
+                }
+
+                let inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
+                    (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(burgeroovWorkers, email, targetWorkerId) : burgeroovWorkers.some(w => w && w.email && w.email.toLowerCase() === email));
+
+                let inMvc = mvcAdminsList[sanitizedEmail] === true ||
+                    (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(mvcWorkersList, email, targetWorkerId) : mvcWorkersList.some(w => w && w.email && w.email.toLowerCase() === email));
+
+                let inMvcFresh = mvcfreshAdminsList[sanitizedEmail] === true ||
+                    (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(mvcfreshWorkersList, email, targetWorkerId) : mvcfreshWorkersList.some(w => w && w.email && w.email.toLowerCase() === email));
+
+                if (accessSnap && accessSnap.exists() && accessSnap.val()) {
+                    const acc = accessSnap.val();
+                    if (acc.burgeroov === true) inBurgeroov = true;
+                    if (acc.mvc === true) inMvc = true;
+                    if (acc.mvcfresh === true) inMvcFresh = true;
+                }
+
+                if (pwdSnap && pwdSnap.exists() && pwdSnap.val() && pwdSnap.val().company) {
+                    const assignedComp = pwdSnap.val().company;
+                    if (assignedComp === 'burgeroov') inBurgeroov = true;
+                    if (assignedComp === 'mvc') inMvc = true;
+                    if (assignedComp === 'mvcfresh') inMvcFresh = true;
+                }
+
+                // Update selector cards display based on assigned status
+                const cardBurgeroov = document.querySelector('.burgeroov-card');
+                const cardMvc = document.querySelector('.mvc-card');
+                const cardMvcFresh = document.querySelector('.mvcfresh-card');
+
+                if (cardBurgeroov) cardBurgeroov.style.display = inBurgeroov ? 'block' : 'none';
+                if (cardMvc) cardMvc.style.display = inMvc ? 'block' : 'none';
+                if (cardMvcFresh) cardMvcFresh.style.display = inMvcFresh ? 'block' : 'none';
+
+                overlay.style.display = 'none';
+
+                const activeCompanies = [];
+                if (inBurgeroov) activeCompanies.push('burgeroov');
+                if (inMvc) activeCompanies.push('mvc');
+                if (inMvcFresh) activeCompanies.push('mvcfresh');
+
+                window.userActiveCompanies = activeCompanies;
+                window.isMultiCompany = activeCompanies.length > 1;
+
+                const locationSearch = (typeof window !== 'undefined' && window.location && window.location.search) ? window.location.search : '';
+                const urlParams = new URLSearchParams(locationSearch);
+                const queryCompany = urlParams.get('companyId');
+                const queryTab = urlParams.get('tab');
+
+                let chosenCompany = null;
+                if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc' || queryCompany === 'mvcfresh')) {
+                    if ((queryCompany === 'mvc' && inMvc) ||
+                        (queryCompany === 'burgeroov' && inBurgeroov) ||
+                        (queryCompany === 'mvcfresh' && inMvcFresh)) {
+                        chosenCompany = queryCompany;
+                    }
+                }
+
+                if (chosenCompany) {
+                    selectCompany(chosenCompany);
+                    if (queryTab) {
+                        setTimeout(() => {
+                            switchTab(queryTab);
+                            window.history.replaceState({}, document.title, window.location.pathname);
+                        }, 500);
+                    } else {
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                } else {
+                    const savedCompany = localStorage.getItem('selected_company');
+                    if (savedCompany && activeCompanies.includes(savedCompany)) {
+                        selectCompany(savedCompany);
+                        return;
+                    }
+                    if (activeCompanies.length > 1) {
+                        showCompanySelectionHUD();
+                    } else if (activeCompanies.length === 1) {
+                        selectCompany(activeCompanies[0]);
+                    } else {
+                        showUnassignedOverlay(user.email);
+                    }
+                }
+            }).catch((error) => {
+                console.error("Error checking company access:", error);
+                document.getElementById('auth-loader').style.display = 'none';
+                document.getElementById('auth-btn').style.display = 'block';
+
+                overlay.style.display = 'none';
+                const savedCompany = localStorage.getItem('selected_company');
+                if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
+                    selectCompany(savedCompany);
+                } else {
+                    showCompanySelectionHUD();
+                }
+            });
+        }
     } else {
         currentUser = null;
         if (currentCustomerSession) {
@@ -976,17 +1101,11 @@ auth.onAuthStateChanged(async (user) => {
         });
         notificationListeners = {};
 
-        const overlay = document.getElementById('auth-overlay');
-        const appWrapper = document.getElementById('app-wrapper');
-        const loader = document.getElementById('auth-loader');
-        const btn = document.getElementById('auth-btn');
-        const compOverlay = document.getElementById('company-selection-overlay');
-
-        if (loader) loader.style.display = 'none';
-        if (btn) btn.style.display = 'block';
-        if (overlay) overlay.style.display = 'flex';
-        if (appWrapper) appWrapper.style.display = 'none';
-        if (compOverlay) compOverlay.style.display = 'none';
+        document.getElementById('auth-loader').style.display = 'none';
+        document.getElementById('auth-btn').style.display = 'block';
+        overlay.style.display = 'flex';
+        appWrapper.style.display = 'none';
+        document.getElementById('company-selection-overlay').style.display = 'none';
 
         if (window.companyListenerRef) {
             window.companyListenerRef.off();
@@ -1043,8 +1162,10 @@ function checkUnassignedUserAccess(isManualTrigger = false) {
         db.ref('companies/mvc/admins').once('value').catch(() => null),
         db.ref('companies/mvc/workers').once('value').catch(() => null),
         db.ref('companies/mvcfresh/admins').once('value').catch(() => null),
-        db.ref('companies/mvcfresh/workers').once('value').catch(() => null)
-    ]).then(([bgAdmins, bgWorkers, mvcAdmins, mvcWorkers, freshAdmins, freshWorkers]) => {
+        db.ref('companies/mvcfresh/workers').once('value').catch(() => null),
+        db.ref(`customerCodes/workerPasswords/${sanitizedEmail}`).once('value').catch(() => null),
+        db.ref(`customerCodes/workerAccess/${sanitizedEmail}`).once('value').catch(() => null)
+    ]).then(([bgAdmins, bgWorkers, mvcAdmins, mvcWorkers, freshAdmins, freshWorkers, pwdSnap, accessSnap]) => {
         const burgeroovAdmins = parseAdminsSnap(bgAdmins);
         const burgeroovWorkers = parseWorkersSnap(bgWorkers);
 
@@ -1054,19 +1175,47 @@ function checkUnassignedUserAccess(isManualTrigger = false) {
         const mvcfreshAdminsList = parseAdminsSnap(freshAdmins);
         const mvcfreshWorkersList = parseWorkersSnap(freshWorkers);
 
-        const inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
-            burgeroovWorkers.some(w => w && w.email && w.email.toLowerCase() === email);
+        let targetWorkerId = null;
+        if (pwdSnap && pwdSnap.exists() && pwdSnap.val()) {
+            const pwdVal = pwdSnap.val();
+            if (pwdVal.workerId) {
+                targetWorkerId = pwdVal.workerId;
+                try { localStorage.setItem('mvc_worker_id_' + sanitizedEmail, targetWorkerId); } catch (e) { }
+            }
+        }
+        if (!targetWorkerId && typeof localStorage !== 'undefined') {
+            targetWorkerId = localStorage.getItem('mvc_worker_id_' + sanitizedEmail);
+        }
 
-        const inMvc = mvcAdminsList[sanitizedEmail] === true ||
-            mvcWorkersList.some(w => w && w.email && w.email.toLowerCase() === email);
+        let inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
+            (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(burgeroovWorkers, email, targetWorkerId) : burgeroovWorkers.some(w => w && w.email && w.email.toLowerCase() === email));
 
-        const inMvcFresh = mvcfreshAdminsList[sanitizedEmail] === true ||
-            mvcfreshWorkersList.some(w => w && w.email && w.email.toLowerCase() === email);
+        let inMvc = mvcAdminsList[sanitizedEmail] === true ||
+            (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(mvcWorkersList, email, targetWorkerId) : mvcWorkersList.some(w => w && w.email && w.email.toLowerCase() === email));
+
+        let inMvcFresh = mvcfreshAdminsList[sanitizedEmail] === true ||
+            (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(mvcfreshWorkersList, email, targetWorkerId) : mvcfreshWorkersList.some(w => w && w.email && w.email.toLowerCase() === email));
+
+        if (accessSnap && accessSnap.exists() && accessSnap.val()) {
+            const acc = accessSnap.val();
+            if (acc.burgeroov === true) inBurgeroov = true;
+            if (acc.mvc === true) inMvc = true;
+            if (acc.mvcfresh === true) inMvcFresh = true;
+        }
+
+        if (pwdSnap && pwdSnap.exists() && pwdSnap.val() && pwdSnap.val().company) {
+            const assignedComp = pwdSnap.val().company;
+            if (assignedComp === 'burgeroov') inBurgeroov = true;
+            if (assignedComp === 'mvc') inMvc = true;
+            if (assignedComp === 'mvcfresh') inMvcFresh = true;
+        }
 
         const activeCompanies = [];
         if (inBurgeroov) activeCompanies.push('burgeroov');
         if (inMvc) activeCompanies.push('mvc');
         if (inMvcFresh) activeCompanies.push('mvcfresh');
+
+        window.userActiveCompanies = activeCompanies;
 
         if (activeCompanies.length > 0) {
             hideUnassignedOverlay();
@@ -1098,16 +1247,16 @@ function toggleAuthMode() {
     authMode = window.authMode;
     const isAr = currentAppLang === 'ar';
 
-    document.getElementById('auth-title').textContent = authMode === 'login' 
-        ? (t('auth-title-login') || 'Login to Dashboard') 
+    document.getElementById('auth-title').textContent = authMode === 'login'
+        ? (t('auth-title-login') || 'Login to Dashboard')
         : (t('auth-title-signup') || 'Create Viewer Account');
-        
-    document.getElementById('auth-btn').textContent = authMode === 'login' 
-        ? (t('btn-signin') || 'Sign In') 
+
+    document.getElementById('auth-btn').textContent = authMode === 'login'
+        ? (t('btn-signin') || 'Sign In')
         : (t('btn-signup') || 'Sign Up');
 
-    document.getElementById('auth-toggle-text').textContent = authMode === 'login' 
-        ? (t('link-signup') || 'Sign Up') 
+    document.getElementById('auth-toggle-text').textContent = authMode === 'login'
+        ? (t('link-signup') || 'Sign Up')
         : (t('btn-signin') || 'Sign In');
 
     const confirmWrapper = document.getElementById('auth-confirm-password-wrapper');
@@ -1117,15 +1266,15 @@ function toggleAuthMode() {
     document.getElementById('auth-error-msg').style.display = 'none';
 }
 
-async function handleAuthSubmit() {
+function handleAuthSubmit() {
     const activeAuthMode = typeof authMode !== 'undefined' ? authMode : (window.authMode || 'login');
-    const emailInput = document.getElementById('auth-email').value.trim().toLowerCase();
-    const passwordInput = document.getElementById('auth-password').value.trim();
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value.trim();
     const errorMsg = document.getElementById('auth-error-msg');
     const btn = document.getElementById('auth-btn');
     const loader = document.getElementById('auth-loader');
 
-    if (!emailInput || !passwordInput) {
+    if (!email || !password) {
         errorMsg.style.color = "var(--danger)";
         errorMsg.textContent = currentAppLang === 'ar' ? "الرجاء إدخال البريد الإلكتروني وكلمة المرور." : "Please enter email and password.";
         errorMsg.style.display = 'block'; return;
@@ -1133,7 +1282,7 @@ async function handleAuthSubmit() {
 
     if (activeAuthMode === 'signup') {
         const confirmPassword = document.getElementById('auth-confirm-password').value.trim();
-        if (passwordInput !== confirmPassword) {
+        if (password !== confirmPassword) {
             errorMsg.style.color = "var(--danger)";
             errorMsg.textContent = currentAppLang === 'ar' ? "كلمتا المرور غير متطابقتين." : "Passwords do not match.";
             errorMsg.style.display = 'block';
@@ -1145,108 +1294,9 @@ async function handleAuthSubmit() {
     loader.style.display = 'block';
     errorMsg.style.display = 'none';
 
-    window.lastAttemptedLoginPassword = passwordInput;
-    window.lastAttemptedLoginEmail = emailInput;
-
     if (activeAuthMode === 'login') {
-        const emailKey = emailInput.replace(/\./g, ',');
-        let customWorkerPassword = null;
-
-        // Step 1: Check customerCodes workerPasswords node (publicly readable per Firebase Rules)
-        if (typeof db !== 'undefined' && db) {
-            try {
-                const snap = await db.ref(`customerCodes/workerPasswords/${emailKey}`).once('value');
-                if (snap.exists() && snap.val() && snap.val().password) {
-                    customWorkerPassword = snap.val().password;
-                }
-            } catch(e){}
-        }
-
-        // Step 2: Check localStorage cache
-        if (!customWorkerPassword) {
-            try {
-                const cachedPwd = localStorage.getItem('mvc_worker_pwd_' + emailKey);
-                if (cachedPwd) customWorkerPassword = cachedPwd;
-            } catch(e){}
-        }
-
-        // Step 3: Check globalWorkerPasswords node
-        if (!customWorkerPassword && typeof db !== 'undefined' && db) {
-            try {
-                const snap = await db.ref(`globalWorkerPasswords/${emailKey}`).once('value');
-                if (snap.exists() && snap.val() && snap.val().password) {
-                    customWorkerPassword = snap.val().password;
-                    try { localStorage.setItem('mvc_worker_pwd_' + emailKey, customWorkerPassword); } catch(e){}
-                }
-            } catch(e){}
-        }
-
-        // Step 3: Check companies nodes
-        if (!customWorkerPassword && typeof db !== 'undefined' && db) {
-            try {
-                const companyKeys = ['burgeroov', 'mvc', 'mvcfresh'];
-                for (const cKey of companyKeys) {
-                    const snap = await db.ref(`companies/${cKey}/workerPasswords/${emailKey}`).once('value');
-                    if (snap.exists() && snap.val() && snap.val().password) {
-                        customWorkerPassword = snap.val().password;
-                        try { localStorage.setItem('mvc_worker_pwd_' + emailKey, customWorkerPassword); } catch(e){}
-                        break;
-                    }
-                }
-            } catch(e){}
-        }
-
-        // Step 4: Check in-memory workers array if available
-        if (!customWorkerPassword && typeof getCompanyData === 'function') {
-            try {
-                const companyData = getCompanyData();
-                if (companyData && companyData.workers) {
-                    const w = companyData.workers.find(w => w && w.email && w.email.toLowerCase() === emailInput);
-                    if (w && w.password) {
-                        customWorkerPassword = w.password;
-                    }
-                }
-            } catch(e){}
-        }
-
-        // CRITICAL SECURITY ENFORCEMENT:
-        // If an Admin password exists for this account, ONLY ACCEPT the matching custom password!
-        if (customWorkerPassword) {
-            if (passwordInput !== customWorkerPassword) {
-                btn.style.display = 'block';
-                loader.style.display = 'none';
-                errorMsg.style.color = "var(--danger)";
-                errorMsg.textContent = currentAppLang === 'ar' 
-                    ? "❌ كلمة المرور غير صحيحة. قام المدير بتغيير كلمة المرور الخاصة بحسابك، يرجى استخدام كلمة المرور الجديدة." 
-                    : "❌ Incorrect password. Admin has updated the password for your account. Please use the new password.";
-                errorMsg.style.display = 'block';
-                return; // STOP EXECUTION IMMEDIATELY! Do NOT call Firebase Auth!
-            }
-        }
-
-        // Attempt Firebase Auth sign-in
-        auth.signInWithEmailAndPassword(emailInput, passwordInput)
-            .catch(async (error) => {
-                // If worker entered the correct Admin-assigned password despite Firebase Auth rejecting or rate-limiting
-                let isWorkerAuthorized = false;
-                if (customWorkerPassword && passwordInput === customWorkerPassword) {
-                    isWorkerAuthorized = true;
-                }
-
-                if (isWorkerAuthorized) {
-                    // Try creating Firebase Auth user if account doesn't exist
-                    try {
-                        const createRes = await auth.createUserWithEmailAndPassword(emailInput, passwordInput);
-                        if (createRes && createRes.user) return;
-                    } catch(createErr) {}
-
-                    // Fallback: process user companies, permissions and UI cleanly
-                    processLoggedInUser(emailInput);
-                    btn.style.display = 'block';
-                    loader.style.display = 'none';
-                    return;
-                }
-
+        auth.signInWithEmailAndPassword(email, password)
+            .catch(error => {
                 btn.style.display = 'block';
                 loader.style.display = 'none';
                 errorMsg.style.color = "var(--danger)";
@@ -1254,7 +1304,7 @@ async function handleAuthSubmit() {
                 errorMsg.style.display = 'block';
             });
     } else {
-        auth.createUserWithEmailAndPassword(emailInput, passwordInput)
+        auth.createUserWithEmailAndPassword(email, password)
             .catch(error => {
                 btn.style.display = 'block';
                 loader.style.display = 'none';
@@ -1268,40 +1318,11 @@ async function handleAuthSubmit() {
 function logout() {
     hideUnassignedOverlay();
     localStorage.removeItem('selected_company');
-    localStorage.removeItem('mvc_user_email');
-    localStorage.removeItem('mvc_user_role');
-    window.currentAppUser = null;
-    currentUser = null;
-
     if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession) {
         logoutCustomerSession();
+        return;
     }
-    try {
-        if (auth && typeof auth.signOut === 'function') {
-            auth.signOut();
-        }
-    } catch(e){}
-
-    const overlay = document.getElementById('auth-overlay');
-    if (overlay) overlay.style.display = 'flex';
-
-    const authContainer = document.getElementById('auth-container');
-    if (authContainer) authContainer.style.display = 'block';
-    
-    const mainDashboard = document.getElementById('main-dashboard');
-    if (mainDashboard) mainDashboard.style.display = 'none';
-
-    const companyHud = document.getElementById('company-selection-hud');
-    if (companyHud) companyHud.style.display = 'none';
-
-    const pwdInput = document.getElementById('password');
-    if (pwdInput) pwdInput.value = '';
-
-    const authLoader = document.getElementById('auth-loader');
-    if (authLoader) authLoader.style.display = 'none';
-
-    const authBtn = document.getElementById('auth-btn');
-    if (authBtn) authBtn.style.display = 'block';
+    auth.signOut();
 }
 
 // --- ROLE BASED ACCESS CONTROL (RBAC) ---
@@ -1687,7 +1708,8 @@ function listenToCloudData() {
         renderAll();
         checkStockAlerts();
     }, (error) => {
-        console.warn("Database listener notice (Rules / Permission):", error);
+        console.error("Error listening to database:", error);
+        alert("Database connection error. Ensure your Firebase Rules are set to true.");
     });
 }
 
@@ -2113,15 +2135,15 @@ document.addEventListener('keydown', function (e) {
 function getMonthlyStats(worker, monthStr) {
     if (!worker.monthlyStats) worker.monthlyStats = {};
     if (!worker.monthlyStats[monthStr]) {
-        worker.monthlyStats[monthStr] = { 
-            custodyList: [], 
-            violationsList: [], 
-            rewardsList: [], 
-            costs: 0, 
-            paymentsList: [], 
-            deliveriesList: [], 
+        worker.monthlyStats[monthStr] = {
+            custodyList: [],
+            violationsList: [],
+            rewardsList: [],
+            costs: 0,
+            paymentsList: [],
+            deliveriesList: [],
             legacyDeliveries: 0,
-            overtimeList: [] 
+            overtimeList: []
         };
     } else if (!worker.monthlyStats[monthStr].overtimeList) {
         worker.monthlyStats[monthStr].overtimeList = [];
@@ -2421,7 +2443,6 @@ if (typeof toggleDarkMode === 'function') window.toggleDarkMode = toggleDarkMode
 if (typeof parseAdminsSnap === 'function') window.parseAdminsSnap = parseAdminsSnap;
 if (typeof parseWorkersSnap === 'function') window.parseWorkersSnap = parseWorkersSnap;
 if (typeof getCompanyData === 'function') window.getCompanyData = getCompanyData;
-if (typeof processLoggedInUser === 'function') window.processLoggedInUser = processLoggedInUser;
 if (typeof showUnassignedOverlay === 'function') window.showUnassignedOverlay = showUnassignedOverlay;
 if (typeof hideUnassignedOverlay === 'function') window.hideUnassignedOverlay = hideUnassignedOverlay;
 if (typeof checkUnassignedUserAccess === 'function') window.checkUnassignedUserAccess = checkUnassignedUserAccess;

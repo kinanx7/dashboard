@@ -92,10 +92,10 @@ function renderWorkerViolationPanel() {
 }
 
 function renderBranches() {
-    const list = document.getElementById('branches-list'); 
+    const list = document.getElementById('branches-list');
     const select = document.getElementById('w-branch');
     const editSelect = document.getElementById('ops-edit-branch');
-    list.innerHTML = ''; 
+    list.innerHTML = '';
     select.innerHTML = '';
     if (editSelect) editSelect.innerHTML = '';
     getCompanyData().branches.forEach(branch => {
@@ -103,7 +103,7 @@ function renderBranches() {
         li.innerHTML = `<span style="font-weight: 500; color: var(--text-main);">${branch}</span> <button class="btn-outline-danger admin-only" style="padding: 4px 10px; font-size: 0.75rem;" onclick="deleteBranch('${branch}')">Remove</button>`;
         list.appendChild(li);
         const option = document.createElement('option'); option.value = branch; option.textContent = branch; select.appendChild(option);
-        
+
         if (editSelect) {
             const editOption = document.createElement('option');
             editOption.value = branch;
@@ -225,7 +225,7 @@ function renderOpsDetails() {
                 const div = document.createElement('div');
                 div.className = 'flex-between list-item';
                 div.style.cssText = 'background:var(--input-bg); padding:10px; border-radius:8px; border:1px solid var(--border-color);';
-                
+
                 let statusText = '';
                 if (s.dayOfWeek) {
                     statusText = `<span class="badge" style="background:#f59e0b; color:white; margin:0;">${isAr ? translateDynamicTerm(s.dayOfWeek) : 'Override: ' + s.dayOfWeek}</span>`;
@@ -235,7 +235,7 @@ function renderOpsDetails() {
                     statusText = s.active ? `<span class="badge badge-good" style="margin:0;">Active</span>` : `<button onclick="activateWorkerShift('${s.id}')" class="btn-outline-info" style="padding:4px 8px; font-size:0.75rem;">Activate</button>`;
                 }
                 let delBtn = `<button onclick="deleteWorkerShift('${s.id}')" class="btn-outline-danger" style="padding:4px 8px; font-size:0.75rem; border:none; text-decoration:underline;">Delete</button>`;
-                
+
                 div.innerHTML = `
                     <div>
                         <strong style="color:var(--text-main);">🕒 ${s.startTime} - ${s.endTime}</strong>
@@ -256,7 +256,7 @@ function renderOpsDetails() {
     const duration = getShiftDurationHours(worker.startTime, worker.endTime);
     const baseIncome = parseFloat(worker.income) || 0;
     const hourlyRate = baseIncome / (30 * duration);
-    
+
     if (durationEl) durationEl.textContent = `${duration.toFixed(1)} hrs`;
     if (hourlyRateEl) hourlyRateEl.textContent = `SAR ${hourlyRate.toFixed(2)}/hr`;
 
@@ -273,7 +273,7 @@ function renderOpsDetails() {
                 const div = document.createElement('div');
                 div.className = 'flex-between list-item';
                 div.style.cssText = 'background:var(--input-bg); padding:10px; border-radius:8px; border:1px solid var(--border-color);';
-                
+
                 div.innerHTML = `
                     <div>
                         <strong style="color:var(--text-main);">🕒 ${o.hours} hr (x${o.multiplier})</strong><br>
