@@ -472,6 +472,8 @@
                         Prepare</button>
                     <button id="tab-ai-assistant" class="dept-tab admin-only" onclick="switchTab('ai-assistant')" data-i18n="tab-ai-assistant">🤖
                         AI Assistant</button>
+                    <button id="tab-vault" class="dept-tab admin-only" onclick="switchTab('vault')" data-i18n="tab-vault">📁
+                        Informations</button>
                 </div>
                 <button type="button" class="btn-outline" id="tab-reorder-btn" onclick="toggleTabReorderMode()"
                     style="padding: 8px 16px; border-radius: 100px; font-weight: 700; font-size: 0.85rem;" data-i18n="btn-reorder-tabs">
@@ -686,6 +688,43 @@
 
                 <!-- Main Content: Daily Ops -->
                 <div>
+                    <!-- Employee Login Information & Password Management Card (Admin Only) -->
+                    <div class="card admin-only" style="border-top: 4px solid #6366f1; margin-bottom: 24px;">
+                        <div class="flex-between" style="flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+                            <div>
+                                <h2 class="card-title" style="margin: 0; padding: 0; border: none; display: flex; align-items: center; gap: 10px;">
+                                    <span>🔑 Employee Login Credentials & Password Control</span>
+                                    <span id="ops-worker-count-badge" class="badge" style="background: rgba(99, 102, 241, 0.15); color: #6366f1; border: 1px solid rgba(99, 102, 241, 0.3); font-size: 0.78rem; font-weight: 800; padding: 4px 12px; border-radius: 20px;">0 Workers</span>
+                                </h2>
+                                <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; font-weight: 600;">
+                                    View worker account login emails, passwords, and reset or assign custom passwords.
+                                </div>
+                            </div>
+                            
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="text" id="ops-worker-login-search" onkeyup="renderWorkerLoginTable()" placeholder="🔍 Search worker or email..." style="padding: 8px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.88rem; font-weight: 700; width: 220px;">
+                            </div>
+                        </div>
+
+                        <!-- Workers Credentials Table -->
+                        <div class="table-container" style="overflow-x: auto; max-height: 450px;">
+                            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+                                <thead>
+                                    <tr style="background: var(--input-bg); border-bottom: 2px solid var(--border-color);">
+                                        <th style="padding: 12px 16px; font-weight: 800; color: var(--text-main);">Employee Name</th>
+                                        <th style="padding: 12px 16px; font-weight: 800; color: var(--text-main);">Login Email</th>
+                                        <th style="padding: 12px 16px; font-weight: 800; color: var(--text-main);">Role / Position</th>
+                                        <th style="padding: 12px 16px; font-weight: 800; color: var(--text-main);">Assigned Password</th>
+                                        <th style="padding: 12px 16px; font-weight: 800; color: var(--text-main); text-align: center;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ops-worker-login-tbody">
+                                    <!-- Dynamically rendered by renderWorkerLoginTable() -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                     <!-- High Money / Money Requests Approval Card -->
                     <div class="card admin-only" id="high-money-approvals-card"
                         style="border-top: 4px solid var(--secondary); margin-bottom: 24px;">
@@ -3254,7 +3293,13 @@
 
                         <!-- Chat Input Form (flex-shrink: 0 ensures it is NEVER hidden or clipped) -->
                         <form id="ai-chat-form" onsubmit="event.preventDefault(); handleAIChatSubmit();" style="padding: 14px 16px; background: var(--card-bg); border-top: 2px solid var(--border-color); display: flex; gap: 10px; align-items: center; margin: 0; flex-shrink: 0;">
-                            <input type="text" id="ai-chat-input" placeholder="اكتب طلبك هنا للمساعد الذكي... / Type your command..." required autocomplete="off" style="flex: 1; padding: 14px 18px; border-radius: 12px; border: 2px solid #6366f1; background: var(--input-bg); color: var(--text-main); font-size: 0.95rem; font-weight: 700; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.15);">
+                            <input type="text" id="ai-chat-input" placeholder="اكتب طلبك هنا أو تحدث بالمايك... / Type or speak command..." required autocomplete="off" style="flex: 1; padding: 14px 18px; border-radius: 12px; border: 2px solid #6366f1; background: var(--input-bg); color: var(--text-main); font-size: 0.95rem; font-weight: 700; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.15);">
+                            
+                            <!-- Voice Input Button (Arabic & English Speech Recognition) -->
+                            <button type="button" id="ai-chat-voice-btn" onclick="toggleAIChatVoiceInput()" title="Voice Dictation (Arabic / English)" style="padding: 14px 18px; border-radius: 12px; font-weight: 900; font-size: 1.1rem; background: var(--input-bg); border: 2px solid #6366f1; color: #6366f1; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; flex-shrink: 0; transition: all 0.2s ease;">
+                                <span>🎤</span>
+                            </button>
+
                             <button type="submit" id="ai-chat-send-btn" class="btn-primary" style="padding: 14px 24px; border-radius: 12px; font-weight: 900; font-size: 0.92rem; background: linear-gradient(135deg, #4f46e5, #3730a3); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3); flex-shrink: 0;">
                                 <span>إرسال</span>
                                 <span style="font-size: 1.1rem;">🚀</span>
@@ -3265,6 +3310,98 @@
 
                 </div>
             </div>
+        </div>
+
+        <!-- Admin Informations & Document Vault Section -->
+        <div id="view-vault" class="view-section admin-only" style="grid-template-columns: 1fr;">
+            <div class="card" style="width: 100%; border-top: 4px solid #6366f1;">
+                <!-- Header Title & Controls -->
+                <div class="flex-between" style="margin-bottom: 20px; flex-wrap: wrap; gap: 14px; align-items: center;">
+                    <div>
+                        <h2 class="card-title" style="margin:0; border:none; padding:0; display:flex; align-items:center; gap:10px;">
+                            <span>📁 Admin Information & Document Vault</span>
+                            <span id="vault-count-badge" class="badge" style="background: rgba(99,102,241,0.15); color: #6366f1; border: 1px solid rgba(99,102,241,0.3); font-size: 0.78rem; font-weight: 800; padding: 4px 12px; border-radius: 20px;">0 Items</span>
+                        </h2>
+                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; font-weight: 600;">
+                            Store, organize & search confidential documents, car licenses, contracts, passwords, photos, and notes.
+                        </div>
+                    </div>
+                    <button type="button" onclick="toggleVaultAddForm()" class="btn-primary" style="padding: 10px 20px; border-radius: 12px; font-weight: 800; background: linear-gradient(135deg, #6366f1, #4f46e5); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <span>➕ Add New Information Note</span>
+                    </button>
+                </div>
+
+                <!-- Add Note Form (Collapsible Card) -->
+                <div id="vault-add-form-container" style="display: none; background: var(--input-bg); padding: 20px; border-radius: 14px; border: 2px dashed #6366f1; margin-bottom: 24px; box-shadow: var(--shadow-sm);">
+                    <div class="flex-between" style="margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                        <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--text-main); margin:0; display:flex; align-items:center; gap:8px;">
+                            <span>📝 Upload New Information / Document</span>
+                        </h3>
+                        <button type="button" onclick="toggleVaultAddForm()" style="background:transparent; border:none; color:var(--text-muted); font-weight:800; font-size:1.2rem; cursor:pointer;">✕</button>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 14px;">
+                        <div>
+                            <label style="font-weight: 800; font-size: 0.82rem; color: var(--text-main); margin-bottom: 6px; display: block;">Title / Document Name *</label>
+                            <input type="text" id="vault-note-title" placeholder="e.g. Car License - Hilux, Commercial CR, Wifi Password" style="width:100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-weight: 700; font-size: 0.9rem;">
+                        </div>
+                        <div>
+                            <label style="font-weight: 800; font-size: 0.82rem; color: var(--text-main); margin-bottom: 6px; display: block;">Category / Tag</label>
+                            <select id="vault-note-category" style="width:100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-weight: 700; font-size: 0.9rem;">
+                                <option value="Vehicle">🚗 Vehicle / License (استمارة/رخصة)</option>
+                                <option value="Contracts">📜 Contracts & Legal (عقود ووثائق)</option>
+                                <option value="Passwords">🔑 Passwords & Credentials (كلمات سر)</option>
+                                <option value="Documents">🆔 IDs & Official Papers (ثبوتيات)</option>
+                                <option value="General" selected>📌 General Information (معلومات عامة)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 14px;">
+                        <label style="font-weight: 800; font-size: 0.82rem; color: var(--text-main); margin-bottom: 6px; display: block;">Notes / Description / Details</label>
+                        <textarea id="vault-note-text" rows="3" placeholder="Write plate numbers, renewal dates, passwords, or detailed text notes here..." style="width:100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-weight: 600; font-size: 0.9rem; font-family: inherit; line-height: 1.5;"></textarea>
+                    </div>
+
+                    <div style="margin-bottom: 18px;">
+                        <label style="font-weight: 800; font-size: 0.82rem; color: var(--text-main); margin-bottom: 6px; display: block;">📷 Upload Image / License Photo (Optional)</label>
+                        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+                            <input type="file" id="vault-note-image-file" accept="image/*" onchange="handleVaultImagePreview(event)" style="padding: 10px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); flex:1; min-width:220px;">
+                            <button type="button" id="vault-clear-img-btn" onclick="clearVaultImagePreview()" style="display:none; padding:10px 16px; border-radius:10px; background:rgba(220, 38, 38, 0.15); border:1px solid rgba(220, 38, 38, 0.3); color:var(--danger); font-weight:800; font-size:0.85rem; cursor:pointer;">✕ Remove Photo</button>
+                        </div>
+                        <div id="vault-img-preview-container" style="display:none; margin-top:12px;">
+                            <img id="vault-img-preview" style="max-height:180px; border-radius:12px; border:2px solid #6366f1; box-shadow:var(--shadow-sm);">
+                        </div>
+                    </div>
+
+                    <div style="display:flex; justify-content:flex-end; gap:12px;">
+                        <button type="button" onclick="toggleVaultAddForm()" class="btn-neutral" style="padding:10px 20px; border-radius:10px; font-weight:800;">Cancel</button>
+                        <button type="button" onclick="postVaultNote()" class="btn-success" style="padding:10px 24px; border-radius:10px; font-weight:800; background:linear-gradient(135deg,#10b981,#059669); color:white; border:none; cursor:pointer; box-shadow:0 2px 8px rgba(16,185,129,0.3);">🔒 Save Information Note</button>
+                    </div>
+                </div>
+
+                <!-- Filter & Search Toolbar -->
+                <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom: 20px; background: var(--input-bg); padding: 12px 16px; border-radius: 14px; border: 1px solid var(--border-color);">
+                    <div style="flex:1; min-width:220px; position:relative;">
+                        <input type="text" id="vault-search-input" onkeyup="renderVaultNotes()" placeholder="🔍 Search documents, licenses, plate numbers..." style="width:100%; padding: 10px 14px 10px 38px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-weight: 700; font-size: 0.9rem;">
+                        <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 1rem; color: var(--text-muted); pointer-events: none;">🔍</span>
+                    </div>
+
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;" id="vault-category-filters">
+                        <button type="button" onclick="setVaultCategoryFilter('ALL')" class="btn-vault-filter active-vault-filter" data-cat="ALL" style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:1px solid var(--border-color); background:#6366f1; color:white; cursor:pointer;">All Notes</button>
+                        <button type="button" onclick="setVaultCategoryFilter('Vehicle')" class="btn-vault-filter" data-cat="Vehicle" style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:1px solid var(--border-color); background:transparent; color:var(--text-main); cursor:pointer;">🚗 Vehicles</button>
+                        <button type="button" onclick="setVaultCategoryFilter('Contracts')" class="btn-vault-filter" data-cat="Contracts" style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:1px solid var(--border-color); background:transparent; color:var(--text-main); cursor:pointer;">📜 Contracts</button>
+                        <button type="button" onclick="setVaultCategoryFilter('Passwords')" class="btn-vault-filter" data-cat="Passwords" style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:1px solid var(--border-color); background:transparent; color:var(--text-main); cursor:pointer;">🔑 Passwords</button>
+                        <button type="button" onclick="setVaultCategoryFilter('Documents')" class="btn-vault-filter" data-cat="Documents" style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:1px solid var(--border-color); background:transparent; color:var(--text-main); cursor:pointer;">🆔 IDs</button>
+                        <button type="button" onclick="setVaultCategoryFilter('General')" class="btn-vault-filter" data-cat="General" style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:1px solid var(--border-color); background:transparent; color:var(--text-main); cursor:pointer;">📌 General</button>
+                    </div>
+                </div>
+
+                <!-- CARDS GRID (Reminder style cards next to each other) -->
+                <div id="vault-notes-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; width: 100%;">
+                    <!-- Dynamically rendered by renderVaultNotes() -->
+                </div>
+            </div>
+        </div>
 
         <!-- Locked Department Overlay (shown when a worker taps a restricted tab) -->
         <div id="view-locked" class="view-section">
@@ -3892,6 +4029,44 @@
         </div>
     </div>
 
+    <!-- Reset Worker Password Modal -->
+    <div id="worker-reset-password-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 10000; backdrop-filter: blur(6px); align-items: center; justify-content: center; padding: 16px;">
+        <div style="background: var(--card-bg); border-radius: 20px; border: 2px solid #6366f1; width: 100%; max-width: 480px; padding: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.35);">
+            <div class="flex-between" style="margin-bottom: 18px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 1.5rem;">🔑</span>
+                    <div>
+                        <h3 style="font-size: 1.15rem; font-weight: 900; color: var(--text-main); margin: 0;">Reset Worker Password</h3>
+                        <div id="reset-pwd-worker-name" style="font-size: 0.85rem; color: #6366f1; font-weight: 800; margin-top: 2px;"></div>
+                    </div>
+                </div>
+                <button type="button" onclick="closeWorkerResetPasswordModal()" style="background: transparent; border: none; color: var(--text-muted); font-size: 1.3rem; cursor: pointer; font-weight: 800;">✕</button>
+            </div>
+
+            <input type="hidden" id="reset-pwd-worker-id">
+
+            <div style="margin-bottom: 14px;">
+                <label style="font-weight: 800; font-size: 0.82rem; color: var(--text-main); margin-bottom: 6px; display: block;">New Password *</label>
+                <input type="password" id="reset-pwd-input" placeholder="Enter new password (min 6 characters)" style="width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-weight: 700;">
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label style="font-weight: 800; font-size: 0.82rem; color: var(--text-main); margin-bottom: 6px; display: block;">Confirm New Password *</label>
+                <input type="password" id="reset-pwd-confirm-input" placeholder="Confirm new password" style="width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-weight: 700;">
+            </div>
+
+            <div style="margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="reset-pwd-show-toggle" onchange="toggleResetPwdVisibility()" style="width: auto; cursor: pointer;">
+                <label for="reset-pwd-show-toggle" style="margin: 0; text-transform: none; font-size: 0.85rem; font-weight: 700; color: var(--text-main); cursor: pointer;">👁️ Show Password while typing</label>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" onclick="closeWorkerResetPasswordModal()" class="btn-neutral" style="padding: 10px 20px; border-radius: 10px; font-weight: 800;">Cancel</button>
+                <button type="button" onclick="submitWorkerPasswordReset()" class="btn-success" style="padding: 10px 24px; border-radius: 10px; font-weight: 900; background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; border: none; cursor: pointer; box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);">💾 Save & Reset Password</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Customer Feedback (Complaints & Suggestions) Modal -->
     <div id="market-feedback-modal" class="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; backdrop-filter:blur(5px); align-items:center; justify-content:center; padding:16px;">
         <div class="card" style="max-width:560px; width:100%; border-top:4px solid #d97706; box-shadow:0 12px 36px rgba(0,0,0,0.4); border-radius:20px; overflow:hidden; padding:26px; background:var(--card-bg, #ffffff);">
@@ -4041,22 +4216,26 @@
                 onclick="switchTab('ai-assistant'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">🤖</span><span data-i18n="tab-ai-assistant">AI Assistant</span>
             </button>
+            <button class="mob-dept-item mob-sheet-tab admin-only" data-tab="vault"
+                onclick="switchTab('vault'); closeMobDeptMenu()">
+                <span class="mob-dept-icon">📁</span><span data-i18n="tab-vault">Informations</span>
+            </button>
         </div>
     </div>
 
     <script defer src="translations.js"></script>
     <!-- Modularized Core & Feature Scripts -->
-    <script defer src="js/core.js?v=58"></script>
-    <script defer src="js/auth.js?v=58"></script>
-    <script defer src="js/adverts_notes.js?v=58"></script>
-    <script defer src="js/sales_costs.js?v=58"></script>
-    <script defer src="js/warehouse.js?v=58"></script>
-    <script defer src="js/tasks.js?v=58"></script>
-    <script defer src="js/drivers.js?v=58"></script>
-    <script defer src="js/ops.js?v=58"></script>
-    <script defer src="js/finance.js?v=58"></script>
-    <script defer src="js/market.js?v=58"></script>
-    <script defer src="js/prepare.js?v=58"></script>
+    <script defer src="js/core.js?v=79"></script>
+    <script defer src="js/auth.js?v=79"></script>
+    <script defer src="js/adverts_notes.js?v=79"></script>
+    <script defer src="js/sales_costs.js?v=79"></script>
+    <script defer src="js/warehouse.js?v=79"></script>
+    <script defer src="js/tasks.js?v=79"></script>
+    <script defer src="js/drivers.js?v=79"></script>
+    <script defer src="js/ops.js?v=79"></script>
+    <script defer src="js/finance.js?v=79"></script>
+    <script defer src="js/market.js?v=79"></script>
+    <script defer src="js/prepare.js?v=79"></script>
 </body>
 
 

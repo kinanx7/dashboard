@@ -751,7 +751,8 @@ body {
 #view-reminders.active-view,
 #view-market.active-view,
 #view-prepare.active-view,
-#view-ai-assistant.active-view {
+#view-ai-assistant.active-view,
+#view-vault.active-view {
     grid-template-columns: 1fr;
 }
 
@@ -3018,6 +3019,7 @@ body:not(.role-admin) .task-grid {
         overflow: hidden !important;
         display: -webkit-box !important;
         -webkit-line-clamp: 2 !important;
+        line-clamp: 2 !important;
         -webkit-box-orient: vertical !important;
     }
 

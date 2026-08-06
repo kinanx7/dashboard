@@ -28,6 +28,7 @@ const uiTranslations = {
         "tab-ops": "⚙️ Operations",
         "tab-ranks": "🏆 Ranks",
         "tab-attendance": "📅 Attendance",
+        "tab-vault": "📁 Informations",
         "tab-tasks": "📋 Tasks",
         "tab-warehouse": "📦 Warehouse",
         "tab-drivers": "🚚 Drivers",
@@ -707,6 +708,7 @@ const uiTranslations = {
         "tab-reminders": "⏰ التذكيرات",
         "tab-market": "🏪 السوق",
         "tab-ai-assistant": "🤖 المساعد الذكي",
+        "tab-vault": "📁 المعلومات",
 
         // الحضور والغياب
         "perm-attendance-label": "مسؤول الحضور",

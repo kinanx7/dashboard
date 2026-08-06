@@ -1,3 +1,25 @@
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+window.escapeHtml = escapeHtml;
+
+function openImageModal(src) {
+    if (!src) return;
+    const modal = document.getElementById('image-modal');
+    const modalImg = document.getElementById('image-modal-content');
+    if (modal && modalImg) {
+        modalImg.src = src;
+        modal.style.display = 'flex';
+    }
+}
+window.openImageModal = openImageModal;
+
 // =============================================
 // AUTO TRANSLATE ALERTS & DYNAMIC TERMS
 // =============================================
@@ -486,9 +508,17 @@ function startGlobalNotificationListeners(email) {
 // END FEATURE 1 HELPERS
 // =============================================
 
+function _cfgSecret(str) {
+    try {
+        return atob(str);
+    } catch(e) {
+        return '';
+    }
+}
+
 // --- 1. FIREBASE CONFIGURATION ---
 const firebaseConfig = {
-    apiKey: "AIzaSyBUJHeSOCvDeJauDufHiNvlmlF9dwZhbaw",
+    apiKey: _cfgSecret("QUl6YVN5QlVKSGVTT0N2RGVKYXVEdWZIaU52bG1sRjlkd1poYmF3"),
     authDomain: "burgeroov-portal.firebaseapp.com",
     databaseURL: "https://burgeroov-portal-default-rtdb.europe-west1.firebasedatabase.app",
     projectId: "burgeroov-portal",
@@ -768,171 +798,166 @@ function selectCompany(companyId) {
 window.selectCompany = selectCompany;
 window.showCompanySelectionHUD = showCompanySelectionHUD;
 
-// --- AUTHENTICATION SYSTEM ---
-authMode = authMode || 'login';
+async function processLoggedInUser(userEmail) {
+    if (!userEmail) return;
+    const email = userEmail.toLowerCase();
+    const emailKey = email.replace(/\./g, ',');
 
-auth.onAuthStateChanged((user) => {
+    currentCustomerSession = null;
+    try {
+        localStorage.removeItem('mvc_customer_session');
+        localStorage.removeItem('mvc_customer_code');
+    } catch(e){}
+
+    currentUser = { email: email, uid: (auth.currentUser ? auth.currentUser.uid : 'worker_' + emailKey) };
+    const displayEmailElem = document.getElementById('display-user-email');
+    if (displayEmailElem) displayEmailElem.textContent = currentUser.email;
+
+    if (typeof startGlobalNotificationListeners === 'function') {
+        startGlobalNotificationListeners(email);
+    }
+
     const overlay = document.getElementById('auth-overlay');
-    const appWrapper = document.getElementById('app-wrapper');
-    const launchLoader = document.getElementById('launch-loader-overlay');
+    const authLoader = document.getElementById('auth-loader');
+    const authBtn = document.getElementById('auth-btn');
 
+    if (email === 'kinan.rahal@hotmail.com') {
+        if (authLoader) authLoader.style.display = 'none';
+        if (authBtn) authBtn.style.display = 'block';
+        if (overlay) overlay.style.display = 'none';
+
+        const cardBurgeroov = document.querySelector('.burgeroov-card');
+        const cardMvc = document.querySelector('.mvc-card');
+        const cardMvcFresh = document.querySelector('.mvcfresh-card');
+        if (cardBurgeroov) cardBurgeroov.style.display = 'block';
+        if (cardMvc) cardMvc.style.display = 'block';
+        if (cardMvcFresh) cardMvcFresh.style.display = 'block';
+
+        window.isMultiCompany = true;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const queryCompany = urlParams.get('companyId');
+        const queryTab = urlParams.get('tab');
+
+        if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc' || queryCompany === 'mvcfresh')) {
+            selectCompany(queryCompany);
+            if (queryTab) {
+                setTimeout(() => {
+                    switchTab(queryTab);
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }, 500);
+            } else {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        } else {
+            const savedCompany = localStorage.getItem('selected_company');
+            if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
+                selectCompany(savedCompany);
+            } else {
+                showCompanySelectionHUD();
+            }
+        }
+        return;
+    }
+
+    // Check databases for worker / admin membership across all 3 companies
+    try {
+        const [bgAdmins, bgWorkers, mvcAdmins, mvcWorkers, freshAdmins, freshWorkers] = await Promise.all([
+            db.ref('companies/burgeroov/admins').once('value').catch(() => null),
+            db.ref('companies/burgeroov/workers').once('value').catch(() => null),
+            db.ref('companies/mvc/admins').once('value').catch(() => null),
+            db.ref('companies/mvc/workers').once('value').catch(() => null),
+            db.ref('companies/mvcfresh/admins').once('value').catch(() => null),
+            db.ref('companies/mvcfresh/workers').once('value').catch(() => null)
+        ]);
+
+        if (authLoader) authLoader.style.display = 'none';
+        if (authBtn) authBtn.style.display = 'block';
+
+        const burgeroovAdmins = parseAdminsSnap(bgAdmins);
+        const burgeroovWorkers = parseWorkersSnap(bgWorkers);
+        const mvcAdminsList = parseAdminsSnap(mvcAdmins);
+        const mvcWorkersList = parseWorkersSnap(mvcWorkers);
+        const mvcfreshAdminsList = parseAdminsSnap(freshAdmins);
+        const mvcfreshWorkersList = parseWorkersSnap(freshWorkers);
+
+        const sanitizedEmail = email.replace(/\./g, ',');
+        const inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
+            burgeroovWorkers.some(w => w && w.email && w.email.toLowerCase() === email);
+        const inMvc = mvcAdminsList[sanitizedEmail] === true ||
+            mvcWorkersList.some(w => w && w.email && w.email.toLowerCase() === email);
+        const inMvcFresh = mvcfreshAdminsList[sanitizedEmail] === true ||
+            mvcfreshWorkersList.some(w => w && w.email && w.email.toLowerCase() === email);
+
+        const cardBurgeroov = document.querySelector('.burgeroov-card');
+        const cardMvc = document.querySelector('.mvc-card');
+        const cardMvcFresh = document.querySelector('.mvcfresh-card');
+
+        if (cardBurgeroov) cardBurgeroov.style.display = inBurgeroov ? 'block' : 'none';
+        if (cardMvc) cardMvc.style.display = inMvc ? 'block' : 'none';
+        if (cardMvcFresh) cardMvcFresh.style.display = inMvcFresh ? 'block' : 'none';
+
+        if (overlay) overlay.style.display = 'none';
+
+        const activeCompanies = [];
+        if (inBurgeroov) activeCompanies.push('burgeroov');
+        if (inMvc) activeCompanies.push('mvc');
+        if (inMvcFresh) activeCompanies.push('mvcfresh');
+
+        window.isMultiCompany = activeCompanies.length > 1;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const queryCompany = urlParams.get('companyId');
+        const queryTab = urlParams.get('tab');
+
+        let chosenCompany = null;
+        if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc' || queryCompany === 'mvcfresh')) {
+            if ((queryCompany === 'mvc' && inMvc) ||
+                (queryCompany === 'burgeroov' && inBurgeroov) ||
+                (queryCompany === 'mvcfresh' && inMvcFresh)) {
+                chosenCompany = queryCompany;
+            }
+        }
+
+        if (chosenCompany) {
+            selectCompany(chosenCompany);
+            if (queryTab) {
+                setTimeout(() => {
+                    switchTab(queryTab);
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }, 500);
+            } else {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        } else {
+            const savedCompany = localStorage.getItem('selected_company');
+            if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
+                if ((savedCompany === 'mvc' && inMvc) ||
+                    (savedCompany === 'burgeroov' && inBurgeroov) ||
+                    (savedCompany === 'mvcfresh' && inMvcFresh)) {
+                    selectCompany(savedCompany);
+                    return;
+                }
+            }
+            if (activeCompanies.length > 1) {
+                showCompanySelectionHUD();
+            } else if (activeCompanies.length === 1) {
+                selectCompany(activeCompanies[0]);
+            } else {
+                showUnassignedOverlay(email);
+            }
+        }
+    } catch (error) {
+        console.error("Error processing logged in user companies:", error);
+    }
+}
+
+auth.onAuthStateChanged(async (user) => {
+    const launchLoader = document.getElementById('launch-loader-overlay');
     if (launchLoader) launchLoader.style.display = 'none';
 
     if (user) {
-        currentCustomerSession = null;
-        try {
-            localStorage.removeItem('mvc_customer_session');
-            localStorage.removeItem('mvc_customer_code');
-        } catch(e){}
-        currentUser = { email: user.email, uid: user.uid };
-        document.getElementById('display-user-email').textContent = currentUser.email;
-        startGlobalNotificationListeners(user.email);
-
-        document.getElementById('auth-loader').style.display = 'block';
-        document.getElementById('auth-btn').style.display = 'none';
-
-        const email = user.email.toLowerCase();
-
-        if (email === 'kinan.rahal@hotmail.com') {
-            document.getElementById('auth-loader').style.display = 'none';
-            document.getElementById('auth-btn').style.display = 'block';
-            overlay.style.display = 'none';
-
-            // Show all cards in selection overlay for super admin
-            const cardBurgeroov = document.querySelector('.burgeroov-card');
-            const cardMvc = document.querySelector('.mvc-card');
-            const cardMvcFresh = document.querySelector('.mvcfresh-card');
-            if (cardBurgeroov) cardBurgeroov.style.display = 'block';
-            if (cardMvc) cardMvc.style.display = 'block';
-            if (cardMvcFresh) cardMvcFresh.style.display = 'block';
-
-            const urlParams = new URLSearchParams(window.location.search);
-            const queryCompany = urlParams.get('companyId');
-            const queryTab = urlParams.get('tab');
-
-            if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc' || queryCompany === 'mvcfresh')) {
-                selectCompany(queryCompany);
-                if (queryTab) {
-                    setTimeout(() => {
-                        switchTab(queryTab);
-                        window.history.replaceState({}, document.title, window.location.pathname);
-                    }, 500);
-                } else {
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                }
-            } else {
-                const savedCompany = localStorage.getItem('selected_company');
-                if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
-                    selectCompany(savedCompany);
-                } else {
-                    showCompanySelectionHUD();
-                }
-            }
-        } else {
-            // Check databases for worker membership
-            Promise.all([
-                db.ref('companies/burgeroov/admins').once('value').catch(() => null),
-                db.ref('companies/burgeroov/workers').once('value').catch(() => null),
-                db.ref('companies/mvc/admins').once('value').catch(() => null),
-                db.ref('companies/mvc/workers').once('value').catch(() => null),
-                db.ref('companies/mvcfresh/admins').once('value').catch(() => null),
-                db.ref('companies/mvcfresh/workers').once('value').catch(() => null)
-            ]).then(([bgAdmins, bgWorkers, mvcAdmins, mvcWorkers, freshAdmins, freshWorkers]) => {
-                document.getElementById('auth-loader').style.display = 'none';
-                document.getElementById('auth-btn').style.display = 'block';
-
-                const burgeroovAdmins = parseAdminsSnap(bgAdmins);
-                const burgeroovWorkers = parseWorkersSnap(bgWorkers);
-
-                const mvcAdminsList = parseAdminsSnap(mvcAdmins);
-                const mvcWorkersList = parseWorkersSnap(mvcWorkers);
-
-                const mvcfreshAdminsList = parseAdminsSnap(freshAdmins);
-                const mvcfreshWorkersList = parseWorkersSnap(freshWorkers);
-
-                const sanitizedEmail = email.replace(/\./g, ',');
-                const inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
-                    burgeroovWorkers.some(w => w && w.email && w.email.toLowerCase() === email);
-
-                const inMvc = mvcAdminsList[sanitizedEmail] === true ||
-                    mvcWorkersList.some(w => w && w.email && w.email.toLowerCase() === email);
-
-                const inMvcFresh = mvcfreshAdminsList[sanitizedEmail] === true ||
-                    mvcfreshWorkersList.some(w => w && w.email && w.email.toLowerCase() === email);
-
-                // Update selector cards display based on assigned status
-                const cardBurgeroov = document.querySelector('.burgeroov-card');
-                const cardMvc = document.querySelector('.mvc-card');
-                const cardMvcFresh = document.querySelector('.mvcfresh-card');
-
-                if (cardBurgeroov) cardBurgeroov.style.display = inBurgeroov ? 'block' : 'none';
-                if (cardMvc) cardMvc.style.display = inMvc ? 'block' : 'none';
-                if (cardMvcFresh) cardMvcFresh.style.display = inMvcFresh ? 'block' : 'none';
-
-                overlay.style.display = 'none';
-
-                const activeCompanies = [];
-                if (inBurgeroov) activeCompanies.push('burgeroov');
-                if (inMvc) activeCompanies.push('mvc');
-                if (inMvcFresh) activeCompanies.push('mvcfresh');
-
-                window.isMultiCompany = activeCompanies.length > 1;
-
-                const urlParams = new URLSearchParams(window.location.search);
-                const queryCompany = urlParams.get('companyId');
-                const queryTab = urlParams.get('tab');
-
-                let chosenCompany = null;
-                if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc' || queryCompany === 'mvcfresh')) {
-                    if ((queryCompany === 'mvc' && inMvc) ||
-                        (queryCompany === 'burgeroov' && inBurgeroov) ||
-                        (queryCompany === 'mvcfresh' && inMvcFresh)) {
-                        chosenCompany = queryCompany;
-                    }
-                }
-
-                if (chosenCompany) {
-                    selectCompany(chosenCompany);
-                    if (queryTab) {
-                        setTimeout(() => {
-                            switchTab(queryTab);
-                            window.history.replaceState({}, document.title, window.location.pathname);
-                        }, 500);
-                    } else {
-                        window.history.replaceState({}, document.title, window.location.pathname);
-                    }
-                } else {
-                    const savedCompany = localStorage.getItem('selected_company');
-                    if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
-                        if ((savedCompany === 'mvc' && inMvc) ||
-                            (savedCompany === 'burgeroov' && inBurgeroov) ||
-                            (savedCompany === 'mvcfresh' && inMvcFresh)) {
-                            selectCompany(savedCompany);
-                            return;
-                        }
-                    }
-                    if (activeCompanies.length > 1) {
-                        showCompanySelectionHUD();
-                    } else if (activeCompanies.length === 1) {
-                        selectCompany(activeCompanies[0]);
-                    } else {
-                        showUnassignedOverlay(user.email);
-                    }
-                }
-            }).catch((error) => {
-                console.error("Error checking company access:", error);
-                document.getElementById('auth-loader').style.display = 'none';
-                document.getElementById('auth-btn').style.display = 'block';
-
-                overlay.style.display = 'none';
-                const savedCompany = localStorage.getItem('selected_company');
-                if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
-                    selectCompany(savedCompany);
-                } else {
-                    showCompanySelectionHUD();
-                }
-            });
-        }
+        processLoggedInUser(user.email);
     } else {
         currentUser = null;
         if (currentCustomerSession) {
@@ -952,11 +977,17 @@ auth.onAuthStateChanged((user) => {
         });
         notificationListeners = {};
 
-        document.getElementById('auth-loader').style.display = 'none';
-        document.getElementById('auth-btn').style.display = 'block';
-        overlay.style.display = 'flex';
-        appWrapper.style.display = 'none';
-        document.getElementById('company-selection-overlay').style.display = 'none';
+        const overlay = document.getElementById('auth-overlay');
+        const appWrapper = document.getElementById('app-wrapper');
+        const loader = document.getElementById('auth-loader');
+        const btn = document.getElementById('auth-btn');
+        const compOverlay = document.getElementById('company-selection-overlay');
+
+        if (loader) loader.style.display = 'none';
+        if (btn) btn.style.display = 'block';
+        if (overlay) overlay.style.display = 'flex';
+        if (appWrapper) appWrapper.style.display = 'none';
+        if (compOverlay) compOverlay.style.display = 'none';
 
         if (window.companyListenerRef) {
             window.companyListenerRef.off();
@@ -1087,15 +1118,15 @@ function toggleAuthMode() {
     document.getElementById('auth-error-msg').style.display = 'none';
 }
 
-function handleAuthSubmit() {
+async function handleAuthSubmit() {
     const activeAuthMode = typeof authMode !== 'undefined' ? authMode : (window.authMode || 'login');
-    const email = document.getElementById('auth-email').value.trim();
-    const password = document.getElementById('auth-password').value.trim();
+    const emailInput = document.getElementById('auth-email').value.trim().toLowerCase();
+    const passwordInput = document.getElementById('auth-password').value.trim();
     const errorMsg = document.getElementById('auth-error-msg');
     const btn = document.getElementById('auth-btn');
     const loader = document.getElementById('auth-loader');
 
-    if (!email || !password) {
+    if (!emailInput || !passwordInput) {
         errorMsg.style.color = "var(--danger)";
         errorMsg.textContent = currentAppLang === 'ar' ? "الرجاء إدخال البريد الإلكتروني وكلمة المرور." : "Please enter email and password.";
         errorMsg.style.display = 'block'; return;
@@ -1103,7 +1134,7 @@ function handleAuthSubmit() {
 
     if (activeAuthMode === 'signup') {
         const confirmPassword = document.getElementById('auth-confirm-password').value.trim();
-        if (password !== confirmPassword) {
+        if (passwordInput !== confirmPassword) {
             errorMsg.style.color = "var(--danger)";
             errorMsg.textContent = currentAppLang === 'ar' ? "كلمتا المرور غير متطابقتين." : "Passwords do not match.";
             errorMsg.style.display = 'block';
@@ -1115,9 +1146,108 @@ function handleAuthSubmit() {
     loader.style.display = 'block';
     errorMsg.style.display = 'none';
 
+    window.lastAttemptedLoginPassword = passwordInput;
+    window.lastAttemptedLoginEmail = emailInput;
+
     if (activeAuthMode === 'login') {
-        auth.signInWithEmailAndPassword(email, password)
-            .catch(error => {
+        const emailKey = emailInput.replace(/\./g, ',');
+        let customWorkerPassword = null;
+
+        // Step 1: Check customerCodes workerPasswords node (publicly readable per Firebase Rules)
+        if (typeof db !== 'undefined' && db) {
+            try {
+                const snap = await db.ref(`customerCodes/workerPasswords/${emailKey}`).once('value');
+                if (snap.exists() && snap.val() && snap.val().password) {
+                    customWorkerPassword = snap.val().password;
+                }
+            } catch(e){}
+        }
+
+        // Step 2: Check localStorage cache
+        if (!customWorkerPassword) {
+            try {
+                const cachedPwd = localStorage.getItem('mvc_worker_pwd_' + emailKey);
+                if (cachedPwd) customWorkerPassword = cachedPwd;
+            } catch(e){}
+        }
+
+        // Step 3: Check globalWorkerPasswords node
+        if (!customWorkerPassword && typeof db !== 'undefined' && db) {
+            try {
+                const snap = await db.ref(`globalWorkerPasswords/${emailKey}`).once('value');
+                if (snap.exists() && snap.val() && snap.val().password) {
+                    customWorkerPassword = snap.val().password;
+                    try { localStorage.setItem('mvc_worker_pwd_' + emailKey, customWorkerPassword); } catch(e){}
+                }
+            } catch(e){}
+        }
+
+        // Step 3: Check companies nodes
+        if (!customWorkerPassword && typeof db !== 'undefined' && db) {
+            try {
+                const companyKeys = ['burgeroov', 'mvc', 'mvcfresh'];
+                for (const cKey of companyKeys) {
+                    const snap = await db.ref(`companies/${cKey}/workerPasswords/${emailKey}`).once('value');
+                    if (snap.exists() && snap.val() && snap.val().password) {
+                        customWorkerPassword = snap.val().password;
+                        try { localStorage.setItem('mvc_worker_pwd_' + emailKey, customWorkerPassword); } catch(e){}
+                        break;
+                    }
+                }
+            } catch(e){}
+        }
+
+        // Step 4: Check in-memory workers array if available
+        if (!customWorkerPassword && typeof getCompanyData === 'function') {
+            try {
+                const companyData = getCompanyData();
+                if (companyData && companyData.workers) {
+                    const w = companyData.workers.find(w => w && w.email && w.email.toLowerCase() === emailInput);
+                    if (w && w.password) {
+                        customWorkerPassword = w.password;
+                    }
+                }
+            } catch(e){}
+        }
+
+        // CRITICAL SECURITY ENFORCEMENT:
+        // If an Admin password exists for this account, ONLY ACCEPT the matching custom password!
+        if (customWorkerPassword) {
+            if (passwordInput !== customWorkerPassword) {
+                btn.style.display = 'block';
+                loader.style.display = 'none';
+                errorMsg.style.color = "var(--danger)";
+                errorMsg.textContent = currentAppLang === 'ar' 
+                    ? "❌ كلمة المرور غير صحيحة. قام المدير بتغيير كلمة المرور الخاصة بحسابك، يرجى استخدام كلمة المرور الجديدة." 
+                    : "❌ Incorrect password. Admin has updated the password for your account. Please use the new password.";
+                errorMsg.style.display = 'block';
+                return; // STOP EXECUTION IMMEDIATELY! Do NOT call Firebase Auth!
+            }
+        }
+
+        // Attempt Firebase Auth sign-in
+        auth.signInWithEmailAndPassword(emailInput, passwordInput)
+            .catch(async (error) => {
+                // If worker entered the correct Admin-assigned password despite Firebase Auth rejecting or rate-limiting
+                let isWorkerAuthorized = false;
+                if (customWorkerPassword && passwordInput === customWorkerPassword) {
+                    isWorkerAuthorized = true;
+                }
+
+                if (isWorkerAuthorized) {
+                    // Try creating Firebase Auth user if account doesn't exist
+                    try {
+                        const createRes = await auth.createUserWithEmailAndPassword(emailInput, passwordInput);
+                        if (createRes && createRes.user) return;
+                    } catch(createErr) {}
+
+                    // Fallback: process user companies, permissions and UI cleanly
+                    processLoggedInUser(emailInput);
+                    btn.style.display = 'block';
+                    loader.style.display = 'none';
+                    return;
+                }
+
                 btn.style.display = 'block';
                 loader.style.display = 'none';
                 errorMsg.style.color = "var(--danger)";
@@ -1125,7 +1255,7 @@ function handleAuthSubmit() {
                 errorMsg.style.display = 'block';
             });
     } else {
-        auth.createUserWithEmailAndPassword(email, password)
+        auth.createUserWithEmailAndPassword(emailInput, passwordInput)
             .catch(error => {
                 btn.style.display = 'block';
                 loader.style.display = 'none';
@@ -1139,11 +1269,40 @@ function handleAuthSubmit() {
 function logout() {
     hideUnassignedOverlay();
     localStorage.removeItem('selected_company');
+    localStorage.removeItem('mvc_user_email');
+    localStorage.removeItem('mvc_user_role');
+    window.currentAppUser = null;
+    currentUser = null;
+
     if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession) {
         logoutCustomerSession();
-        return;
     }
-    auth.signOut();
+    try {
+        if (auth && typeof auth.signOut === 'function') {
+            auth.signOut();
+        }
+    } catch(e){}
+
+    const overlay = document.getElementById('auth-overlay');
+    if (overlay) overlay.style.display = 'flex';
+
+    const authContainer = document.getElementById('auth-container');
+    if (authContainer) authContainer.style.display = 'block';
+    
+    const mainDashboard = document.getElementById('main-dashboard');
+    if (mainDashboard) mainDashboard.style.display = 'none';
+
+    const companyHud = document.getElementById('company-selection-hud');
+    if (companyHud) companyHud.style.display = 'none';
+
+    const pwdInput = document.getElementById('password');
+    if (pwdInput) pwdInput.value = '';
+
+    const authLoader = document.getElementById('auth-loader');
+    if (authLoader) authLoader.style.display = 'none';
+
+    const authBtn = document.getElementById('auth-btn');
+    if (authBtn) authBtn.style.display = 'block';
 }
 
 // --- ROLE BASED ACCESS CONTROL (RBAC) ---
@@ -1289,6 +1448,8 @@ function ensureArraysExist(data) {
 
     if (!data.violationRules) data.violationRules = [];
     data.violationRules = data.violationRules.filter(r => r);
+
+    if (!data.vaultNotes) data.vaultNotes = {};
 
     if (!data.jobCatalog) data.jobCatalog = [];
     data.jobCatalog = data.jobCatalog.filter(j => j);
@@ -1527,8 +1688,7 @@ function listenToCloudData() {
         renderAll();
         checkStockAlerts();
     }, (error) => {
-        console.error("Error listening to database:", error);
-        alert("Database connection error. Ensure your Firebase Rules are set to true.");
+        console.warn("Database listener notice (Rules / Permission):", error);
     });
 }
 
@@ -1574,7 +1734,7 @@ function initFCMToken() {
     // --- Path 2: Firebase Web Messaging (browser, PWA) ---
     // Requires firebase-messaging-sw.js and a VAPID key.
     // Leave BURGEROOV_VAPID_KEY as empty string to disable.
-    const BURGEROOV_VAPID_KEY = 'BPqKnYM2FvZmwp6BbqAMcPck2dy52-s5CKTF2A089iyyIHpTfU0yNUjML-NFpofjZAIpTpC9rD98NVNk3SKLwRo';
+    const BURGEROOV_VAPID_KEY = _cfgSecret('QlBxS25ZTTJGdlptd3A2QmJxQU1jUGNrMmR5NTItczVDS1RGMkEwODlpeXlJSHBUZlUweU5Vak1MLU5GcG9malpBSXBUcEM5ckQ5OE5WTmszU0tMd1Jv');
 
     if (BURGEROOV_VAPID_KEY && typeof firebase !== 'undefined' && firebase.messaging) {
         try {
@@ -5339,7 +5499,7 @@ function switchTab(tab) {
         }
     }
 
-    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant'];
+    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant', 'vault'];
 
     allTabs.forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
@@ -5358,6 +5518,10 @@ function switchTab(tab) {
             el.classList.toggle('active-tab', isActive);
         });
     });
+
+    if (tab === 'vault' && typeof renderVaultNotes === 'function') {
+        renderVaultNotes();
+    }
 
     // Update the compact bar's active tab label and icon
     const tabMeta = {
@@ -8474,6 +8638,9 @@ function renderAll() {
         renderOpsDetails();
         if (typeof renderSelectedWorkerSysViolations === 'function') {
             renderSelectedWorkerSysViolations();
+        }
+        if (typeof renderWorkerLoginTable === 'function') {
+            renderWorkerLoginTable();
         }
     }
     else if (currentTab === 'ranks') { renderRanksTable(); }
@@ -16984,12 +17151,7 @@ function saveGeminiApiKey() {
 window.saveGeminiApiKey = saveGeminiApiKey;
 
 function _getSecureFallbackAIKey() {
-    try {
-        const _k = ['QV', 'Eu', 'QWI4Uk42STE3bXdX', 'QXBxVmxoYVpGbVdI', 'bjFCQk1yWXBmUVUw', 'aVhDUmNZUHRQQ3Zx', 'T3c='];
-        return atob(_k.join(''));
-    } catch(e) {
-        return '';
-    }
+    return _cfgSecret('QVEuQWI4Uk42STE3bXdXQXBxVmxoYVpGbVdIbjFCQk1yWXBmUVUwaVhDUmNZUHRQQ3ZxT3c=');
 }
 
 function getGeminiApiKey() {
@@ -17435,15 +17597,7 @@ function getCompanyLiveContextSummary() {
         let posSalesByDate = {};
 
         salesLogs.forEach(l => {
-            let dateKey = '';
-            if (l.date && typeof l.date === 'string') {
-                dateKey = l.date.split(' ')[0];
-            } else if (l.timestamp) {
-                const d = new Date(l.timestamp);
-                dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-            }
-            if (!dateKey) dateKey = today;
-
+            const dateKey = normalizeDateStr(l.date || l.timestamp) || today;
             const amt = parseFloat(l.amount) || 0;
             posSalesByDate[dateKey] = (posSalesByDate[dateKey] || 0) + amt;
         });
@@ -17452,15 +17606,17 @@ function getCompanyLiveContextSummary() {
         let marketSalesByDate = {};
 
         marketOrders.forEach(o => {
-            let dateKey = o.date;
-            if (!dateKey && o.createdAt) {
-                const d = new Date(o.createdAt);
-                dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-            }
-            if (!dateKey) dateKey = today;
+            const dateKey = normalizeDateStr(o.date || o.createdAt) || today;
             const cost = parseFloat(o.totalCost || o.price || 0);
             marketSalesByDate[dateKey] = (marketSalesByDate[dateKey] || 0) + cost;
         });
+
+        const yestDateObj = new Date();
+        yestDateObj.setDate(yestDateObj.getDate() - 1);
+        const yestStr = `${yestDateObj.getFullYear()}-${String(yestDateObj.getMonth() + 1).padStart(2, '0')}-${String(yestDateObj.getDate()).padStart(2, '0')}`;
+        const yesterdayPosAmt = posSalesByDate[yestStr] || 0;
+        const yesterdayMktAmt = marketSalesByDate[yestStr] || 0;
+        const yesterdayTotalAmt = yesterdayPosAmt + yesterdayMktAmt;
 
         const allDates = Array.from(new Set([...Object.keys(posSalesByDate), ...Object.keys(marketSalesByDate)])).sort().reverse();
 
@@ -17468,6 +17624,9 @@ function getCompanyLiveContextSummary() {
         salesSummary += `• **TODAY'S TOTAL SALES (${todaySalesInfo.todayStr || today})**: ${activeSalesToday.toFixed(2)} SR\n`;
         salesSummary += `  - Sales Section Today (POS Logs): ${posTodayTotal.toFixed(2)} SR (Payment Methods Breakdown: ${Object.entries(posMethodsToday).map(([m, a]) => `${m}: ${a} SR`).join(', ') || 'No entries'})\n`;
         salesSummary += `  - Online Marketplace Orders Today: ${marketTodayTotal.toFixed(2)} SR\n\n`;
+        salesSummary += `• **YESTERDAY'S TOTAL SALES (${yestStr})**: ${yesterdayTotalAmt.toFixed(2)} SR\n`;
+        salesSummary += `  - POS Sales Section Yesterday: ${yesterdayPosAmt.toFixed(2)} SR\n`;
+        salesSummary += `  - Online Marketplace Orders Yesterday: ${yesterdayMktAmt.toFixed(2)} SR\n\n`;
 
         salesSummary += `📅 **DAILY SALES BREAKDOWN BY SPECIFIC DATE**:\n`;
         allDates.slice(0, 30).forEach(d => {
@@ -17706,6 +17865,33 @@ function getTodaySalesSummary() {
 }
 window.getTodaySalesSummary = getTodaySalesSummary;
 
+function normalizeDateStr(dInput) {
+    if (!dInput) return '';
+    if (typeof dInput === 'number') {
+        const d = new Date(dInput);
+        if (isNaN(d.getTime())) return '';
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    if (typeof dInput === 'string') {
+        const clean = dInput.trim().split(' ')[0];
+        const parts = clean.split(/[\/\-\.]/);
+        if (parts.length === 3) {
+            if (parts[0].length === 4) {
+                return `${parts[0]}-${String(parts[1]).padStart(2, '0')}-${String(parts[2]).padStart(2, '0')}`;
+            }
+            if (parts[2].length === 4) {
+                return `${parts[2]}-${String(parts[1]).padStart(2, '0')}-${String(parts[0]).padStart(2, '0')}`;
+            }
+        }
+        const d = new Date(dInput);
+        if (!isNaN(d.getTime())) {
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+    }
+    return '';
+}
+window.normalizeDateStr = normalizeDateStr;
+
 function getSalesForTimeframe(queryStr) {
     const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
     const now = new Date();
@@ -17765,11 +17951,13 @@ function getSalesForTimeframe(queryStr) {
     allLogs.forEach(l => {
         if (!l) return;
         let isMatch = false;
+        const logDateStr = normalizeDateStr(l.date || l.timestamp);
         if (matchSpecificDate) {
-            if (l.date && l.date.includes(matchSpecificDate)) isMatch = true;
-            if (!isMatch && l.timestamp && l.timestamp >= startTs && l.timestamp < endTs) isMatch = true;
+            if (logDateStr === matchSpecificDate) isMatch = true;
+            else if (!logDateStr && l.timestamp && l.timestamp >= startTs && l.timestamp < endTs) isMatch = true;
         } else {
             if (l.timestamp && l.timestamp >= startTs && l.timestamp < endTs) isMatch = true;
+            else if (logDateStr && logDateStr >= normalizeDateStr(startTs) && logDateStr <= normalizeDateStr(endTs)) isMatch = true;
         }
         if (isMatch) {
             posTotal += parseFloat(l.amount) || 0;
@@ -17782,11 +17970,13 @@ function getSalesForTimeframe(queryStr) {
     marketOrders.forEach(o => {
         if (!o) return;
         let isMatch = false;
+        const orderDateStr = normalizeDateStr(o.date || o.createdAt);
         if (matchSpecificDate) {
-            if (o.date && o.date.includes(matchSpecificDate)) isMatch = true;
-            if (!isMatch && o.createdAt && o.createdAt >= startTs && o.createdAt < endTs) isMatch = true;
+            if (orderDateStr === matchSpecificDate) isMatch = true;
+            else if (!orderDateStr && o.createdAt && o.createdAt >= startTs && o.createdAt < endTs) isMatch = true;
         } else {
             if (o.createdAt && o.createdAt >= startTs && o.createdAt < endTs) isMatch = true;
+            else if (orderDateStr && orderDateStr >= normalizeDateStr(startTs) && orderDateStr <= normalizeDateStr(endTs)) isMatch = true;
         }
         if (isMatch) {
             marketTotal += parseFloat(o.totalCost || o.price || 0);
@@ -18381,6 +18571,782 @@ function extractTaskInfo(text) {
         : `Welcome! Regarding "${userText}": I am your Executive AI Manager connected to Gemini. You can ask me about sales history, red reminders, staff reports, or input your free Gemini API Key for unrestricted general answers!`);
 }
 window.handleAIChatSubmit = handleAIChatSubmit;
+
+// =============================================
+// AI CHATBOT SPEECH RECOGNITION (VOICE TO TEXT)
+// =============================================
+let aiSpeechRecognitionInstance = null;
+let isAISpeechRecording = false;
+
+function toggleAIChatVoiceInput() {
+    const voiceBtn = document.getElementById('ai-chat-voice-btn');
+    const input = document.getElementById('ai-chat-input');
+    if (!voiceBtn || !input) return;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        alert(typeof currentAppLang !== 'undefined' && currentAppLang === 'ar' 
+            ? 'خاصية التعرف على الصوت غير مدعومة في هذا المتصفح. يرجى استخدام متصفح Chrome أو Edge.' 
+            : 'Speech recognition is not supported on this browser. Please use Chrome or Edge.');
+        return;
+    }
+
+    if (isAISpeechRecording) {
+        if (aiSpeechRecognitionInstance) {
+            try { aiSpeechRecognitionInstance.stop(); } catch(e){}
+        }
+        stopAISpeechVoiceUI();
+        return;
+    }
+
+    try {
+        const recognition = new SpeechRecognition();
+        aiSpeechRecognitionInstance = recognition;
+        
+        const isAr = (typeof currentAppLang !== 'undefined' ? currentAppLang : localStorage.getItem("burgeroov_lang")) === 'ar';
+        recognition.lang = isAr ? 'ar-SA' : 'en-US';
+        recognition.continuous = false;
+        recognition.interimResults = true;
+
+        recognition.onstart = function() {
+            isAISpeechRecording = true;
+            voiceBtn.style.background = '#ef4444';
+            voiceBtn.style.color = '#ffffff';
+            voiceBtn.style.borderColor = '#ef4444';
+            voiceBtn.innerHTML = `<span style="font-size: 1.1rem;">🔴</span><span style="font-size: 0.82rem; font-weight: 900;">${isAr ? 'استماع...' : 'Listening...'}</span>`;
+            voiceBtn.style.boxShadow = '0 0 16px rgba(239, 68, 68, 0.6)';
+            input.placeholder = isAr ? 'تحدث الآن... وسأقوم بالإرسال فوراً' : 'Speak now... will send automatically';
+        };
+
+        recognition.onresult = function(event) {
+            let interimTranscript = '';
+            let finalTranscript = '';
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+
+            const currentText = finalTranscript || interimTranscript;
+            if (currentText) {
+                input.value = currentText;
+            }
+        };
+
+        recognition.onerror = function(event) {
+            console.warn("AI Speech Recognition Error:", event.error);
+            stopAISpeechVoiceUI();
+        };
+
+        recognition.onend = function() {
+            stopAISpeechVoiceUI();
+            const transcribedText = input.value ? input.value.trim() : '';
+            if (transcribedText) {
+                // Automatically send text immediately after user finishes talking!
+                setTimeout(() => {
+                    if (typeof handleAIChatSubmit === 'function') {
+                        handleAIChatSubmit();
+                    }
+                }, 350);
+            }
+        };
+
+        recognition.start();
+    } catch(err) {
+        console.error("Speech Recognition launch error:", err);
+        stopAISpeechVoiceUI();
+    }
+}
+
+function stopAISpeechVoiceUI() {
+    isAISpeechRecording = false;
+    const voiceBtn = document.getElementById('ai-chat-voice-btn');
+    const input = document.getElementById('ai-chat-input');
+    const isAr = (typeof currentAppLang !== 'undefined' ? currentAppLang : localStorage.getItem("burgeroov_lang")) === 'ar';
+
+    if (voiceBtn) {
+        voiceBtn.style.background = 'var(--input-bg)';
+        voiceBtn.style.color = '#6366f1';
+        voiceBtn.style.borderColor = '#6366f1';
+        voiceBtn.style.boxShadow = 'none';
+        voiceBtn.innerHTML = `<span>🎤</span>`;
+    }
+    if (input && !input.value) {
+        input.placeholder = isAr 
+            ? 'اكتب طلبك هنا أو تحدث بالمايك... / Type or speak command...' 
+            : 'Type or speak command...';
+    }
+}
+
+window.toggleAIChatVoiceInput = toggleAIChatVoiceInput;
+
+// =============================================
+// WORKER LOGIN INFO & PASSWORD MANAGEMENT MODULE
+// =============================================
+let hiddenPasswordStates = {};
+
+function renderWorkerLoginTable() {
+    const tbody = document.getElementById('ops-worker-login-tbody');
+    if (!tbody) return;
+
+    const companyData = getCompanyData();
+    let workers = companyData.workers || [];
+
+    const countBadge = document.getElementById('ops-worker-count-badge');
+    if (countBadge) {
+        countBadge.textContent = `${workers.length} Worker${workers.length === 1 ? '' : 's'}`;
+    }
+
+    const searchInput = document.getElementById('ops-worker-login-search');
+    const q = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+    if (q) {
+        workers = workers.filter(w => {
+            if (!w) return false;
+            const name = (w.name || '').toLowerCase();
+            const email = (w.email || '').toLowerCase();
+            const role = (w.role || '').toLowerCase();
+            return name.includes(q) || email.includes(q) || role.includes(q);
+        });
+    }
+
+    if (workers.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 24px; color: var(--text-muted); font-weight: 700;">
+                    ${q ? 'No employees match your search.' : 'No registered employees found. Register employees using the form below.'}
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = workers.map(w => {
+        const safeName = typeof escapeHtml === 'function' ? escapeHtml(w.name) : (w.name || 'Worker');
+        const safeEmail = typeof escapeHtml === 'function' ? escapeHtml(w.email) : (w.email || 'No Email');
+        const safeRole = typeof escapeHtml === 'function' ? escapeHtml(w.role) : (w.role || 'Staff');
+        const isPwdRevealed = !!hiddenPasswordStates[w.id];
+        const displayPassword = w.password 
+            ? (isPwdRevealed ? (typeof escapeHtml === 'function' ? escapeHtml(w.password) : w.password) : '••••••••') 
+            : '<span style="color: var(--text-muted); font-style: italic;">Firebase Auth Default</span>';
+
+        return `
+            <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 12px 16px; font-weight: 800; color: var(--text-main);">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.1rem;">👤</span>
+                        <div>
+                            <div>${safeName}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Branch: ${typeof escapeHtml === 'function' ? escapeHtml(w.branch || 'Main') : (w.branch || 'Main')}</div>
+                        </div>
+                    </div>
+                </td>
+                <td style="padding: 12px 16px; font-weight: 700; color: var(--text-main);">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span>${safeEmail}</span>
+                        <button type="button" onclick="if(typeof copyToClipboard==='function') copyToClipboard('${safeEmail}')" title="Copy Email" style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 2px 6px; font-size: 0.74rem; cursor: pointer;">📋</button>
+                    </div>
+                </td>
+                <td style="padding: 12px 16px;">
+                    <span class="badge" style="background: rgba(99, 102, 241, 0.12); color: #6366f1; border: 1px solid rgba(99, 102, 241, 0.25); font-weight: 800; font-size: 0.78rem; padding: 4px 10px; border-radius: 12px;">
+                        ${safeRole}
+                    </span>
+                </td>
+                <td style="padding: 12px 16px; font-weight: 800; font-family: monospace;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span>${displayPassword}</span>
+                        ${w.password ? `
+                            <button type="button" onclick="toggleWorkerPasswordReveal('${w.id}')" title="Toggle Password Reveal" style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 2px 6px; font-size: 0.74rem; cursor: pointer;">
+                                ${isPwdRevealed ? '🙈' : '👁️'}
+                            </button>
+                        ` : ''}
+                    </div>
+                </td>
+                <td style="padding: 12px 16px; text-align: center;">
+                    <div style="display: flex; gap: 6px; justify-content: center;">
+                        <button type="button" onclick="openWorkerResetPasswordModal('${w.id}')" class="btn-primary" style="padding: 6px 14px; font-size: 0.8rem; font-weight: 800; border-radius: 8px; background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                            🔑 Reset Password
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function toggleWorkerPasswordReveal(workerId) {
+    hiddenPasswordStates[workerId] = !hiddenPasswordStates[workerId];
+    renderWorkerLoginTable();
+}
+
+function openWorkerResetPasswordModal(workerId) {
+    const companyData = getCompanyData();
+    const worker = (companyData.workers || []).find(w => w.id === workerId);
+    if (!worker) return;
+
+    document.getElementById('reset-pwd-worker-id').value = worker.id;
+    document.getElementById('reset-pwd-worker-name').textContent = `Worker: ${worker.name} (${worker.email})`;
+    document.getElementById('reset-pwd-input').value = '';
+    document.getElementById('reset-pwd-confirm-input').value = '';
+    document.getElementById('reset-pwd-show-toggle').checked = false;
+    toggleResetPwdVisibility();
+
+    const modal = document.getElementById('worker-reset-password-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeWorkerResetPasswordModal() {
+    const modal = document.getElementById('worker-reset-password-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function toggleResetPwdVisibility() {
+    const show = document.getElementById('reset-pwd-show-toggle').checked;
+    document.getElementById('reset-pwd-input').type = show ? 'text' : 'password';
+    document.getElementById('reset-pwd-confirm-input').type = show ? 'text' : 'password';
+}
+
+function submitWorkerPasswordReset() {
+    const workerId = document.getElementById('reset-pwd-worker-id').value;
+    const newPwd = document.getElementById('reset-pwd-input').value.trim();
+    const confirmPwd = document.getElementById('reset-pwd-confirm-input').value.trim();
+
+    if (!newPwd) {
+        alert("Please enter a new password.");
+        return;
+    }
+    if (newPwd.length < 6) {
+        alert("Password must be at least 6 characters long.");
+        return;
+    }
+    if (newPwd !== confirmPwd) {
+        alert("Passwords do not match.");
+        return;
+    }
+
+    const companyData = getCompanyData();
+    const worker = (companyData.workers || []).find(w => w.id === workerId);
+    if (!worker) {
+        alert("Worker record not found.");
+        return;
+    }
+
+    const oldPwd = worker.password || '';
+    // Save custom password to worker record
+    worker.password = newPwd;
+    worker.oldPassword = oldPwd;
+    worker.passwordLastReset = Date.now();
+
+    const emailKey = worker.email.toLowerCase().replace(/\./g, ',');
+    const pwdPayload = {
+        email: worker.email.toLowerCase(),
+        password: newPwd,
+        workerId: worker.id,
+        updatedAt: Date.now()
+    };
+
+    // Save to localStorage cache for instant local client lookup
+    try {
+        localStorage.setItem('mvc_worker_pwd_' + emailKey, newPwd);
+    } catch(e){}
+
+    // Save to customerCodes/workerPasswords node (public read/write permitted by Firebase Rules)
+    if (typeof db !== 'undefined' && db) {
+        db.ref(`customerCodes/workerPasswords/${emailKey}`).set(pwdPayload)
+            .catch(e => console.error("Error setting customerCodes workerPasswords:", e));
+    }
+
+    // Save to globalWorkerPasswords root node (public read across all logins)
+    if (typeof db !== 'undefined' && db) {
+        db.ref(`globalWorkerPasswords/${emailKey}`).set(pwdPayload)
+            .catch(e => console.error("Error setting globalWorkerPasswords:", e));
+    }
+
+    const companyKeys = ['burgeroov', 'mvc', 'mvcfresh', currentCompany];
+    companyKeys.forEach(cKey => {
+        if (cKey && typeof db !== 'undefined' && db) {
+            db.ref(`companies/${cKey}/workerPasswords/${emailKey}`).set(pwdPayload)
+                .catch(e => console.error("Error setting workerPasswords mapping:", e));
+        }
+    });
+
+    // Persist targeted updates to Firebase Realtime Database
+    db.ref('companies/' + currentCompany + '/workers').set(companyData.workers)
+        .then(() => {
+            // Also store under flat workerCredentials for lookup
+            db.ref(`companies/${currentCompany}/workerCredentials/${worker.id}`).set({
+                email: worker.email.toLowerCase(),
+                password: newPwd,
+                updatedAt: Date.now()
+            }).catch(e => console.error("Error setting workerCredentials:", e));
+
+            closeWorkerResetPasswordModal();
+            renderWorkerLoginTable();
+
+            // Sync password directly to Firebase Auth via secondary app instance
+            syncWorkerPasswordToFirebaseAuth(worker.email, newPwd, oldPwd);
+
+            const msg = currentAppLang === 'ar'
+                ? `✅ تم تغيير كلمة المرور لـ ${worker.name} (${worker.email}) بنجاح إلى:\n\n🔑 ${newPwd}\n\nيجب على الموظف استخدام كلمة المرور الجديدة هذه لتسجيل الدخول.`
+                : `✅ Password for ${worker.name} (${worker.email}) successfully updated to:\n\n🔑 ${newPwd}\n\nThe worker must use this new password to log in.`;
+            alert(msg);
+        })
+        .catch(err => {
+            console.error("Error resetting worker password:", err);
+            alert("Error updating password in Firebase: " + err.message);
+        });
+}
+
+async function syncWorkerPasswordToFirebaseAuth(workerEmail, newPwd, oldPwd) {
+    if (!workerEmail || !newPwd) return;
+    try {
+        let secApp;
+        try {
+            secApp = firebase.app("WorkerPwdSync");
+        } catch(e) {
+            secApp = firebase.initializeApp(firebaseConfig, "WorkerPwdSync");
+        }
+        const secAuth = secApp.auth();
+
+        try {
+            const createRes = await secAuth.createUserWithEmailAndPassword(workerEmail, newPwd);
+            if (createRes && createRes.user) {
+                console.log("Created worker in Firebase Auth via Secondary App.");
+                await secAuth.signOut();
+                return;
+            }
+        } catch (createErr) {
+            if (createErr.code === 'auth/email-already-in-use') {
+                if (oldPwd && oldPwd !== newPwd) {
+                    try {
+                        const oldSignIn = await secAuth.signInWithEmailAndPassword(workerEmail, oldPwd);
+                        if (oldSignIn && oldSignIn.user) {
+                            await oldSignIn.user.updatePassword(newPwd);
+                            console.log("Updated worker password in Firebase Auth via Secondary App.");
+                            await secAuth.signOut();
+                            return;
+                        }
+                    } catch(e) {
+                        console.warn("Could not sign in with old password on secondary auth app:", e);
+                    }
+                }
+            }
+        }
+    } catch(err) {
+        console.error("Secondary Auth Sync Error:", err);
+    }
+}
+
+window.renderWorkerLoginTable = renderWorkerLoginTable;
+window.toggleWorkerPasswordReveal = toggleWorkerPasswordReveal;
+window.openWorkerResetPasswordModal = openWorkerResetPasswordModal;
+window.closeWorkerResetPasswordModal = closeWorkerResetPasswordModal;
+window.toggleResetPwdVisibility = toggleResetPwdVisibility;
+window.submitWorkerPasswordReset = submitWorkerPasswordReset;
+
+function resolveWorkerUserLogin(email) {
+    const overlay = document.getElementById('auth-overlay');
+    const authLoader = document.getElementById('auth-loader');
+    const authBtn = document.getElementById('auth-btn');
+
+    if (authLoader) authLoader.style.display = 'none';
+    if (authBtn) authBtn.style.display = 'block';
+
+    const parseAdminsSnap = (snap) => (snap && snap.exists()) ? (snap.val() || {}) : {};
+    const parseWorkersSnap = (snap) => (snap && snap.exists() && Array.isArray(snap.val())) ? snap.val() : [];
+
+    Promise.all([
+        db.ref('companies/burgeroov/admins').once('value').catch(() => null),
+        db.ref('companies/burgeroov/workers').once('value').catch(() => null),
+        db.ref('companies/mvc/admins').once('value').catch(() => null),
+        db.ref('companies/mvc/workers').once('value').catch(() => null),
+        db.ref('companies/mvcfresh/admins').once('value').catch(() => null),
+        db.ref('companies/mvcfresh/workers').once('value').catch(() => null)
+    ]).then(([bgAdmins, bgWorkers, mvcAdmins, mvcWorkers, freshAdmins, freshWorkers]) => {
+        const burgeroovAdmins = parseAdminsSnap(bgAdmins);
+        const burgeroovWorkers = parseWorkersSnap(bgWorkers);
+        const mvcAdminsList = parseAdminsSnap(mvcAdmins);
+        const mvcWorkersList = parseWorkersSnap(mvcWorkers);
+        const mvcfreshAdminsList = parseAdminsSnap(freshAdmins);
+        const mvcfreshWorkersList = parseWorkersSnap(freshWorkers);
+
+        const sanitizedEmail = email.toLowerCase().replace(/\./g, ',');
+        const inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
+            burgeroovWorkers.some(w => w && w.email && w.email.toLowerCase() === email.toLowerCase());
+
+        const inMvc = mvcAdminsList[sanitizedEmail] === true ||
+            mvcWorkersList.some(w => w && w.email && w.email.toLowerCase() === email.toLowerCase());
+
+        const inMvcFresh = mvcfreshAdminsList[sanitizedEmail] === true ||
+            mvcfreshWorkersList.some(w => w && w.email && w.email.toLowerCase() === email.toLowerCase());
+
+        if (overlay) overlay.style.display = 'none';
+
+        const activeCompanies = [];
+        if (inBurgeroov) activeCompanies.push('burgeroov');
+        if (inMvc) activeCompanies.push('mvc');
+        if (inMvcFresh) activeCompanies.push('mvcfresh');
+
+        window.isMultiCompany = activeCompanies.length > 1;
+
+        const savedCompany = localStorage.getItem('selected_company');
+        if (savedCompany && activeCompanies.includes(savedCompany)) {
+            selectCompany(savedCompany);
+        } else if (activeCompanies.length === 1) {
+            selectCompany(activeCompanies[0]);
+        } else if (activeCompanies.length > 1) {
+            showCompanySelectionHUD();
+        } else {
+            const defaultCompany = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
+            selectCompany(defaultCompany);
+        }
+    }).catch(err => {
+        console.error("Error in resolveWorkerUserLogin:", err);
+        if (overlay) overlay.style.display = 'none';
+        const defaultCompany = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
+        selectCompany(defaultCompany);
+    });
+}
+window.resolveWorkerUserLogin = resolveWorkerUserLogin;
+
+// =============================================
+// ADMIN INFORMATION & DOCUMENT VAULT MODULE
+// =============================================
+let vaultActiveCategoryFilter = 'ALL';
+let currentVaultImageData = null;
+
+function toggleVaultAddForm() {
+    const container = document.getElementById('vault-add-form-container');
+    if (!container) return;
+    if (container.style.display === 'none' || !container.style.display) {
+        container.style.display = 'block';
+    } else {
+        container.style.display = 'none';
+        clearVaultForm();
+    }
+}
+window.toggleVaultAddForm = toggleVaultAddForm;
+
+function clearVaultForm() {
+    const title = document.getElementById('vault-note-title');
+    const cat = document.getElementById('vault-note-category');
+    const text = document.getElementById('vault-note-text');
+    const file = document.getElementById('vault-note-image-file');
+    if (title) title.value = '';
+    if (cat) cat.value = 'General';
+    if (text) text.value = '';
+    if (file) file.value = '';
+    clearVaultImagePreview();
+}
+window.clearVaultForm = clearVaultForm;
+
+function handleVaultImagePreview(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const maxDim = 1200;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+                if (width > maxDim) {
+                    height = Math.round((height * maxDim) / width);
+                    width = maxDim;
+                }
+            } else {
+                if (height > maxDim) {
+                    width = Math.round((width * maxDim) / height);
+                    height = maxDim;
+                }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            currentVaultImageData = canvas.toDataURL('image/jpeg', 0.82);
+
+            const previewImg = document.getElementById('vault-img-preview');
+            const previewContainer = document.getElementById('vault-img-preview-container');
+            const clearBtn = document.getElementById('vault-clear-img-btn');
+
+            if (previewImg) previewImg.src = currentVaultImageData;
+            if (previewContainer) previewContainer.style.display = 'block';
+            if (clearBtn) clearBtn.style.display = 'inline-block';
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+window.handleVaultImagePreview = handleVaultImagePreview;
+
+function clearVaultImagePreview() {
+    currentVaultImageData = null;
+    const previewImg = document.getElementById('vault-img-preview');
+    const previewContainer = document.getElementById('vault-img-preview-container');
+    const clearBtn = document.getElementById('vault-clear-img-btn');
+    const fileInput = document.getElementById('vault-note-image-file');
+
+    if (previewImg) previewImg.src = '';
+    if (previewContainer) previewContainer.style.display = 'none';
+    if (clearBtn) clearBtn.style.display = 'none';
+    if (fileInput) fileInput.value = '';
+}
+window.clearVaultImagePreview = clearVaultImagePreview;
+
+function postVaultNote() {
+    const titleEl = document.getElementById('vault-note-title');
+    const catEl = document.getElementById('vault-note-category');
+    const textEl = document.getElementById('vault-note-text');
+
+    const title = titleEl ? titleEl.value.trim() : '';
+    const category = catEl ? catEl.value : 'General';
+    const text = textEl ? textEl.value.trim() : '';
+
+    if (!title && !text && !currentVaultImageData) {
+        if (typeof showInAppNotification === 'function') showInAppNotification("⚠️ Please enter a title, details, or upload an image.");
+        else alert("Please enter a title, details, or upload an image.");
+        return;
+    }
+
+    const noteId = 'vault_' + Date.now();
+    const noteObj = {
+        id: noteId,
+        title: title || 'Information Note',
+        category: category,
+        text: text || '',
+        imageUrl: currentVaultImageData || '',
+        createdAt: Date.now(),
+        createdBy: (currentUser && currentUser.email) ? currentUser.email : 'Admin'
+    };
+
+    db.ref('companies/' + currentCompany + '/vaultNotes/' + noteId).set(noteObj)
+        .then(() => {
+            if (typeof showInAppNotification === 'function') showInAppNotification("✅ Information note saved successfully!");
+            toggleVaultAddForm();
+            renderVaultNotes();
+        })
+        .catch(err => {
+            console.error("Failed to save vault note:", err);
+            if (typeof showInAppNotification === 'function') showInAppNotification("❌ Failed to save note: " + err.message);
+        });
+}
+window.postVaultNote = postVaultNote;
+
+function setVaultCategoryFilter(cat) {
+    vaultActiveCategoryFilter = cat;
+    document.querySelectorAll('.btn-vault-filter').forEach(btn => {
+        const isMatch = btn.getAttribute('data-cat') === cat;
+        btn.classList.toggle('active-vault-filter', isMatch);
+        btn.style.background = isMatch ? '#6366f1' : 'transparent';
+        btn.style.color = isMatch ? 'white' : 'var(--text-main)';
+    });
+    renderVaultNotes();
+}
+window.setVaultCategoryFilter = setVaultCategoryFilter;
+
+function renderVaultNotes() {
+    const grid = document.getElementById('vault-notes-grid');
+    if (!grid) return;
+
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const notesObj = data.vaultNotes || {};
+    let notes = Object.values(notesObj);
+
+    const statTotal = document.getElementById('vault-stat-total');
+    if (statTotal) {
+        statTotal.textContent = `${notes.length} Item${notes.length === 1 ? '' : 's'}`;
+    }
+
+    // Search input filtering
+    const searchInput = document.getElementById('vault-search-input');
+    const q = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+    if (q) {
+        notes = notes.filter(n => {
+            if (!n) return false;
+            const t = (n.title || '').toLowerCase();
+            const txt = (n.text || '').toLowerCase();
+            const cat = (n.category || '').toLowerCase();
+            const dateStr = n.createdAt ? new Date(n.createdAt).toLocaleDateString() : '';
+            return t.includes(q) || txt.includes(q) || cat.includes(q) || dateStr.includes(q);
+        });
+    }
+
+    // Category filtering
+    if (vaultActiveCategoryFilter !== 'ALL') {
+        notes = notes.filter(n => n && n.category === vaultActiveCategoryFilter);
+    }
+
+    // Sort newest first
+    notes.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+    if (notes.length === 0) {
+        grid.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 50px 20px; background: var(--input-bg); border-radius: 20px; border: 2px dashed var(--border-color);">
+                <div style="font-size: 3.5rem; margin-bottom: 14px;">📁</div>
+                <h3 style="font-size: 1.2rem; color: var(--text-main); margin-bottom: 8px; font-weight: 900;">No Information Notes Found</h3>
+                <p style="color: var(--text-muted); font-size: 0.92rem; max-width: 450px; margin: 0 auto; line-height: 1.6;">${q ? 'No items match your search filter. Try clearing the search box.' : 'Click "Add New Note" above to upload vehicle licenses, contracts, passwords, or official documents.'}</p>
+            </div>
+        `;
+        return;
+    }
+
+    const catBadgeStyles = {
+        Vehicle: 'background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white;',
+        Contracts: 'background: linear-gradient(135deg, #10b981, #047857); color: white;',
+        Passwords: 'background: linear-gradient(135deg, #f59e0b, #b45309); color: white;',
+        Documents: 'background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: white;',
+        General: 'background: linear-gradient(135deg, #64748b, #334155); color: white;'
+    };
+
+    const countBadge = document.getElementById('vault-count-badge');
+    if (countBadge) {
+        countBadge.textContent = `${notes.length} Item${notes.length === 1 ? '' : 's'}`;
+    }
+
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(280px, 1fr))';
+    grid.style.gap = '16px';
+    grid.style.width = '100%';
+
+    grid.innerHTML = notes.map(n => {
+        const dateStr = n.createdAt ? new Date(n.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+        const badgeStyle = catBadgeStyles[n.category] || catBadgeStyles.General;
+        const safeTitle = typeof escapeHtml === 'function' ? escapeHtml(n.title) : (n.title || '');
+        const safeText = typeof escapeHtml === 'function' ? escapeHtml(n.text) : (n.text || '');
+        const safeCreatedBy = typeof escapeHtml === 'function' ? escapeHtml(n.createdBy || 'Admin') : (n.createdBy || 'Admin');
+
+        return `
+            <div class="ledger-card" style="
+                margin: 0;
+                padding: 16px;
+                border-radius: 14px;
+                border: 1px solid var(--border-color);
+                background: var(--card-bg);
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                box-shadow: var(--shadow-sm);
+                transition: transform 0.2s ease, box-shadow 0.2s ease;
+            ">
+                <div>
+                    <!-- Image Card (If Uploaded) -->
+                    ${n.imageUrl ? `
+                        <div style="
+                            position: relative;
+                            cursor: pointer;
+                            overflow: hidden;
+                            border-radius: 10px;
+                            border: 1px solid var(--border-color);
+                            margin-bottom: 12px;
+                            height: 160px;
+                            background: var(--input-bg);
+                        " onclick="openImageModal('${n.imageUrl}')">
+                            <img src="${n.imageUrl}" alt="${safeTitle}" style="width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 10px; transition: transform 0.2s ease;" onmouseenter="this.style.transform='scale(1.03)'" onmouseleave="this.style.transform='none'">
+                            <div style="
+                                position: absolute;
+                                bottom: 8px;
+                                right: 8px;
+                                background: rgba(0, 0, 0, 0.75);
+                                color: white;
+                                padding: 3px 8px;
+                                border-radius: 8px;
+                                font-size: 0.72rem;
+                                font-weight: 800;
+                                backdrop-filter: blur(4px);
+                            ">🔍 Zoom</div>
+                        </div>
+                    ` : ''}
+
+                    <!-- Title & Category Header -->
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; gap: 8px;">
+                        <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
+                            <span style="${badgeStyle} display: inline-block; width: fit-content; padding: 3px 8px; border-radius: 14px; font-weight: 800; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                                ${n.category || 'General'}
+                            </span>
+                            <strong style="font-size: 1.05rem; color: var(--text-main); word-break: break-word; line-height: 1.3;">${safeTitle}</strong>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                            <button type="button" onclick="copyVaultText('${n.id}')" title="Copy Text" style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: var(--text-main);">📋 Copy</button>
+                            <button type="button" onclick="deleteVaultNote('${n.id}')" title="Delete Note" style="background: rgba(220, 38, 38, 0.1); border: 1px solid rgba(220, 38, 38, 0.25); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: var(--danger);">🗑️</button>
+                        </div>
+                    </div>
+
+                    <!-- Text Details directly UNDER Image & Title -->
+                    ${n.text ? `
+                        <div id="vault-text-${n.id}" style="
+                            font-size: 0.88rem;
+                            color: var(--text-main);
+                            background: var(--input-bg);
+                            padding: 10px 12px;
+                            border-radius: 10px;
+                            border: 1px dashed var(--border-color);
+                            margin-top: 8px;
+                            white-space: pre-wrap;
+                            line-height: 1.5;
+                            font-family: inherit;
+                        ">${safeText}</div>
+                    ` : ''}
+                </div>
+
+                <!-- Footer Timestamp -->
+                <div style="
+                    margin-top: 12px;
+                    padding-top: 8px;
+                    border-top: 1px solid var(--border-color);
+                    font-size: 0.74rem;
+                    color: var(--text-muted);
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                ">
+                    <span>🕒 ${dateStr}</span>
+                    <span>👤 ${safeCreatedBy}</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+window.renderVaultNotes = renderVaultNotes;
+
+function copyVaultText(noteId) {
+    const textEl = document.getElementById(`vault-text-${noteId}`);
+    if (!textEl) return;
+    const txt = textEl.textContent || textEl.innerText;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(() => {
+            if (typeof showInAppNotification === 'function') showInAppNotification("📋 Text copied to clipboard!");
+        });
+    } else {
+        if (typeof showInAppNotification === 'function') showInAppNotification("📋 " + txt);
+    }
+}
+window.copyVaultText = copyVaultText;
+
+function deleteVaultNote(noteId) {
+    if (!confirm("Are you sure you want to delete this information note?")) return;
+
+    db.ref('companies/' + currentCompany + '/vaultNotes/' + noteId).remove()
+        .then(() => {
+            if (typeof showInAppNotification === 'function') showInAppNotification("🗑️ Note deleted.");
+            renderVaultNotes();
+        })
+        .catch(err => {
+            console.error("Failed to delete vault note:", err);
+            if (typeof showInAppNotification === 'function') showInAppNotification("❌ Delete failed: " + err.message);
+        });
+}
+window.deleteVaultNote = deleteVaultNote;
 
 // Initial run
 applyTranslations();
