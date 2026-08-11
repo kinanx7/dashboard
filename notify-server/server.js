@@ -41,6 +41,14 @@ const messaging = admin.messaging();
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
+// Health Check & Dedicated Keep-Alive endpoints for Render Cron Pings
+app.get(['/ping', '/health'], (_req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    return res.status(200).json({ status: 'ok', server: 'Burgeroov Notify Server', timestamp: Date.now() });
+});
+
 app.get('/', (_req, res) => res.send('Burgeroov Notification Server is running ✅'));
 app.listen(PORT, () => console.log(`[Server] Listening on port ${PORT}`));
 
