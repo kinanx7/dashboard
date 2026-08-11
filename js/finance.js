@@ -361,13 +361,14 @@ function renderSummaryTable() {
         const netThisMonth = base + rew + volumeReward + ov - viol - sysViolDeduction - lateDeduction;
         const paidThisMonth = calculatePaymentsTotal(stats.paymentsList);
 
-        // Calculate Monthly Attendance Stats
+        // Calculate Monthly Attendance, Lateness & Vacation Stats
         const companyData = getCompanyData();
         const attendance = companyData.attendance || {};
         const graceMins = parseInt(companyData.lateGraceMinutes || 0);
 
         let presentCount = 0;
         let absentCount = 0;
+        let vacationCount = 0;
         let lateCount = 0;
 
         Object.keys(attendance).forEach(dateStr => {
@@ -377,41 +378,54 @@ function renderSummaryTable() {
                 if (att) {
                     if (att.status === 'present') {
                         presentCount++;
-                        let shiftStart = worker.startTime;
-                        const dateParts = dateStr.split('-');
-                        const dateObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
-                        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                        const dayOfWeekName = dayNames[dateObj.getDay()];
-                        const dateOverrideShift = (worker.shifts || []).find(s => s.dayOfWeek === dayOfWeekName || s.specificDate === dateStr);
-                        if (dateOverrideShift) {
-                            shiftStart = dateOverrideShift.startTime;
-                        }
-                        if (att.time && shiftStart) {
-                            const [sH, sM] = shiftStart.split(':').map(Number);
-                            const [cH, cM] = att.time.split(':').map(Number);
-                            if (!isNaN(sH) && !isNaN(cH)) {
-                                const startMins = sH * 60 + (sM || 0);
-                                const checkMins = cH * 60 + (cM || 0);
-                                const diff = checkMins - startMins;
-                                const rules = companyData.lateRules || [];
-                                let isLate = false;
-                                if (rules.length === 0) {
-                                    if (diff > graceMins) isLate = true;
-                                } else {
-                                    const minMins = Math.min(...rules.map(r => r.mins));
-                                    if (diff >= minMins) isLate = true;
-                                }
-                                if (isLate) {
-                                    lateCount++;
+                        const isLateStr = att.lateness && att.lateness !== '' && att.lateness !== 'None' && att.lateness !== '--';
+                        if (isLateStr) {
+                            lateCount++;
+                        } else {
+                            let shiftStart = worker.startTime || '09:00';
+                            const dateParts = dateStr.split('-');
+                            const dateObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+                            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                            const dayOfWeekName = dayNames[dateObj.getDay()];
+                            const dateOverrideShift = (worker.shifts || []).find(s => s.dayOfWeek === dayOfWeekName || s.specificDate === dateStr);
+                            if (dateOverrideShift) {
+                                shiftStart = dateOverrideShift.startTime;
+                            }
+                            if (att.time && shiftStart) {
+                                const [sH, sM] = shiftStart.split(':').map(Number);
+                                const [cH, cM] = att.time.split(':').map(Number);
+                                if (!isNaN(sH) && !isNaN(cH)) {
+                                    const startMins = sH * 60 + (sM || 0);
+                                    const checkMins = cH * 60 + (cM || 0);
+                                    const diff = checkMins - startMins;
+                                    const rules = companyData.lateRules || [];
+                                    let isLate = false;
+                                    if (rules.length === 0) {
+                                        if (diff > graceMins) isLate = true;
+                                    } else {
+                                        const minMins = Math.min(...rules.map(r => r.mins));
+                                        if (diff >= minMins) isLate = true;
+                                    }
+                                    if (isLate) {
+                                        lateCount++;
+                                    }
                                 }
                             }
                         }
                     } else if (att.status === 'absent') {
                         absentCount++;
+                    } else if (att.status === 'vacation') {
+                        vacationCount++;
                     }
                 }
             }
         });
+
+        // Add performance log vacations if logged via log daily performance
+        const perfVacations = monthlyLogs.filter(l => l.noteType === 'vacation').length;
+        if (vacationCount === 0 && perfVacations > 0) {
+            vacationCount = perfVacations;
+        }
 
         // Count Tasks Done in Current Month
         const monthAbbr = new Date(currentGlobalMonth + '-01').toLocaleString('en-US', { month: 'short' });
@@ -596,6 +610,10 @@ function renderSummaryTable() {
                                     <span>${isAr ? 'حاضر' : 'Present'}:</span>
                                     <span>${presentCount}</span>
                                 </div>
+                                <div style="color:#0284c7; display:flex; justify-content:space-between; gap:6px;">
+                                    <span>${isAr ? 'إجازة' : 'Vacation'}:</span>
+                                    <span>${vacationCount}</span>
+                                </div>
                                 <div style="color:var(--danger); display:flex; justify-content:space-between; gap:6px;">
                                     <span>${isAr ? 'غائب' : 'Absent'}:</span>
                                     <span>${absentCount}</span>
@@ -705,13 +723,66 @@ function renderSummaryTable() {
 
 
 
+// --- GAMIFICATION LEADERBOARDS (EMPLOYEES & DRIVERS) ---
+function saveRankingSettings() {
+    const isAr = currentAppLang === 'ar';
+    const attendPts = parseInt(document.getElementById('rank-pts-attendance')?.value || '5', 10);
+    const onTimePts = parseInt(document.getElementById('rank-pts-ontime')?.value || '2', 10);
+    const normalTaskPts = parseInt(document.getElementById('rank-pts-normal-task')?.value || '10', 10);
+    const urgentTaskPts = parseInt(document.getElementById('rank-pts-urgent-task')?.value || '20', 10);
+    const deliveryPts = parseInt(document.getElementById('rank-pts-delivery')?.value || '15', 10);
+
+    const rankingSettings = {
+        attendPts,
+        onTimePts,
+        normalTaskPts,
+        urgentTaskPts,
+        deliveryPts,
+        updatedAt: Date.now()
+    };
+
+    db.ref(`companies/${currentCompany}/rankingSettings`).set(rankingSettings)
+        .then(() => {
+            if (typeof showInAppNotification === 'function') {
+                showInAppNotification(isAr ? 'تم حفظ إعدادات نقاط التقييم بنجاح!' : 'Point rules saved successfully!');
+            }
+            renderLeaderboard();
+        })
+        .catch(err => console.error("Error saving ranking settings:", err));
+}
+window.saveRankingSettings = saveRankingSettings;
+
+function renderRankingSettingsInputs() {
+    const companyData = getCompanyData();
+    const settings = companyData.rankingSettings || { attendPts: 5, onTimePts: 2, normalTaskPts: 10, urgentTaskPts: 20, deliveryPts: 15 };
+
+    const elAtt = document.getElementById('rank-pts-attendance');
+    const elOnTime = document.getElementById('rank-pts-ontime');
+    const elNormal = document.getElementById('rank-pts-normal-task');
+    const elUrgent = document.getElementById('rank-pts-urgent-task');
+    const elDelivery = document.getElementById('rank-pts-delivery');
+
+    if (elAtt && !elAtt.matches(':focus')) elAtt.value = settings.attendPts !== undefined ? settings.attendPts : 5;
+    if (elOnTime && !elOnTime.matches(':focus')) elOnTime.value = settings.onTimePts !== undefined ? settings.onTimePts : 2;
+    if (elNormal && !elNormal.matches(':focus')) elNormal.value = settings.normalTaskPts !== undefined ? settings.normalTaskPts : 10;
+    if (elUrgent && !elUrgent.matches(':focus')) elUrgent.value = settings.urgentTaskPts !== undefined ? settings.urgentTaskPts : 20;
+    if (elDelivery && !elDelivery.matches(':focus')) elDelivery.value = settings.deliveryPts !== undefined ? settings.deliveryPts : 15;
+}
+window.renderRankingSettingsInputs = renderRankingSettingsInputs;
+
 function renderLeaderboard() {
-    const workers = getCompanyData().workers || [];
+    const companyData = getCompanyData();
+    const workers = companyData.workers || [];
     if (workers.length === 0) return;
 
-    const isAr = currentAppLang === 'ar';
+    if (typeof renderRankingSettingsInputs === 'function') {
+        renderRankingSettingsInputs();
+    }
 
-    // 1. Calculate general leaderboard (All non-driver/regular tasks & perfection score)
+    const isAr = currentAppLang === 'ar';
+    const settings = companyData.rankingSettings || { attendPts: 5, onTimePts: 2, normalTaskPts: 10, urgentTaskPts: 20, deliveryPts: 15 };
+
+    // 1. Calculate general leaderboard (All workers with custom points)
     const generalRanked = workers.map(worker => {
         const avg = parseFloat(getAveragePerfection(getLogsForMonth(worker, currentGlobalMonth)) || 0);
 
@@ -723,17 +794,37 @@ function renderLeaderboard() {
                 if (job.status === 'completed' || job.done) {
                     const urgency = (job.urgency || 'normal').toLowerCase();
                     if (urgency === 'high' || urgency === 'urgent') {
-                        taskPoints += 30;
+                        taskPoints += (settings.urgentTaskPts !== undefined ? settings.urgentTaskPts : 20);
                         taskHigh++;
                     } else {
-                        taskPoints += 15;
+                        taskPoints += (settings.normalTaskPts !== undefined ? settings.normalTaskPts : 10);
                         taskNormal++;
                     }
                 }
             });
         }
 
-        const totalScore = Math.round(avg + taskPoints);
+        // Attendance points for current month
+        let attendancePoints = 0;
+        const allAttendance = companyData.attendance || {};
+        Object.keys(allAttendance).forEach(dateStr => {
+            if (currentGlobalMonth && dateStr.startsWith(currentGlobalMonth)) {
+                const dayAtt = (allAttendance[dateStr] || {})[worker.id];
+                if (dayAtt && dayAtt.status === 'present') {
+                    attendancePoints += (settings.attendPts !== undefined ? settings.attendPts : 5);
+                    if (!dayAtt.lateness) {
+                        attendancePoints += (settings.onTimePts !== undefined ? settings.onTimePts : 2);
+                    }
+                }
+            }
+        });
+
+        // Driver delivery points
+        const stats = getMonthlyStats(worker, currentGlobalMonth);
+        const deliveries = (stats.deliveriesList ? stats.deliveriesList.length : 0) + (stats.legacyDeliveries || 0);
+        const deliveryPoints = deliveries * (settings.deliveryPts !== undefined ? settings.deliveryPts : 15);
+
+        const totalScore = Math.round(avg + taskPoints + attendancePoints + deliveryPoints);
 
         return {
             id: worker.id,
@@ -743,6 +834,8 @@ function renderLeaderboard() {
             taskPoints: taskPoints,
             taskHigh: taskHigh,
             taskNormal: taskNormal,
+            attendancePoints: attendancePoints,
+            deliveryPoints: deliveryPoints,
             score: totalScore
         };
     }).sort((a, b) => b.score - a.score);
@@ -786,9 +879,9 @@ function renderLeaderboard() {
 
             let breakdownStr = '';
             if (isAr) {
-                breakdownStr = `الأداء: ${worker.avg}% | نقاط المهام: ${worker.taskPoints} (عاجل: ${worker.taskHigh}، عادي: ${worker.taskNormal})`;
+                breakdownStr = `الأداء: ${worker.avg}% | الحضور: ${worker.attendancePoints}ن | المهام: ${worker.taskPoints}ن (عاجل: ${worker.taskHigh}، عادي: ${worker.taskNormal})${worker.deliveryPoints > 0 ? ` | التوصيل: ${worker.deliveryPoints}ن` : ''}`;
             } else {
-                breakdownStr = `Perf: ${worker.avg}% | Task Pts: ${worker.taskPoints} (High: ${worker.taskHigh}, Normal: ${worker.taskNormal})`;
+                breakdownStr = `Perf: ${worker.avg}% | Att: ${worker.attendancePoints}p | Tasks: ${worker.taskPoints}p (Urgent: ${worker.taskHigh}, Normal: ${worker.taskNormal})${worker.deliveryPoints > 0 ? ` | Del: ${worker.deliveryPoints}p` : ''}`;
             }
 
             genListDiv.innerHTML += `
@@ -1138,6 +1231,10 @@ function renderPaymentRequests() {
     const companyData = getCompanyData();
     const pRequests = companyData.paymentRequests || {};
     const reqList = Object.values(pRequests).sort((a, b) => b.timestamp - a.timestamp);
+
+    const pendingPayCount = reqList.filter(r => r.status === 'pending' || r.status === 'waiting_manager_approval').length;
+    const payBadge = document.getElementById('pending-pay-count-badge');
+    if (payBadge) payBadge.textContent = `${pendingPayCount} ${isAr ? 'قيد الانتظار' : 'Pending'}`;
 
     const thresholdInput = document.getElementById('high-money-threshold-input');
     if (thresholdInput) {
@@ -1705,34 +1802,40 @@ function getLateDeductionsForMonth(worker, monthStr) {
         if (dateStr.startsWith(monthStr)) {
             const dayMap = attendance[dateStr] || {};
             const att = dayMap[worker.id];
-            let shiftStart = worker.startTime;
-            const dateParts = dateStr.split('-');
-            const dateObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
-            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-            const dayOfWeekName = dayNames[dateObj.getDay()];
-            const dateOverrideShift = (worker.shifts || []).find(s => s.dayOfWeek === dayOfWeekName || s.specificDate === dateStr);
-            if (dateOverrideShift) {
-                shiftStart = dateOverrideShift.startTime;
-            }
-            if (att && att.status === 'present' && att.time && shiftStart) {
-                const [sH, sM] = shiftStart.split(':').map(Number);
-                const [cH, cM] = att.time.split(':').map(Number);
-                if (!isNaN(sH) && !isNaN(cH)) {
-                    const startMins = sH * 60 + (sM || 0);
-                    const checkMins = cH * 60 + (cM || 0);
-                    const diff = checkMins - startMins;
-                    if (diff > 0) {
-                        if (rules.length === 0) {
-                            if (diff > graceMins && legacyPenalty > 0) {
-                                totalDeduction += legacyPenalty;
-                            }
-                        } else {
-                            // Find highest matching tier
-                            const sortedRules = [...rules].sort((a, b) => b.mins - a.mins);
-                            const matchedRule = sortedRules.find(r => diff >= r.mins);
-                            if (matchedRule) {
-                                totalDeduction += parseFloat(matchedRule.penalty || 0);
-                            }
+            if (att && att.status === 'present') {
+                let diff = 0;
+                let shiftStart = worker.startTime || '09:00';
+                const dateParts = dateStr.split('-');
+                const dateObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+                const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                const dayOfWeekName = dayNames[dateObj.getDay()];
+                const dateOverrideShift = (worker.shifts || []).find(s => s.dayOfWeek === dayOfWeekName || s.specificDate === dateStr);
+                if (dateOverrideShift) {
+                    shiftStart = dateOverrideShift.startTime;
+                }
+                if (att.time && shiftStart) {
+                    const [sH, sM] = shiftStart.split(':').map(Number);
+                    const [cH, cM] = att.time.split(':').map(Number);
+                    if (!isNaN(sH) && !isNaN(cH)) {
+                        const startMins = sH * 60 + (sM || 0);
+                        const checkMins = cH * 60 + (cM || 0);
+                        diff = checkMins - startMins;
+                    }
+                } else if (att.lateness) {
+                    const matchedMins = String(att.lateness).match(/\d+/);
+                    if (matchedMins) diff = parseInt(matchedMins[0]);
+                }
+
+                if (diff > 0) {
+                    if (rules.length === 0) {
+                        if (diff > graceMins && legacyPenalty > 0) {
+                            totalDeduction += legacyPenalty;
+                        }
+                    } else {
+                        const sortedRules = [...rules].sort((a, b) => b.mins - a.mins);
+                        const matchedRule = sortedRules.find(r => diff >= r.mins);
+                        if (matchedRule) {
+                            totalDeduction += parseFloat(matchedRule.penalty || 0);
                         }
                     }
                 }
@@ -2112,11 +2215,16 @@ function renderAttendance() {
             }
         }
 
+        const reportBtn = `<button onclick="showWorker3MonthAttendanceReport('${w.id}')" class="btn-outline" style="padding: 2px 8px; font-size: 0.72rem; margin-top: 4px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; background: var(--input-bg);" title="${isAr ? 'تقرير الحضور لآخر 3 أشهر' : '3-Month Attendance Report'}">
+            📊 <span>${isAr ? 'تقرير 3 أشهر' : '3-Mo Report'}</span>
+        </button>`;
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>
                 <strong style="color:var(--text-main); display:block;">${w.name}</strong>
                 <span style="font-size:0.75rem; color:var(--text-muted);">${w.role || ''}</span>
+                <div>${reportBtn}</div>
                 ${exitHtml}
             </td>
             <td>${statusHtml}</td>
@@ -2172,6 +2280,191 @@ function renderAttendance() {
     }
     renderLateRules();
 }
+
+function showWorker3MonthAttendanceReport(workerId) {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const companyData = getCompanyData();
+    const workers = companyData.workers || [];
+    const worker = workers.find(w => w.id === workerId);
+    if (!worker) return;
+
+    const modal = document.getElementById('modal-3month-attendance-report');
+    if (!modal) return;
+
+    const titleEl = document.getElementById('att-report-worker-name');
+    const rangeEl = document.getElementById('att-report-date-range');
+    const summaryEl = document.getElementById('att-report-summary-boxes');
+    const detailsEl = document.getElementById('att-report-details-container');
+
+    const today = new Date();
+    const startDate = new Date();
+    startDate.setDate(today.getDate() - 89); // 90 days inclusive
+
+    const yyyyStart = startDate.getFullYear();
+    const mmStart = String(startDate.getMonth() + 1).padStart(2, '0');
+    const ddStart = String(startDate.getDate()).padStart(2, '0');
+
+    const yyyyEnd = today.getFullYear();
+    const mmEnd = String(today.getMonth() + 1).padStart(2, '0');
+    const ddEnd = String(today.getDate()).padStart(2, '0');
+
+    if (titleEl) titleEl.textContent = `📊 ${worker.name} — ${isAr ? 'تقرير الحضور (3 أشهر)' : '3-Month Attendance Report'}`;
+    if (rangeEl) rangeEl.textContent = `${yyyyStart}-${mmStart}-${ddStart} ➔ ${yyyyEnd}-${mmEnd}-${ddEnd} (90 ${isAr ? 'يوم' : 'Days'})`;
+
+    const allAttendance = companyData.attendance || {};
+    let countPresent = 0;
+    let countVacation = 0;
+    let countAbsent = 0;
+    let countLate = 0;
+
+    const monthGroups = {}; // key: YYYY-MM
+
+    for (let d = new Date(startDate); d <= today; d.setDate(d.getDate() + 1)) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dayStr = String(d.getDate()).padStart(2, '0');
+        const dateKey = `${y}-${m}-${dayStr}`;
+        const monthKey = `${y}-${m}`;
+
+        if (!monthGroups[monthKey]) {
+            monthGroups[monthKey] = [];
+        }
+
+        const dayAtt = (allAttendance[dateKey] || {})[workerId];
+        let status = 'not_marked';
+        let checkin = '--';
+        let lateness = '--';
+
+        if (dayAtt) {
+            status = dayAtt.status || 'not_marked';
+            if (status === 'present') {
+                countPresent++;
+                checkin = dayAtt.time || '--';
+                if (dayAtt.lateness) {
+                    countLate++;
+                    lateness = dayAtt.lateness;
+                }
+            } else if (status === 'vacation') {
+                countVacation++;
+            } else if (status === 'absent') {
+                countAbsent++;
+            }
+        }
+
+        const dayOfWeekNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const dayName = dayOfWeekNames[d.getDay()];
+
+        monthGroups[monthKey].push({
+            date: dateKey,
+            dayName: dayName,
+            status: status,
+            checkin: checkin,
+            lateness: lateness
+        });
+    }
+
+    const totalMarkedDays = countPresent + countVacation + countAbsent;
+    const attRate = totalMarkedDays > 0 ? Math.round((countPresent / (countPresent + countAbsent)) * 100) : 100;
+
+    if (summaryEl) {
+        summaryEl.innerHTML = `
+            <div class="stat-box" style="background:var(--card-bg); border:1px solid var(--border-color); padding:12px; border-radius:10px; text-align:center;">
+                <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">✔️ ${isAr ? 'أيام الحضور' : 'Present Days'}</div>
+                <div style="font-size:1.4rem; font-weight:800; color:var(--success);">${countPresent}</div>
+            </div>
+            <div class="stat-box" style="background:var(--card-bg); border:1px solid var(--border-color); padding:12px; border-radius:10px; text-align:center;">
+                <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">🌴 ${isAr ? 'أيام الإجازة' : 'Vacation Days'}</div>
+                <div style="font-size:1.4rem; font-weight:800; color:#0284c7;">${countVacation}</div>
+            </div>
+            <div class="stat-box" style="background:var(--card-bg); border:1px solid var(--border-color); padding:12px; border-radius:10px; text-align:center;">
+                <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">❌ ${isAr ? 'أيام الغياب' : 'Absent Days'}</div>
+                <div style="font-size:1.4rem; font-weight:800; color:var(--danger);">${countAbsent}</div>
+            </div>
+            <div class="stat-box" style="background:var(--card-bg); border:1px solid var(--border-color); padding:12px; border-radius:10px; text-align:center;">
+                <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">⚠️ ${isAr ? 'مرات التأخر' : 'Late Times'}</div>
+                <div style="font-size:1.4rem; font-weight:800; color:#d97706;">${countLate}</div>
+            </div>
+            <div class="stat-box" style="background:var(--card-bg); border:1px solid var(--border-color); padding:12px; border-radius:10px; text-align:center;">
+                <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">📈 ${isAr ? 'نسبة الحضور' : 'Attendance Rate'}</div>
+                <div style="font-size:1.4rem; font-weight:800; color:var(--primary);">${isNaN(attRate) ? 100 : attRate}%</div>
+            </div>
+        `;
+    }
+
+    if (detailsEl) {
+        detailsEl.innerHTML = '';
+
+        const monthKeysSorted = Object.keys(monthGroups).sort().reverse();
+        monthKeysSorted.forEach(mKey => {
+            const daysList = monthGroups[mKey].reverse();
+            let rowsHtml = '';
+
+            daysList.forEach(day => {
+                let badge = `<span class="badge" style="background:var(--input-bg); color:var(--text-muted);">${isAr ? 'لم يُسجل' : 'Not Marked'}</span>`;
+                if (day.status === 'present') {
+                    badge = `<span class="badge badge-good">✔️ ${isAr ? 'حاضر' : 'Present'}</span>`;
+                } else if (day.status === 'vacation') {
+                    badge = `<span class="badge" style="background:#0284c7; color:white;">🌴 ${isAr ? 'إجازة' : 'Vacation'}</span>`;
+                } else if (day.status === 'absent') {
+                    badge = `<span class="badge badge-bad">❌ ${isAr ? 'غائب' : 'Absent'}</span>`;
+                }
+
+                let lateBadge = '--';
+                if (day.lateness && day.lateness !== '--') {
+                    lateBadge = `<span style="color:var(--danger); font-weight:700;">⚠️ ${day.lateness}</span>`;
+                } else if (day.status === 'present') {
+                    lateBadge = `<span style="color:var(--success); font-weight:600;">✅ ${isAr ? 'في الوقت' : 'On Time'}</span>`;
+                }
+
+                const editTimeBtn = `<button onclick="editWorkerPastAttendanceTime('${workerId}', '${day.date}', '${day.checkin}', '${day.status}')" class="btn-outline" style="padding:2px 8px; font-size:0.75rem; font-weight:600; cursor:pointer;" title="${isAr ? 'تعديل الوقت والحالة' : 'Manage Time & Status'}">✏️ ${isAr ? 'تعديل' : 'Edit'}</button>`;
+
+                rowsHtml += `
+                    <tr>
+                        <td style="font-weight:600;">${day.date} (${(typeof t === 'function' && t(day.dayName)) || day.dayName})</td>
+                        <td>${badge}</td>
+                        <td style="font-family:monospace; text-align:center;">
+                            <div style="display:inline-flex; align-items:center; gap:8px; justify-content:center;">
+                                <span>${day.checkin}</span>
+                                ${editTimeBtn}
+                            </div>
+                        </td>
+                        <td>${lateBadge}</td>
+                    </tr>
+                `;
+            });
+
+            detailsEl.innerHTML += `
+                <div class="card" style="margin-bottom:0; padding:16px; border:1px solid var(--border-color); border-radius:12px;">
+                    <h3 style="margin-bottom:12px; font-size:1.05rem; color:var(--primary);">🗓️ ${mKey}</h3>
+                    <div class="table-container" style="max-height:220px; overflow-y:auto;">
+                        <table style="width:100%; font-size:0.85rem;">
+                            <thead>
+                                <tr>
+                                    <th>${isAr ? 'التاريخ واليوم' : 'Date & Day'}</th>
+                                    <th>${isAr ? 'الحالة' : 'Status'}</th>
+                                    <th>${isAr ? 'وقت الدخول' : 'Check-In'}</th>
+                                    <th>${isAr ? 'التأخر' : 'Lateness'}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rowsHtml}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    modal.style.display = 'flex';
+}
+
+function close3MonthAttendanceReport() {
+    const modal = document.getElementById('modal-3month-attendance-report');
+    if (modal) modal.style.display = 'none';
+}
+window.showWorker3MonthAttendanceReport = showWorker3MonthAttendanceReport;
+window.close3MonthAttendanceReport = close3MonthAttendanceReport;
 
 // --- ACTIVITY LOG SYSTEM ---
 
@@ -4496,15 +4789,196 @@ function addReminder() {
 }
 window.addReminder = addReminder;
 
+let currentRemindersLimit = 20;
+let isRemindersInfiniteScrollAttached = false;
+
+function setupRemindersInfiniteScroll() {
+    if (isRemindersInfiniteScrollAttached) return;
+    isRemindersInfiniteScrollAttached = true;
+
+    window.addEventListener('scroll', () => {
+        const remindersView = document.getElementById('view-reminders');
+        if (!remindersView || remindersView.style.display === 'none') return;
+
+        const scrollTop = window.scrollY || document.documentElement.scrollTop;
+        const windowHeight = window.innerHeight;
+        const docHeight = document.documentElement.scrollHeight;
+
+        if (scrollTop + windowHeight >= docHeight - 350) {
+            const companyData = getCompanyData();
+            const remindersObj = companyData.reminders || {};
+            const totalReminders = Object.keys(remindersObj).length;
+
+            if (currentRemindersLimit < totalReminders) {
+                currentRemindersLimit += 20;
+                renderReminders();
+            }
+        }
+    });
+}
+
+function loadMoreReminders() {
+    currentRemindersLimit += 20;
+    renderReminders();
+}
+window.loadMoreReminders = loadMoreReminders;
+window.setupRemindersInfiniteScroll = setupRemindersInfiniteScroll;
+
+function toggleLeadTimeChip(el) {
+    const cb = el.querySelector('input[type="checkbox"]');
+    if (cb) {
+        cb.checked = !cb.checked;
+        if (cb.checked) {
+            el.classList.add('active');
+        } else {
+            el.classList.remove('active');
+        }
+    }
+}
+window.toggleLeadTimeChip = toggleLeadTimeChip;
+
+function editWorkerPastAttendanceTime(workerId, dateStr, currentCheckin, currentStatus) {
+    const modal = document.getElementById('modal-edit-past-attendance');
+    if (!modal) return;
+
+    document.getElementById('edit-past-att-worker-id').value = workerId;
+    document.getElementById('edit-past-att-date-str').value = dateStr;
+    document.getElementById('edit-past-att-date-display').textContent = `${dateStr}`;
+
+    const statusSelect = document.getElementById('edit-past-att-status-select');
+    if (statusSelect) {
+        statusSelect.value = currentStatus && currentStatus !== 'not_marked' ? currentStatus : 'present';
+    }
+
+    const timePicker = document.getElementById('edit-past-att-time-picker');
+    if (timePicker) {
+        let defaultTime = '09:00';
+        if (currentCheckin && currentCheckin !== '--') {
+            const timeParts = currentCheckin.match(/\d{2}:\d{2}/);
+            if (timeParts) defaultTime = timeParts[0];
+        }
+        timePicker.value = defaultTime;
+    }
+
+    onEditPastAttStatusChange();
+    modal.style.display = 'flex';
+}
+window.editWorkerPastAttendanceTime = editWorkerPastAttendanceTime;
+
+function closeEditPastAttendanceModal() {
+    const modal = document.getElementById('modal-edit-past-attendance');
+    if (modal) modal.style.display = 'none';
+}
+window.closeEditPastAttendanceModal = closeEditPastAttendanceModal;
+
+function onEditPastAttStatusChange() {
+    const statusSelect = document.getElementById('edit-past-att-status-select');
+    const timeGroup = document.getElementById('edit-past-att-time-group');
+    if (statusSelect && timeGroup) {
+        timeGroup.style.display = statusSelect.value === 'present' ? 'block' : 'none';
+    }
+}
+window.onEditPastAttStatusChange = onEditPastAttStatusChange;
+
+function savePastAttendanceEdit() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const workerId = document.getElementById('edit-past-att-worker-id').value;
+    const dateStr = document.getElementById('edit-past-att-date-str').value;
+    const status = document.getElementById('edit-past-att-status-select').value;
+    const timeVal = document.getElementById('edit-past-att-time-picker').value;
+
+    if (!workerId || !dateStr) return;
+
+    const companyData = getCompanyData();
+    const workers = companyData.workers || [];
+    const worker = workers.find(w => w.id === workerId);
+    let lateness = '';
+
+    if (status === 'present' && timeVal && worker) {
+        let shiftStart = worker.startTime || '09:00';
+        const dateParts = dateStr.split('-');
+        const dateObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const dayOfWeekName = dayNames[dateObj.getDay()];
+        const dateOverrideShift = (worker.shifts || []).find(s => s.dayOfWeek === dayOfWeekName || s.specificDate === dateStr);
+        if (dateOverrideShift) {
+            shiftStart = dateOverrideShift.startTime;
+        }
+        if (typeof calculateLateness === 'function') {
+            lateness = calculateLateness(shiftStart, timeVal) || '';
+        }
+    }
+
+    const attObj = {
+        status: status,
+        time: status === 'present' ? timeVal : '',
+        lateness: lateness,
+        updatedAt: Date.now(),
+        updatedBy: currentUser ? (currentUser.email || 'Admin') : 'Admin'
+    };
+
+    db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}`).set(attObj)
+        .then(() => {
+            closeEditPastAttendanceModal();
+            if (typeof showInAppNotification === 'function') {
+                showInAppNotification(isAr ? `تم تحديث الحضور ليوم ${dateStr} بنجاح!` : `Attendance updated for ${dateStr}!`);
+            }
+            showWorker3MonthAttendanceReport(workerId);
+            if (typeof renderAttendance === 'function') renderAttendance();
+            if (typeof renderSummaryTable === 'function') renderSummaryTable();
+            if (typeof renderFinanceTable === 'function') renderFinanceTable();
+        })
+        .catch(err => alert("Error updating attendance: " + err.message));
+}
+window.savePastAttendanceEdit = savePastAttendanceEdit;
+
+function togglePendingPaymentRequests() {
+    const card = document.getElementById('pending-payment-requests-card');
+    if (card) {
+        card.style.display = card.style.display === 'none' ? 'block' : 'none';
+    }
+}
+window.togglePendingPaymentRequests = togglePendingPaymentRequests;
+
+function togglePendingCustodyRequests() {
+    const card = document.getElementById('pending-custody-requests-card');
+    if (card) {
+        card.style.display = card.style.display === 'none' ? 'block' : 'none';
+    }
+}
+window.togglePendingCustodyRequests = togglePendingCustodyRequests;
+
+function toggleAddReminderForm() {
+    const formCard = document.getElementById('card-add-reminder');
+    if (formCard) {
+        formCard.style.display = formCard.style.display === 'none' ? 'block' : 'none';
+    }
+}
+window.toggleAddReminderForm = toggleAddReminderForm;
+
 function getReminderCycleLabel(cycle, isAr) {
-    if (!cycle || cycle === 'none') return isAr ? 'مرة واحدة' : 'One-time';
+    if (!cycle || cycle === 'none') return isAr ? '📌 مرة واحدة' : '📌 One-time';
     switch (cycle) {
-        case 'daily': return isAr ? '🔄 تكرار يومي' : '🔄 Daily Cycle';
-        case 'weekly': return isAr ? '🔄 تكرار أسبوعي' : '🔄 Weekly Cycle';
-        case 'monthly': return isAr ? '🔄 تكرار شهري' : '🔄 Monthly Cycle';
-        case 'quarterly': return isAr ? '🔄 كل 3 أشهر' : '🔄 Quarterly (3m)';
-        case 'half_yearly': return isAr ? '🔄 كل 6 أشهر' : '🔄 Half-Yearly (6m)';
-        case 'yearly': return isAr ? '🔄 تكرار سنوي (كل 1 سنة)' : '🔄 Yearly (1 Year)';
+        case 'daily': return isAr ? '🔄 يومياً' : '🔄 Daily';
+        case 'weekly': return isAr ? '🔄 أسبوعياً' : '🔄 Weekly';
+        case 'monthly': return isAr ? '🔄 شهرياً' : '🔄 Monthly';
+        case 'quarterly': return isAr ? '🔄 كل 3 أشهر' : '🔄 Every 3 Months';
+        case 'half_yearly': return isAr ? '🔄 كل 6 أشهر' : '🔄 Every 6 Months';
+        case 'yearly': case '1year': case '1years': return isAr ? '🔄 كل 1 سنة' : '🔄 Every 1 Year';
+        case '2years': return isAr ? '🔄 كل سنتين' : '🔄 Every 2 Years';
+        case '3years': return isAr ? '🔄 كل 3 سنوات' : '🔄 Every 3 Years';
+        case '4years': return isAr ? '🔄 كل 4 سنوات' : '🔄 Every 4 Years';
+        case '5years': return isAr ? '🔄 كل 5 سنوات' : '🔄 Every 5 Years';
+        case '6years': return isAr ? '🔄 كل 6 سنوات' : '🔄 Every 6 Years';
+        case '7years': return isAr ? '🔄 كل 7 سنوات' : '🔄 Every 7 Years';
+        case '8years': return isAr ? '🔄 كل 8 سنوات' : '🔄 Every 8 Years';
+        case '9years': return isAr ? '🔄 كل 9 سنوات' : '🔄 Every 9 Years';
+        case '10years': return isAr ? '🔄 كل 10 سنوات' : '🔄 Every 10 Years';
+        case '11years': return isAr ? '🔄 كل 11 سنة' : '🔄 Every 11 Years';
+        case '12years': return isAr ? '🔄 كل 12 سنة' : '🔄 Every 12 Years';
+        case '13years': return isAr ? '🔄 كل 13 سنة' : '🔄 Every 13 Years';
+        case '14years': return isAr ? '🔄 كل 14 سنة' : '🔄 Every 14 Years';
+        case '15years': return isAr ? '🔄 كل 15 سنة' : '🔄 Every 15 Years';
         default: return isAr ? '🔄 تكرار مخصص' : '🔄 Recurring';
     }
 }
@@ -4582,19 +5056,40 @@ function renderReminders() {
     const container = document.getElementById('reminders-list-container');
     if (!container) return;
 
+    if (typeof setupRemindersInfiniteScroll === 'function') {
+        setupRemindersInfiniteScroll();
+    }
+
     const isAr = currentAppLang === 'ar';
     const companyData = getCompanyData();
     const remindersObj = companyData.reminders || {};
     const now = Date.now();
 
-    const remindersList = Object.values(remindersObj).sort((a, b) => (a.deadlineMs || 0) - (b.deadlineMs || 0));
+    const searchInput = document.getElementById('reminders-search-input');
+    if (searchInput && !searchInput.dataset.bound) {
+        searchInput.dataset.bound = 'true';
+        searchInput.addEventListener('input', () => {
+            currentRemindersLimit = 20;
+            renderReminders();
+        });
+    }
+    const searchQuery = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+    let remindersList = Object.values(remindersObj).sort((a, b) => (a.deadlineMs || 0) - (b.deadlineMs || 0));
+
+    if (searchQuery) {
+        remindersList = remindersList.filter(r =>
+            (r.title && r.title.toLowerCase().includes(searchQuery)) ||
+            (r.note && r.note.toLowerCase().includes(searchQuery))
+        );
+    }
 
     const countBadge = document.getElementById('reminders-count-badge');
     if (countBadge) {
         countBadge.textContent = `${remindersList.length} ${isAr ? 'تذكير نشط' : 'Active'}`;
     }
 
-    // Check Due Reminders for Alert Banner based on leadTimes and deadline
+    // Check Due Reminders for Alert Banner
     const dueReminders = remindersList.filter(r => r.deadlineMs && isReminderAlerting(r, now));
     const banner = document.getElementById('reminders-due-banner');
     const bannerText = document.getElementById('reminders-due-text');
@@ -4610,12 +5105,14 @@ function renderReminders() {
     }
 
     if (remindersList.length === 0) {
-        container.innerHTML = `<p style="text-align:center; color:var(--text-muted); padding:30px; font-size:0.9rem;">${isAr ? 'لا توجد تذكيرات مضافة بعد. استخدم النموذج لإضافة تذكير جديد.' : 'No reminders found. Use the form to add a new reminder.'}</p>`;
+        container.innerHTML = `<p style="text-align:center; color:var(--text-muted); padding:30px; font-size:0.9rem; width:100%;">${isAr ? 'لا توجد تذكيرات مضافة بعد. استخدم النموذج لإضافة تذكير جديد.' : 'No reminders found. Use the form to add a new reminder.'}</p>`;
         return;
     }
 
     container.innerHTML = '';
-    remindersList.forEach(r => {
+    const itemsToRender = remindersList.slice(0, currentRemindersLimit);
+
+    itemsToRender.forEach(r => {
         const isDue = r.deadlineMs <= now;
         const diffMs = (r.deadlineMs || 0) - now;
         const daysLeft = diffMs / (1000 * 60 * 60 * 24);
@@ -4628,46 +5125,80 @@ function renderReminders() {
 
         const cycleText = getReminderCycleLabel(r.cycle, isAr);
         const cycleBadge = r.cycle && r.cycle !== 'none'
-            ? `<span class="badge" style="background: rgba(37,99,235,0.15); color: #2563eb; border: 1px solid rgba(37,99,235,0.3); font-size: 0.76rem; font-weight: 800;">${cycleText}${r.completedCycles ? ` (${isAr ? 'الدورة' : 'Cycle'} #${r.completedCycles})` : ''}</span>`
-            : `<span class="badge" style="background: rgba(100,116,139,0.12); color: var(--text-muted); font-size: 0.74rem;">📌 ${isAr ? 'تذكير لمرة واحدة' : 'One-time'}</span>`;
+            ? `<span class="badge" style="background: rgba(37,99,235,0.15); color: #2563eb; border: 1px solid rgba(37,99,235,0.3); font-size: 0.74rem; font-weight: 800;">${cycleText}${r.completedCycles ? ` (#${r.completedCycles})` : ''}</span>`
+            : `<span class="badge" style="background: rgba(100,116,139,0.12); color: var(--text-muted); font-size: 0.74rem;">📌 ${isAr ? 'مرة واحدة' : 'One-time'}</span>`;
 
-        const finishBtn = `<button onclick="completeReminderCycle('${r.id}')" class="btn-success" style="padding:6px 14px; font-size:0.84rem; border-radius:8px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:6px; box-shadow: 0 2px 8px rgba(16,185,129,0.3); transition: all 0.2s ease;" title="${isAr ? 'إنجاز التذكير وتجديد الدورة' : 'Finish Reminder / Advance Cycle'}">
-            ✅ ${isAr ? 'تم الإنجاز (Finished)' : 'Finished'}
+        const markDoneBtn = `<button onclick="markReminderDoneFinal('${r.id}')" class="btn-success" style="padding:6px 12px; font-size:0.8rem; border-radius:8px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:5px; box-shadow: 0 2px 8px rgba(16,185,129,0.3);" title="${isAr ? 'إنجاز وإنهاء التذكير بالكامل' : 'Mark Completed & Remove'}">
+            ✅ ${isAr ? 'تم الإنجاز (Done)' : 'Done'}
         </button>`;
 
-        const sendTaskBtn = `<button onclick="convertReminderToTask('${r.id}')" class="btn-outline" style="padding:5px 12px; font-size:0.8rem; border-radius:8px; border:1px solid var(--secondary); color:var(--secondary); font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:5px;" title="${isAr ? 'إرسال كمهمة' : 'Send as Task'}">📋 ${isAr ? 'إرسال كمهمة' : 'Send as Task'}</button>`;
+        const repeatCycleBtn = r.cycle && r.cycle !== 'none' ? `<button onclick="completeReminderCycle('${r.id}')" class="btn-primary" style="padding:6px 12px; font-size:0.8rem; border-radius:8px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:5px; background:linear-gradient(135deg, #2563eb, #1d4ed8);" title="${isAr ? 'إنجاز وتجديد الدورة التكرارية القادمة' : 'Done + Repeat Next Cycle'}">
+            🔄 ${isAr ? 'إنجاز + تكرار الدورة' : 'Done + Repeat'}
+        </button>` : '';
+
+        const sendTaskBtn = `<button onclick="convertReminderToTask('${r.id}')" class="btn-outline" style="padding:5px 10px; font-size:0.75rem; border-radius:8px; border:1px solid var(--secondary); color:var(--secondary); font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" title="${isAr ? 'تحويل لمهمة' : 'As Task'}">📋 ${isAr ? 'مهمة' : 'Task'}</button>`;
 
         container.innerHTML += `
-            <div class="ledger-card" style="border:${theme.border}; background:${theme.bg}; padding:16px; margin-bottom:0; border-radius:12px; transition: all 0.2s ease;">
-                <div class="flex-between" style="align-items:flex-start;">
-                    <div>
-                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                            <strong style="font-size:1.1rem; color:var(--text-main);">${r.title}</strong>
-                            ${theme.badge}
-                            ${cycleBadge}
-                        </div>
-                        <div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">
-                            🕒 ${isAr ? 'موعد الاستحقاق:' : 'Deadline:'} <strong>${deadlineStr}</strong>
-                        </div>
-                        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">
-                            🔔 ${isAr ? 'التنبيهات قبل الموعد:' : 'Alert lead times:'} <strong>${activeLeadStr || 'None'}</strong>
-                        </div>
-                    </div>
-                    <div style="display:flex; gap:6px; align-items:center;">
-                        <button onclick="openEditReminderModal('${r.id}')" style="background:none; border:none; color:var(--secondary); cursor:pointer; font-size:1.1rem; padding:4px;" title="${isAr ? 'تعديل' : 'Edit'}">✏️</button>
-                        <button onclick="deleteReminder('${r.id}')" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:1.2rem; padding:4px;" title="${isAr ? 'حذف' : 'Delete'}">✖</button>
+            <div class="reminder-leaderboard-row" style="border:${theme.border}; background:${theme.bg};">
+                <!-- Col 1: Title, Status Badge & Cycle -->
+                <div style="min-width:0;">
+                    <strong style="font-size:1.05rem; color:var(--text-main); display:block; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${r.title}</strong>
+                    <div style="display:flex; gap:6px; margin-top:4px; flex-wrap:wrap; align-items:center;">
+                        ${theme.badge}
+                        ${cycleBadge}
                     </div>
                 </div>
-                ${r.note ? `<div style="font-size:0.85rem; margin-top:8px; padding-top:8px; border-top:1px dashed var(--border-color); color:var(--text-main);">📝 <em>${r.note}</em></div>` : ''}
-                <div style="display:flex; justify-content:flex-end; margin-top:12px; gap:8px; flex-wrap:wrap; align-items:center;">
-                    ${finishBtn}
+
+                <!-- Col 2: Complete Description / Note -->
+                <div style="min-width:0; color:var(--text-main); font-size:0.88rem; line-height:1.4; word-break:break-word;">
+                    ${r.note ? `📝 <em>${r.note}</em>` : `<span style="color:var(--text-muted); font-size:0.8rem;">${isAr ? 'بدون وصف إضافي' : 'No extra description'}</span>`}
+                </div>
+
+                <!-- Col 3: Deadline & Alerts -->
+                <div style="min-width:0; font-size:0.82rem; color:var(--text-muted);">
+                    <div>🕒 <strong>${deadlineStr}</strong></div>
+                    <div style="font-size:0.75rem; margin-top:2px;">🔔 ${isAr ? 'تنبيه:' : 'Alert:'} <strong>${activeLeadStr || 'None'}</strong></div>
+                </div>
+
+                <!-- Col 4: Action Buttons Cluster -->
+                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
+                    ${markDoneBtn}
+                    ${repeatCycleBtn}
                     ${sendTaskBtn}
+                    <button onclick="openEditReminderModal('${r.id}')" class="btn-outline" style="padding:5px 8px; font-size:0.85rem;" title="${isAr ? 'تعديل' : 'Edit'}">✏️</button>
+                    <button onclick="deleteReminder('${r.id}')" class="btn-danger" style="padding:5px 8px; font-size:0.85rem;" title="${isAr ? 'حذف' : 'Delete'}">✖</button>
                 </div>
             </div>
         `;
     });
+
+    if (remindersList.length > currentRemindersLimit) {
+        const remainingCount = remindersList.length - currentRemindersLimit;
+        const autoScrollIndicatorHtml = `
+            <div id="reminders-auto-scroll-indicator" style="text-align:center; width:100%; padding:14px 0; margin-top:10px; color:var(--text-muted); font-size:0.85rem; font-weight:700;">
+                ⌛ ${isAr ? `جاري تحميل المزيد من التذكيرات تلقائياً عند التمرير... (متبقي ${remainingCount})` : `Auto-loading more reminders on scroll... (${remainingCount} remaining)`}
+            </div>
+        `;
+        container.innerHTML += autoScrollIndicatorHtml;
+    }
 }
 window.renderReminders = renderReminders;
+
+function markReminderDoneFinal(remId) {
+    const isAr = currentAppLang === 'ar';
+    if (!confirm(isAr ? 'هل أنت تأكد من إنجاز هذا التذكير بالكامل وإزالته؟' : 'Are you sure you want to mark this reminder completed and remove it?')) {
+        return;
+    }
+    db.ref(`companies/${currentCompany}/reminders/${remId}`).remove()
+        .then(() => {
+            if (typeof showInAppNotification === 'function') {
+                showInAppNotification(isAr ? 'تم إنجاز التذكير وإزالته بنجاح!' : 'Reminder completed & removed!');
+            }
+            renderReminders();
+        })
+        .catch(err => console.error("Error removing reminder:", err));
+}
+window.markReminderDoneFinal = markReminderDoneFinal;
 
 function completeReminderCycle(remId) {
     const isAr = currentAppLang === 'ar';
@@ -4713,9 +5244,23 @@ function completeReminderCycle(remId) {
         case 'half_yearly':
             baseDate.setMonth(baseDate.getMonth() + 6);
             break;
-        case 'yearly':
+        case 'yearly': case '1year': case '1years':
             baseDate.setFullYear(baseDate.getFullYear() + 1);
             break;
+        case '2years': baseDate.setFullYear(baseDate.getFullYear() + 2); break;
+        case '3years': baseDate.setFullYear(baseDate.getFullYear() + 3); break;
+        case '4years': baseDate.setFullYear(baseDate.getFullYear() + 4); break;
+        case '5years': baseDate.setFullYear(baseDate.getFullYear() + 5); break;
+        case '6years': baseDate.setFullYear(baseDate.getFullYear() + 6); break;
+        case '7years': baseDate.setFullYear(baseDate.getFullYear() + 7); break;
+        case '8years': baseDate.setFullYear(baseDate.getFullYear() + 8); break;
+        case '9years': baseDate.setFullYear(baseDate.getFullYear() + 9); break;
+        case '10years': baseDate.setFullYear(baseDate.getFullYear() + 10); break;
+        case '11years': baseDate.setFullYear(baseDate.getFullYear() + 11); break;
+        case '12years': baseDate.setFullYear(baseDate.getFullYear() + 12); break;
+        case '13years': baseDate.setFullYear(baseDate.getFullYear() + 13); break;
+        case '14years': baseDate.setFullYear(baseDate.getFullYear() + 14); break;
+        case '15years': baseDate.setFullYear(baseDate.getFullYear() + 15); break;
         default:
             baseDate.setDate(baseDate.getDate() + 1);
     }
@@ -4802,6 +5347,11 @@ function openEditReminderModal(remId) {
     const leadTimes = r.leadTimes || ['1_2d', '5d', '10d', '15d', '1m'];
     document.querySelectorAll('.edit-rem-lead-cb').forEach(cb => {
         cb.checked = leadTimes.includes(cb.value);
+        const parentLabel = cb.closest('.lead-time-chip');
+        if (parentLabel) {
+            if (cb.checked) parentLabel.classList.add('active');
+            else parentLabel.classList.remove('active');
+        }
     });
 
     const modal = document.getElementById('edit-reminder-modal');

@@ -1417,11 +1417,11 @@ function renderAll() {
             renderSelectedWorkerSysViolations();
         }
     }
-    else if (currentTab === 'ranks') { renderRanksTable(); }
+    else if (currentTab === 'ranks') { renderRanksTable(); renderLeaderboard(); }
     else if (currentTab === 'attendance') { renderAttendance(); }
     else if (currentTab === 'tasks') { renderTasks(); }
     else if (currentTab === 'finance') { renderFinanceTable(); renderFinDetails(); renderFinanceSpendArea(); }
-    else if (currentTab === 'summary') { renderSummaryTable(); renderLeaderboard(); }
+    else if (currentTab === 'summary') { renderSummaryTable(); }
     else if (currentTab === 'drivers') { renderDriversList(); renderDriverPanel(); renderDriverVolumeRewards(); }
     else if (currentTab === 'adverts') { renderAdverts(); }
     else if (currentTab === 'notes') { renderNotes(); }

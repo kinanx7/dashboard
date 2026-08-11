@@ -2092,6 +2092,9 @@ function switchTab(tab) {
     if (!isLocked) {
         renderAll();
         if (tab === 'reminders' && typeof renderReminders === 'function') {
+            if (typeof currentRemindersLimit !== 'undefined') {
+                currentRemindersLimit = 20;
+            }
             renderReminders();
         }
         if (tab === 'market' && typeof renderMarket === 'function') {
@@ -2311,6 +2314,9 @@ function switchTab(tab) {
     if (!isLocked) {
         renderAll();
         if (tab === 'reminders' && typeof renderReminders === 'function') {
+            if (typeof currentRemindersLimit !== 'undefined') {
+                currentRemindersLimit = 20;
+            }
             renderReminders();
         }
         if (tab === 'market' && typeof renderMarket === 'function') {

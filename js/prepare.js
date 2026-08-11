@@ -2069,13 +2069,14 @@ function renderVaultNotes() {
     const grid = document.getElementById('vault-notes-grid');
     if (!grid) return;
 
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
     const notesObj = data.vaultNotes || {};
     let notes = Object.values(notesObj);
 
     const statTotal = document.getElementById('vault-stat-total');
     if (statTotal) {
-        statTotal.textContent = `${notes.length} Item${notes.length === 1 ? '' : 's'}`;
+        statTotal.textContent = isAr ? `${notes.length} عنصر` : `${notes.length} Item${notes.length === 1 ? '' : 's'}`;
     }
 
     // Search input filtering
@@ -2102,11 +2103,15 @@ function renderVaultNotes() {
     notes.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
     if (notes.length === 0) {
+        const emptyTitle = isAr ? 'لا توجد ملاحظات أو وثائق معلومات' : 'No Information Notes Found';
+        const emptyDesc = q 
+            ? (isAr ? 'لا توجد عناصر تطابق البحث. حاول تغيير نص البحث.' : 'No items match your search filter. Try clearing the search box.') 
+            : (isAr ? 'انقر فوق "إضافة ملاحظة معلومات جديدة" أعلاه لرفع رخص المركبات، العقود، كلمات السر، أو الأوراق الرسمية.' : 'Click "Add New Note" above to upload vehicle licenses, contracts, passwords, or official documents.');
         grid.innerHTML = `
             <div style="grid-column: 1 / -1; text-align: center; padding: 50px 20px; background: var(--input-bg); border-radius: 20px; border: 2px dashed var(--border-color);">
                 <div style="font-size: 3.5rem; margin-bottom: 14px;">📁</div>
-                <h3 style="font-size: 1.2rem; color: var(--text-main); margin-bottom: 8px; font-weight: 900;">No Information Notes Found</h3>
-                <p style="color: var(--text-muted); font-size: 0.92rem; max-width: 450px; margin: 0 auto; line-height: 1.6;">${q ? 'No items match your search filter. Try clearing the search box.' : 'Click "Add New Note" above to upload vehicle licenses, contracts, passwords, or official documents.'}</p>
+                <h3 style="font-size: 1.2rem; color: var(--text-main); margin-bottom: 8px; font-weight: 900;">${emptyTitle}</h3>
+                <p style="color: var(--text-muted); font-size: 0.92rem; max-width: 450px; margin: 0 auto; line-height: 1.6;">${emptyDesc}</p>
             </div>
         `;
         return;
@@ -2120,9 +2125,17 @@ function renderVaultNotes() {
         General: 'background: linear-gradient(135deg, #64748b, #334155); color: white;'
     };
 
+    const catBadgeLabels = {
+        Vehicle: isAr ? '🚗 مركبات ورخص' : 'Vehicle',
+        Contracts: isAr ? '📜 عقود ووثائق' : 'Contracts',
+        Passwords: isAr ? '🔑 كلمات سر' : 'Passwords',
+        Documents: isAr ? '🆔 ثبوتيات' : 'Documents',
+        General: isAr ? '📌 عامة' : 'General'
+    };
+
     const countBadge = document.getElementById('vault-count-badge');
     if (countBadge) {
-        countBadge.textContent = `${notes.length} Item${notes.length === 1 ? '' : 's'}`;
+        countBadge.textContent = isAr ? `${notes.length} عنصر` : `${notes.length} Item${notes.length === 1 ? '' : 's'}`;
     }
 
     grid.style.display = 'grid';
@@ -2131,11 +2144,12 @@ function renderVaultNotes() {
     grid.style.width = '100%';
 
     grid.innerHTML = notes.map(n => {
-        const dateStr = n.createdAt ? new Date(n.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+        const dateStr = n.createdAt ? new Date(n.createdAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
         const badgeStyle = catBadgeStyles[n.category] || catBadgeStyles.General;
+        const badgeLabel = catBadgeLabels[n.category] || (n.category || (isAr ? 'عامة' : 'General'));
         const safeTitle = typeof escapeHtml === 'function' ? escapeHtml(n.title) : (n.title || '');
         const safeText = typeof escapeHtml === 'function' ? escapeHtml(n.text) : (n.text || '');
-        const safeCreatedBy = typeof escapeHtml === 'function' ? escapeHtml(n.createdBy || 'Admin') : (n.createdBy || 'Admin');
+        const safeCreatedBy = typeof escapeHtml === 'function' ? escapeHtml(n.createdBy || (isAr ? 'المدير' : 'Admin')) : (n.createdBy || (isAr ? 'المدير' : 'Admin'));
 
         return `
             <div class="ledger-card" style="
@@ -2175,7 +2189,7 @@ function renderVaultNotes() {
                                 font-size: 0.72rem;
                                 font-weight: 800;
                                 backdrop-filter: blur(4px);
-                            ">🔍 Zoom</div>
+                            ">${isAr ? '🔍 تكبير' : '🔍 Zoom'}</div>
                         </div>
                     ` : ''}
 
@@ -2183,13 +2197,13 @@ function renderVaultNotes() {
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; gap: 8px;">
                         <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
                             <span style="${badgeStyle} display: inline-block; width: fit-content; padding: 3px 8px; border-radius: 14px; font-weight: 800; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px;">
-                                ${n.category || 'General'}
+                                ${badgeLabel}
                             </span>
                             <strong style="font-size: 1.05rem; color: var(--text-main); word-break: break-word; line-height: 1.3;">${safeTitle}</strong>
                         </div>
                         <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
-                            <button type="button" onclick="copyVaultText('${n.id}')" title="Copy Text" style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: var(--text-main);">📋 Copy</button>
-                            <button type="button" onclick="deleteVaultNote('${n.id}')" title="Delete Note" style="background: rgba(220, 38, 38, 0.1); border: 1px solid rgba(220, 38, 38, 0.25); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: var(--danger);">🗑️</button>
+                            <button type="button" onclick="copyVaultText('${n.id}')" title="${isAr ? 'نسخ النص' : 'Copy Text'}" style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: var(--text-main);">${isAr ? '📋 نسخ' : '📋 Copy'}</button>
+                            <button type="button" onclick="deleteVaultNote('${n.id}')" title="${isAr ? 'حذف الملاحظة' : 'Delete Note'}" style="background: rgba(220, 38, 38, 0.1); border: 1px solid rgba(220, 38, 38, 0.25); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: var(--danger);">🗑️</button>
                         </div>
                     </div>
 

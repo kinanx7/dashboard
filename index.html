@@ -1264,6 +1264,151 @@
                         </table>
                     </div>
                 </div>
+
+                <!-- Leaderboard Card (Moved to Ranks Section) -->
+                <div class="card" style="margin-top: 24px;">
+                    <div class="grid-2-col" style="gap: 24px; width: 100%;">
+
+                        <!-- General Leaderboard Column -->
+                        <div>
+                            <h2 class="card-title" data-i18n="title-general-leaderboard">🏆 Monthly Employee Leaderboard
+                            </h2>
+                            <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom: 20px;"
+                                data-i18n="desc-general-leaderboard">Based on performance score and completed task
+                                points.</p>
+
+                            <!-- Podium Layout (Gold, Silver, Bronze) -->
+                            <div
+                                style="display:flex; justify-content:center; align-items:flex-end; gap:10px; padding:15px 0; margin-bottom:15px; border-bottom:1px solid var(--border-color);">
+                                <!-- 2nd Place -->
+                                <div style="display:flex; flex-direction:column; align-items:center; width:80px;">
+                                    <div id="podium-2-avatar" style="font-size:1.8rem; margin-bottom:5px;">🥈</div>
+                                    <div id="podium-2-name"
+                                        style="font-weight:700; font-size:0.85rem; color:var(--text-main); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:80px;">
+                                        —</div>
+                                    <div id="podium-2-score" style="font-size:0.75rem; color:var(--text-muted);">—</div>
+                                    <div
+                                        style="width:60px; height:60px; background:#cbd5e1; border-top-left-radius:6px; border-top-right-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.2rem; color:#64748b;">
+                                        2</div>
+                                </div>
+                                <!-- 1st Place -->
+                                <div style="display:flex; flex-direction:column; align-items:center; width:90px;">
+                                    <div id="podium-1-avatar" style="font-size:2.2rem; margin-bottom:5px;">🥇</div>
+                                    <div id="podium-1-name"
+                                        style="font-weight:800; font-size:0.95rem; color:var(--primary); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:90px;">
+                                        —</div>
+                                    <div id="podium-1-score"
+                                        style="font-size:0.8rem; font-weight:700; color:var(--text-main);">—</div>
+                                    <div
+                                        style="width:70px; height:90px; background:#fef08a; border-top-left-radius:6px; border-top-right-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:1.6rem; color:#ca8a04; border:1.5px solid #facc15;">
+                                        1</div>
+                                </div>
+                                <!-- 3rd Place -->
+                                <div style="display:flex; flex-direction:column; align-items:center; width:80px;">
+                                    <div id="podium-3-avatar" style="font-size:1.8rem; margin-bottom:5px;">🥉</div>
+                                    <div id="podium-3-name"
+                                        style="font-weight:700; font-size:0.85rem; color:var(--text-main); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:80px;">
+                                        —</div>
+                                    <div id="podium-3-score" style="font-size:0.75rem; color:var(--text-muted);">—</div>
+                                    <div
+                                        style="width:60px; height:45px; background:#fed7aa; border-top-left-radius:6px; border-top-right-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.1rem; color:#b45309;">
+                                        3</div>
+                                </div>
+                            </div>
+
+                            <!-- Ranks List -->
+                            <div id="leaderboard-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+                        </div>
+
+                        <!-- Delivery Leaderboard Column -->
+                        <div>
+                            <h2 class="card-title" data-i18n="title-delivery-leaderboard">🚚 Delivery Leaderboard</h2>
+                            <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom: 20px;"
+                                data-i18n="desc-delivery-leaderboard">Driver rankings based strictly on the number of
+                                completed deliveries.</p>
+
+                            <!-- Driver Podium Layout -->
+                            <div
+                                style="display:flex; justify-content:center; align-items:flex-end; gap:10px; padding:15px 0; margin-bottom:15px; border-bottom:1px solid var(--border-color);">
+                                <!-- 2nd Place Driver -->
+                                <div style="display:flex; flex-direction:column; align-items:center; width:80px;">
+                                    <div id="podium-drv-2-avatar" style="font-size:1.8rem; margin-bottom:5px;">🥈</div>
+                                    <div id="podium-drv-2-name"
+                                        style="font-weight:700; font-size:0.85rem; color:var(--text-main); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:80px;">
+                                        —</div>
+                                    <div id="podium-drv-2-score" style="font-size:0.75rem; color:var(--text-muted);">—
+                                    </div>
+                                    <div
+                                        style="width:60px; height:60px; background:#cbd5e1; border-top-left-radius:6px; border-top-right-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.2rem; color:#64748b;">
+                                        2</div>
+                                </div>
+                                <!-- 1st Place Driver -->
+                                <div style="display:flex; flex-direction:column; align-items:center; width:90px;">
+                                    <div id="podium-drv-1-avatar" style="font-size:2.2rem; margin-bottom:5px;">🥇</div>
+                                    <div id="podium-drv-1-name"
+                                        style="font-weight:800; font-size:0.95rem; color:var(--primary); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:90px;">
+                                        —</div>
+                                    <div id="podium-drv-1-score"
+                                        style="font-size:0.8rem; font-weight:700; color:var(--text-main);">—</div>
+                                    <div
+                                        style="width:70px; height:90px; background:#fef08a; border-top-left-radius:6px; border-top-right-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:1.6rem; color:#ca8a04; border:1.5px solid #facc15;">
+                                        1</div>
+                                </div>
+                                <!-- 3rd Place Driver -->
+                                <div style="display:flex; flex-direction:column; align-items:center; width:80px;">
+                                    <div id="podium-drv-3-avatar" style="font-size:1.8rem; margin-bottom:5px;">🥉</div>
+                                    <div id="podium-drv-3-name"
+                                        style="font-weight:700; font-size:0.85rem; color:var(--text-main); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:80px;">
+                                        —</div>
+                                    <div id="podium-drv-3-score" style="font-size:0.75rem; color:var(--text-muted);">—
+                                    </div>
+                                    <div
+                                        style="width:60px; height:45px; background:#fed7aa; border-top-left-radius:6px; border-top-right-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.1rem; color:#b45309;">
+                                        3</div>
+                                </div>
+                            </div>
+
+                            <!-- Driver List -->
+                            <div id="driver-leaderboard-list" style="display:flex; flex-direction:column; gap:8px;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Leaderboard Points Rules Configuration (Admin Only) -->
+                <div class="card admin-only" style="margin-top: 24px;">
+                    <div class="card-header-flex">
+                        <h2 class="card-title in-flex">⚙️ Leaderboard Point Rules Configuration</h2>
+                    </div>
+                    <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom: 16px;">
+                        Customize the exact points awarded to workers for attendance, task completions, and driver deliveries.
+                    </p>
+                    <form onsubmit="event.preventDefault(); saveRankingSettings();" style="margin:0; padding:0; background:transparent; border:none; box-shadow:none;">
+                        <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 16px;">
+                            <div class="form-group">
+                                <label style="font-size:0.8rem;">📅 Attendance Point (per day)</label>
+                                <input type="number" id="rank-pts-attendance" value="5" min="0" step="1" required />
+                            </div>
+                            <div class="form-group">
+                                <label style="font-size:0.8rem;">⏰ On-Time Check-In Bonus</label>
+                                <input type="number" id="rank-pts-ontime" value="2" min="0" step="1" required />
+                            </div>
+                            <div class="form-group">
+                                <label style="font-size:0.8rem;">📋 Normal Task Point</label>
+                                <input type="number" id="rank-pts-normal-task" value="10" min="0" step="1" required />
+                            </div>
+                            <div class="form-group">
+                                <label style="font-size:0.8rem;">🔴 High / Urgent Task Point</label>
+                                <input type="number" id="rank-pts-urgent-task" value="20" min="0" step="1" required />
+                            </div>
+                            <div class="form-group">
+                                <label style="font-size:0.8rem;">🚚 Delivery Point (per order)</label>
+                                <input type="number" id="rank-pts-delivery" value="15" min="0" step="1" required />
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-primary" style="padding: 10px 20px;">💾 Save Point Rules</button>
+                    </form>
+                </div>
             </div>
 
             <!-- ========================================== -->
@@ -2021,8 +2166,24 @@
 
                 <!-- Main Content: Financial Table & Export -->
                 <div>
-                    <!-- Pending Payment Requests Card -->
-                    <div class="card finance-admin" style="border-top: 4px solid var(--warning); margin-bottom: 24px;">
+                    <!-- Separate Toggle Buttons for Pending Requests -->
+                    <div class="finance-admin" style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom: 20px;">
+                        <button onclick="togglePendingPaymentRequests()" class="btn-outline" style="flex:1; min-width:220px; padding: 12px 16px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; border: 1.5px dashed var(--warning); color: var(--text-main); background: var(--input-bg); border-radius: 12px; cursor: pointer;">
+                            <span style="display:flex; align-items:center; gap:8px;">
+                                <span>💳 Pending Payment Requests</span>
+                            </span>
+                            <span id="pending-pay-count-badge" class="badge" style="background:var(--warning); color:white; font-weight:800; font-size:0.8rem;">0 Pending</span>
+                        </button>
+                        <button onclick="togglePendingCustodyRequests()" class="btn-outline" style="flex:1; min-width:220px; padding: 12px 16px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; border: 1.5px dashed #f59e0b; color: var(--text-main); background: var(--input-bg); border-radius: 12px; cursor: pointer;">
+                            <span style="display:flex; align-items:center; gap:8px;">
+                                <span>📦 Pending Custody Requests</span>
+                            </span>
+                            <span id="pending-custody-count-badge" class="badge" style="background:#f59e0b; color:white; font-weight:800; font-size:0.8rem;">0 Pending</span>
+                        </button>
+                    </div>
+
+                    <!-- Pending Payment Requests Card (Hidden by Default) -->
+                    <div id="pending-payment-requests-card" class="card finance-admin" style="display:none; border-top: 4px solid var(--warning); margin-bottom: 20px;">
                         <h2 class="card-title" data-i18n="title-pending-requests">Pending Payment Requests</h2>
                         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;"
                             data-i18n="desc-pending-requests">
@@ -2034,8 +2195,8 @@
                         </div>
                     </div>
 
-                    <!-- Pending Custody Requests Card -->
-                    <div class="card finance-admin" style="border-top: 4px solid #f59e0b; margin-bottom: 24px;">
+                    <!-- Pending Custody Requests Card (Hidden by Default) -->
+                    <div id="pending-custody-requests-card" class="card finance-admin" style="display:none; border-top: 4px solid #f59e0b; margin-bottom: 20px;">
                         <h2 class="card-title" data-i18n="title-pending-custody-requests">Pending Custody Requests</h2>
                         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;"
                             data-i18n="desc-pending-custody-requests">
@@ -2163,115 +2324,7 @@
                     </div>
                 </div>
 
-                <!-- Leaderboard Card -->
-                <div class="card" style="margin-top: 24px;">
-                    <div class="grid-2-col" style="gap: 24px; width: 100%;">
 
-                        <!-- General Leaderboard Column -->
-                        <div>
-                            <h2 class="card-title" data-i18n="title-general-leaderboard">🏆 Monthly Employee Leaderboard
-                            </h2>
-                            <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom: 20px;"
-                                data-i18n="desc-general-leaderboard">Based on performance score and completed task
-                                points.</p>
-
-                            <!-- Podium Layout (Gold, Silver, Bronze) -->
-                            <div
-                                style="display:flex; justify-content:center; align-items:flex-end; gap:10px; padding:15px 0; margin-bottom:15px; border-bottom:1px solid var(--border-color);">
-                                <!-- 2nd Place -->
-                                <div style="display:flex; flex-direction:column; align-items:center; width:80px;">
-                                    <div id="podium-2-avatar" style="font-size:1.8rem; margin-bottom:5px;">🥈</div>
-                                    <div id="podium-2-name"
-                                        style="font-weight:700; font-size:0.85rem; color:var(--text-main); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:80px;">
-                                        —</div>
-                                    <div id="podium-2-score" style="font-size:0.75rem; color:var(--text-muted);">—</div>
-                                    <div
-                                        style="width:60px; height:60px; background:#cbd5e1; border-top-left-radius:6px; border-top-right-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.2rem; color:#64748b;">
-                                        2</div>
-                                </div>
-                                <!-- 1st Place -->
-                                <div style="display:flex; flex-direction:column; align-items:center; width:90px;">
-                                    <div id="podium-1-avatar" style="font-size:2.2rem; margin-bottom:5px;">🥇</div>
-                                    <div id="podium-1-name"
-                                        style="font-weight:800; font-size:0.95rem; color:var(--primary); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:90px;">
-                                        —</div>
-                                    <div id="podium-1-score"
-                                        style="font-size:0.8rem; font-weight:700; color:var(--text-main);">—</div>
-                                    <div
-                                        style="width:70px; height:90px; background:#fef08a; border-top-left-radius:6px; border-top-right-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:1.6rem; color:#ca8a04; border:1.5px solid #facc15;">
-                                        1</div>
-                                </div>
-                                <!-- 3rd Place -->
-                                <div style="display:flex; flex-direction:column; align-items:center; width:80px;">
-                                    <div id="podium-3-avatar" style="font-size:1.8rem; margin-bottom:5px;">🥉</div>
-                                    <div id="podium-3-name"
-                                        style="font-weight:700; font-size:0.85rem; color:var(--text-main); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:80px;">
-                                        —</div>
-                                    <div id="podium-3-score" style="font-size:0.75rem; color:var(--text-muted);">—</div>
-                                    <div
-                                        style="width:60px; height:45px; background:#fed7aa; border-top-left-radius:6px; border-top-right-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.1rem; color:#b45309;">
-                                        3</div>
-                                </div>
-                            </div>
-
-                            <!-- Ranks List -->
-                            <div id="leaderboard-list" style="display:flex; flex-direction:column; gap:8px;"></div>
-                        </div>
-
-                        <!-- Delivery Leaderboard Column -->
-                        <div>
-                            <h2 class="card-title" data-i18n="title-delivery-leaderboard">🚚 Delivery Leaderboard</h2>
-                            <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom: 20px;"
-                                data-i18n="desc-delivery-leaderboard">Driver rankings based strictly on the number of
-                                completed deliveries.</p>
-
-                            <!-- Driver Podium Layout -->
-                            <div
-                                style="display:flex; justify-content:center; align-items:flex-end; gap:10px; padding:15px 0; margin-bottom:15px; border-bottom:1px solid var(--border-color);">
-                                <!-- 2nd Place Driver -->
-                                <div style="display:flex; flex-direction:column; align-items:center; width:80px;">
-                                    <div id="podium-drv-2-avatar" style="font-size:1.8rem; margin-bottom:5px;">🥈</div>
-                                    <div id="podium-drv-2-name"
-                                        style="font-weight:700; font-size:0.85rem; color:var(--text-main); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:80px;">
-                                        —</div>
-                                    <div id="podium-drv-2-score" style="font-size:0.75rem; color:var(--text-muted);">—
-                                    </div>
-                                    <div
-                                        style="width:60px; height:60px; background:#cbd5e1; border-top-left-radius:6px; border-top-right-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.2rem; color:#64748b;">
-                                        2</div>
-                                </div>
-                                <!-- 1st Place Driver -->
-                                <div style="display:flex; flex-direction:column; align-items:center; width:90px;">
-                                    <div id="podium-drv-1-avatar" style="font-size:2.2rem; margin-bottom:5px;">🥇</div>
-                                    <div id="podium-drv-1-name"
-                                        style="font-weight:800; font-size:0.95rem; color:var(--primary); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:90px;">
-                                        —</div>
-                                    <div id="podium-drv-1-score"
-                                        style="font-size:0.8rem; font-weight:700; color:var(--text-main);">—</div>
-                                    <div
-                                        style="width:70px; height:90px; background:#fef08a; border-top-left-radius:6px; border-top-right-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:1.6rem; color:#ca8a04; border:1.5px solid #facc15;">
-                                        1</div>
-                                </div>
-                                <!-- 3rd Place Driver -->
-                                <div style="display:flex; flex-direction:column; align-items:center; width:80px;">
-                                    <div id="podium-drv-3-avatar" style="font-size:1.8rem; margin-bottom:5px;">🥉</div>
-                                    <div id="podium-drv-3-name"
-                                        style="font-weight:700; font-size:0.85rem; color:var(--text-main); text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:80px;">
-                                        —</div>
-                                    <div id="podium-drv-3-score" style="font-size:0.75rem; color:var(--text-muted);">—
-                                    </div>
-                                    <div
-                                        style="width:60px; height:45px; background:#fed7aa; border-top-left-radius:6px; border-top-right-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.1rem; color:#b45309;">
-                                        3</div>
-                                </div>
-                            </div>
-
-                            <!-- Driver List -->
-                            <div id="driver-leaderboard-list" style="display:flex; flex-direction:column; gap:8px;">
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <div id="view-adverts" class="view-section">
@@ -3009,10 +3062,20 @@
                     </div>
                 </div>
 
-                <div style="display: flex; flex-direction: column; gap: 24px; width: 100%;">
-                    <!-- Add New Reminder Card -->
-                    <div class="card"
-                        style="border-top: 4px solid var(--primary); width: 100%; box-sizing: border-box;">
+                <div style="display: flex; flex-direction: column; gap: 20px; width: 100%;">
+                    <!-- Top Action & Search Bar for Reminders -->
+                    <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+                        <button onclick="toggleAddReminderForm()" class="btn-primary" style="padding:10px 18px; font-weight:700; display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+                            <span>➕ Add New Reminder</span>
+                        </button>
+                        <div style="flex:1; min-width:240px;">
+                            <input type="text" id="reminders-search-input" oninput="renderReminders()" placeholder="🔍 Search reminders by title or details..." style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.9rem; box-sizing:border-box;" />
+                        </div>
+                    </div>
+
+                    <!-- Add New Reminder Card (Hidden by Default) -->
+                    <div id="card-add-reminder" class="card"
+                        style="display:none; border-top: 4px solid var(--primary); width: 100%; box-sizing: border-box;">
                         <h2 class="card-title" data-i18n="title-add-reminder">⏰ Add New Reminder</h2>
                         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;"
                             data-i18n="desc-add-reminder">Set a recurring reminder for installments, renewals, or
@@ -3045,47 +3108,55 @@
                                         <option value="quarterly">📅 Every 3 Months (كل 3 أشهر)</option>
                                         <option value="half_yearly">📅 Every 6 Months (كل 6 أشهر)</option>
                                         <option value="yearly">📅 Every 1 Year (كل سنة)</option>
+                                        <option value="2years">📅 Every 2 Years (كل سنتين)</option>
+                                        <option value="3years">📅 Every 3 Years (كل 3 سنوات)</option>
+                                        <option value="4years">📅 Every 4 Years (كل 4 سنوات)</option>
+                                        <option value="5years">📅 Every 5 Years (كل 5 سنوات)</option>
+                                        <option value="6years">📅 Every 6 Years (كل 6 سنوات)</option>
+                                        <option value="7years">📅 Every 7 Years (كل 7 سنوات)</option>
+                                        <option value="8years">📅 Every 8 Years (كل 8 سنوات)</option>
+                                        <option value="9years">📅 Every 9 Years (كل 9 سنوات)</option>
+                                        <option value="10years">📅 Every 10 Years (كل 10 سنوات)</option>
+                                        <option value="11years">📅 Every 11 Years (كل 11 سنة)</option>
+                                        <option value="12years">📅 Every 12 Years (كل 12 سنة)</option>
+                                        <option value="13years">📅 Every 13 Years (كل 13 سنة)</option>
+                                        <option value="14years">📅 Every 14 Years (كل 14 سنة)</option>
+                                        <option value="15years">📅 Every 15 Years (كل 15 سنة)</option>
                                     </select>
                                 </div>
                             </div>
 
                             <div class="form-group" style="margin-bottom: 16px;">
                                 <label
-                                    style="font-weight: 700; color: var(--text-main); display: block; margin-bottom: 6px;"
-                                    data-i18n="label-reminder-lead-times">
-                                    🔔 Remind Me Before Deadline (Check all options that apply):
+                                    style="font-weight: 700; color: var(--text-main); display: block; margin-bottom: 8px;"
+                                    data-i18n="label-reminder-leadtime">
+                                    🔔 Remind Me Before Deadline (Select lead time alerts):
                                 </label>
-                                <div
-                                    style="display: flex; flex-wrap: wrap; gap: 10px; background: var(--input-bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
-                                    <label
-                                        style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-main);">
-                                        <input type="checkbox" id="rem-opt-1-2d" class="rem-lead-cb" value="1_2d"
-                                            checked style="accent-color: var(--primary);">
-                                        <span>🔴 1 & 2 days before</span>
+                                <div class="lead-time-chips-container">
+                                    <label class="lead-time-chip active" onclick="toggleLeadTimeChip(this)">
+                                        <input type="checkbox" id="rem-opt-1-2d" class="rem-lead-cb" value="1_2d" checked>
+                                        <span class="chip-icon">🔴</span>
+                                        <span data-i18n="leadtime-1_2d">1 & 2 days before</span>
                                     </label>
-                                    <label
-                                        style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-main);">
-                                        <input type="checkbox" id="rem-opt-5d" class="rem-lead-cb" value="5d" checked
-                                            style="accent-color: var(--primary);">
-                                        <span>🟡 5 days before</span>
+                                    <label class="lead-time-chip active" onclick="toggleLeadTimeChip(this)">
+                                        <input type="checkbox" id="rem-opt-5d" class="rem-lead-cb" value="5d" checked>
+                                        <span class="chip-icon">🟡</span>
+                                        <span data-i18n="leadtime-5d">5 days before</span>
                                     </label>
-                                    <label
-                                        style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-main);">
-                                        <input type="checkbox" id="rem-opt-10d" class="rem-lead-cb" value="10d" checked
-                                            style="accent-color: var(--primary);">
-                                        <span>🔵 10 days before</span>
+                                    <label class="lead-time-chip active" onclick="toggleLeadTimeChip(this)">
+                                        <input type="checkbox" id="rem-opt-10d" class="rem-lead-cb" value="10d" checked>
+                                        <span class="chip-icon">🔵</span>
+                                        <span data-i18n="leadtime-10d">10 days before</span>
                                     </label>
-                                    <label
-                                        style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-main);">
-                                        <input type="checkbox" id="rem-opt-15d" class="rem-lead-cb" value="15d"
-                                            style="accent-color: var(--primary);">
-                                        <span>🔵 15 days before</span>
+                                    <label class="lead-time-chip" onclick="toggleLeadTimeChip(this)">
+                                        <input type="checkbox" id="rem-opt-15d" class="rem-lead-cb" value="15d">
+                                        <span class="chip-icon">🔵</span>
+                                        <span data-i18n="leadtime-15d">15 days before</span>
                                     </label>
-                                    <label
-                                        style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-main);">
-                                        <input type="checkbox" id="rem-opt-1m" class="rem-lead-cb" value="1m"
-                                            style="accent-color: var(--primary);">
-                                        <span>🔵 1 month before</span>
+                                    <label class="lead-time-chip" onclick="toggleLeadTimeChip(this)">
+                                        <input type="checkbox" id="rem-opt-1m" class="rem-lead-cb" value="1m">
+                                        <span class="chip-icon">🔵</span>
+                                        <span data-i18n="leadtime-1m">1 month before</span>
                                     </label>
                                 </div>
                             </div>
@@ -3518,19 +3589,20 @@
                     <div>
                         <h2 class="card-title"
                             style="margin:0; border:none; padding:0; display:flex; align-items:center; gap:10px;">
-                            <span>📁 Admin Information & Document Vault</span>
+                            <span data-i18n="title-vault-main">📁 Admin Information & Document Vault</span>
                             <span id="vault-count-badge" class="badge"
                                 style="background: rgba(99,102,241,0.15); color: #6366f1; border: 1px solid rgba(99,102,241,0.3); font-size: 0.78rem; font-weight: 800; padding: 4px 12px; border-radius: 20px;">0
                                 Items</span>
                         </h2>
-                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; font-weight: 600;">
+                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; font-weight: 600;"
+                            data-i18n="desc-vault-main">
                             Store, organize & search confidential documents, car licenses, contracts, passwords, photos,
                             and notes.
                         </div>
                     </div>
                     <button type="button" onclick="toggleVaultAddForm()" class="btn-primary"
                         style="padding: 10px 20px; border-radius: 12px; font-weight: 800; background: linear-gradient(135deg, #6366f1, #4f46e5); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-                        <span>➕ Add New Information Note</span>
+                        <span data-i18n="btn-add-vault-note">➕ Add New Information Note</span>
                     </button>
                 </div>
 
@@ -3541,7 +3613,7 @@
                         style="margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
                         <h3
                             style="font-size: 1.05rem; font-weight: 800; color: var(--text-main); margin:0; display:flex; align-items:center; gap:8px;">
-                            <span>📝 Upload New Information / Document</span>
+                            <span data-i18n="title-upload-vault-note">📝 Upload New Information / Document</span>
                         </h3>
                         <button type="button" onclick="toggleVaultAddForm()"
                             style="background:transparent; border:none; color:var(--text-muted); font-weight:800; font-size:1.2rem; cursor:pointer;">✕</button>
@@ -3550,47 +3622,49 @@
                     <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 14px;">
                         <div>
                             <label
-                                style="font-weight: 800; font-size: 0.82rem; color: var(--text-main); margin-bottom: 6px; display: block;">Title
-                                / Document Name *</label>
+                                style="font-weight: 800; font-size: 0.82rem; color: var(--text-main); margin-bottom: 6px; display: block;"
+                                data-i18n="label-vault-title">Title / Document Name *</label>
                             <input type="text" id="vault-note-title"
                                 placeholder="e.g. Car License - Hilux, Commercial CR, Wifi Password"
+                                data-i18n="[placeholder]placeholder-vault-title"
                                 style="width:100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-weight: 700; font-size: 0.9rem;">
                         </div>
                         <div>
                             <label
-                                style="font-weight: 800; font-size: 0.82rem; color: var(--text-main); margin-bottom: 6px; display: block;">Category
-                                / Tag</label>
+                                style="font-weight: 800; font-size: 0.82rem; color: var(--text-main); margin-bottom: 6px; display: block;"
+                                data-i18n="label-vault-category">Category / Tag</label>
                             <select id="vault-note-category"
                                 style="width:100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-weight: 700; font-size: 0.9rem;">
-                                <option value="Vehicle">🚗 Vehicle / License (استمارة/رخصة)</option>
-                                <option value="Contracts">📜 Contracts & Legal (عقود ووثائق)</option>
-                                <option value="Passwords">🔑 Passwords & Credentials (كلمات سر)</option>
-                                <option value="Documents">🆔 IDs & Official Papers (ثبوتيات)</option>
-                                <option value="General" selected>📌 General Information (معلومات عامة)</option>
+                                <option value="Vehicle" data-i18n="opt-vault-cat-vehicle">🚗 Vehicle / License (استمارة/رخصة)</option>
+                                <option value="Contracts" data-i18n="opt-vault-cat-contracts">📜 Contracts & Legal (عقود ووثائق)</option>
+                                <option value="Passwords" data-i18n="opt-vault-cat-passwords">🔑 Passwords & Credentials (كلمات سر)</option>
+                                <option value="Documents" data-i18n="opt-vault-cat-documents">🆔 IDs & Official Papers (ثبوتيات)</option>
+                                <option value="General" selected data-i18n="opt-vault-cat-general">📌 General Information (معلومات عامة)</option>
                             </select>
                         </div>
                     </div>
 
                     <div style="margin-bottom: 14px;">
                         <label
-                            style="font-weight: 800; font-size: 0.82rem; color: var(--text-main); margin-bottom: 6px; display: block;">Notes
-                            / Description / Details</label>
+                            style="font-weight: 800; font-size: 0.82rem; color: var(--text-main); margin-bottom: 6px; display: block;"
+                            data-i18n="label-vault-text">Notes / Description / Details</label>
                         <textarea id="vault-note-text" rows="3"
                             placeholder="Write plate numbers, renewal dates, passwords, or detailed text notes here..."
+                            data-i18n="[placeholder]placeholder-vault-text"
                             style="width:100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-weight: 600; font-size: 0.9rem; font-family: inherit; line-height: 1.5;"></textarea>
                     </div>
 
                     <div style="margin-bottom: 18px;">
                         <label
-                            style="font-weight: 800; font-size: 0.82rem; color: var(--text-main); margin-bottom: 6px; display: block;">📷
-                            Upload Image / License Photo (Optional)</label>
+                            style="font-weight: 800; font-size: 0.82rem; color: var(--text-main); margin-bottom: 6px; display: block;"
+                            data-i18n="label-vault-image">📷 Upload Image / License Photo (Optional)</label>
                         <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
                             <input type="file" id="vault-note-image-file" accept="image/*"
                                 onchange="handleVaultImagePreview(event)"
                                 style="padding: 10px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); flex:1; min-width:220px;">
                             <button type="button" id="vault-clear-img-btn" onclick="clearVaultImagePreview()"
-                                style="display:none; padding:10px 16px; border-radius:10px; background:rgba(220, 38, 38, 0.15); border:1px solid rgba(220, 38, 38, 0.3); color:var(--danger); font-weight:800; font-size:0.85rem; cursor:pointer;">✕
-                                Remove Photo</button>
+                                style="display:none; padding:10px 16px; border-radius:10px; background:rgba(220, 38, 38, 0.15); border:1px solid rgba(220, 38, 38, 0.3); color:var(--danger); font-weight:800; font-size:0.85rem; cursor:pointer;"
+                                data-i18n="btn-vault-clear-img">✕ Remove Photo</button>
                         </div>
                         <div id="vault-img-preview-container" style="display:none; margin-top:12px;">
                             <img id="vault-img-preview"
@@ -3600,10 +3674,11 @@
 
                     <div style="display:flex; justify-content:flex-end; gap:12px;">
                         <button type="button" onclick="toggleVaultAddForm()" class="btn-neutral"
-                            style="padding:10px 20px; border-radius:10px; font-weight:800;">Cancel</button>
+                            style="padding:10px 20px; border-radius:10px; font-weight:800;"
+                            data-i18n="btn-cancel">Cancel</button>
                         <button type="button" onclick="postVaultNote()" class="btn-success"
-                            style="padding:10px 24px; border-radius:10px; font-weight:800; background:linear-gradient(135deg,#10b981,#059669); color:white; border:none; cursor:pointer; box-shadow:0 2px 8px rgba(16,185,129,0.3);">🔒
-                            Save Information Note</button>
+                            style="padding:10px 24px; border-radius:10px; font-weight:800; background:linear-gradient(135deg,#10b981,#059669); color:white; border:none; cursor:pointer; box-shadow:0 2px 8px rgba(16,185,129,0.3);"
+                            data-i18n="btn-save-vault-note">🔒 Save Information Note</button>
                     </div>
                 </div>
 
@@ -3613,6 +3688,7 @@
                     <div style="flex:1; min-width:220px; position:relative;">
                         <input type="text" id="vault-search-input" onkeyup="renderVaultNotes()"
                             placeholder="🔍 Search documents, licenses, plate numbers..."
+                            data-i18n="[placeholder]placeholder-vault-search"
                             style="width:100%; padding: 10px 14px 10px 38px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-weight: 700; font-size: 0.9rem;">
                         <span
                             style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 1rem; color: var(--text-muted); pointer-events: none;">🔍</span>
@@ -3621,28 +3697,28 @@
                     <div style="display:flex; gap:6px; flex-wrap:wrap;" id="vault-category-filters">
                         <button type="button" onclick="setVaultCategoryFilter('ALL')"
                             class="btn-vault-filter active-vault-filter" data-cat="ALL"
-                            style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:1px solid var(--border-color); background:#6366f1; color:white; cursor:pointer;">All
-                            Notes</button>
+                            style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:1px solid var(--border-color); background:#6366f1; color:white; cursor:pointer;"
+                            data-i18n="filter-vault-all">All Notes</button>
                         <button type="button" onclick="setVaultCategoryFilter('Vehicle')" class="btn-vault-filter"
                             data-cat="Vehicle"
-                            style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:1px solid var(--border-color); background:transparent; color:var(--text-main); cursor:pointer;">🚗
-                            Vehicles</button>
+                            style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:1px solid var(--border-color); background:transparent; color:var(--text-main); cursor:pointer;"
+                            data-i18n="filter-vault-vehicle">🚗 Vehicles</button>
                         <button type="button" onclick="setVaultCategoryFilter('Contracts')" class="btn-vault-filter"
                             data-cat="Contracts"
-                            style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:1px solid var(--border-color); background:transparent; color:var(--text-main); cursor:pointer;">📜
-                            Contracts</button>
+                            style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:1px solid var(--border-color); background:transparent; color:var(--text-main); cursor:pointer;"
+                            data-i18n="filter-vault-contracts">📜 Contracts</button>
                         <button type="button" onclick="setVaultCategoryFilter('Passwords')" class="btn-vault-filter"
                             data-cat="Passwords"
-                            style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:1px solid var(--border-color); background:transparent; color:var(--text-main); cursor:pointer;">🔑
-                            Passwords</button>
+                            style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:1px solid var(--border-color); background:transparent; color:var(--text-main); cursor:pointer;"
+                            data-i18n="filter-vault-passwords">🔑 Passwords</button>
                         <button type="button" onclick="setVaultCategoryFilter('Documents')" class="btn-vault-filter"
                             data-cat="Documents"
-                            style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:1px solid var(--border-color); background:transparent; color:var(--text-main); cursor:pointer;">🆔
-                            IDs</button>
+                            style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:1px solid var(--border-color); background:transparent; color:var(--text-main); cursor:pointer;"
+                            data-i18n="filter-vault-documents">🆔 IDs</button>
                         <button type="button" onclick="setVaultCategoryFilter('General')" class="btn-vault-filter"
                             data-cat="General"
-                            style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:1px solid var(--border-color); background:transparent; color:var(--text-main); cursor:pointer;">📌
-                            General</button>
+                            style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:1px solid var(--border-color); background:transparent; color:var(--text-main); cursor:pointer;"
+                            data-i18n="filter-vault-general">📌 General</button>
                     </div>
                 </div>
 
@@ -3873,45 +3949,53 @@
                         <option value="quarterly">📅 Every 3 Months (كل 3 أشهر)</option>
                         <option value="half_yearly">📅 Every 6 Months (كل 6 أشهر)</option>
                         <option value="yearly">📅 Every 1 Year (كل سنة)</option>
+                        <option value="2years">📅 Every 2 Years (كل سنتين)</option>
+                        <option value="3years">📅 Every 3 Years (كل 3 سنوات)</option>
+                        <option value="4years">📅 Every 4 Years (كل 4 سنوات)</option>
+                        <option value="5years">📅 Every 5 Years (كل 5 سنوات)</option>
+                        <option value="6years">📅 Every 6 Years (كل 6 سنوات)</option>
+                        <option value="7years">📅 Every 7 Years (كل 7 سنوات)</option>
+                        <option value="8years">📅 Every 8 Years (كل 8 سنوات)</option>
+                        <option value="9years">📅 Every 9 Years (كل 9 سنوات)</option>
+                        <option value="10years">📅 Every 10 Years (كل 10 سنوات)</option>
+                        <option value="11years">📅 Every 11 Years (كل 11 سنة)</option>
+                        <option value="12years">📅 Every 12 Years (كل 12 سنة)</option>
+                        <option value="13years">📅 Every 13 Years (كل 13 سنة)</option>
+                        <option value="14years">📅 Every 14 Years (كل 14 سنة)</option>
+                        <option value="15years">📅 Every 15 Years (كل 15 سنة)</option>
                     </select>
                 </div>
 
                 <div class="form-group" style="margin-bottom: 16px;">
-                    <label style="font-weight: 700; color: var(--text-main); display: block; margin-bottom: 6px;"
+                    <label style="font-weight: 700; color: var(--text-main); display: block; margin-bottom: 8px;"
                         data-i18n="label-reminder-lead-times">
-                        🔔 Remind Me Before Deadline (Check all options that apply):
+                        🔔 Remind Me Before Deadline (Select lead time alerts):
                     </label>
-                    <div
-                        style="display: flex; flex-wrap: wrap; gap: 10px; background: var(--input-bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
-                        <label
-                            style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-main);">
-                            <input type="checkbox" id="edit-rem-opt-1-2d" class="edit-rem-lead-cb" value="1_2d"
-                                style="accent-color: var(--primary);">
-                            <span>🔴 1 & 2 days before</span>
+                    <div class="lead-time-chips-container">
+                        <label class="lead-time-chip" onclick="toggleLeadTimeChip(this)">
+                            <input type="checkbox" id="edit-rem-opt-1-2d" class="edit-rem-lead-cb" value="1_2d">
+                            <span class="chip-icon">🔴</span>
+                            <span>1 & 2 days before</span>
                         </label>
-                        <label
-                            style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-main);">
-                            <input type="checkbox" id="edit-rem-opt-5d" class="edit-rem-lead-cb" value="5d"
-                                style="accent-color: var(--primary);">
-                            <span>🟡 5 days before</span>
+                        <label class="lead-time-chip" onclick="toggleLeadTimeChip(this)">
+                            <input type="checkbox" id="edit-rem-opt-5d" class="edit-rem-lead-cb" value="5d">
+                            <span class="chip-icon">🟡</span>
+                            <span>5 days before</span>
                         </label>
-                        <label
-                            style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-main);">
-                            <input type="checkbox" id="edit-rem-opt-10d" class="edit-rem-lead-cb" value="10d"
-                                style="accent-color: var(--primary);">
-                            <span>🔵 10 days before</span>
+                        <label class="lead-time-chip" onclick="toggleLeadTimeChip(this)">
+                            <input type="checkbox" id="edit-rem-opt-10d" class="edit-rem-lead-cb" value="10d">
+                            <span class="chip-icon">🔵</span>
+                            <span>10 days before</span>
                         </label>
-                        <label
-                            style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-main);">
-                            <input type="checkbox" id="edit-rem-opt-15d" class="edit-rem-lead-cb" value="15d"
-                                style="accent-color: var(--primary);">
-                            <span>🔵 15 days before</span>
+                        <label class="lead-time-chip" onclick="toggleLeadTimeChip(this)">
+                            <input type="checkbox" id="edit-rem-opt-15d" class="edit-rem-lead-cb" value="15d">
+                            <span class="chip-icon">🔵</span>
+                            <span>15 days before</span>
                         </label>
-                        <label
-                            style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-main);">
-                            <input type="checkbox" id="edit-rem-opt-1m" class="edit-rem-lead-cb" value="1m"
-                                style="accent-color: var(--primary);">
-                            <span>🔵 1 month before</span>
+                        <label class="lead-time-chip" onclick="toggleLeadTimeChip(this)">
+                            <input type="checkbox" id="edit-rem-opt-1m" class="edit-rem-lead-cb" value="1m">
+                            <span class="chip-icon">🔵</span>
+                            <span>1 month before</span>
                         </label>
                     </div>
                 </div>
@@ -4618,18 +4702,79 @@
 
     <script defer src="translations.js"></script>
     <!-- Modularized Core & Feature Scripts -->
-    <script defer src="js/core.js?v=67"></script>
-    <script defer src="js/auth.js?v=67"></script>
-    <script defer src="js/adverts_notes.js?v=67"></script>
-    <script defer src="js/sales_costs.js?v=67"></script>
-    <script defer src="js/warehouse.js?v=67"></script>
-    <script defer src="js/tasks.js?v=67"></script>
-    <script defer src="js/drivers.js?v=67"></script>
-    <script defer src="js/ops.js?v=67"></script>
-    <script defer src="js/finance.js?v=67"></script>
-    <script defer src="js/market.js?v=67"></script>
-    <script defer src="js/prepare.js?v=67"></script>
-</body>
+    <script defer src="js/core.js?v=78"></script>
+    <script defer src="js/auth.js?v=78"></script>
+    <script defer src="js/adverts_notes.js?v=78"></script>
+    <script defer src="js/sales_costs.js?v=78"></script>
+    <script defer src="js/warehouse.js?v=78"></script>
+    <script defer src="js/tasks.js?v=78"></script>
+    <script defer src="js/drivers.js?v=78"></script>
+    <script defer src="js/ops.js?v=78"></script>
+    <script defer src="js/finance.js?v=78"></script>
+    <script defer src="js/market.js?v=78"></script>
+    <script defer src="js/prepare.js?v=78"></script>
+    <!-- 3-Month Attendance Report Modal -->
+    <div id="modal-3month-attendance-report" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.65); backdrop-filter:blur(4px); display:none; justify-content:center; align-items:center; z-index:999999;">
+        <div class="modal-content" style="max-width: 850px; width: 95%; max-height: 88vh; overflow-y: auto; border-radius: 16px; padding: 24px; background:var(--card-bg); box-shadow:0 10px 40px rgba(0,0,0,0.5); margin:auto;">
+            <div class="flex-between" style="border-bottom: 1px solid var(--border-color); padding-bottom: 14px; margin-bottom: 16px;">
+                <div>
+                    <h2 style="margin:0; font-size:1.3rem; color:var(--text-main);" id="att-report-worker-name">📊 3-Month Attendance Report</h2>
+                    <span style="font-size:0.85rem; color:var(--text-muted);" id="att-report-date-range">Last 90 Days</span>
+                </div>
+                <button onclick="close3MonthAttendanceReport()" class="btn-neutral" style="padding:4px 10px; font-size:1.1rem; border:none; background:transparent; cursor:pointer;">✖</button>
+            </div>
 
+            <!-- Summary Stat Cards -->
+            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px;" id="att-report-summary-boxes">
+                <!-- Dynamically populated -->
+            </div>
+
+            <!-- Detailed Month Logs -->
+            <div id="att-report-details-container" style="display:flex; flex-direction:column; gap:16px;">
+                <!-- Dynamically populated -->
+            </div>
+
+            <div style="text-align:right; margin-top:20px; border-top:1px solid var(--border-color); padding-top:14px;">
+                <button onclick="close3MonthAttendanceReport()" class="btn-neutral" style="padding:10px 20px;">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Past Attendance Modal (Picker & Status Dropdown) -->
+    <div id="modal-edit-past-attendance" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.65); backdrop-filter:blur(4px); justify-content:center; align-items:center; z-index:9999999;">
+        <div class="modal-content" style="max-width: 440px; width: 92%; border-radius: 16px; padding: 24px; background:var(--card-bg); border: 1px solid var(--border-color); box-shadow:0 10px 40px rgba(0,0,0,0.5);">
+            <div class="flex-between" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                <h3 style="margin:0; font-size:1.1rem; color:var(--primary); font-weight:800;" id="edit-past-att-modal-title" data-i18n="title-edit-past-att">✏️ Edit Past Attendance</h3>
+                <button onclick="closeEditPastAttendanceModal()" class="btn-neutral" style="padding:4px 10px; font-size:1rem; border:none; background:transparent; cursor:pointer;">✖</button>
+            </div>
+            <input type="hidden" id="edit-past-att-worker-id">
+            <input type="hidden" id="edit-past-att-date-str">
+            
+            <div style="margin-bottom: 16px;">
+                <label style="font-weight:700; display:block; margin-bottom:6px; font-size:0.88rem; color:var(--text-main);" data-i18n="label-past-att-date">📅 Date & Day</label>
+                <div id="edit-past-att-date-display" style="padding:10px 12px; background:var(--input-bg); border-radius:8px; border:1px solid var(--border-color); font-weight:700; color:var(--text-main); font-size:0.9rem;">2026-07-24</div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label style="font-weight:700; display:block; margin-bottom:6px; font-size:0.88rem; color:var(--text-main);" data-i18n="label-past-att-status">📌 Attendance Status</label>
+                <select id="edit-past-att-status-select" onchange="onEditPastAttStatusChange()" style="width:100%; padding:10px; border-radius:8px; background:var(--input-bg); color:var(--text-main); border:1px solid var(--border-color); font-size:0.9rem; font-weight:600;">
+                    <option value="present" data-i18n="opt-status-present">✔️ Present (حاضر)</option>
+                    <option value="vacation" data-i18n="opt-status-vacation">🌴 Vacation (إجازة)</option>
+                    <option value="absent" data-i18n="opt-status-absent">❌ Absent (غائب)</option>
+                </select>
+            </div>
+
+            <div id="edit-past-att-time-group" style="margin-bottom: 20px;">
+                <label style="font-weight:700; display:block; margin-bottom:6px; font-size:0.88rem; color:var(--text-main);" data-i18n="label-past-att-time">⏰ Select Check-In Time</label>
+                <input type="time" id="edit-past-att-time-picker" style="width:100%; padding:10px; border-radius:8px; background:var(--input-bg); color:var(--text-main); border:1px solid var(--border-color); font-size:1rem; font-weight:700; box-sizing:border-box;">
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button onclick="closeEditPastAttendanceModal()" class="btn-outline" style="padding:10px 18px; font-weight:700;" data-i18n="btn-cancel">Cancel</button>
+                <button onclick="savePastAttendanceEdit()" class="btn-primary" style="padding:10px 22px; font-weight:700;" data-i18n="btn-save-past-att">💾 Save Changes</button>
+            </div>
+        </div>
+    </div>
+</body>
 
 </html>

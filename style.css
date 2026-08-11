@@ -3202,3 +3202,90 @@ body:not(.role-admin) .task-grid {
         border-radius: 4px !important;
     }
 }
+
+/* Reminders HUD Horizontal Leaderboard Row List Style */
+#reminders-list-container {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.reminder-leaderboard-row {
+    display: grid !important;
+    grid-template-columns: 240px 1fr 220px auto !important;
+    gap: 16px !important;
+    align-items: center !important;
+    padding: 14px 18px !important;
+    background: var(--card-bg) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 12px !important;
+    box-shadow: var(--shadow-sm) !important;
+    transition: all 0.2s ease !important;
+}
+
+.reminder-leaderboard-row:hover {
+    border-color: var(--primary) !important;
+    transform: translateX(4px) !important;
+    box-shadow: var(--shadow-md) !important;
+}
+
+@media (max-width: 1024px) {
+    .reminder-leaderboard-row {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+    }
+}
+
+/* Professional Reminder Lead-Time Toggle Chips */
+.lead-time-chips-container {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 12px !important;
+    background: var(--input-bg) !important;
+    padding: 16px !important;
+    border-radius: 12px !important;
+    border: 1px solid var(--border-color) !important;
+    box-sizing: border-box !important;
+}
+
+.lead-time-chip {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 10px 18px !important;
+    border-radius: 24px !important;
+    border: 1.5px solid var(--border-color) !important;
+    background: var(--card-bg) !important;
+    color: var(--text-main) !important;
+    font-size: 0.88rem !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    user-select: none !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
+    position: relative !important;
+}
+
+.lead-time-chip:hover {
+    border-color: var(--primary) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15) !important;
+}
+
+.lead-time-chip input[type="checkbox"] {
+    position: absolute !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+}
+
+.lead-time-chip.active {
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.18), rgba(124, 58, 237, 0.18)) !important;
+    border-color: var(--primary) !important;
+    color: var(--primary) !important;
+    box-shadow: 0 0 0 1.5px var(--primary), 0 4px 12px rgba(37, 99, 235, 0.2) !important;
+}
