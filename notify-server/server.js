@@ -830,3 +830,100 @@ function startNotificationListeners(companyId) {
 startNotificationListeners('burgeroov');
 startNotificationListeners('mvc');
 startNotificationListeners('mvcfresh');
+
+// ─── Automated GMT+3 Task Cycle Server Dispatcher ────────────────────────────────
+function getGMT3ServerTime() {
+    const now = new Date();
+    const options = { timeZone: 'Asia/Riyadh', hour12: false, hour: '2-digit', minute: '2-digit', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' };
+    const formatter = new Intl.DateTimeFormat('en-US', options);
+    const parts = formatter.formatToParts(now);
+    let year, month, day, hour, minute, weekdayStr;
+    parts.forEach(p => {
+        if (p.type === 'year') year = p.value;
+        if (p.type === 'month') month = p.value;
+        if (p.type === 'day') day = p.value;
+        if (p.type === 'hour') hour = p.value;
+        if (p.type === 'minute') minute = p.value;
+        if (p.type === 'weekday') weekdayStr = p.value;
+    });
+    const dayCode = (weekdayStr || '').toLowerCase().substring(0, 3);
+    return { dateStr: `${year}-${month}-${day}`, timeStr: `${hour}:${minute}`, dayCode };
+}
+
+async function runServerTaskCycleCheck() {
+    const companyKeys = ['burgeroov', 'mvc', 'mvcfresh'];
+    const { dateStr, timeStr, dayCode } = getGMT3ServerTime();
+
+    for (const cKey of companyKeys) {
+        try {
+            const [cyclesSnap, workersSnap] = await Promise.all([
+                db.ref(`companies/${cKey}/taskCycles`).once('value'),
+                db.ref(`companies/${cKey}/workers`).once('value')
+            ]);
+
+            const cyclesObj = cyclesSnap.val();
+            if (!cyclesObj) continue;
+
+            const rawWorkers = workersSnap.val();
+            let workers = [];
+            if (Array.isArray(rawWorkers)) {
+                workers = rawWorkers;
+            } else if (rawWorkers && typeof rawWorkers === 'object') {
+                workers = Object.values(rawWorkers);
+            }
+
+            Object.keys(cyclesObj).forEach(workerId => {
+                const cycle = cyclesObj[workerId];
+                if (!cycle || !cycle.items) return;
+                const items = Array.isArray(cycle.items) ? cycle.items : Object.values(cycle.items);
+
+                items.forEach(async (item, itemIdx) => {
+                    if (!item || !item.time || !item.title) return;
+
+                    // Check day recurrence
+                    const daysArr = Array.isArray(item.days) ? item.days : ['every'];
+                    const isTodayScheduled = daysArr.includes('every') || daysArr.length === 0 || daysArr.includes(dayCode);
+
+                    if (isTodayScheduled && item.time === timeStr && item.lastDispatchedDate !== dateStr) {
+                        console.log(`⏰ [Server Task Cycle GMT+3] Dispatching scheduled task for worker ${workerId} on ${dayCode} at ${timeStr}: "${item.title}"`);
+
+                        await db.ref(`companies/${cKey}/taskCycles/${workerId}/items/${itemIdx}/lastDispatchedDate`).set(dateStr);
+
+                        const wIndex = workers.findIndex(w => w && String(w.id) === String(workerId));
+                        if (wIndex !== -1) {
+                            const worker = workers[wIndex];
+                            const existingJobs = Array.isArray(worker.jobs) ? worker.jobs : [];
+                            const newJob = {
+                                id: Date.now(),
+                                title: `🔁 [Daily Cycle ${timeStr}] ${item.title}`,
+                                status: 'pending',
+                                createdAt: Date.now(),
+                                assignedBy: 'Task Cycle System'
+                            };
+                            existingJobs.push(newJob);
+                            await db.ref(`companies/${cKey}/workers/${wIndex}/jobs`).set(existingJobs);
+
+                            if (worker.phone && worker.waAlertsEnabled !== false) {
+                                const companyLabel = cKey === 'mvcfresh' ? 'MVC Fresh' : (cKey === 'mvc' ? 'MVC' : 'Burgeroov');
+                                const tpls = companyTemplates[cKey] || {};
+                                const rawTpl = tpls.cycle || '🔁 *تنبيه مهمة دورية مجدولة [{company_name}]*\n\nالمهمة: {task_title}\nالموظف: {worker_name}\n\nيرجى فتح اللوحة والمتابعة!';
+                                const waMsg = formatCustomTemplate(rawTpl, {
+                                    workerName: worker.name || 'الموظف',
+                                    taskTitle: item.title,
+                                    orderId: timeStr,
+                                    companyName: companyLabel
+                                });
+                                sendWhatsAppDirect(worker.phone, waMsg);
+                            }
+                        }
+                    }
+                });
+            });
+        } catch (e) {
+            console.error(`[Server Task Cycle Error] ${cKey}:`, e.message);
+        }
+    }
+}
+
+setInterval(runServerTaskCycleCheck, 30000);
+

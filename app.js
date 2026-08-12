@@ -343,6 +343,7 @@ function startGlobalNotificationListeners(email) {
                 let prevOrderStartTime = myWorkerData && myWorkerData.activeOrder ? myWorkerData.activeOrder.startTime : null;
                 let prevViolationsCount = myWorkerData && myWorkerData.systemViolations ? myWorkerData.systemViolations.length : 0;
                 let prevPaymentReqStatuses = {};
+                let prevCustodyReqStatuses = {};
                 let prevGeneralDeliveries = {};
 
                 // Get initial general deliveries
@@ -358,6 +359,16 @@ function startGlobalNotificationListeners(email) {
                         const reqs = snap.val() || {};
                         Object.keys(reqs).forEach(id => {
                             prevPaymentReqStatuses[id] = reqs[id].status;
+                        });
+                    }
+                }).catch(() => { });
+
+                // Get initial custody requests
+                db.ref(`companies/${companyId}/custodyRequests`).once('value').then(snap => {
+                    if (snap.exists()) {
+                        const reqs = snap.val() || {};
+                        Object.keys(reqs).forEach(id => {
+                            prevCustodyReqStatuses[id] = reqs[id].status;
                         });
                     }
                 }).catch(() => { });
@@ -389,6 +400,10 @@ function startGlobalNotificationListeners(email) {
                         const pRequests = companyData.paymentRequests || {};
                         Object.keys(pRequests).forEach(id => {
                             prevPaymentReqStatuses[id] = pRequests[id].status;
+                        });
+                        const cRequests = companyData.custodyRequests || {};
+                        Object.keys(cRequests).forEach(id => {
+                            prevCustodyReqStatuses[id] = cRequests[id].status;
                         });
                         prevGeneralDeliveries = companyData.generalDeliveries || {};
                         return;
@@ -453,6 +468,32 @@ function startGlobalNotificationListeners(email) {
                                     if (msg) showInAppNotification(msg);
                                 }
                                 prevPaymentReqStatuses[req.id] = req.status;
+                            }
+                        });
+
+                        // 5. Custody Request Status Check for Worker
+                        const cRequests = companyData.custodyRequests || {};
+                        Object.values(cRequests).forEach(req => {
+                            if (req.workerId === updatedWorker.id) {
+                                const prevStatus = prevCustodyReqStatuses[req.id];
+                                if (prevStatus && req.status !== prevStatus) {
+                                    let msg = '';
+                                    if (req.status === 'accepted') {
+                                        msg = isAr
+                                            ? `📦 تم قبول طلب العهدة في ${compName}! الكود: ${req.code}`
+                                            : `📦 Custody request approved in ${compName}! Code: ${req.code}`;
+                                    } else if (req.status === 'rejected') {
+                                        msg = isAr
+                                            ? `❌ تم رفض طلب العهدة في ${compName}`
+                                            : `❌ Custody request rejected in ${compName}`;
+                                    } else if (req.status === 'given') {
+                                        msg = isAr
+                                            ? `📦 تم تسليم العهدة بقيمة ${req.amount} ريال بنجاح في ${compName}`
+                                            : `📦 Custody of SAR ${req.amount} given successfully in ${compName}!`;
+                                    }
+                                    if (msg) showInAppNotification(msg);
+                                }
+                                prevCustodyReqStatuses[req.id] = req.status;
                             }
                         });
                     }
@@ -10256,6 +10297,22 @@ function acceptPaymentRequest(reqId) {
             if (typeof logActivity === 'function') {
                 logActivity('finance', req.workerId, req.workerName, `Accepted payment request of SAR ${approvedAmount} for ${req.workerName}`);
             }
+
+            // Dispatch WhatsApp notification with payment release code
+            const workers = getCompanyData().workers || [];
+            const worker = workers.find(w => w && String(w.id) === String(req.workerId));
+            const phone = (worker && worker.phone) ? worker.phone : (req.phone || '');
+            if (phone && (worker ? worker.waAlertsEnabled !== false : true)) {
+                const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+                const tpls = getCompanyData().messagingTemplates || {};
+                const rawTpl = tpls.payment || (isAr ? '💵 *تم قبول طلب السلفة [{company_name}]*\n\nالموظف: {worker_name}\nالمبلغ: {amount} ر.س\nرمز الصرف الخاص بك: {order_id}' : '💵 Advance Approved! [{company_name}]\nWorker: {worker_name}\nAmount: SAR {amount}\nCode: {order_id}');
+                const formattedMsg = formatMessagingText(rawTpl, {
+                    worker_name: req.workerName || (worker ? worker.name : 'الموظف'),
+                    amount: approvedAmount,
+                    order_id: code
+                });
+                sendWhatsAppDirect(phone, formattedMsg);
+            }
         }).catch(err => console.error("Error accepting request:", err));
     }
 }
@@ -10866,6 +10923,22 @@ function managerAcceptPaymentRequest(reqId) {
     }).then(() => {
         if (typeof logActivity === 'function') {
             logActivity('finance', req.workerId, req.workerName, `Manager final approved high payment request of SAR ${approvedAmount} for ${req.workerName}`);
+        }
+
+        // Dispatch WhatsApp notification with payment release code
+        const workers = getCompanyData().workers || [];
+        const worker = workers.find(w => w && String(w.id) === String(req.workerId));
+        const phone = (worker && worker.phone) ? worker.phone : (req.phone || '');
+        if (phone && (worker ? worker.waAlertsEnabled !== false : true)) {
+            const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+            const tpls = getCompanyData().messagingTemplates || {};
+            const rawTpl = tpls.payment || (isAr ? '💵 *تم قبول طلب السلفة [{company_name}]*\n\nالموظف: {worker_name}\nالمبلغ: {amount} ر.س\nرمز الصرف الخاص بك: {order_id}' : '💵 Advance Approved! [{company_name}]\nWorker: {worker_name}\nAmount: SAR {amount}\nCode: {order_id}');
+            const formattedMsg = formatMessagingText(rawTpl, {
+                worker_name: req.workerName || (worker ? worker.name : 'الموظف'),
+                amount: approvedAmount,
+                order_id: code
+            });
+            sendWhatsAppDirect(phone, formattedMsg);
         }
     }).catch(err => console.error("Error final approving request:", err));
 }
@@ -12768,6 +12841,22 @@ function acceptCustodyRequest(reqId) {
         handledAt: Date.now()
     }).then(() => {
         logActivity('finance', req.workerId, req.workerName, `Accepted custody request of SAR ${req.amount} for ${req.workerName}`);
+
+        // Dispatch WhatsApp notification with custody release code
+        const workers = getCompanyData().workers || [];
+        const worker = workers.find(w => w && String(w.id) === String(req.workerId));
+        const phone = (worker && worker.phone) ? worker.phone : (req.phone || '');
+        if (phone && (worker ? worker.waAlertsEnabled !== false : true)) {
+            const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+            const tpls = getCompanyData().messagingTemplates || {};
+            const rawTpl = tpls.custody || (isAr ? '📦 *تم قبول طلب العهدة [{company_name}]*\n\nالموظف: {worker_name}\nالقيمة: {amount} ر.س\nرمز الاستلام الخاص بك: {order_id}' : '📦 Custody Approved! [{company_name}]\nWorker: {worker_name}\nAmount: SAR {amount}\nCode: {order_id}');
+            const formattedMsg = formatMessagingText(rawTpl, {
+                worker_name: req.workerName || (worker ? worker.name : 'الموظف'),
+                amount: req.amount || '0',
+                order_id: code
+            });
+            sendWhatsAppDirect(phone, formattedMsg);
+        }
     }).catch(err => console.error("Error accepting custody request:", err));
 }
 
@@ -13929,6 +14018,7 @@ function addReminder() {
     const isAr = currentAppLang === 'ar';
     const titleVal = document.getElementById('reminder-title-input') ? document.getElementById('reminder-title-input').value.trim() : '';
     const deadlineVal = document.getElementById('reminder-deadline-input') ? document.getElementById('reminder-deadline-input').value : '';
+    const phoneVal = document.getElementById('reminder-phone-input') ? document.getElementById('reminder-phone-input').value.trim() : '';
     const noteVal = document.getElementById('reminder-note-input') ? document.getElementById('reminder-note-input').value.trim() : '';
     const leadTimes = Array.from(document.querySelectorAll('.rem-lead-cb:checked')).map(cb => cb.value);
 
@@ -13955,6 +14045,7 @@ function addReminder() {
         title: titleVal,
         deadlineMs: deadlineMs,
         deadlineISO: deadlineVal,
+        targetPhone: phoneVal,
         cycle: cycleVal || 'none',
         note: noteVal,
         leadTimes: leadTimes.length > 0 ? leadTimes : ['1_2d', '5d', '10d', '15d', '1m'],
@@ -13967,8 +14058,19 @@ function addReminder() {
         .then(() => {
             if (document.getElementById('reminder-title-input')) document.getElementById('reminder-title-input').value = '';
             if (document.getElementById('reminder-deadline-input')) document.getElementById('reminder-deadline-input').value = '';
+            if (document.getElementById('reminder-phone-input')) document.getElementById('reminder-phone-input').value = '';
             if (document.getElementById('reminder-note-input')) document.getElementById('reminder-note-input').value = '';
             if (document.getElementById('reminder-cycle-input')) document.getElementById('reminder-cycle-input').value = 'none';
+
+            if (phoneVal) {
+                const tpls = getCompanyData().messagingTemplates || {};
+                const rawTpl = tpls.reminder || (isAr ? '⏰ *تنبيه تذكير هام [{company_name}]*\n\nالتذكير: "{task_title}"\nالموعد النهائي: {reason}' : '⏰ Reminder Alert! Title: "{task_title}". Deadline: {reason}');
+                const waMsg = rawTpl.replace(/{task_title}/g, titleVal)
+                                    .replace(/{reason}/g, new Date(deadlineMs).toLocaleDateString())
+                                    .replace(/{company_name}/g, currentCompany.toUpperCase());
+                if (typeof sendWhatsAppDirect === 'function') sendWhatsAppDirect(phoneVal, waMsg);
+            }
+
             renderReminders();
         })
         .catch(err => {
@@ -14350,6 +14452,7 @@ function renderReminders() {
                 <!-- Col 3: Deadline & Alerts -->
                 <div style="min-width:0; font-size:0.82rem; color:var(--text-muted);">
                     <div>🕒 <strong>${deadlineStr}</strong></div>
+                    ${r.targetPhone ? `<div style="font-size:0.78rem; margin-top:2px; color:#10b981; font-weight:800;">📱 ${r.targetPhone}</div>` : ''}
                     <div style="font-size:0.75rem; margin-top:2px;">🔔 ${isAr ? 'تنبيه:' : 'Alert:'} <strong>${activeLeadStr || 'None'}</strong></div>
                 </div>
 
@@ -14531,6 +14634,10 @@ function openEditReminderModal(remId) {
         document.getElementById('edit-reminder-deadline').value = new Date(r.deadlineMs).toISOString().slice(0, 16);
     }
 
+    if (document.getElementById('edit-reminder-phone')) {
+        document.getElementById('edit-reminder-phone').value = r.targetPhone || '';
+    }
+
     if (document.getElementById('edit-reminder-cycle')) {
         document.getElementById('edit-reminder-cycle').value = r.cycle || 'none';
     }
@@ -14563,6 +14670,7 @@ function saveEditReminder() {
     const remId = document.getElementById('edit-reminder-id').value;
     const titleVal = document.getElementById('edit-reminder-title').value.trim();
     const deadlineVal = document.getElementById('edit-reminder-deadline').value;
+    const phoneVal = document.getElementById('edit-reminder-phone') ? document.getElementById('edit-reminder-phone').value.trim() : '';
     const cycleVal = document.getElementById('edit-reminder-cycle') ? document.getElementById('edit-reminder-cycle').value : 'none';
     const noteVal = document.getElementById('edit-reminder-note').value.trim();
     const leadTimes = Array.from(document.querySelectorAll('.edit-rem-lead-cb:checked')).map(cb => cb.value);
@@ -14576,6 +14684,7 @@ function saveEditReminder() {
         title: titleVal,
         deadlineMs: deadlineMs,
         deadlineISO: deadlineVal,
+        targetPhone: phoneVal,
         cycle: cycleVal || 'none',
         note: noteVal,
         leadTimes: leadTimes.length > 0 ? leadTimes : ['1_2d', '5d', '10d', '15d', '1m']
@@ -19971,6 +20080,44 @@ function renderVaultNotes() {
         const safeText = typeof escapeHtml === 'function' ? escapeHtml(n.text) : (n.text || '');
         const safeCreatedBy = typeof escapeHtml === 'function' ? escapeHtml(n.createdBy || (isAr ? 'المدير' : 'Admin')) : (n.createdBy || (isAr ? 'المدير' : 'Admin'));
 
+        const rawText = n.text || '';
+        const isLongText = rawText.length > 140 || (rawText.match(/\n/g) || []).length >= 3;
+        const isMatchingSearch = q && rawText.toLowerCase().includes(q);
+        const startExpanded = isMatchingSearch;
+
+        const textStyle = startExpanded ? `
+            font-size: 0.88rem;
+            color: var(--text-main);
+            background: var(--input-bg);
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px dashed var(--border-color);
+            margin-top: 8px;
+            white-space: pre-wrap;
+            line-height: 1.5;
+            font-family: inherit;
+            display: block;
+            max-height: none;
+            overflow: visible;
+        ` : `
+            font-size: 0.88rem;
+            color: var(--text-main);
+            background: var(--input-bg);
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px dashed var(--border-color);
+            margin-top: 8px;
+            white-space: pre-wrap;
+            line-height: 1.5;
+            font-family: inherit;
+            display: -webkit-box;
+            -webkit-line-clamp: 4;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            max-height: 100px;
+            text-overflow: ellipsis;
+        `;
+
         return `
             <div class="ledger-card" ondblclick="if (!event.target.closest('button')) editVaultNote('${n.id}')" style="
                 margin: 0;
@@ -20031,18 +20178,12 @@ function renderVaultNotes() {
 
                     <!-- Text Details directly UNDER Image & Title -->
                     ${n.text ? `
-                        <div id="vault-text-${n.id}" style="
-                            font-size: 0.88rem;
-                            color: var(--text-main);
-                            background: var(--input-bg);
-                            padding: 10px 12px;
-                            border-radius: 10px;
-                            border: 1px dashed var(--border-color);
-                            margin-top: 8px;
-                            white-space: pre-wrap;
-                            line-height: 1.5;
-                            font-family: inherit;
-                        ">${safeText}</div>
+                        <div id="vault-text-${n.id}" class="${startExpanded ? 'expanded' : ''}" style="${textStyle}">${safeText}</div>
+                        ${isLongText ? `
+                            <button type="button" id="vault-toggle-btn-${n.id}" onclick="toggleVaultNoteExpand('${n.id}')" style="background:none; border:none; color:var(--primary); font-size:0.78rem; font-weight:800; cursor:pointer; margin-top:6px; padding:2px 4px; display:inline-flex; align-items:center; gap:4px;">
+                                📖 ${startExpanded ? (isAr ? 'طي الملاحظة' : 'Show Less') : (isAr ? 'عرض المزيد' : 'Show More')}
+                            </button>
+                        ` : ''}
                     ` : ''}
                 </div>
 
@@ -20066,10 +20207,42 @@ function renderVaultNotes() {
 }
 window.renderVaultNotes = renderVaultNotes;
 
-function copyVaultText(noteId) {
+function toggleVaultNoteExpand(noteId) {
     const textEl = document.getElementById(`vault-text-${noteId}`);
+    const btnEl = document.getElementById(`vault-toggle-btn-${noteId}`);
     if (!textEl) return;
-    const txt = textEl.textContent || textEl.innerText;
+
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const isExpanded = textEl.classList.contains('expanded');
+
+    if (isExpanded) {
+        textEl.classList.remove('expanded');
+        textEl.style.display = '-webkit-box';
+        textEl.style.webkitLineClamp = '4';
+        textEl.style.webkitBoxOrient = 'vertical';
+        textEl.style.overflow = 'hidden';
+        textEl.style.maxHeight = '100px';
+        if (btnEl) btnEl.innerHTML = `📖 ${isAr ? 'عرض المزيد' : 'Show More'}`;
+    } else {
+        textEl.classList.add('expanded');
+        textEl.style.display = 'block';
+        textEl.style.webkitLineClamp = 'none';
+        textEl.style.overflow = 'visible';
+        textEl.style.maxHeight = 'none';
+        if (btnEl) btnEl.innerHTML = `📖 ${isAr ? 'طي الملاحظة' : 'Show Less'}`;
+    }
+}
+window.toggleVaultNoteExpand = toggleVaultNoteExpand;
+
+function copyVaultText(noteId) {
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const notesObj = data.vaultNotes || {};
+    const note = notesObj[noteId];
+    const textEl = document.getElementById(`vault-text-${noteId}`);
+    const txt = note ? note.text : (textEl ? (textEl.textContent || textEl.innerText) : '');
+
+    if (!txt) return;
+
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(txt).then(() => {
             if (typeof showInAppNotification === 'function') showInAppNotification("📋 Text copied to clipboard!");
@@ -20145,11 +20318,16 @@ window.insertTemplateTag = insertTemplateTag;
 function resetTemplateToDefault(type) {
     const defaults = {
         task: '📋 مرحباً {worker_name}! تم إسناد مهمة جديدة لك: "{task_title}". افتح اللوحة للمتابعة.',
+        cycle: '🔁 تنبيه مهمة دورية مجدولة [{company_name}]\n\nالمهمة: {task_title}\nالموظف: {worker_name}\n\nيرجى الإنجاز والمتابعة!',
+        inquiry: '❓ استفسار جديد من المدير [{company_name}]\n\nالموظف: {worker_name}\nسؤال المدير: "{task_title}"\n\nيرجى الرد في اللوحة برمز تم التنفيذ / لم ينفذ.',
         delivery: '🛵 مرحباً {worker_name}! طلب توصيل جديد #{order_id} للعميل: {customer_name}.',
         prepare: '👨‍🍳 تنبيه التحضير! طلب سوق جديد #{order_id} يحتوي على {items_count} أصناف بحاجة للتحضير.',
+        reminder: '⏰ تنبيه تذكير هام [{company_name}]\n\nالتذكير: "{task_title}"\nالموعد النهائي: {reason}',
+        payment: '💵 تم قبول طلب السلفة [{company_name}]\n\nالموظف: {worker_name}\nالمبلغ: {amount} ر.س\nرمز الصرف الخاص بك: {order_id}',
+        custody: '📦 تم قبول طلب العهدة [{company_name}]\n\nالموظف: {worker_name}\nالقيمة: {amount} ر.س\nرمز الاستلام الخاص بك: {order_id}',
         violation: '⚠️ تنبيه هام {worker_name}: تم تسجيل مخالفة على ملفك بقيمة {amount} ر.س: "{reason}".',
         reward: '🎉 مبروك {worker_name}! تم إضافة مكافأة لك بقيمة {amount} ر.س: "{reason}".',
-        expiry: '⏰ تنبيه انتهاء الوثيقة: {doc_name} ينتهي خلال {days} أيام بتاريخ {expiry_date}.'
+        expiry: '⏰ تنبيه انتهاء الوثيقة: {reason} ينتهي خلال {amount} أيام بتاريخ {customer_name}.'
     };
     const el = document.getElementById(`msg-tpl-${type}`);
     if (el && defaults[type]) {
@@ -20157,6 +20335,167 @@ function resetTemplateToDefault(type) {
     }
 }
 window.resetTemplateToDefault = resetTemplateToDefault;
+
+function filterMessagingTemplates(cat, btn) {
+    const cards = document.querySelectorAll('#messaging-templates-grid .msg-tpl-card');
+    cards.forEach(card => {
+        if (cat === 'all' || card.classList.contains(`cat-${cat}`)) {
+            card.style.display = 'flex';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+
+    const buttons = document.querySelectorAll('.btn-filter-tpl');
+    buttons.forEach(b => {
+        b.classList.remove('active');
+        b.style.background = 'var(--card-bg)';
+        b.style.color = 'var(--text-main)';
+        b.style.border = '1px solid var(--border-color)';
+    });
+
+    if (btn) {
+        btn.classList.add('active');
+        btn.style.background = 'var(--primary)';
+        btn.style.color = 'white';
+        btn.style.border = 'none';
+    }
+}
+window.filterMessagingTemplates = filterMessagingTemplates;
+
+function toggleAllWorkerAlerts(enable) {
+    const checkboxes = document.querySelectorAll('#messaging-workers-list input[type="checkbox"]');
+    checkboxes.forEach(cb => {
+        cb.checked = !!enable;
+    });
+}
+window.toggleAllWorkerAlerts = toggleAllWorkerAlerts;
+
+function filterMessagingWorkers() {
+    const query = document.getElementById('msg-worker-search')?.value?.toLowerCase().trim() || '';
+    const container = document.getElementById('messaging-workers-list');
+    if (!container) return;
+
+    const rows = container.children;
+    for (let r of rows) {
+        const text = r.textContent.toLowerCase();
+        if (!query || text.includes(query)) {
+            r.style.display = 'flex';
+        } else {
+            r.style.display = 'none';
+        }
+    }
+}
+window.filterMessagingWorkers = filterMessagingWorkers;
+
+function sendTestTemplateAlert(type) {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const el = document.getElementById(`msg-tpl-${type}`);
+    const rawTpl = el ? el.value : '';
+
+    if (!rawTpl) {
+        alert(isAr ? 'القالب فارغ.' : 'Template is empty.');
+        return;
+    }
+
+    const testData = {
+        worker_name: 'أحمد علي',
+        task_title: 'فحص جودة المخزون',
+        order_id: 'ORD-9982',
+        customer_name: 'سارة خالد',
+        items_count: '5',
+        amount: '150',
+        reason: 'تجديد تصريح العمل',
+        company_name: (typeof currentCompany !== 'undefined' ? currentCompany.toUpperCase() : 'DEMO')
+    };
+
+    let msg = rawTpl;
+    Object.keys(testData).forEach(k => {
+        msg = msg.replace(new RegExp(`{${k}}`, 'g'), testData[k]);
+    });
+
+    const testWorkerIdx = document.getElementById('msg-test-worker')?.value;
+    let targetPhone = '';
+    if (testWorkerIdx !== undefined && testWorkerIdx !== null && testWorkerIdx !== '') {
+        const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+        const worker = (data.workers || [])[testWorkerIdx];
+        if (worker && worker.phone) targetPhone = worker.phone;
+    }
+
+    if (!targetPhone) {
+        const userPhone = prompt(isAr ? 'أدخل رقم الهاتف لتلقي رسالة الاختبار (مع رمز الدولة):' : 'Enter recipient phone number for test message:', '+966500000000');
+        if (!userPhone) return;
+        targetPhone = userPhone.trim();
+    }
+
+    if (typeof sendWhatsAppDirect === 'function') {
+        sendWhatsAppDirect(targetPhone, msg);
+        alert((isAr ? '🚀 تم إرسال الرسالة التجريبية إلى: ' : '🚀 Test WhatsApp alert sent to: ') + targetPhone);
+    } else {
+        alert((isAr ? '📱 معاينة رسالة الاختبار:\n\n' : '📱 Test Message Preview:\n\n') + msg);
+    }
+}
+window.sendTestTemplateAlert = sendTestTemplateAlert;
+
+function formatMessagingText(rawTpl, replacements = {}) {
+    if (!rawTpl) return '';
+    let text = String(rawTpl);
+
+    const compData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const compName = replacements.company_name || replacements.companyName || compData.name || compData.companyName || (typeof currentCompany !== 'undefined' ? currentCompany.toUpperCase() : 'DEMO');
+
+    const defaultVars = {
+        company_name: compName,
+        companyName: compName,
+        worker_name: replacements.worker_name || replacements.workerName || 'الموظف',
+        task_title: replacements.task_title || replacements.title || '',
+        order_id: replacements.order_id || replacements.code || replacements.id || '',
+        customer_name: replacements.customer_name || replacements.customer || '',
+        items_count: replacements.items_count || '1',
+        amount: replacements.amount || '0',
+        reason: replacements.reason || replacements.note || ''
+    };
+
+    const finalVars = { ...defaultVars, ...replacements };
+
+    Object.keys(finalVars).forEach(key => {
+        const val = finalVars[key] !== undefined && finalVars[key] !== null ? String(finalVars[key]) : '';
+        text = text.replace(new RegExp(`\\[\\s*{${key}}\\s*\\]`, 'gi'), val);
+        text = text.replace(new RegExp(`{${key}}`, 'gi'), val);
+    });
+
+    text = text.replace(/\[\s*{[a-zA-Z0-9_$]+}\s*\]/g, '').replace(/{[a-zA-Z0-9_$]+}/g, '');
+    return text.trim();
+}
+window.formatMessagingText = formatMessagingText;
+
+function sendWhatsAppDirect(phone, text) {
+    if (!phone || !text) return Promise.resolve(false);
+    const cleanPhone = String(phone).replace(/[^0-9+]/g, '').trim();
+    if (!cleanPhone) return Promise.resolve(false);
+
+    const serverUrlInput = document.getElementById('wa-server-url');
+    const config = typeof getCompanyData === 'function' ? (getCompanyData().messagingConfig || {}) : {};
+    const baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || config.serverUrl || 'https://burgeroov-notify.onrender.com';
+
+    const formattedText = formatMessagingText(text);
+
+    return fetch(`${baseUrl}/wa/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: cleanPhone, text: formattedText })
+    })
+    .then(res => res.json())
+    .then(data => {
+        console.log(`WhatsApp direct message sent to ${cleanPhone}:`, data);
+        return data.success;
+    })
+    .catch(err => {
+        console.warn(`WhatsApp direct message HTTP error for ${cleanPhone}:`, err);
+        return false;
+    });
+}
+window.sendWhatsAppDirect = sendWhatsAppDirect;
 
 function renderMessagingSection() {
     const list = document.getElementById('messaging-workers-list');
@@ -20177,15 +20516,20 @@ function renderMessagingSection() {
 
     const defaultTpls = {
         task: '📋 مرحباً {worker_name}! تم إسناد مهمة جديدة لك: "{task_title}". افتح اللوحة للمتابعة.',
+        cycle: '🔁 تنبيه مهمة دورية مجدولة [{company_name}]\n\nالمهمة: {task_title}\nالموظف: {worker_name}\n\nيرجى الإنجاز والمتابعة!',
+        inquiry: '❓ استفسار جديد من المدير [{company_name}]\n\nالموظف: {worker_name}\nسؤال المدير: "{task_title}"\n\nيرجى الرد في اللوحة برمز تم التنفيذ / لم ينفذ.',
         delivery: '🛵 مرحباً {worker_name}! طلب توصيل جديد #{order_id} للعميل: {customer_name}.',
         prepare: '👨‍🍳 تنبيه التحضير! طلب سوق جديد #{order_id} يحتوي على {items_count} أصناف بحاجة للتحضير.',
+        reminder: '⏰ تنبيه تذكير هام [{company_name}]\n\nالتذكير: "{task_title}"\nالموعد النهائي: {reason}',
+        payment: '💵 تم قبول طلب السلفة [{company_name}]\n\nالموظف: {worker_name}\nالمبلغ: {amount} ر.س\nرمز الصرف الخاص بك: {order_id}',
+        custody: '📦 تم قبول طلب العهدة [{company_name}]\n\nالموظف: {worker_name}\nالقيمة: {amount} ر.س\nرمز الاستلام الخاص بك: {order_id}',
         violation: '⚠️ تنبيه هام {worker_name}: تم تسجيل مخالفة على ملفك بقيمة {amount} ر.س: "{reason}".',
         reward: '🎉 مبروك {worker_name}! تم إضافة مكافأة لك بقيمة {amount} ر.س: "{reason}".',
-        expiry: '⏰ تنبيه انتهاء الوثيقة: {doc_name} ينتهي خلال {days} أيام بتاريخ {expiry_date}.'
+        expiry: '⏰ تنبيه انتهاء الوثيقة: {reason} ينتهي خلال {amount} أيام بتاريخ {customer_name}.'
     };
 
     // Populate Templates
-    const fields = ['task', 'delivery', 'prepare', 'violation', 'reward', 'expiry'];
+    const fields = ['task', 'cycle', 'inquiry', 'delivery', 'prepare', 'reminder', 'payment', 'custody', 'violation', 'reward', 'expiry'];
     fields.forEach(f => {
         const el = document.getElementById(`msg-tpl-${f}`);
         if (el) {
@@ -20235,6 +20579,21 @@ function renderMessagingSection() {
 }
 window.renderMessagingSection = renderMessagingSection;
 
+let messagingTemplateSaveDebounce = null;
+function autoSaveMessagingTemplate(tplKey) {
+    if (!tplKey || typeof db === 'undefined' || typeof currentCompany === 'undefined') return;
+    const el = document.getElementById(`msg-tpl-${tplKey}`);
+    if (!el) return;
+    const val = el.value;
+
+    if (messagingTemplateSaveDebounce) clearTimeout(messagingTemplateSaveDebounce);
+    messagingTemplateSaveDebounce = setTimeout(() => {
+        db.ref(`companies/${currentCompany}/messagingTemplates/${tplKey}`).set(val);
+        console.log(`Autosaved template msg-tpl-${tplKey}`);
+    }, 400);
+}
+window.autoSaveMessagingTemplate = autoSaveMessagingTemplate;
+
 function saveAllMessagingSettings() {
     if (typeof db === 'undefined' || typeof currentCompany === 'undefined') return;
 
@@ -20258,8 +20617,13 @@ function saveAllMessagingSettings() {
     // Save Message Templates
     const templates = {
         task: document.getElementById('msg-tpl-task')?.value || '',
+        cycle: document.getElementById('msg-tpl-cycle')?.value || '',
+        inquiry: document.getElementById('msg-tpl-inquiry')?.value || '',
         delivery: document.getElementById('msg-tpl-delivery')?.value || '',
         prepare: document.getElementById('msg-tpl-prepare')?.value || '',
+        reminder: document.getElementById('msg-tpl-reminder')?.value || '',
+        payment: document.getElementById('msg-tpl-payment')?.value || '',
+        custody: document.getElementById('msg-tpl-custody')?.value || '',
         violation: document.getElementById('msg-tpl-violation')?.value || '',
         reward: document.getElementById('msg-tpl-reward')?.value || '',
         expiry: document.getElementById('msg-tpl-expiry')?.value || ''
@@ -20275,8 +20639,8 @@ function saveAllMessagingSettings() {
 
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     alert(isAr 
-        ? '💾 تم حفظ أرقام الهواتف، رابط الخادم، وقوالب الرسائل بنجاح!' 
-        : '💾 Phone numbers, Server URL, and message templates saved successfully!');
+        ? '💾 تم حفظ أرقام الهواتف، رابط الخادم، وقوالب الرسائل الـ 11 بنجاح!' 
+        : '💾 Phone numbers, Server URL, and all 11 message templates saved successfully!');
 }
 window.saveAllMessagingSettings = saveAllMessagingSettings;
 
@@ -20565,6 +20929,8 @@ function setTaskFormMode(mode) {
         populateInquiryWorkerDropdown();
     } else if (mode === 'hud') {
         openInquiriesHUDModal();
+    } else if (mode === 'cycle') {
+        openTaskCycleHUDModal();
     } else {
         if (assignForm) assignForm.style.display = 'block';
         if (inquiryForm) inquiryForm.style.display = 'none';
@@ -20950,6 +21316,426 @@ function renderInquiriesModal() {
     }).join('');
 }
 window.renderInquiriesModal = renderInquiriesModal;
+
+// =============================================
+// TASK CYCLE SYSTEM (SCHEDULED TASKS PER WORKER & DAYS)
+// =============================================
+let currentCycleItemsDraft = [];
+let currentEditingCycleItemId = null;
+
+function toggleCycleDaysPillsVisibility() {
+    const sel = document.getElementById('cycle-recurrence-select');
+    const container = document.getElementById('cycle-days-pills-container');
+    if (!sel || !container) return;
+    container.style.display = sel.value === 'specific' ? 'flex' : 'none';
+}
+window.toggleCycleDaysPillsVisibility = toggleCycleDaysPillsVisibility;
+
+function toggleCycleDayPill(btn) {
+    if (!btn) return;
+    const isSelected = btn.classList.contains('active-day-pill');
+    if (isSelected) {
+        btn.classList.remove('active-day-pill');
+        btn.style.background = 'var(--input-bg)';
+        btn.style.color = 'var(--text-main)';
+        btn.style.borderColor = 'var(--border-color)';
+    } else {
+        btn.classList.add('active-day-pill');
+        btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+        btn.style.color = 'white';
+        btn.style.borderColor = '#10b981';
+    }
+}
+window.toggleCycleDayPill = toggleCycleDayPill;
+
+function getSelectedCycleDays() {
+    const recSel = document.getElementById('cycle-recurrence-select');
+    if (!recSel || recSel.value === 'every') return ['every'];
+
+    const pills = document.querySelectorAll('.cycle-day-pill.active-day-pill');
+    const days = [];
+    pills.forEach(p => {
+        const d = p.getAttribute('data-day');
+        if (d) days.push(d);
+    });
+    return days.length > 0 ? days : ['every'];
+}
+window.getSelectedCycleDays = getSelectedCycleDays;
+
+function openTaskCycleHUDModal() {
+    const modal = document.getElementById('modal-task-cycle-hud');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    resetCycleTaskForm();
+
+    // Populate worker dropdown
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const sel = document.getElementById('cycle-worker-select');
+    if (sel) {
+        sel.innerHTML = `<option value="">${(typeof currentAppLang !== 'undefined' && currentAppLang === 'ar') ? '-- اختر الموظف --' : '-- Choose Worker --'}</option>`;
+        const workers = data.workers || [];
+        workers.forEach(w => {
+            if (w) {
+                const opt = document.createElement('option');
+                opt.value = w.id;
+                opt.textContent = w.name || ('Worker #' + w.id);
+                sel.appendChild(opt);
+            }
+        });
+        if (workers.length > 0 && workers[0]) {
+            sel.value = workers[0].id;
+            onCycleWorkerSelected();
+        }
+    }
+}
+window.openTaskCycleHUDModal = openTaskCycleHUDModal;
+
+function closeTaskCycleHUDModal() {
+    const modal = document.getElementById('modal-task-cycle-hud');
+    if (modal) modal.style.display = 'none';
+    resetCycleTaskForm();
+}
+window.closeTaskCycleHUDModal = closeTaskCycleHUDModal;
+
+function onCycleWorkerSelected() {
+    resetCycleTaskForm();
+    const sel = document.getElementById('cycle-worker-select');
+    if (!sel || !sel.value) {
+        currentCycleItemsDraft = [];
+        renderCycleItemsDraft();
+        return;
+    }
+
+    const workerId = sel.value;
+    
+    // Fetch directly from Firebase RTDB to guarantee loading saved tasks
+    db.ref(`companies/${currentCompany}/taskCycles/${workerId}`).once('value')
+        .then(snap => {
+            const workerCycle = snap.val() || {};
+            const items = Array.isArray(workerCycle.items) ? workerCycle.items : (workerCycle.items ? Object.values(workerCycle.items) : []);
+            
+            // Sync local cache
+            const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+            if (!companyData.taskCycles) companyData.taskCycles = {};
+            companyData.taskCycles[workerId] = workerCycle;
+
+            currentCycleItemsDraft = JSON.parse(JSON.stringify(items));
+            renderCycleItemsDraft();
+        })
+        .catch(err => {
+            console.error("Failed to load worker task cycle:", err);
+            currentCycleItemsDraft = [];
+            renderCycleItemsDraft();
+        });
+}
+window.onCycleWorkerSelected = onCycleWorkerSelected;
+
+function resetCycleTaskForm() {
+    currentEditingCycleItemId = null;
+    const titleInput = document.getElementById('cycle-item-title');
+    const timeInput = document.getElementById('cycle-item-time');
+    const recSel = document.getElementById('cycle-recurrence-select');
+    const submitBtn = document.getElementById('btn-add-cycle-item-submit');
+    const cancelBtn = document.getElementById('btn-cancel-cycle-edit');
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    if (titleInput) titleInput.value = '';
+    if (timeInput && !timeInput.value) timeInput.value = '14:20';
+    if (recSel) {
+        recSel.value = 'every';
+        toggleCycleDaysPillsVisibility();
+    }
+
+    const pills = document.querySelectorAll('.cycle-day-pill');
+    pills.forEach(p => {
+        p.classList.remove('active-day-pill');
+        p.style.background = 'var(--input-bg)';
+        p.style.color = 'var(--text-main)';
+        p.style.borderColor = 'var(--border-color)';
+    });
+
+    if (cancelBtn) cancelBtn.style.display = 'none';
+    if (submitBtn) {
+        submitBtn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+        submitBtn.innerHTML = `<span>${isAr ? '➕ إضافة مهمة للدورة' : '➕ Add Task to Cycle'}</span>`;
+    }
+}
+window.resetCycleTaskForm = resetCycleTaskForm;
+
+function editCycleItemDraft(itemId) {
+    const item = currentCycleItemsDraft.find(i => String(i.id) === String(itemId));
+    if (!item) return;
+
+    currentEditingCycleItemId = itemId;
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    const titleInput = document.getElementById('cycle-item-title');
+    const timeInput = document.getElementById('cycle-item-time');
+    const recSel = document.getElementById('cycle-recurrence-select');
+    const submitBtn = document.getElementById('btn-add-cycle-item-submit');
+    const cancelBtn = document.getElementById('btn-cancel-cycle-edit');
+
+    if (titleInput) titleInput.value = item.title || '';
+    if (timeInput) timeInput.value = item.time || '14:20';
+
+    const daysArr = Array.isArray(item.days) ? item.days : ['every'];
+    if (recSel) {
+        if (daysArr.includes('every') || daysArr.length === 0) {
+            recSel.value = 'every';
+        } else {
+            recSel.value = 'specific';
+        }
+        toggleCycleDaysPillsVisibility();
+    }
+
+    const pills = document.querySelectorAll('.cycle-day-pill');
+    pills.forEach(p => {
+        const dayAttr = p.getAttribute('data-day');
+        if (daysArr.includes(dayAttr)) {
+            p.classList.add('active-day-pill');
+            p.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+            p.style.color = 'white';
+            p.style.borderColor = '#10b981';
+        } else {
+            p.classList.remove('active-day-pill');
+            p.style.background = 'var(--input-bg)';
+            p.style.color = 'var(--text-main)';
+            p.style.borderColor = 'var(--border-color)';
+        }
+    });
+
+    if (cancelBtn) cancelBtn.style.display = 'inline-block';
+    if (submitBtn) {
+        submitBtn.style.background = 'linear-gradient(135deg, #3b82f6, #1d4ed8)';
+        submitBtn.innerHTML = `<span>${isAr ? '✏️ تعديل المهمة' : '✏️ Update Task'}</span>`;
+    }
+
+    const formContainer = document.getElementById('cycle-item-title');
+    if (formContainer && typeof formContainer.focus === 'function') formContainer.focus();
+}
+window.editCycleItemDraft = editCycleItemDraft;
+
+function addCycleItemToDraft() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const sel = document.getElementById('cycle-worker-select');
+    const titleInput = document.getElementById('cycle-item-title');
+    const timeInput = document.getElementById('cycle-item-time');
+
+    if (!sel || !sel.value) {
+        if (typeof showInAppNotification === 'function') showInAppNotification(isAr ? '⚠️ يرجى اختيار الموظف أولاً' : '⚠️ Please select a worker first.');
+        return;
+    }
+
+    const title = titleInput ? titleInput.value.trim() : '';
+    const time = timeInput ? timeInput.value.trim() : '';
+    const days = getSelectedCycleDays();
+
+    if (!title || !time) {
+        if (typeof showInAppNotification === 'function') showInAppNotification(isAr ? '⚠️ يرجى كتابة وصف المهمة وتحديد الوقت' : '⚠️ Please enter task description and scheduled time.');
+        return;
+    }
+
+    if (currentEditingCycleItemId) {
+        // Update existing item
+        const existingIdx = currentCycleItemsDraft.findIndex(i => String(i.id) === String(currentEditingCycleItemId));
+        if (existingIdx !== -1) {
+            currentCycleItemsDraft[existingIdx].title = title;
+            currentCycleItemsDraft[existingIdx].time = time;
+            currentCycleItemsDraft[existingIdx].days = days;
+            currentCycleItemsDraft[existingIdx].updatedAt = Date.now();
+        }
+        resetCycleTaskForm();
+    } else {
+        // Add new item
+        const newItem = {
+            id: 'tc_' + Date.now(),
+            title,
+            time,
+            days,
+            createdAt: Date.now()
+        };
+        currentCycleItemsDraft.push(newItem);
+        if (titleInput) titleInput.value = '';
+    }
+
+    currentCycleItemsDraft.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+    autoSaveWorkerTaskCycle();
+}
+window.addCycleItemToDraft = addCycleItemToDraft;
+
+function removeCycleItemDraft(itemId) {
+    if (String(currentEditingCycleItemId) === String(itemId)) {
+        resetCycleTaskForm();
+    }
+    currentCycleItemsDraft = currentCycleItemsDraft.filter(i => String(i.id) !== String(itemId));
+    autoSaveWorkerTaskCycle();
+}
+window.removeCycleItemDraft = removeCycleItemDraft;
+
+function renderCycleItemsDraft() {
+    const container = document.getElementById('cycle-items-list');
+    const countBadge = document.getElementById('cycle-count-badge');
+    if (!container) return;
+
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    if (countBadge) {
+        countBadge.textContent = isAr ? `${currentCycleItemsDraft.length} مهام مضافة` : `${currentCycleItemsDraft.length} Tasks in Cycle`;
+    }
+
+    if (currentCycleItemsDraft.length === 0) {
+        container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:20px; font-size:0.88rem; background:var(--input-bg); border-radius:10px; border:1px dashed var(--border-color);">${isAr ? 'لا توجد مهام مجدولة لهذا الموظف بعد. قم بإضافة مهمة ووقت أعلاه.' : 'No tasks scheduled in this worker cycle yet. Add a task and time above.'}</div>`;
+        return;
+    }
+
+    const dayLabels = {
+        sun: isAr ? 'أحد' : 'Sun',
+        mon: isAr ? 'إثنين' : 'Mon',
+        tue: isAr ? 'ثلاثاء' : 'Tue',
+        wed: isAr ? 'أربعاء' : 'Wed',
+        thu: isAr ? 'خميس' : 'Thu',
+        fri: isAr ? 'جمعة' : 'Fri',
+        sat: isAr ? 'سبت' : 'Sat'
+    };
+
+    container.innerHTML = currentCycleItemsDraft.map(item => {
+        const safeTitle = typeof escapeHtml === 'function' ? escapeHtml(item.title) : item.title;
+        let formattedTime = item.time;
+        try {
+            const [h, m] = item.time.split(':');
+            const dateObj = new Date();
+            dateObj.setHours(parseInt(h, 10), parseInt(m, 10));
+            formattedTime = dateObj.toLocaleTimeString(isAr ? 'ar-SA' : 'en-US', { hour: '2-digit', minute: '2-digit' });
+        } catch(e){}
+
+        const daysArr = Array.isArray(item.days) ? item.days : ['every'];
+        let daysBadgeText = isAr ? 'كل يوم' : 'Every Day';
+        if (!daysArr.includes('every') && daysArr.length > 0) {
+            daysBadgeText = daysArr.map(d => dayLabels[d] || d).join(', ');
+        }
+
+        const isEditingThis = String(currentEditingCycleItemId) === String(item.id);
+        const activeBorder = isEditingThis ? 'border:2px solid var(--primary); background:rgba(79, 70, 229, 0.06);' : 'border:1px solid var(--border-color); background:var(--card-bg);';
+
+        return `
+            <div ondblclick="if (!event.target.closest('button')) editCycleItemDraft('${item.id}')" style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; border-radius:10px; ${activeBorder} flex-wrap:wrap; gap:8px; cursor:pointer;" title="${isAr ? 'انقر مرتين للتعديل' : 'Double-click to edit'}">
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <span style="background:rgba(79, 70, 229, 0.12); color:var(--primary); font-weight:800; font-size:0.82rem; padding:4px 10px; border-radius:8px; border:1px solid rgba(79, 70, 229, 0.25);">🕒 ${formattedTime} (GMT+3)</span>
+                    <span style="background:rgba(16, 185, 129, 0.12); color:#10b981; font-weight:800; font-size:0.78rem; padding:4px 10px; border-radius:8px; border:1px solid rgba(16, 185, 129, 0.25);">📅 ${daysBadgeText}</span>
+                    <span style="font-size:0.9rem; font-weight:700; color:var(--text-main);">${safeTitle}</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:4px;">
+                    <button type="button" onclick="editCycleItemDraft('${item.id}')" style="background:none; border:none; color:var(--primary); cursor:pointer; font-size:1.1rem; padding:2px 6px;" title="${isAr ? 'تعديل المهمة' : 'Edit Task'}">✏️</button>
+                    <button type="button" onclick="removeCycleItemDraft('${item.id}')" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:1.1rem; padding:2px 6px;" title="${isAr ? 'حذف من الدورة' : 'Remove from Cycle'}">✖</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+window.renderCycleItemsDraft = renderCycleItemsDraft;
+
+function autoSaveWorkerTaskCycle() {
+    const sel = document.getElementById('cycle-worker-select');
+    if (!sel || !sel.value) return;
+
+    const workerId = sel.value;
+    const workerName = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : 'Worker';
+
+    const payload = {
+        workerId,
+        workerName,
+        items: currentCycleItemsDraft,
+        updatedAt: Date.now()
+    };
+
+    // Save directly to Firebase RTDB
+    db.ref(`companies/${currentCompany}/taskCycles/${workerId}`).set(payload)
+        .then(() => {
+            const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+            if (!data.taskCycles) data.taskCycles = {};
+            data.taskCycles[workerId] = payload;
+            renderCycleItemsDraft();
+        })
+        .catch(err => {
+            console.error("Failed to auto-save task cycle:", err);
+        });
+}
+window.autoSaveWorkerTaskCycle = autoSaveWorkerTaskCycle;
+window.saveWorkerTaskCycle = autoSaveWorkerTaskCycle;
+
+// =============================================
+// AUTOMATED TASK CYCLE DISPATCHER (GMT+3 TIME CHECKER)
+// =============================================
+function getGMT3Time() {
+    const now = new Date();
+    const options = { timeZone: 'Asia/Riyadh', hour12: false, hour: '2-digit', minute: '2-digit', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' };
+    const formatter = new Intl.DateTimeFormat('en-US', options);
+    const parts = formatter.formatToParts(now);
+    let year, month, day, hour, minute, weekdayStr;
+    parts.forEach(p => {
+        if (p.type === 'year') year = p.value;
+        if (p.type === 'month') month = p.value;
+        if (p.type === 'day') day = p.value;
+        if (p.type === 'hour') hour = p.value;
+        if (p.type === 'minute') minute = p.value;
+        if (p.type === 'weekday') weekdayStr = p.value;
+    });
+    const dayCode = (weekdayStr || '').toLowerCase().substring(0, 3);
+    return { dateStr: `${year}-${month}-${day}`, timeStr: `${hour}:${minute}`, dayCode };
+}
+
+function checkScheduledTaskCycles() {
+    if (typeof currentCompany === 'undefined' || !currentCompany) return;
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const taskCycles = data.taskCycles || {};
+    if (Object.keys(taskCycles).length === 0) return;
+
+    const { dateStr, timeStr, dayCode } = getGMT3Time();
+
+    Object.keys(taskCycles).forEach(workerId => {
+        const cycleObj = taskCycles[workerId];
+        if (!cycleObj || !cycleObj.items) return;
+        const items = Array.isArray(cycleObj.items) ? cycleObj.items : Object.values(cycleObj.items);
+
+        items.forEach((item, itemIdx) => {
+            if (!item || !item.time || !item.title) return;
+
+            // Check day recurrence
+            const daysArr = Array.isArray(item.days) ? item.days : ['every'];
+            const isTodayScheduled = daysArr.includes('every') || daysArr.length === 0 || daysArr.includes(dayCode);
+
+            if (isTodayScheduled && item.time === timeStr && item.lastDispatchedDate !== dateStr) {
+                console.log(`⏰ [Task Cycle GMT+3 Trigger] Dispatching scheduled task for worker ${workerId} on ${dayCode} at ${timeStr}: "${item.title}"`);
+
+                // Mark dispatched to prevent duplicate triggers today
+                item.lastDispatchedDate = dateStr;
+                db.ref(`companies/${currentCompany}/taskCycles/${workerId}/items/${itemIdx}/lastDispatchedDate`).set(dateStr);
+
+                // Assign task to worker's jobs list
+                const workers = data.workers || [];
+                let targetWorkerIndex = -1;
+                workers.forEach((w, idx) => {
+                    if (w && String(w.id) === String(workerId)) targetWorkerIndex = idx;
+                });
+
+                if (targetWorkerIndex !== -1) {
+                    const existingJobs = Array.isArray(workers[targetWorkerIndex].jobs) ? workers[targetWorkerIndex].jobs : [];
+                    const newJob = {
+                        id: Date.now(),
+                        title: `🔁 [Daily Cycle ${timeStr}] ${item.title}`,
+                        status: 'pending',
+                        createdAt: Date.now(),
+                        assignedBy: 'Task Cycle System'
+                    };
+                    existingJobs.push(newJob);
+                    db.ref(`companies/${currentCompany}/workers/${targetWorkerIndex}/jobs`).set(existingJobs);
+                }
+            }
+        });
+    });
+}
+
+setInterval(checkScheduledTaskCycles, 30000);
 
 // Initial run
 applyTranslations();

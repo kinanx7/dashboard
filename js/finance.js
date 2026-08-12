@@ -1120,6 +1120,22 @@ function acceptPaymentRequest(reqId) {
             if (typeof logActivity === 'function') {
                 logActivity('finance', req.workerId, req.workerName, `Accepted payment request of SAR ${approvedAmount} for ${req.workerName}`);
             }
+
+            // Dispatch WhatsApp notification with payment release code
+            const workers = getCompanyData().workers || [];
+            const worker = workers.find(w => w && String(w.id) === String(req.workerId));
+            const phone = (worker && worker.phone) ? worker.phone : (req.phone || '');
+            if (phone && (worker ? worker.waAlertsEnabled !== false : true)) {
+                const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+                const tpls = getCompanyData().messagingTemplates || {};
+                const rawTpl = tpls.payment || (isAr ? '💵 *تم قبول طلب السلفة [{company_name}]*\n\nالموظف: {worker_name}\nالمبلغ: {amount} ر.س\nرمز الصرف الخاص بك: {order_id}' : '💵 Advance Approved! [{company_name}]\nWorker: {worker_name}\nAmount: SAR {amount}\nCode: {order_id}');
+                const formattedMsg = formatMessagingText(rawTpl, {
+                    worker_name: req.workerName || (worker ? worker.name : 'الموظف'),
+                    amount: approvedAmount,
+                    order_id: code
+                });
+                sendWhatsAppDirect(phone, formattedMsg);
+            }
         }).catch(err => console.error("Error accepting request:", err));
     }
 }
@@ -1730,6 +1746,22 @@ function managerAcceptPaymentRequest(reqId) {
     }).then(() => {
         if (typeof logActivity === 'function') {
             logActivity('finance', req.workerId, req.workerName, `Manager final approved high payment request of SAR ${approvedAmount} for ${req.workerName}`);
+        }
+
+        // Dispatch WhatsApp notification with payment release code
+        const workers = getCompanyData().workers || [];
+        const worker = workers.find(w => w && String(w.id) === String(req.workerId));
+        const phone = (worker && worker.phone) ? worker.phone : (req.phone || '');
+        if (phone && (worker ? worker.waAlertsEnabled !== false : true)) {
+            const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+            const tpls = getCompanyData().messagingTemplates || {};
+            const rawTpl = tpls.payment || (isAr ? '💵 *تم قبول طلب السلفة [{company_name}]*\n\nالموظف: {worker_name}\nالمبلغ: {amount} ر.س\nرمز الصرف الخاص بك: {order_id}' : '💵 Advance Approved! [{company_name}]\nWorker: {worker_name}\nAmount: SAR {amount}\nCode: {order_id}');
+            const formattedMsg = formatMessagingText(rawTpl, {
+                worker_name: req.workerName || (worker ? worker.name : 'الموظف'),
+                amount: approvedAmount,
+                order_id: code
+            });
+            sendWhatsAppDirect(phone, formattedMsg);
         }
     }).catch(err => console.error("Error final approving request:", err));
 }
@@ -3618,6 +3650,22 @@ function acceptCustodyRequest(reqId) {
         handledAt: Date.now()
     }).then(() => {
         logActivity('finance', req.workerId, req.workerName, `Accepted custody request of SAR ${req.amount} for ${req.workerName}`);
+
+        // Dispatch WhatsApp notification with custody release code
+        const workers = getCompanyData().workers || [];
+        const worker = workers.find(w => w && String(w.id) === String(req.workerId));
+        const phone = (worker && worker.phone) ? worker.phone : (req.phone || '');
+        if (phone && (worker ? worker.waAlertsEnabled !== false : true)) {
+            const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+            const tpls = getCompanyData().messagingTemplates || {};
+            const rawTpl = tpls.custody || (isAr ? '📦 *تم قبول طلب العهدة [{company_name}]*\n\nالموظف: {worker_name}\nالقيمة: {amount} ر.س\nرمز الاستلام الخاص بك: {order_id}' : '📦 Custody Approved! [{company_name}]\nWorker: {worker_name}\nAmount: SAR {amount}\nCode: {order_id}');
+            const formattedMsg = formatMessagingText(rawTpl, {
+                worker_name: req.workerName || (worker ? worker.name : 'الموظف'),
+                amount: req.amount || '0',
+                order_id: code
+            });
+            sendWhatsAppDirect(phone, formattedMsg);
+        }
     }).catch(err => console.error("Error accepting custody request:", err));
 }
 
@@ -4762,6 +4810,7 @@ function addReminder() {
     const isAr = currentAppLang === 'ar';
     const titleVal = document.getElementById('reminder-title-input') ? document.getElementById('reminder-title-input').value.trim() : '';
     const deadlineVal = document.getElementById('reminder-deadline-input') ? document.getElementById('reminder-deadline-input').value : '';
+    const phoneVal = document.getElementById('reminder-phone-input') ? document.getElementById('reminder-phone-input').value.trim() : '';
     const noteVal = document.getElementById('reminder-note-input') ? document.getElementById('reminder-note-input').value.trim() : '';
     const leadTimes = Array.from(document.querySelectorAll('.rem-lead-cb:checked')).map(cb => cb.value);
 
@@ -4788,6 +4837,7 @@ function addReminder() {
         title: titleVal,
         deadlineMs: deadlineMs,
         deadlineISO: deadlineVal,
+        targetPhone: phoneVal,
         cycle: cycleVal || 'none',
         note: noteVal,
         leadTimes: leadTimes.length > 0 ? leadTimes : ['1_2d', '5d', '10d', '15d', '1m'],
@@ -4800,8 +4850,19 @@ function addReminder() {
         .then(() => {
             if (document.getElementById('reminder-title-input')) document.getElementById('reminder-title-input').value = '';
             if (document.getElementById('reminder-deadline-input')) document.getElementById('reminder-deadline-input').value = '';
+            if (document.getElementById('reminder-phone-input')) document.getElementById('reminder-phone-input').value = '';
             if (document.getElementById('reminder-note-input')) document.getElementById('reminder-note-input').value = '';
             if (document.getElementById('reminder-cycle-input')) document.getElementById('reminder-cycle-input').value = 'none';
+
+            if (phoneVal) {
+                const tpls = getCompanyData().messagingTemplates || {};
+                const rawTpl = tpls.reminder || (isAr ? '⏰ *تنبيه تذكير هام [{company_name}]*\n\nالتذكير: "{task_title}"\nالموعد النهائي: {reason}' : '⏰ Reminder Alert! Title: "{task_title}". Deadline: {reason}');
+                const waMsg = rawTpl.replace(/{task_title}/g, titleVal)
+                                    .replace(/{reason}/g, new Date(deadlineMs).toLocaleDateString())
+                                    .replace(/{company_name}/g, currentCompany.toUpperCase());
+                if (typeof sendWhatsAppDirect === 'function') sendWhatsAppDirect(phoneVal, waMsg);
+            }
+
             renderReminders();
         })
         .catch(err => {
@@ -5183,6 +5244,7 @@ function renderReminders() {
                 <!-- Col 3: Deadline & Alerts -->
                 <div style="min-width:0; font-size:0.82rem; color:var(--text-muted);">
                     <div>🕒 <strong>${deadlineStr}</strong></div>
+                    ${r.targetPhone ? `<div style="font-size:0.78rem; margin-top:2px; color:#10b981; font-weight:800;">📱 ${r.targetPhone}</div>` : ''}
                     <div style="font-size:0.75rem; margin-top:2px;">🔔 ${isAr ? 'تنبيه:' : 'Alert:'} <strong>${activeLeadStr || 'None'}</strong></div>
                 </div>
 
@@ -5364,6 +5426,10 @@ function openEditReminderModal(remId) {
         document.getElementById('edit-reminder-deadline').value = new Date(r.deadlineMs).toISOString().slice(0, 16);
     }
 
+    if (document.getElementById('edit-reminder-phone')) {
+        document.getElementById('edit-reminder-phone').value = r.targetPhone || '';
+    }
+
     if (document.getElementById('edit-reminder-cycle')) {
         document.getElementById('edit-reminder-cycle').value = r.cycle || 'none';
     }
@@ -5396,6 +5462,7 @@ function saveEditReminder() {
     const remId = document.getElementById('edit-reminder-id').value;
     const titleVal = document.getElementById('edit-reminder-title').value.trim();
     const deadlineVal = document.getElementById('edit-reminder-deadline').value;
+    const phoneVal = document.getElementById('edit-reminder-phone') ? document.getElementById('edit-reminder-phone').value.trim() : '';
     const cycleVal = document.getElementById('edit-reminder-cycle') ? document.getElementById('edit-reminder-cycle').value : 'none';
     const noteVal = document.getElementById('edit-reminder-note').value.trim();
     const leadTimes = Array.from(document.querySelectorAll('.edit-rem-lead-cb:checked')).map(cb => cb.value);
@@ -5409,6 +5476,7 @@ function saveEditReminder() {
         title: titleVal,
         deadlineMs: deadlineMs,
         deadlineISO: deadlineVal,
+        targetPhone: phoneVal,
         cycle: cycleVal || 'none',
         note: noteVal,
         leadTimes: leadTimes.length > 0 ? leadTimes : ['1_2d', '5d', '10d', '15d', '1m']

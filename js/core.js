@@ -344,6 +344,7 @@ function startGlobalNotificationListeners(email) {
                 let prevOrderStartTime = myWorkerData && myWorkerData.activeOrder ? myWorkerData.activeOrder.startTime : null;
                 let prevViolationsCount = myWorkerData && myWorkerData.systemViolations ? myWorkerData.systemViolations.length : 0;
                 let prevPaymentReqStatuses = {};
+                let prevCustodyReqStatuses = {};
                 let prevGeneralDeliveries = {};
 
                 // Get initial general deliveries
@@ -359,6 +360,16 @@ function startGlobalNotificationListeners(email) {
                         const reqs = snap.val() || {};
                         Object.keys(reqs).forEach(id => {
                             prevPaymentReqStatuses[id] = reqs[id].status;
+                        });
+                    }
+                }).catch(() => { });
+
+                // Get initial custody requests
+                db.ref(`companies/${companyId}/custodyRequests`).once('value').then(snap => {
+                    if (snap.exists()) {
+                        const reqs = snap.val() || {};
+                        Object.keys(reqs).forEach(id => {
+                            prevCustodyReqStatuses[id] = reqs[id].status;
                         });
                     }
                 }).catch(() => { });
@@ -390,6 +401,10 @@ function startGlobalNotificationListeners(email) {
                         const pRequests = companyData.paymentRequests || {};
                         Object.keys(pRequests).forEach(id => {
                             prevPaymentReqStatuses[id] = pRequests[id].status;
+                        });
+                        const cRequests = companyData.custodyRequests || {};
+                        Object.keys(cRequests).forEach(id => {
+                            prevCustodyReqStatuses[id] = cRequests[id].status;
                         });
                         prevGeneralDeliveries = companyData.generalDeliveries || {};
                         return;
@@ -454,6 +469,32 @@ function startGlobalNotificationListeners(email) {
                                     if (msg) showInAppNotification(msg);
                                 }
                                 prevPaymentReqStatuses[req.id] = req.status;
+                            }
+                        });
+
+                        // 5. Custody Request Status Check for Worker
+                        const cRequests = companyData.custodyRequests || {};
+                        Object.values(cRequests).forEach(req => {
+                            if (req.workerId === updatedWorker.id) {
+                                const prevStatus = prevCustodyReqStatuses[req.id];
+                                if (prevStatus && req.status !== prevStatus) {
+                                    let msg = '';
+                                    if (req.status === 'accepted') {
+                                        msg = isAr
+                                            ? `📦 تم قبول طلب العهدة في ${compName}! الكود: ${req.code}`
+                                            : `📦 Custody request approved in ${compName}! Code: ${req.code}`;
+                                    } else if (req.status === 'rejected') {
+                                        msg = isAr
+                                            ? `❌ تم رفض طلب العهدة في ${compName}`
+                                            : `❌ Custody request rejected in ${compName}`;
+                                    } else if (req.status === 'given') {
+                                        msg = isAr
+                                            ? `📦 تم تسليم العهدة بقيمة ${req.amount} ريال بنجاح في ${compName}`
+                                            : `📦 Custody of SAR ${req.amount} given successfully in ${compName}!`;
+                                    }
+                                    if (msg) showInAppNotification(msg);
+                                }
+                                prevCustodyReqStatuses[req.id] = req.status;
                             }
                         });
                     }
