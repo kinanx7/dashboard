@@ -940,3 +940,9 @@ async function runServerTaskCycleCheck() {
 
 setInterval(runServerTaskCycleCheck, 30000);
 
+// ─── Start HTTP Server & Initialize WhatsApp Engine ────────────────────────
+app.listen(PORT, () => {
+    console.log(`🚀 Burgeroov Notify & WhatsApp Gateway Server is active and listening on port ${PORT}`);
+    initWhatsAppEngine();
+});
+
