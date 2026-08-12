@@ -331,6 +331,12 @@ async function sendWhatsAppDirect(phone, text) {
     }
 }
 
+// ─── Notification Listeners Global State ─────────────────────────────────────
+const prevState = {};
+const notifiedGeneralTasks = {};
+const isFirstGeneralTasksLoad = {};
+const companyTemplates = {};
+
 // Helper to safely get preparing workers across all company nodes & formats
 async function getPreparingWorkersForCompany(companyId) {
     const companyList = [companyId, 'mvc', 'mvcfresh', 'burgeroov'];
