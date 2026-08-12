@@ -484,6 +484,9 @@
                     <button id="tab-vault" class="dept-tab admin-only" onclick="switchTab('vault')"
                         data-i18n="tab-vault">📁
                         Informations</button>
+                    <button id="tab-messaging" class="dept-tab admin-only" onclick="switchTab('messaging')"
+                        data-i18n="tab-messaging">💬
+                        Messaging</button>
                 </div>
                 <button type="button" class="btn-outline" id="tab-reorder-btn" onclick="toggleTabReorderMode()"
                     style="padding: 8px 16px; border-radius: 100px; font-weight: 700; font-size: 0.85rem;"
@@ -3730,6 +3733,164 @@
             </div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- VIEW 19: MESSAGING & WHATSAPP GATEWAY VIEW -->
+        <!-- ========================================== -->
+        <div id="view-messaging" class="view-section admin-only" style="grid-template-columns: 1fr;">
+            <div class="card" style="width: 100%; border-top: 4px solid #10b981;">
+                <!-- Main Section Header -->
+                <div class="flex-between" style="margin-bottom: 24px; flex-wrap: wrap; gap: 14px; align-items: center;">
+                    <div>
+                        <h2 class="card-title" style="margin:0; border:none; padding:0; display:flex; align-items:center; gap:10px;">
+                            <span data-i18n="title-messaging-main">💬 Automated Messaging & WhatsApp Gateway</span>
+                            <span id="msg-status-badge" class="badge" style="background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); font-size: 0.78rem; font-weight: 800; padding: 4px 12px; border-radius: 20px;">
+                                🟢 Gateway Online
+                            </span>
+                        </h2>
+                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; font-weight: 600;" data-i18n="desc-messaging-main">
+                            Manage worker phone numbers, connect WhatsApp Business via QR Code, and customize automated notification templates for tasks, orders, and reminders.
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button type="button" onclick="saveAllMessagingSettings()" class="btn-success" style="padding: 10px 20px; border-radius: 12px; font-weight: 800; background: linear-gradient(135deg, #10b981, #059669); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow:0 2px 8px rgba(16,185,129,0.3);" data-i18n="btn-save-all-messaging">
+                            <span>💾 Save All Settings</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 3 COLUMN GRID: 1. QR Code / Status | 2. Worker Numbers | 3. Template Customizer -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+                    
+                    <!-- CARD 1: WhatsApp Business Connection & QR Code -->
+                    <div style="background: var(--input-bg); border-radius: 16px; border: 1px solid var(--border-color); padding: 20px; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <h3 style="font-size: 1.05rem; font-weight: 900; color: var(--text-main); margin-bottom: 6px; display:flex; align-items:center; gap:8px;">
+                                <span data-i18n="title-wa-connection">📱 WhatsApp Business Connection</span>
+                            </h3>
+                            <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
+                                Self-hosted on your Render Server. Open WhatsApp Business on your phone (Linked Devices -> Link a Device) and scan the QR code below.
+                            </p>
+
+                            <!-- Gateway Credentials / Server URL Input -->
+                            <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">
+                                <label style="font-size:0.75rem; font-weight:800; color:var(--text-muted);">Render Server Gateway URL:</label>
+                                <input type="text" id="wa-server-url" value="https://burgeroov-notify-server.onrender.com" placeholder="https://burgeroov-notify-server.onrender.com" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.82rem; font-weight:700;">
+                            </div>
+
+                            <!-- QR Code Box Container -->
+                            <div style="text-align: center; background: var(--card-bg); padding: 16px; border-radius: 14px; border: 2px dashed #10b981; margin-bottom: 14px; position: relative;">
+                                <div id="wa-qr-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 160px;">
+                                    <img id="wa-qr-img" src="https://burgeroov-notify-server.onrender.com/wa/qr" alt="WhatsApp QR Code" style="width: 160px; height: 160px; border-radius: 10px; box-shadow: var(--shadow-sm); border: 1px solid var(--border-color);" onerror="this.src='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=MVC_RENDER_GATEWAY_OFFLINE';">
+                                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px; font-weight: 700;">
+                                        Scan Live QR Code with WhatsApp Business
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; font-size:0.85rem; font-weight:700; background:var(--card-bg); padding:8px 12px; border-radius:10px; border:1px solid var(--border-color);">
+                                <span>Status:</span>
+                                <span id="wa-connection-text" style="color:#10b981; font-weight:900;">🟢 Active & Linked</span>
+                            </div>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                                <button type="button" onclick="refreshWhatsAppQR()" class="btn-neutral" style="padding:10px; border-radius:10px; font-weight:800; font-size:0.8rem;">
+                                    🔄 Refresh QR
+                                </button>
+                                <button type="button" onclick="logoutWhatsAppSession()" class="btn-danger" style="padding:10px; border-radius:10px; font-weight:800; font-size:0.8rem; background:linear-gradient(135deg, #ef4444, #dc2626); color:white; border:none; cursor:pointer;">
+                                    🚪 Switch Number
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CARD 2: Worker Phone Number Assignment Table -->
+                    <div style="background: var(--input-bg); border-radius: 16px; border: 1px solid var(--border-color); padding: 20px;">
+                        <h3 style="font-size: 1.05rem; font-weight: 900; color: var(--text-main); margin-bottom: 6px; display:flex; align-items:center; gap:8px;">
+                            <span data-i18n="title-workers-phone-matrix">👥 Workers Phone Number Matrix</span>
+                        </h3>
+                        <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px; line-height: 1.5;">
+                            Assign worker phone numbers with country codes (e.g. +966501234567) and toggle WhatsApp alerts enabled per worker.
+                        </p>
+
+                        <!-- Workers Table -->
+                        <div style="max-height: 380px; overflow-y: auto; padding-right: 4px;">
+                            <div id="messaging-workers-list" style="display: flex; flex-direction: column; gap: 10px;">
+                                <!-- Rendered by renderMessagingWorkers() -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CARD 3: Notification Message Templates Matrix -->
+                    <div style="background: var(--input-bg); border-radius: 16px; border: 1px solid var(--border-color); padding: 20px;">
+                        <h3 style="font-size: 1.05rem; font-weight: 900; color: var(--text-main); margin-bottom: 6px; display:flex; align-items:center; gap:8px;">
+                            <span data-i18n="title-custom-templates">📝 Custom Notification Templates</span>
+                        </h3>
+                        <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
+                            Customize automated text messages for every situation. Available tags: <code>{worker_name}</code>, <code>{task_title}</code>, <code>{order_id}</code>, <code>{amount}</code>.
+                        </p>
+
+                        <div style="max-height: 380px; overflow-y: auto; padding-right: 4px; display: flex; flex-direction: column; gap: 14px;">
+                            <!-- Template 1: Task -->
+                            <div>
+                                <label style="font-weight: 800; font-size: 0.78rem; color: var(--text-main); margin-bottom: 4px; display: block;" data-i18n="label-tpl-task">📋 New Task Template</label>
+                                <textarea id="msg-tpl-task" rows="2" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.82rem; font-weight:600;"></textarea>
+                            </div>
+
+                            <!-- Template 2: Delivery -->
+                            <div>
+                                <label style="font-weight: 800; font-size: 0.78rem; color: var(--text-main); margin-bottom: 4px; display: block;" data-i18n="label-tpl-delivery">🛵 New Delivery Order Template</label>
+                                <textarea id="msg-tpl-delivery" rows="2" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.82rem; font-weight:600;"></textarea>
+                            </div>
+
+                            <!-- Template 3: Prepare Order -->
+                            <div>
+                                <label style="font-weight: 800; font-size: 0.78rem; color: var(--text-main); margin-bottom: 4px; display: block;" data-i18n="label-tpl-prepare">👨‍🍳 New Kitchen/Market Prepare Template</label>
+                                <textarea id="msg-tpl-prepare" rows="2" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.82rem; font-weight:600;"></textarea>
+                            </div>
+
+                            <!-- Template 4: Violation -->
+                            <div>
+                                <label style="font-weight: 800; font-size: 0.78rem; color: var(--text-main); margin-bottom: 4px; display: block;" data-i18n="label-tpl-violation">⚠️ Violation / Deduction Template</label>
+                                <textarea id="msg-tpl-violation" rows="2" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.82rem; font-weight:600;"></textarea>
+                            </div>
+
+                            <!-- Template 5: Reward -->
+                            <div>
+                                <label style="font-weight: 800; font-size: 0.78rem; color: var(--text-main); margin-bottom: 4px; display: block;" data-i18n="label-tpl-reward">🎉 Reward Added Template</label>
+                                <textarea id="msg-tpl-reward" rows="2" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.82rem; font-weight:600;"></textarea>
+                            </div>
+
+                            <!-- Template 6: Expiry Reminder -->
+                            <div>
+                                <label style="font-weight: 800; font-size: 0.78rem; color: var(--text-main); margin-bottom: 4px; display: block;" data-i18n="label-tpl-expiry">⏰ Document Expiry Template</label>
+                                <textarea id="msg-tpl-expiry" rows="2" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.82rem; font-weight:600;"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BOTTOM TOOLBAR: TEST MESSAGE SENDER -->
+                <div style="margin-top: 20px; background: var(--input-bg); padding: 16px; border-radius: 14px; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+                    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; flex:1;">
+                        <span style="font-weight:900; font-size:0.88rem; color:var(--text-main);">🚀 Send Test Notification:</span>
+                        <select id="msg-test-worker" style="padding:8px 12px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-weight:700; font-size:0.85rem; min-width:160px;"></select>
+                        <select id="msg-test-type" style="padding:8px 12px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-weight:700; font-size:0.85rem; min-width:160px;">
+                            <option value="task">📋 Task Alert</option>
+                            <option value="delivery">🛵 Delivery Alert</option>
+                            <option value="prepare">👨‍🍳 Kitchen Prepare Alert</option>
+                            <option value="violation">⚠️ Violation Alert</option>
+                            <option value="reward">🎉 Reward Alert</option>
+                            <option value="expiry">⏰ Expiry Alert</option>
+                        </select>
+                    </div>
+                    <button type="button" onclick="sendTestMessagingAlert()" class="btn-primary" style="padding:10px 20px; border-radius:10px; font-weight:800; background:linear-gradient(135deg, #3b82f6, #1d4ed8); color:white; border:none; cursor:pointer;">
+                        <span>🚀 Send Test WhatsApp</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Locked Department Overlay (shown when a worker taps a restricted tab) -->
         <div id="view-locked" class="view-section">
             <div style="text-align:center; max-width:480px; margin:0 auto; padding:20px;">
@@ -4702,17 +4863,17 @@
 
     <script defer src="translations.js"></script>
     <!-- Modularized Core & Feature Scripts -->
-    <script defer src="js/core.js?v=78"></script>
-    <script defer src="js/auth.js?v=78"></script>
-    <script defer src="js/adverts_notes.js?v=78"></script>
-    <script defer src="js/sales_costs.js?v=78"></script>
-    <script defer src="js/warehouse.js?v=78"></script>
-    <script defer src="js/tasks.js?v=78"></script>
-    <script defer src="js/drivers.js?v=78"></script>
-    <script defer src="js/ops.js?v=78"></script>
-    <script defer src="js/finance.js?v=78"></script>
-    <script defer src="js/market.js?v=78"></script>
-    <script defer src="js/prepare.js?v=78"></script>
+    <script defer src="js/core.js?v=83"></script>
+    <script defer src="js/auth.js?v=83"></script>
+    <script defer src="js/adverts_notes.js?v=83"></script>
+    <script defer src="js/sales_costs.js?v=83"></script>
+    <script defer src="js/warehouse.js?v=83"></script>
+    <script defer src="js/tasks.js?v=83"></script>
+    <script defer src="js/drivers.js?v=83"></script>
+    <script defer src="js/ops.js?v=83"></script>
+    <script defer src="js/finance.js?v=83"></script>
+    <script defer src="js/market.js?v=83"></script>
+    <script defer src="js/prepare.js?v=83"></script>
     <!-- 3-Month Attendance Report Modal -->
     <div id="modal-3month-attendance-report" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.65); backdrop-filter:blur(4px); display:none; justify-content:center; align-items:center; z-index:999999;">
         <div class="modal-content" style="max-width: 850px; width: 95%; max-height: 88vh; overflow-y: auto; border-radius: 16px; padding: 24px; background:var(--card-bg); box-shadow:0 10px 40px rgba(0,0,0,0.5); margin:auto;">

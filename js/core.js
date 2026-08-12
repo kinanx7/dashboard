@@ -2038,7 +2038,7 @@ function switchTab(tab) {
         }
     }
 
-    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant', 'vault'];
+    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant', 'vault', 'messaging'];
 
     allTabs.forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
@@ -2061,6 +2061,9 @@ function switchTab(tab) {
     if (tab === 'vault' && typeof renderVaultNotes === 'function') {
         renderVaultNotes();
     }
+    if (tab === 'messaging' && typeof renderMessagingSection === 'function') {
+        renderMessagingSection();
+    }
 
     // Update the compact bar's active tab label and icon
     const tabMeta = {
@@ -2078,6 +2081,8 @@ function switchTab(tab) {
         reminders: { icon: '⏰', label: 'Reminders' },
         market: { icon: '🏪', label: 'Market' },
         prepare: { icon: '👨‍🍳', label: 'Prepare' },
+        vault: { icon: '📁', label: 'Informations' },
+        messaging: { icon: '💬', label: 'Messaging' },
     };
     const meta = tabMeta[tab] || { icon: '⚙️', label: tab };
     const iconEl = document.getElementById('mob-active-icon');
@@ -2260,7 +2265,7 @@ function switchTab(tab) {
         }
     }
 
-    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant', 'vault'];
+    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant', 'vault', 'messaging'];
 
     allTabs.forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
@@ -2283,6 +2288,9 @@ function switchTab(tab) {
     if (tab === 'vault' && typeof renderVaultNotes === 'function') {
         renderVaultNotes();
     }
+    if (tab === 'messaging' && typeof renderMessagingSection === 'function') {
+        renderMessagingSection();
+    }
 
     // Update the compact bar's active tab label and icon
     const tabMeta = {
@@ -2300,6 +2308,8 @@ function switchTab(tab) {
         reminders: { icon: '⏰', label: 'Reminders' },
         market: { icon: '🏪', label: 'Market' },
         prepare: { icon: '👨‍🍳', label: 'Prepare' },
+        vault: { icon: '📁', label: 'Informations' },
+        messaging: { icon: '💬', label: 'Messaging' },
     };
     const meta = tabMeta[tab] || { icon: '⚙️', label: tab };
     const iconEl = document.getElementById('mob-active-icon');

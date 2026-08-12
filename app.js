@@ -5524,7 +5524,7 @@ function switchTab(tab) {
         }
     }
 
-    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant', 'vault'];
+    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant', 'vault', 'messaging'];
 
     allTabs.forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
@@ -5547,6 +5547,9 @@ function switchTab(tab) {
     if (tab === 'vault' && typeof renderVaultNotes === 'function') {
         renderVaultNotes();
     }
+    if (tab === 'messaging' && typeof renderMessagingSection === 'function') {
+        renderMessagingSection();
+    }
 
     // Update the compact bar's active tab label and icon
     const tabMeta = {
@@ -5564,6 +5567,8 @@ function switchTab(tab) {
         reminders: { icon: '⏰', label: 'Reminders' },
         market: { icon: '🏪', label: 'Market' },
         prepare: { icon: '👨‍🍳', label: 'Prepare' },
+        vault: { icon: '📁', label: 'Informations' },
+        messaging: { icon: '💬', label: 'Messaging' },
     };
     const meta = tabMeta[tab] || { icon: '⚙️', label: tab };
     const iconEl = document.getElementById('mob-active-icon');
@@ -17850,6 +17855,31 @@ function executeAIToolAction(toolName, args) {
     console.log("Executing AI Tool Action:", toolName, args);
     const isAr = currentAppLang === 'ar';
 
+    if (toolName === 'execute_universal_action') {
+        const desc = args.action_description || (isAr ? 'تنفيذ إجراء تلقائي' : 'Auto-executed Action');
+        const jsCode = args.javascript_code || '';
+        let execSuccess = true;
+        let execErr = '';
+        if (jsCode) {
+            try {
+                const fn = new Function(jsCode);
+                fn();
+                if (typeof renderAll === 'function') renderAll();
+            } catch(e) {
+                console.error("AI Dynamic Execution Error:", e);
+                execSuccess = false;
+                execErr = e.message;
+            }
+        }
+        return {
+            success: execSuccess,
+            message: execSuccess 
+                ? (isAr ? `تم تنفيذ الإجراء بنجاح: ${desc}` : `Successfully executed action: ${desc}`)
+                : (isAr ? `حدث خطأ أثناء تنفيذ الإجراء: ${execErr}` : `Action execution error: ${execErr}`),
+            actionBadge: `⚡ ${desc}`
+        };
+    }
+
     if (toolName === 'add_market_product') {
         let rawName = args.name || '';
         let cleanName = rawName
@@ -18614,46 +18644,28 @@ function getRemindersSummary() {
 window.getRemindersSummary = getRemindersSummary;
 
 async function fetchGeneralKnowledge(query, isAr) {
-    if (!query || query.length < 3) return null;
-    const lower = query.toLowerCase();
+    if (!query || query.length < 2) return null;
 
-    // Skip dashboard action triggers
-    if (/(sales|mbe3at|مبيعات|منتج|مهمة|رصيد|مطبخ|تذكير|راتب|خصم)/i.test(lower)) return null;
+    const liveContext = typeof getCompanyLiveContextSummary === 'function' ? getCompanyLiveContextSummary() : '';
+    const sysMsg = isAr
+        ? `أنت المدير التنفيذي الذكي للبوابة (MVC Smart AI Executive Manager). أنت متمكن جداً من اللغة العربية والتنفيذ الذكي للأوامر وتحليل بيانات النظام بالريال السعودي.
+إذا كان السؤال يخص بيانات النظام أو الموظفين أو المبيعات أو المستودع أو التذكيرات، فاستخرج الإجابة بدقة من بيانات النظام اللحظية التالية:
+${liveContext}`
+        : `You are MVC Smart AI Executive Manager. You possess deep neural intelligence and accurate understanding of system data, business advice, and general questions.
+System Context Data:
+${liveContext}`;
 
-    // 1. Try Free AI API (Pollinations.ai Endpoint)
     try {
-        const sysMsg = isAr
-            ? "أنت مساعد ذكي يعطي إجابات قصيرة ودقيقة ومباشرة لجميع الأسئلة."
-            : "You are a smart executive AI manager. Give a concise, accurate, direct answer to the question.";
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
-        const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent(query)}?system=${encodeURIComponent(sysMsg)}`, { signal: controller.signal });
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent(query)}?system=${encodeURIComponent(sysMsg)}&model=openai`, { 
+            signal: controller.signal 
+        });
         clearTimeout(timeoutId);
         if (res.status === 200) {
             const text = await res.text();
             if (text && text.length > 5 && !text.includes('Error') && !text.includes('html')) {
                 return text.trim();
-            }
-        }
-    } catch (e) { }
-
-    // 2. Try Wikipedia Knowledge Summary API
-    try {
-        let topic = query.replace(/what|how|tall|high|big|is|the|of|a|an|where|who|when|tell|me|about/gi, '').trim();
-        if (/khalifa|خليفة/i.test(query)) topic = 'Burj_Khalifa';
-        if (/sudan|سودان/i.test(query)) topic = 'Khartoum';
-
-        if (topic && topic.length >= 2) {
-            const lang = isAr ? 'ar' : 'en';
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 3000);
-            const res = await fetch(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topic)}`, { signal: controller.signal });
-            clearTimeout(timeoutId);
-            if (res.status === 200) {
-                const data = await res.json();
-                if (data.extract) {
-                    return data.extract;
-                }
             }
         }
     } catch (e) { }
@@ -18797,6 +18809,41 @@ function resetAIChatMicUI() {
 window.toggleAIChatVoiceInput = toggleAIChatVoiceInput;
 window.resetAIChatMicUI = resetAIChatMicUI;
 
+function showAIThinkingIndicator() {
+    removeAIThinkingIndicator();
+    const history = document.getElementById('ai-chat-history');
+    if (!history) return;
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    const container = document.createElement('div');
+    container.id = 'ai-thinking-indicator';
+    container.style.display = 'flex';
+    container.style.gap = '12px';
+    container.style.alignItems = 'flex-start';
+    container.style.marginBottom = '12px';
+
+    container.innerHTML = `
+        <div style="width:36px; height:36px; border-radius:12px; background:linear-gradient(135deg, #6366f1, #4f46e5); color:white; display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0;">🧠</div>
+        <div style="background:var(--input-bg); border:1px solid var(--border-color); padding:12px 18px; border-radius:4px 18px 18px 18px; font-size:0.9rem; color:var(--text-main); font-weight:700; display:flex; align-items:center; gap:8px; box-shadow:var(--shadow-sm);">
+            <span>${isAr ? 'المساعد الذكي يفكر ويحلل النظام' : 'MVC AI Executive Manager is thinking'}</span>
+            <span class="ai-thinking-dots">
+                <span class="ai-thinking-dot"></span>
+                <span class="ai-thinking-dot"></span>
+                <span class="ai-thinking-dot"></span>
+            </span>
+        </div>
+    `;
+    history.appendChild(container);
+    history.scrollTop = history.scrollHeight;
+}
+
+function removeAIThinkingIndicator() {
+    const el = document.getElementById('ai-thinking-indicator');
+    if (el) el.remove();
+}
+window.showAIThinkingIndicator = showAIThinkingIndicator;
+window.removeAIThinkingIndicator = removeAIThinkingIndicator;
+
 async function handleAIChatSubmit() {
     if (isAIChatListening && aiChatSpeechRecognition) {
         try { aiChatSpeechRecognition.stop(); } catch(e){}
@@ -18809,6 +18856,7 @@ async function handleAIChatSubmit() {
 
     input.value = '';
     renderAIChatMessage('user', userText);
+    showAIThinkingIndicator();
 
     const apiKey = getGeminiApiKey();
     const isAr = currentAppLang === 'ar';
@@ -18822,20 +18870,42 @@ async function handleAIChatSubmit() {
     if (apiKey) {
         try {
             const liveContext = getCompanyLiveContextSummary();
-            const systemPrompt = `You are MVC Smart AI Executive Manager powered by Gemini. You possess full intelligence and neural reasoning. You must answer ANY question in the world (science, philosophy, history, riddles like 'who came first egg or chicken', recipes, math, business advice, chit-chat) warmly, accurately, and naturally in Arabic or English.
+            const systemPrompt = isAr ? `أنت "المساعد الذكي التنفيذي لشبكة وبوابة إم في سي (MVC Smart AI Executive Manager)".
+تتمتع بالذكاء الاصطناعي الفائق، التحليل المنطقي العميق، والقدرة على الفهم التام للغة العربية بجميع لهجاتها وفصاحتها، بالإضافة للغة الإنجليزية.
 
-GUIDELINES FOR DASHBOARD DATA:
-1. DAILY SALES & DATE QUERIES: When the user asks for sales, revenue, or earnings (even with typos like 'sles', 'sls', 'saales', 'مبعات', 'جم المبيعات', 'كم دخل اليوم'), consult the TODAY'S TOTAL SALES or DAILY SALES BREAKDOWN BY SPECIFIC DATE section in the LIVE DATA below and output the exact SR revenue in this exact 1-line format:
+صلاحياتك ودورك في النظام:
+1. الفهم الكامل والحي لجميع بيانات الشركة: لديك صلاحية الاطلاع المباشر على بيانات الموظفين، الرواتب، السلف، المخالفات، المكافآت، الحضور والتأخير، الإجازات، مخزون المستودع، منتجات السوق، التذكيرات، والوثائق.
+2. التنفيذ التلقائي الفوري للأوامر (Universal Action): إذا طلب منك المستخدم إضافة، تعديل، حذف، أو خصم أي شيء (مثال: "أضف منتج"، "تعديل راتب"، "خصم تأخير"، "تسجيل إجازة"، "إضافة تذكير"، "حذف صنف منتهي")، قم فوراً باستدعاء أداة "execute_universal_action" وكتابة كود البرمجة التنفيذي للعملية.
+3. الإجابة الذكية الفائقة عن جميع الأسئلة العامة (علوم، فلسفة، رياضيات، تاريخ، ثقافة، نصائح إدارية) بأسلوب راقٍ وشيق ومبسط.
+4. الإجابات المالية والاستعلامات: عند السؤال عن المبيعات أو الموظفين أو التأخير، قدم تقريراً شاملاً ومفصلاً بالريال السعودي (ر.س).
+
+بيانات النظام الحية اللحظية:
+${liveContext}` : `You are MVC Smart AI Executive Manager powered by Gemini Thinking Engine. You possess full intelligence, neural reasoning, and universal project authority. You answer ANY question in the world (science, philosophy, history, recipes, math, business advice) warmly, accurately, and naturally in Arabic or English.
+
+UNIVERSAL AUTOMATIC CONTROL & EXECUTIVE GUIDELINES:
+1. FULL PROJECT UNDERSTANDING: You have access to the complete live system data below. You understand every worker, salary, attendance, inventory stock, sale, cost, reminder, and market product.
+2. DYNAMIC AUTOMATIC ACTIONS: If the user asks to add, edit, delete, modify, or update ANYTHING (e.g. salaries, inventory items, worker tasks, reminders, penalties, rewards, market products, tabs), use the tool function "execute_universal_action" or dedicated tool functions to perform the JavaScript modification directly on the live client/database.
+3. DAILY SALES & DATE QUERIES: Output exact SR revenue in this exact 1-line format:
 "Your sales today - (YYYY-MM-DD) - is ( AMOUNT SR )" (or in Arabic: "مبيعاتك اليوم - (YYYY-MM-DD) - هي ( AMOUNT ر.س )")
-2. ATTENDANCE, LATENESS & VACATION QUERIES: When the user asks who was late today, who is absent, or who is on vacation (e.g. 'من المتأخر اليوم؟', 'من في إجازة؟', 'who was late today?', 'who is on vacation?'), check the ATTENDANCE, LATENESS & VACATION TRACKER section below and give exact names, check-in times, and lateness details.
-3. WORKER MONEY & PAYROLL REPORTS: When the user asks for a money/financial report for a SPECIFIC worker (e.g. 'money history of Ahmed'), search for that worker's name and extract base salary, current balance, custody, rewards, violations, and payments.
-4. ACTIONS & TOOL CALLS: When the user asks to add market products, assign worker tasks, refill balances, or navigate tabs, invoke the appropriate tool functions.
+4. ATTENDANCE & LATENESS QUERIES: Provide exact names, check-in times, and lateness details.
 
 === LIVE REAL-TIME SYSTEM DATA ===
 ${liveContext}`;
             const toolsDeclaration = [
                 {
                     functionDeclarations: [
+                        {
+                            name: "execute_universal_action",
+                            description: "Executes any action, modification, update, creation, deletion, or query dynamically by providing executable client-side JavaScript code and a concise summary.",
+                            parameters: {
+                                type: "OBJECT",
+                                properties: {
+                                    action_description: { type: "STRING", description: "Human readable summary of what action was taken in Arabic or English" },
+                                    javascript_code: { type: "STRING", description: "Valid client-side JavaScript code to perform the requested action on the live database or UI state." }
+                                },
+                                required: ["action_description", "javascript_code"]
+                            }
+                        },
                         {
                             name: "add_market_product",
                             description: "Adds a new product to the market catalog",
@@ -18879,7 +18949,7 @@ ${liveContext}`;
                             parameters: {
                                 type: "OBJECT",
                                 properties: {
-                                    tab_name: { type: "STRING", description: "Tab name: 'market', 'prepare', 'tasks', 'finance'" }
+                                    tab_name: { type: "STRING", description: "Tab name: 'market', 'prepare', 'tasks', 'finance', 'warehouse', 'reminders', 'vault'" }
                                 },
                                 required: ["tab_name"]
                             }
@@ -18888,7 +18958,14 @@ ${liveContext}`;
                 }
             ];
 
-            const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-flash-latest', 'gemini-pro'];
+            const modelsToTry = [
+                'gemini-2.0-flash',
+                'gemini-2.0-flash-thinking-exp-01-21',
+                'gemini-1.5-flash',
+                'gemini-1.5-flash-latest',
+                'gemini-flash-latest',
+                'gemini-pro'
+            ];
             let data = null;
 
             // Attempt 1: Call API with tools declaration and multi-turn chat history
@@ -18955,6 +19032,7 @@ ${liveContext}`;
             }
 
             if (data && !data.error && data.candidates?.[0]) {
+                removeAIThinkingIndicator();
                 const candidate = data.candidates[0].content;
                 const functionCall = candidate?.parts?.find(p => p.functionCall)?.functionCall;
 
@@ -18982,13 +19060,16 @@ ${liveContext}`;
     // Secondary Neural & General Knowledge Engine (when Gemini API key is rate-limited)
     try {
         const generalAns = await fetchGeneralKnowledge(userText, isAr);
+        removeAIThinkingIndicator();
         if (generalAns) {
             renderAIChatMessage('bot', generalAns);
             if (!window._aiChatHistory) window._aiChatHistory = [];
             window._aiChatHistory.push({ role: 'model', parts: [{ text: generalAns }] });
             return;
         }
-    } catch (e) { }
+    } catch (e) { 
+        removeAIThinkingIndicator();
+    }
 
     function extractProductInfo(text) {
         let rawText = text;
@@ -19635,6 +19716,245 @@ function deleteVaultNote(noteId) {
         });
 }
 window.deleteVaultNote = deleteVaultNote;
+
+// --- MESSAGING & WHATSAPP GATEWAY SYSTEM ---
+function renderMessagingSection() {
+    const list = document.getElementById('messaging-workers-list');
+    if (!list) return;
+
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const workers = data.workers || [];
+    const tpls = data.messagingTemplates || {};
+    const config = data.messagingConfig || {};
+
+    // Populate Gateway credentials
+    const instEl = document.getElementById('wa-instance-id');
+    const tokenEl = document.getElementById('wa-token');
+    if (instEl) instEl.value = config.instanceId || '';
+    if (tokenEl) tokenEl.value = config.token || '';
+
+    const defaultTpls = {
+        task: '📋 مرحباً {worker_name}! تم إسناد مهمة جديدة لك: "{task_title}". افتح اللوحة للمتابعة.',
+        delivery: '🛵 مرحباً {worker_name}! طلب توصيل جديد #{order_id} للعميل: {customer_name}.',
+        prepare: '👨‍🍳 تنبيه التحضير! طلب سوق جديد #{order_id} يحتوي على {items_count} أصناف بحاجة للتحضير.',
+        violation: '⚠️ تنبيه هام {worker_name}: تم تسجيل مخالفة على ملفك بقيمة {amount} ر.س: "{reason}".',
+        reward: '🎉 مبروك {worker_name}! تم إضافة مكافأة لك بقيمة {amount} ر.س: "{reason}".',
+        expiry: '⏰ تنبيه انتهاء الوثيقة: {doc_name} ينتهي خلال {days} أيام بتاريخ {expiry_date}.'
+    };
+
+    // Populate Templates
+    const fields = ['task', 'delivery', 'prepare', 'violation', 'reward', 'expiry'];
+    fields.forEach(f => {
+        const el = document.getElementById(`msg-tpl-${f}`);
+        if (el) {
+            el.value = tpls[f] || defaultTpls[f];
+        }
+    });
+
+    // Populate Workers Matrix List
+    if (workers.length === 0) {
+        list.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted); font-weight:700;">No workers found for this company.</div>`;
+    } else {
+        list.innerHTML = workers.map((w, idx) => {
+            if (!w) return '';
+            const phone = w.phone || '';
+            const enabled = w.waAlertsEnabled !== false;
+            const safeName = typeof escapeHtml === 'function' ? escapeHtml(w.name || `Worker #${idx}`) : (w.name || `Worker #${idx}`);
+            const role = w.role || 'Worker';
+
+            return `
+                <div style="background:var(--card-bg); padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                    <div style="flex:1; min-width:140px;">
+                        <strong style="font-size:0.88rem; color:var(--text-main); display:block;">${safeName}</strong>
+                        <span style="font-size:0.72rem; color:var(--text-muted); font-weight:700;">${role}</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:180px;">
+                        <input type="tel" id="msg-worker-phone-${idx}" value="${phone}" placeholder="+966501234567" style="width:100%; padding:6px 10px; border-radius:6px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.82rem; font-weight:700;">
+                        <label style="display:flex; align-items:center; gap:4px; font-size:0.75rem; font-weight:800; cursor:pointer; color:var(--text-muted); white-space:nowrap;">
+                            <input type="checkbox" id="msg-worker-enable-${idx}" ${enabled ? 'checked' : ''} style="width:auto;"> Alerts
+                        </label>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Populate Test Worker Dropdown
+    const testWorkerSelect = document.getElementById('msg-test-worker');
+    if (testWorkerSelect) {
+        testWorkerSelect.innerHTML = workers.map((w, idx) => {
+            if (!w) return '';
+            return `<option value="${idx}">${w.name || `Worker #${idx}`}</option>`;
+        }).join('');
+    }
+}
+window.renderMessagingSection = renderMessagingSection;
+
+function saveAllMessagingSettings() {
+    if (typeof db === 'undefined' || typeof currentCompany === 'undefined') return;
+
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const workers = data.workers || [];
+
+    // Save Worker Phone Numbers & Alerts Enabled
+    workers.forEach((w, idx) => {
+        const phoneInput = document.getElementById(`msg-worker-phone-${idx}`);
+        const enableInput = document.getElementById(`msg-worker-enable-${idx}`);
+        if (phoneInput && w) {
+            w.phone = phoneInput.value.trim();
+        }
+        if (enableInput && w) {
+            w.waAlertsEnabled = enableInput.checked;
+        }
+    });
+
+    db.ref(`companies/${currentCompany}/workers`).set(workers);
+
+    // Save Message Templates
+    const templates = {
+        task: document.getElementById('msg-tpl-task')?.value || '',
+        delivery: document.getElementById('msg-tpl-delivery')?.value || '',
+        prepare: document.getElementById('msg-tpl-prepare')?.value || '',
+        violation: document.getElementById('msg-tpl-violation')?.value || '',
+        reward: document.getElementById('msg-tpl-reward')?.value || '',
+        expiry: document.getElementById('msg-tpl-expiry')?.value || ''
+    };
+
+    db.ref(`companies/${currentCompany}/messagingTemplates`).set(templates);
+
+    // Save Gateway Config
+    const config = {
+        serverUrl: document.getElementById('wa-server-url')?.value?.trim() || 'https://burgeroov-notify-server.onrender.com'
+    };
+    db.ref(`companies/${currentCompany}/messagingConfig`).set(config);
+
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    alert(isAr 
+        ? '💾 تم حفظ أرقام الهواتف، رابط الخادم، وقوالب الرسائل بنجاح!' 
+        : '💾 Phone numbers, Server URL, and message templates saved successfully!');
+}
+window.saveAllMessagingSettings = saveAllMessagingSettings;
+
+function refreshWhatsAppQR() {
+    const qrImg = document.getElementById('wa-qr-img');
+    const statusText = document.getElementById('wa-connection-text');
+    const serverUrlInput = document.getElementById('wa-server-url');
+
+    const baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || 'https://burgeroov-notify-server.onrender.com';
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    if (qrImg) {
+        qrImg.src = `${baseUrl}/wa/qr?t=${Date.now()}`;
+    }
+
+    // Check status via JSON
+    fetch(`${baseUrl}/wa/status`)
+        .then(res => res.json())
+        .then(data => {
+            if (statusText) {
+                if (data.connected) {
+                    statusText.textContent = isAr ? `🟢 متصل: ${data.user || ''}` : `🟢 Connected: ${data.user || ''}`;
+                    statusText.style.color = '#10b981';
+                } else if (data.qrAvailable) {
+                    statusText.textContent = isAr ? '🟡 رمز QR جاهز للمسح' : '🟡 QR Code Ready to Scan';
+                    statusText.style.color = '#f59e0b';
+                } else {
+                    statusText.textContent = isAr ? '⏳ جاري بدء خادم الواتساب...' : '⏳ Starting WhatsApp Engine...';
+                    statusText.style.color = '#6366f1';
+                }
+            }
+        })
+        .catch(err => {
+            if (statusText) {
+                statusText.textContent = isAr ? '🔴 الخادم قيد التشغيل (أعد المحاولة)' : '🔴 Server Starting (Retry)';
+                statusText.style.color = '#ef4444';
+            }
+        });
+}
+window.refreshWhatsAppQR = refreshWhatsAppQR;
+
+function logoutWhatsAppSession() {
+    const serverUrlInput = document.getElementById('wa-server-url');
+    const baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || 'https://burgeroov-notify-server.onrender.com';
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    if (!confirm(isAr 
+        ? 'هل أنت تأكد من قطع الاتصال برقم الواتساب الحالي لربط رقم جديد؟' 
+        : 'Are you sure you want to disconnect current WhatsApp number to switch to a new phone?')) return;
+
+    fetch(`${baseUrl}/wa/logout`, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            alert(isAr 
+                ? '🚪 تم تسجيل الخروج بنجاح! يتم الآن توليد كود QR جديد لربط رقم الهاتف الجديد.' 
+                : '🚪 Logged out successfully! Generating a new QR code to pair your new phone.');
+            setTimeout(() => refreshWhatsAppQR(), 2000);
+        })
+        .catch(err => {
+            alert(isAr ? '❌ تعذر تسجيل الخروج: ' + err.message : '❌ Logout failed: ' + err.message);
+        });
+}
+window.logoutWhatsAppSession = logoutWhatsAppSession;
+
+function sendTestMessagingAlert() {
+    const workerIdx = document.getElementById('msg-test-worker')?.value;
+    const alertType = document.getElementById('msg-test-type')?.value || 'task';
+    const serverUrlInput = document.getElementById('wa-server-url');
+    const baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || 'https://burgeroov-notify-server.onrender.com';
+
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const workers = data.workers || [];
+    const targetWorker = workers[workerIdx];
+
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    if (!targetWorker) {
+        alert(isAr ? 'يرجى اختيار موظف لاختبار التنبيه.' : 'Please select a worker to test.');
+        return;
+    }
+
+    const phone = targetWorker.phone;
+    if (!phone) {
+        alert(isAr ? `❌ لم يتم تحديد رقم هاتف للموظف "${targetWorker.name}". يرجى إدخال رقم الهاتف وحفظ الإعدادات.` : `❌ No phone number assigned to "${targetWorker.name}". Please enter a phone number first.`);
+        return;
+    }
+
+    const workerName = targetWorker.name || 'Worker';
+    const tplEl = document.getElementById(`msg-tpl-${alertType}`);
+    let text = tplEl ? tplEl.value : 'Test notification';
+
+    text = text.replace(/{worker_name}/g, workerName)
+               .replace(/{task_title}/g, 'تنظيف وعرض المنتجات')
+               .replace(/{order_id}/g, '1042')
+               .replace(/{customer_name}/g, 'مطعم البرجر')
+               .replace(/{amount}/g, '100')
+               .replace(/{reason}/g, 'تميز في الأداء')
+               .replace(/{doc_name}/g, 'استمارة الهيلوكس')
+               .replace(/{days}/g, '5')
+               .replace(/{expiry_date}/g, '2026-08-17');
+
+    fetch(`${baseUrl}/wa/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, text })
+    })
+    .then(res => res.json())
+    .then(resData => {
+        if (resData.success) {
+            alert(isAr 
+                ? `✅ تم إرسال رسالة الواتساب بنجاح إلى الموظف ${workerName} (${phone})!\n\nنص الرسالة:\n"${text}"` 
+                : `✅ WhatsApp message sent successfully to ${workerName} (${phone})!\n\nMessage:\n"${text}"`);
+        } else {
+            alert(isAr 
+                ? `⚠️ تنبيه من الخادم: ${resData.error || 'تعذر الإرسال. تأكد من مسح رمز QR لربط الهاتف.'}` 
+                : `⚠️ Server alert: ${resData.error || 'Failed to send. Ensure WhatsApp is paired via QR code.'}`);
+        }
+    })
+    .catch(err => {
+        alert(isAr ? '❌ فشل الاتصال بالخادم: ' + err.message : '❌ Network error: ' + err.message);
+    });
+}
+window.sendTestMessagingAlert = sendTestMessagingAlert;
 
 // Initial run
 applyTranslations();

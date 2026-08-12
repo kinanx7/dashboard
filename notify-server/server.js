@@ -1,34 +1,28 @@
 /**
- * Burgeroov Push Notification Server
- * ====================================
- * Free alternative to Firebase Cloud Functions.
+ * Burgeroov Push Notification & Self-Hosted WhatsApp Gateway Server
+ * ===================================================================
+ * Free alternative to Firebase Cloud Functions & paid WhatsApp gateways.
  * Deploy this on Render.com (free tier) — no credit card needed.
  *
  * What it does:
  *   - Connects to Firebase RTDB using the Admin SDK
- *   - Watches every worker node in real-time
- *   - Sends FCM push notifications when:
- *       📋 A new task is assigned
- *       🛵 A new delivery order arrives
- *       ⚠️  A new violation is recorded
- *       🎉 A new reward is added
- *
- * Environment variables needed (set in Render.com dashboard):
- *   FIREBASE_PROJECT_ID      = burgeroov-portal
- *   FIREBASE_DATABASE_URL    = https://burgeroov-portal-default-rtdb.europe-west1.firebasedatabase.app
- *   FIREBASE_CLIENT_EMAIL    = (from your service account JSON)
- *   FIREBASE_PRIVATE_KEY     = (from your service account JSON — include \n characters)
+ *   - Watches every worker node in real-time and sends FCM push notifications
+ *   - Hosts a 100% FREE self-hosted WhatsApp Web Gateway powered by Baileys
+ *   - Serves real-time WhatsApp pairing QR codes directly to your dashboard!
  */
 
 const admin   = require('firebase-admin');
 const express = require('express');
+const { makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const QRCode = require('qrcode');
+const fs = require('fs');
+const path = require('path');
 
 // ─── Init Firebase Admin ───────────────────────────────────────────────────
 admin.initializeApp({
     credential: admin.credential.cert({
         projectId:   process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        // Render stores env vars as single-line; restore newlines
         privateKey:  (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
     }),
     databaseURL: process.env.FIREBASE_DATABASE_URL,
@@ -37,22 +31,163 @@ admin.initializeApp({
 const db        = admin.database();
 const messaging = admin.messaging();
 
-// ─── Express keeps the server alive on Render (free plan needs a web port) ──
+// ─── Express App Setup ───────────────────────────────────────────────────────
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// Health Check & Dedicated Keep-Alive endpoints for Render Cron Pings
+app.use(express.json());
+
+// Enable CORS for dashboard requests
+app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    if (req.method === 'OPTIONS') return res.sendStatus(200);
+    next();
+});
+
+// Health Check & Keep-Alive endpoints for Render Cron Pings
 app.get(['/ping', '/health'], (_req, res) => {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    return res.status(200).json({ status: 'ok', server: 'Burgeroov Notify Server', timestamp: Date.now() });
+    return res.status(200).json({ 
+        status: 'ok', 
+        server: 'Burgeroov Notify & WhatsApp Gateway Server', 
+        whatsappConnected: waConnectionState.connected,
+        timestamp: Date.now() 
+    });
 });
 
-app.get('/', (_req, res) => res.send('Burgeroov Notification Server is running ✅'));
+app.get('/', (_req, res) => res.send('Burgeroov Notification & WhatsApp Gateway Server is running ✅'));
+
+// ─── Self-Hosted WhatsApp Web Engine (Baileys) ─────────────────────────────
+let waSocket = null;
+let waQrDataUrl = null;
+let waConnectionState = { connected: false, user: null, status: 'initializing' };
+
+async function initWhatsAppEngine() {
+    console.log('[WhatsApp Engine] Initializing self-hosted WhatsApp Web Gateway...');
+    try {
+        const authDir = path.join(__dirname, 'auth_info_baileys');
+        if (!fs.existsSync(authDir)) fs.mkdirSync(authDir, { recursive: true });
+
+        const { state, saveCreds } = await useMultiFileAuthState(authDir);
+
+        waSocket = makeWASocket({
+            auth: state,
+            printQRInTerminal: false,
+            browser: ['Burgeroov Portal', 'Chrome', '1.0.0']
+        });
+
+        waSocket.ev.on('creds.update', saveCreds);
+
+        waSocket.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update;
+
+            if (qr) {
+                console.log('[WhatsApp Engine] New Pairing QR Code generated!');
+                try {
+                    waQrDataUrl = await QRCode.toDataURL(qr);
+                    waConnectionState = { connected: false, user: null, status: 'qr_ready' };
+                } catch (err) {
+                    console.error('[WhatsApp Engine] Failed to generate QR data URL:', err.message);
+                }
+            }
+
+            if (connection === 'open') {
+                console.log('[WhatsApp Engine] ✅ WhatsApp Connection ACTIVE & LINKED!');
+                waQrDataUrl = null;
+                const userJid = waSocket.user ? waSocket.user.id : 'WhatsApp User';
+                waConnectionState = { connected: true, user: userJid, status: 'connected' };
+            }
+
+            if (connection === 'close') {
+                const shouldReconnect = (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut);
+                console.log('[WhatsApp Engine] Connection closed. Reconnecting:', shouldReconnect);
+                waConnectionState = { connected: false, user: null, status: 'disconnected' };
+                if (shouldReconnect) {
+                    setTimeout(() => initWhatsAppEngine(), 3000);
+                }
+            }
+        });
+    } catch (err) {
+        console.error('[WhatsApp Engine] Initialization error:', err.message);
+    }
+}
+
+// ─── WhatsApp Web HTTP API Endpoints ─────────────────────────────────────────
+app.get('/wa/status', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.json({
+        ...waConnectionState,
+        qrAvailable: Boolean(waQrDataUrl)
+    });
+});
+
+app.get('/wa/qr', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    if (waConnectionState.connected) {
+        return res.status(200).send('<h3 style="color:#10b981; text-align:center; font-family:sans-serif;">🟢 WhatsApp is Connected & Linked!</h3>');
+    }
+    if (waQrDataUrl) {
+        if (req.query.format === 'json') {
+            return res.json({ qr: waQrDataUrl });
+        }
+        const imgBuffer = Buffer.from(waQrDataUrl.split(',')[1], 'base64');
+        res.setHeader('Content-Type', 'image/png');
+        return res.send(imgBuffer);
+    }
+    return res.status(200).send('<h3 style="color:#6366f1; text-align:center; font-family:sans-serif;">⏳ Generating WhatsApp QR Code... Please refresh in 5 seconds.</h3>');
+});
+
+app.post('/wa/logout', async (_req, res) => {
+    try {
+        if (waSocket) {
+            try { await waSocket.logout(); } catch(e){}
+        }
+        const authDir = path.join(__dirname, 'auth_info_baileys');
+        if (fs.existsSync(authDir)) {
+            fs.rmSync(authDir, { recursive: true, force: true });
+        }
+        waConnectionState = { connected: false, user: null, status: 'logged_out' };
+        setTimeout(() => initWhatsAppEngine(), 2000);
+        return res.json({ success: true, message: 'Logged out successfully. Re-generating QR code.' });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/wa/send', async (req, res) => {
+    try {
+        const { phone, text } = req.body || {};
+        if (!phone || !text) {
+            return res.status(400).json({ error: 'Missing phone or text parameter.' });
+        }
+        if (!waConnectionState.connected || !waSocket) {
+            return res.status(531).json({ error: 'WhatsApp engine is not connected. Scan QR code in dashboard.' });
+        }
+
+        let cleanPhone = phone.replace(/[^0-9]/g, '');
+        if (!cleanPhone.endsWith('@s.whatsapp.net')) {
+            cleanPhone = `${cleanPhone}@s.whatsapp.net`;
+        }
+
+        const sentMsg = await waSocket.sendMessage(cleanPhone, { text });
+        console.log(`[WhatsApp Sent] → ${phone}: "${text.substring(0, 40)}..."`);
+        return res.json({ success: true, messageId: sentMsg.key.id, recipient: cleanPhone });
+    } catch (err) {
+        console.error('[WhatsApp Send Error]:', err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 app.listen(PORT, () => console.log(`[Server] Listening on port ${PORT}`));
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// Initialize WhatsApp Engine
+initWhatsAppEngine();
+
+// ─── FCM Push Notification Helpers ──────────────────────────────────────────
 function countAcrossMonths(monthlyStats, field) {
     if (!monthlyStats) return 0;
     return Object.values(monthlyStats)
@@ -73,12 +208,8 @@ async function safeSend(message, label) {
     }
 }
 
-// ─── Cache of previous worker states ─────────────────────────────────────────
-// Key = companyId_workerIndex, Value = last-known worker object
+// ─── Notification Listeners ──────────────────────────────────────────────────
 const prevState = {};
-
-// ─── Cache of previous general tasks ─────────────────────────────────────────
-// Key = companyId_taskId, Value = true
 const notifiedGeneralTasks = {};
 const isFirstGeneralTasksLoad = {};
 
@@ -86,7 +217,6 @@ function startNotificationListeners(companyId) {
     console.log(`[Server] Starting listeners for company: ${companyId}...`);
     isFirstGeneralTasksLoad[companyId] = true;
 
-    // ─── Workers Listener ────────────────────────────────────────────────────
     db.ref(`companies/${companyId}/workers`).on('value', async (snapshot) => {
         const workers = snapshot.val();
         if (!workers) return;
@@ -102,17 +232,12 @@ function startNotificationListeners(companyId) {
             const cacheKey   = `${companyId}_${index}`;
             const before     = prevState[cacheKey] || null;
 
-            // Update cache
             prevState[cacheKey] = JSON.parse(JSON.stringify(after));
 
-            // Skip on first load
             if (!before) return;
-            if (!fcmToken)  {
-                console.log(`[FCM] [${companyId}] "${workerName}" has no token — skip.`);
-                return;
-            }
+            if (!fcmToken) return;
 
-            // ── 1. NEW TASK ──────────────────────────────────────────────────
+            // 1. NEW TASK
             const beforeJobs = Array.isArray(before.jobs) ? before.jobs : [];
             const afterJobs  = Array.isArray(after.jobs)  ? after.jobs  : [];
 
@@ -135,7 +260,7 @@ function startNotificationListeners(companyId) {
                 }
             }
 
-            // ── 2. NEW DELIVERY ORDER ────────────────────────────────────────────
+            // 2. NEW DELIVERY ORDER
             const hadOrder = before?.activeOrder?.startTime;
             const hasOrder = after?.activeOrder?.startTime;
 
@@ -154,7 +279,7 @@ function startNotificationListeners(companyId) {
                 }, `[${companyId}] ORDER → ${workerName}`));
             }
 
-            // ── 3. NEW VIOLATION ─────────────────────────────────────────────────
+            // 3. NEW VIOLATION
             const beforeViol = countAcrossMonths(before?.monthlyStats, 'violationsList');
             const afterViol  = countAcrossMonths(after?.monthlyStats,  'violationsList');
 
@@ -179,7 +304,7 @@ function startNotificationListeners(companyId) {
                 }, `[${companyId}] VIOLATION → ${workerName}`));
             }
 
-            // ── 4. NEW REWARD ────────────────────────────────────────────────────
+            // 4. NEW REWARD
             const beforeRew = countAcrossMonths(before?.monthlyStats, 'rewardsList');
             const afterRew  = countAcrossMonths(after?.monthlyStats,  'rewardsList');
 
@@ -209,12 +334,10 @@ function startNotificationListeners(companyId) {
         });
 
         if (sends.length > 0) await Promise.all(sends);
-
     }, (err) => {
         console.error(`[RTDB] [${companyId}] Workers Listener error:`, err.message);
     });
 
-    // ─── General Tasks Listener ──────────────────────────────────────────────
     db.ref(`companies/${companyId}/generalTasks`).on('value', async (snapshot) => {
         const tasksObj = snapshot.val();
 
@@ -234,7 +357,6 @@ function startNotificationListeners(companyId) {
         const sends = [];
         const companyLabel = companyId === 'mvcfresh' ? 'MVC Fresh' : (companyId === 'mvc' ? 'MVC' : 'Burgeroov');
 
-        // Fetch workers and taskGroups to retrieve tokens and membership
         const [workersSnapshot, groupsSnapshot] = await Promise.all([
             db.ref(`companies/${companyId}/workers`).once('value'),
             db.ref(`companies/${companyId}/taskGroups`).once('value')
@@ -253,10 +375,9 @@ function startNotificationListeners(companyId) {
 
                 workers.forEach((w, index) => {
                     if (w && w.fcmToken) {
-                        // If targeted to a group, only notify group members
                         if (group) {
                             if (!group.members || !group.members.includes(w.id)) {
-                                return; // Skip
+                                return;
                             }
                         }
 
@@ -287,7 +408,7 @@ function startNotificationListeners(companyId) {
     });
 }
 
-// Start notification listeners for Burgeroov, MVC, and MVC Fresh companies
+// Start listeners
 startNotificationListeners('burgeroov');
 startNotificationListeners('mvc');
 startNotificationListeners('mvcfresh');
