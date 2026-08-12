@@ -2408,9 +2408,13 @@
             <!-- ========================================== -->
             <div id="view-activity" class="view-section admin-only">
                 <div class="card" style="width: 100%; border-top: 4px solid var(--secondary);">
-                    <div class="card-header-flex" style="align-items: center; justify-content: space-between;">
-                        <h2 class="card-title in-flex" data-i18n="title-activity-log"
-                            style="margin: 0; padding: 0; border: none;">📜 Daily Activity Log</h2>
+                    <div class="card-header-flex" style="align-items: center; justify-content: space-between; flex-wrap:wrap; gap:10px;">
+                        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                            <h2 class="card-title in-flex" data-i18n="title-activity-log" style="margin: 0; padding: 0; border: none;">📜 Daily Activity Log</h2>
+                            <button type="button" id="clear-activity-log-btn" onclick="clearAllActivityLogs()" class="btn-danger" style="padding: 6px 14px; border-radius: 20px; font-weight: 900; font-size: 0.78rem; background: linear-gradient(135deg, #ef4444, #dc2626); color: white; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow:0 2px 6px rgba(239,68,68,0.3);">
+                                <span>🗑️ Empty Log (1-Click)</span>
+                            </button>
+                        </div>
                         <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
                             <label style="margin: 0; font-size: 0.85rem; font-weight: 700; color: var(--text-muted);"
                                 data-i18n="label-filter-by">Filter By:</label>
@@ -3422,6 +3426,23 @@
                         </div>
 
                         <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+                            <!-- Dedicated Active Preparing Staff Team HUD Bar -->
+                            <div style="display: flex; gap: 12px; align-items: center; background: var(--card-bg); padding: 10px 16px; border-radius: 16px; border: 1px solid var(--border-color); flex-wrap: wrap; box-shadow: var(--shadow-sm); width: 100%; margin-top: 10px; margin-bottom: 6px;">
+                                <div style="display: flex; align-items: center; gap: 8px; border-right: 2px solid var(--border-color); padding-right: 14px; margin-right: 4px;">
+                                    <span style="font-size: 1.1rem;">👨‍🍳</span>
+                                    <div>
+                                        <div id="prepare-staff-count-label" style="font-size: 0.9rem; font-weight: 900; color: var(--text-main);">Active Preparing Staff</div>
+                                        <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700;" data-i18n="prep_staff_sub">Receiving live order alerts</div>
+                                    </div>
+                                </div>
+                                <div id="prepare-assigned-workers-badges" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; flex: 1;">
+                                    <!-- Dynamic worker avatar cards rendered in app.js -->
+                                </div>
+                                <select id="prepare-add-worker-select" onchange="togglePreparingWorkerAssignment(this.value); this.value='';" style="padding: 8px 14px; border-radius: 12px; border: 2px dashed #f59e0b; background: rgba(245, 158, 11, 0.08); color: #f59e0b; font-weight: 900; font-size: 0.85rem; cursor:pointer; outline: none; transition: all 0.2s ease;">
+                                    <!-- Rendered dynamically by renderPrepareSection() -->
+                                </select>
+                            </div>
+
                             <select id="prepare-status-filter" onchange="renderPrepareSection()"
                                 style="padding: 10px 18px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-weight: 900; font-size: 0.92rem; cursor: pointer; box-shadow: var(--shadow-sm);">
                                 <option value="all" selected>🌐 All Statuses / جميع الحالات</option>
@@ -3774,7 +3795,7 @@
                             <!-- Gateway Credentials / Server URL Input -->
                             <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
                                 <label style="font-size:0.75rem; font-weight:800; color:var(--text-muted);">Render Server Gateway URL:</label>
-                                <input type="text" id="wa-server-url" value="https://burgeroov-notify-server.onrender.com" placeholder="https://burgeroov-notify-server.onrender.com" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.82rem; font-weight:700;">
+                                <input type="text" id="wa-server-url" value="https://burgeroov-notify.onrender.com" placeholder="https://burgeroov-notify.onrender.com" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.82rem; font-weight:700;">
                             </div>
 
                             <!-- 8-DIGIT PHONE PAIRING CODE BOX (RECOMMENDED BYPASS) -->
@@ -3797,7 +3818,7 @@
                             <!-- QR Code Box Container -->
                             <div style="text-align: center; background: var(--card-bg); padding: 12px; border-radius: 14px; border: 2px dashed #10b981; margin-bottom: 12px; position: relative;">
                                 <div id="wa-qr-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 140px;">
-                                    <img id="wa-qr-img" src="https://burgeroov-notify-server.onrender.com/wa/qr" alt="WhatsApp QR Code" style="width: 140px; height: 140px; border-radius: 10px; box-shadow: var(--shadow-sm); border: 1px solid var(--border-color);" onerror="this.src='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=MVC_RENDER_GATEWAY_OFFLINE';">
+                                    <img id="wa-qr-img" src="https://burgeroov-notify.onrender.com/wa/qr" alt="WhatsApp QR Code" style="width: 140px; height: 140px; border-radius: 10px; box-shadow: var(--shadow-sm); border: 1px solid var(--border-color);" onerror="this.src='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=MVC_RENDER_GATEWAY_OFFLINE';">
                                     <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 6px; font-weight: 700;">
                                         Scan Live QR Code with WhatsApp Business
                                     </div>
@@ -3840,48 +3861,87 @@
 
                     <!-- CARD 3: Notification Message Templates Matrix -->
                     <div style="background: var(--input-bg); border-radius: 16px; border: 1px solid var(--border-color); padding: 20px;">
-                        <h3 style="font-size: 1.05rem; font-weight: 900; color: var(--text-main); margin-bottom: 6px; display:flex; align-items:center; gap:8px;">
-                            <span data-i18n="title-custom-templates">📝 Custom Notification Templates</span>
-                        </h3>
-                        <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
-                            Customize automated text messages for every situation. Available tags: <code>{worker_name}</code>, <code>{task_title}</code>, <code>{order_id}</code>, <code>{amount}</code>.
-                        </p>
-
-                        <div style="max-height: 380px; overflow-y: auto; padding-right: 4px; display: flex; flex-direction: column; gap: 14px;">
-                            <!-- Template 1: Task -->
+                        <div style="display:flex; align-items:center; justify-space-between; flex-wrap:wrap; gap:10px; margin-bottom:8px;">
                             <div>
-                                <label style="font-weight: 800; font-size: 0.78rem; color: var(--text-main); margin-bottom: 4px; display: block;" data-i18n="label-tpl-task">📋 New Task Template</label>
-                                <textarea id="msg-tpl-task" rows="2" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.82rem; font-weight:600;"></textarea>
+                                <h3 style="font-size: 1.05rem; font-weight: 900; color: var(--text-main); margin:0; display:flex; align-items:center; gap:8px;">
+                                    <span data-i18n="title-custom-templates">📝 Custom Notification Templates</span>
+                                </h3>
+                                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top:2px; margin-bottom:0; line-height: 1.4;">
+                                    Adjust the automatic messages sent to workers on tasks, orders, penalties, rewards & expiries.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Dynamic Tag Pills Helper Toolbar -->
+                        <div style="background: var(--card-bg); border: 1px dashed var(--border-color); border-radius: 12px; padding: 10px 12px; margin-bottom: 14px;">
+                            <span style="font-size:0.75rem; font-weight:800; color:var(--text-muted); display:block; margin-bottom:6px;">
+                                💡 Click a tag to insert placeholder into active template:
+                            </span>
+                            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                                <button type="button" onclick="insertTemplateTag('{worker_name}')" style="background:rgba(59,130,246,0.12); color:#3b82f6; border:1px solid rgba(59,130,246,0.3); border-radius:6px; padding:3px 8px; font-size:0.75rem; font-weight:800; cursor:pointer;">{worker_name}</button>
+                                <button type="button" onclick="insertTemplateTag('{task_title}')" style="background:rgba(16,185,129,0.12); color:#10b981; border:1px solid rgba(16,185,129,0.3); border-radius:6px; padding:3px 8px; font-size:0.75rem; font-weight:800; cursor:pointer;">{task_title}</button>
+                                <button type="button" onclick="insertTemplateTag('{order_id}')" style="background:rgba(245,158,11,0.12); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); border-radius:6px; padding:3px 8px; font-size:0.75rem; font-weight:800; cursor:pointer;">{order_id}</button>
+                                <button type="button" onclick="insertTemplateTag('{customer_name}')" style="background:rgba(139,92,246,0.12); color:#8b5cf6; border:1px solid rgba(139,92,246,0.3); border-radius:6px; padding:3px 8px; font-size:0.75rem; font-weight:800; cursor:pointer;">{customer_name}</button>
+                                <button type="button" onclick="insertTemplateTag('{amount}')" style="background:rgba(239,68,68,0.12); color:#ef4444; border:1px solid rgba(239,68,68,0.3); border-radius:6px; padding:3px 8px; font-size:0.75rem; font-weight:800; cursor:pointer;">{amount}</button>
+                                <button type="button" onclick="insertTemplateTag('{reason}')" style="background:rgba(6,182,212,0.12); color:#06b6d4; border:1px solid rgba(6,182,212,0.3); border-radius:6px; padding:3px 8px; font-size:0.75rem; font-weight:800; cursor:pointer;">{reason}</button>
+                                <button type="button" onclick="insertTemplateTag('{company_name}')" style="background:rgba(236,72,153,0.12); color:#ec4899; border:1px solid rgba(236,72,153,0.3); border-radius:6px; padding:3px 8px; font-size:0.75rem; font-weight:800; cursor:pointer;">{company_name}</button>
+                            </div>
+                        </div>
+
+                        <!-- Template Cards Stack -->
+                        <div style="max-height: 420px; overflow-y: auto; padding-right: 4px; display: flex; flex-direction: column; gap: 14px;">
+                            <!-- Template 1: Task -->
+                            <div style="background:var(--card-bg); border-radius:12px; border:1px solid rgba(59,130,246,0.3); border-left:4px solid #3b82f6; padding:12px 14px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                    <label style="font-weight: 900; font-size: 0.82rem; color: #3b82f6; display: flex; align-items:center; gap:6px;" data-i18n="label-tpl-task">📋 Task Assignment WhatsApp Template</label>
+                                    <button type="button" onclick="resetTemplateToDefault('task')" style="background:none; border:none; color:var(--text-muted); font-size:0.72rem; font-weight:700; cursor:pointer;">↺ Reset</button>
+                                </div>
+                                <textarea id="msg-tpl-task" rows="2" onfocus="setActiveTemplateInput('msg-tpl-task')" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.82rem; font-weight:600; resize:vertical;"></textarea>
                             </div>
 
                             <!-- Template 2: Delivery -->
-                            <div>
-                                <label style="font-weight: 800; font-size: 0.78rem; color: var(--text-main); margin-bottom: 4px; display: block;" data-i18n="label-tpl-delivery">🛵 New Delivery Order Template</label>
-                                <textarea id="msg-tpl-delivery" rows="2" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.82rem; font-weight:600;"></textarea>
+                            <div style="background:var(--card-bg); border-radius:12px; border:1px solid rgba(16,185,129,0.3); border-left:4px solid #10b981; padding:12px 14px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                    <label style="font-weight: 900; font-size: 0.82rem; color: #10b981; display: flex; align-items:center; gap:6px;" data-i18n="label-tpl-delivery">🛵 Delivery Order WhatsApp Template</label>
+                                    <button type="button" onclick="resetTemplateToDefault('delivery')" style="background:none; border:none; color:var(--text-muted); font-size:0.72rem; font-weight:700; cursor:pointer;">↺ Reset</button>
+                                </div>
+                                <textarea id="msg-tpl-delivery" rows="2" onfocus="setActiveTemplateInput('msg-tpl-delivery')" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.82rem; font-weight:600; resize:vertical;"></textarea>
                             </div>
 
                             <!-- Template 3: Prepare Order -->
-                            <div>
-                                <label style="font-weight: 800; font-size: 0.78rem; color: var(--text-main); margin-bottom: 4px; display: block;" data-i18n="label-tpl-prepare">👨‍🍳 New Kitchen/Market Prepare Template</label>
-                                <textarea id="msg-tpl-prepare" rows="2" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.82rem; font-weight:600;"></textarea>
+                            <div style="background:var(--card-bg); border-radius:12px; border:1px solid rgba(245,158,11,0.3); border-left:4px solid #f59e0b; padding:12px 14px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                    <label style="font-weight: 900; font-size: 0.82rem; color: #f59e0b; display: flex; align-items:center; gap:6px;" data-i18n="label-tpl-prepare">👨‍🍳 Kitchen/Market Prepare Template</label>
+                                    <button type="button" onclick="resetTemplateToDefault('prepare')" style="background:none; border:none; color:var(--text-muted); font-size:0.72rem; font-weight:700; cursor:pointer;">↺ Reset</button>
+                                </div>
+                                <textarea id="msg-tpl-prepare" rows="2" onfocus="setActiveTemplateInput('msg-tpl-prepare')" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.82rem; font-weight:600; resize:vertical;"></textarea>
                             </div>
 
                             <!-- Template 4: Violation -->
-                            <div>
-                                <label style="font-weight: 800; font-size: 0.78rem; color: var(--text-main); margin-bottom: 4px; display: block;" data-i18n="label-tpl-violation">⚠️ Violation / Deduction Template</label>
-                                <textarea id="msg-tpl-violation" rows="2" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.82rem; font-weight:600;"></textarea>
+                            <div style="background:var(--card-bg); border-radius:12px; border:1px solid rgba(239,68,68,0.3); border-left:4px solid #ef4444; padding:12px 14px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                    <label style="font-weight: 900; font-size: 0.82rem; color: #ef4444; display: flex; align-items:center; gap:6px;" data-i18n="label-tpl-violation">⚠️ Violation / Deduction Template</label>
+                                    <button type="button" onclick="resetTemplateToDefault('violation')" style="background:none; border:none; color:var(--text-muted); font-size:0.72rem; font-weight:700; cursor:pointer;">↺ Reset</button>
+                                </div>
+                                <textarea id="msg-tpl-violation" rows="2" onfocus="setActiveTemplateInput('msg-tpl-violation')" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.82rem; font-weight:600; resize:vertical;"></textarea>
                             </div>
 
                             <!-- Template 5: Reward -->
-                            <div>
-                                <label style="font-weight: 800; font-size: 0.78rem; color: var(--text-main); margin-bottom: 4px; display: block;" data-i18n="label-tpl-reward">🎉 Reward Added Template</label>
-                                <textarea id="msg-tpl-reward" rows="2" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.82rem; font-weight:600;"></textarea>
+                            <div style="background:var(--card-bg); border-radius:12px; border:1px solid rgba(139,92,246,0.3); border-left:4px solid #8b5cf6; padding:12px 14px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                    <label style="font-weight: 900; font-size: 0.82rem; color: #8b5cf6; display: flex; align-items:center; gap:6px;" data-i18n="label-tpl-reward">🎉 Reward / Bonus Added Template</label>
+                                    <button type="button" onclick="resetTemplateToDefault('reward')" style="background:none; border:none; color:var(--text-muted); font-size:0.72rem; font-weight:700; cursor:pointer;">↺ Reset</button>
+                                </div>
+                                <textarea id="msg-tpl-reward" rows="2" onfocus="setActiveTemplateInput('msg-tpl-reward')" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.82rem; font-weight:600; resize:vertical;"></textarea>
                             </div>
 
                             <!-- Template 6: Expiry Reminder -->
-                            <div>
-                                <label style="font-weight: 800; font-size: 0.78rem; color: var(--text-main); margin-bottom: 4px; display: block;" data-i18n="label-tpl-expiry">⏰ Document Expiry Template</label>
-                                <textarea id="msg-tpl-expiry" rows="2" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.82rem; font-weight:600;"></textarea>
+                            <div style="background:var(--card-bg); border-radius:12px; border:1px solid rgba(6,182,212,0.3); border-left:4px solid #06b6d4; padding:12px 14px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                    <label style="font-weight: 900; font-size: 0.82rem; color: #06b6d4; display: flex; align-items:center; gap:6px;" data-i18n="label-tpl-expiry">⏰ Document Expiry Template</label>
+                                    <button type="button" onclick="resetTemplateToDefault('expiry')" style="background:none; border:none; color:var(--text-muted); font-size:0.72rem; font-weight:700; cursor:pointer;">↺ Reset</button>
+                                </div>
+                                <textarea id="msg-tpl-expiry" rows="2" onfocus="setActiveTemplateInput('msg-tpl-expiry')" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.82rem; font-weight:600; resize:vertical;"></textarea>
                             </div>
                         </div>
                     </div>
@@ -4880,17 +4940,17 @@
 
     <script defer src="translations.js"></script>
     <!-- Modularized Core & Feature Scripts -->
-    <script defer src="js/core.js?v=86"></script>
-    <script defer src="js/auth.js?v=86"></script>
-    <script defer src="js/adverts_notes.js?v=86"></script>
-    <script defer src="js/sales_costs.js?v=86"></script>
-    <script defer src="js/warehouse.js?v=86"></script>
-    <script defer src="js/tasks.js?v=86"></script>
-    <script defer src="js/drivers.js?v=86"></script>
-    <script defer src="js/ops.js?v=86"></script>
-    <script defer src="js/finance.js?v=86"></script>
-    <script defer src="js/market.js?v=86"></script>
-    <script defer src="js/prepare.js?v=86"></script>
+    <script defer src="js/core.js?v=93"></script>
+    <script defer src="js/auth.js?v=93"></script>
+    <script defer src="js/adverts_notes.js?v=93"></script>
+    <script defer src="js/sales_costs.js?v=93"></script>
+    <script defer src="js/warehouse.js?v=93"></script>
+    <script defer src="js/tasks.js?v=93"></script>
+    <script defer src="js/drivers.js?v=93"></script>
+    <script defer src="js/ops.js?v=93"></script>
+    <script defer src="js/finance.js?v=93"></script>
+    <script defer src="js/market.js?v=93"></script>
+    <script defer src="js/prepare.js?v=93"></script>
     <!-- 3-Month Attendance Report Modal -->
     <div id="modal-3month-attendance-report" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.65); backdrop-filter:blur(4px); display:none; justify-content:center; align-items:center; z-index:999999;">
         <div class="modal-content" style="max-width: 850px; width: 95%; max-height: 88vh; overflow-y: auto; border-radius: 16px; padding: 24px; background:var(--card-bg); box-shadow:0 10px 40px rgba(0,0,0,0.5); margin:auto;">

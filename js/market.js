@@ -2859,6 +2859,112 @@ function deleteCustomerCode(code) {
 }
 window.deleteCustomerCode = deleteCustomerCode;
 
+function togglePreparingWorkerAssignment(workerId) {
+    if (!workerId || typeof db === 'undefined' || typeof currentCompany === 'undefined') return;
+
+    const companyData = getCompanyData();
+    let assigned = companyData.assignedPreparingWorkerIds || [];
+
+    // Support legacy single string assignedPreparingWorkerId if migrating
+    if (!Array.isArray(assigned)) {
+        assigned = companyData.assignedPreparingWorkerId ? [String(companyData.assignedPreparingWorkerId)] : [];
+    }
+
+    const wIdStr = String(workerId);
+    if (assigned.includes(wIdStr)) {
+        assigned = assigned.filter(id => String(id) !== wIdStr);
+    } else {
+        assigned.push(wIdStr);
+    }
+
+    db.ref(`companies/${currentCompany}/assignedPreparingWorkerIds`).set(assigned)
+        .then(() => {
+            db.ref(`companies/${currentCompany}/assignedPreparingWorkerId`).set(assigned[0] || null);
+            renderPrepareSection();
+        })
+        .catch(err => console.error("Error updating preparing workers:", err));
+}
+window.togglePreparingWorkerAssignment = togglePreparingWorkerAssignment;
+window.assignPreparingWorker = togglePreparingWorkerAssignment;
+
+function deletePrepareOrderAndRefund(companyKey, orderId) {
+    const isAr = currentAppLang === 'ar';
+    const isAdminOrMgr = typeof isUserAdminOrManager === 'function' ? isUserAdminOrManager() : true;
+    const canDelete = isAdminOrMgr || !!(typeof currentUser !== 'undefined' && currentUser && (currentUser.canDeletePrepareOrders || currentUser.role === 'operations'));
+
+    if (!canDelete) {
+        alert(isAr 
+            ? '⛔ ليس لديك صلاحية حذف الطلبات وإعادة الرصيد. فقط موظف العمليات / المدير يمكنه ذلك!' 
+            : '⛔ You do not have permission to delete orders and refund SR balance.');
+        return;
+    }
+
+    const found = findMarketOrderById(orderId);
+    const order = found.order;
+    const targetComp = companyKey || found.companyKey || currentCompany;
+
+    if (!order) {
+        alert(isAr ? 'الطلب غير موجود.' : 'Order not found.');
+        return;
+    }
+
+    const orderNum = formatMarketOrderNum(order);
+    if (!confirm(isAr 
+        ? `هل أنت تأكد من حذف الطلب #${orderNum} نهائياً وإعادة مبلغ (SAR ${order.totalCost || 0}) لحساب الزبون؟` 
+        : `Are you sure you want to permanently delete order #${orderNum} and refund SAR ${order.totalCost || 0} to customer balance?`)) {
+        return;
+    }
+
+    const totalCost = parseFloat(order.totalCost) || 0;
+    const custCode = String(order.customerCode || order.workerId || '').trim();
+    const customerName = order.workerName || order.customerName || 'Customer';
+    const actorLabel = (typeof currentUser !== 'undefined' && currentUser && (currentUser.name || currentUser.email)) ? (currentUser.name || currentUser.email) : 'Operations Manager';
+
+    const updates = {};
+    updates[`companies/${targetComp}/marketOrders/${orderId}`] = null;
+
+    if (totalCost > 0 && custCode) {
+        let currentCoins = 0;
+        if (window.localCustomerRegistry && window.localCustomerRegistry[custCode] && typeof window.localCustomerRegistry[custCode].coins !== 'undefined') {
+            currentCoins = parseFloat(window.localCustomerRegistry[custCode].coins) || 0;
+        }
+        const newCoins = currentCoins + totalCost;
+        updates[`publicCustomerCodes/${custCode}/coins`] = newCoins;
+        updates[`customerCodes/${custCode}/coins`] = newCoins;
+        updates[`companies/${targetComp}/customers/${custCode}/coins`] = newCoins;
+    }
+
+    // Log event in Activity Log
+    const actId = 'act_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+    const logObj = {
+        id: actId,
+        type: 'warehouse_delete',
+        actorName: actorLabel,
+        details: `🗑️ Order #${orderNum} (${customerName}) deleted by ${actorLabel}. SAR ${totalCost} refunded to customer wallet.`,
+        timestamp: Date.now()
+    };
+    updates[`companies/${targetComp}/activityLogs/${actId}`] = logObj;
+
+    db.ref().update(updates).then(() => {
+        ['mvc', 'mvcfresh', 'burgeroov'].forEach(cKey => {
+            if (appData[cKey] && appData[cKey].marketOrders) {
+                delete appData[cKey].marketOrders[orderId];
+            }
+        });
+        renderPrepareSection();
+        renderActivityLog();
+        if (typeof showInAppNotification === 'function') {
+            showInAppNotification(isAr 
+                ? `🗑️ تم حذف الطلب وإعادة (SAR ${totalCost}) لحساب ${customerName} وتسجيل العملية بالسجل بنجاح!` 
+                : `🗑️ Order deleted, SAR ${totalCost} refunded to ${customerName}, and logged in Activity Log successfully!`);
+        }
+    }).catch(err => {
+        console.error("Error deleting prepare order:", err);
+        alert(isAr ? 'حدث خطأ أثناء حذف الطلب.' : 'Error deleting prepare order.');
+    });
+}
+window.deletePrepareOrderAndRefund = deletePrepareOrderAndRefund;
+
 
 // --- AUTOMATIC IN-SCOPE WINDOW EXPORTS ---
 if (typeof getCurrentWorkerId === 'function') window.getCurrentWorkerId = getCurrentWorkerId;

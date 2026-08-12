@@ -2863,6 +2863,28 @@ function deleteActivityLog(activityId) {
     }
 }
 
+function clearAllActivityLogs() {
+    const isAr = currentAppLang === 'ar';
+    if (!confirm(isAr 
+        ? '⚠️ هل أنت تأكد من تفريغ سجل الأنشطة بالكامل بضغطة واحدة لتوفير مساحة الذاكرة؟' 
+        : '⚠️ Are you sure you want to empty the entire activity log with 1-click to save database space?')) {
+        return;
+    }
+    db.ref(`companies/${currentCompany}/activityLogs`).remove()
+        .then(() => {
+            if (appData[currentCompany]) appData[currentCompany].activityLogs = {};
+            renderActivityLog();
+            if (typeof showInAppNotification === 'function') {
+                showInAppNotification(isAr ? '🗑️ تم تفريغ سجل الأنشطة بالكامل بنجاح!' : '🗑️ Activity log emptied successfully!');
+            }
+        })
+        .catch(err => {
+            console.error("Error clearing activity log:", err);
+            alert(isAr ? 'حدث خطأ أثناء تفريغ السجل.' : 'Error clearing activity log.');
+        });
+}
+window.clearAllActivityLogs = clearAllActivityLogs;
+
 // Bind to window
 window.markWorkerAttendance = markWorkerAttendance;
 window.clearWorkerAttendance = clearWorkerAttendance;

@@ -11950,6 +11950,28 @@ function deleteActivityLog(activityId) {
     }
 }
 
+function clearAllActivityLogs() {
+    const isAr = currentAppLang === 'ar';
+    if (!confirm(isAr 
+        ? '⚠️ هل أنت تأكد من تفريغ سجل الأنشطة بالكامل بضغطة واحدة لتوفير مساحة الذاكرة؟' 
+        : '⚠️ Are you sure you want to empty the entire activity log with 1-click to save database space?')) {
+        return;
+    }
+    db.ref(`companies/${currentCompany}/activityLogs`).remove()
+        .then(() => {
+            if (appData[currentCompany]) appData[currentCompany].activityLogs = {};
+            renderActivityLog();
+            if (typeof showInAppNotification === 'function') {
+                showInAppNotification(isAr ? '🗑️ تم تفريغ سجل الأنشطة بالكامل بنجاح!' : '🗑️ Activity log emptied successfully!');
+            }
+        })
+        .catch(err => {
+            console.error("Error clearing activity log:", err);
+            alert(isAr ? 'حدث خطأ أثناء تفريغ السجل.' : 'Error clearing activity log.');
+        });
+}
+window.clearAllActivityLogs = clearAllActivityLogs;
+
 // Bind to window
 window.markWorkerAttendance = markWorkerAttendance;
 window.clearWorkerAttendance = clearWorkerAttendance;
@@ -17370,12 +17392,175 @@ function deleteCustomerCode(code) {
 }
 window.deleteCustomerCode = deleteCustomerCode;
 
+function togglePreparingWorkerAssignment(workerId) {
+    if (!workerId || typeof db === 'undefined' || typeof currentCompany === 'undefined') return;
+
+    const companyData = getCompanyData();
+    let assigned = companyData.assignedPreparingWorkerIds || [];
+
+    // Support legacy single string assignedPreparingWorkerId if migrating
+    if (!Array.isArray(assigned)) {
+        assigned = companyData.assignedPreparingWorkerId ? [String(companyData.assignedPreparingWorkerId)] : [];
+    }
+
+    const wIdStr = String(workerId);
+    if (assigned.includes(wIdStr)) {
+        assigned = assigned.filter(id => String(id) !== wIdStr);
+    } else {
+        assigned.push(wIdStr);
+    }
+
+    db.ref(`companies/${currentCompany}/assignedPreparingWorkerIds`).set(assigned)
+        .then(() => {
+            db.ref(`companies/${currentCompany}/assignedPreparingWorkerId`).set(assigned[0] || null);
+            renderPrepareSection();
+        })
+        .catch(err => console.error("Error updating preparing workers:", err));
+}
+window.togglePreparingWorkerAssignment = togglePreparingWorkerAssignment;
+window.assignPreparingWorker = togglePreparingWorkerAssignment;
+
+function deletePrepareOrderAndRefund(companyKey, orderId) {
+    const isAr = currentAppLang === 'ar';
+    const isAdminOrMgr = typeof isUserAdminOrManager === 'function' ? isUserAdminOrManager() : true;
+    const canDelete = isAdminOrMgr || !!(typeof currentUser !== 'undefined' && currentUser && (currentUser.canDeletePrepareOrders || currentUser.role === 'operations'));
+
+    if (!canDelete) {
+        alert(isAr 
+            ? '⛔ ليس لديك صلاحية حذف الطلبات وإعادة الرصيد. فقط موظف العمليات / المدير يمكنه ذلك!' 
+            : '⛔ You do not have permission to delete orders and refund SR balance.');
+        return;
+    }
+
+    const found = findMarketOrderById(orderId);
+    const order = found.order;
+    const targetComp = companyKey || found.companyKey || currentCompany;
+
+    if (!order) {
+        alert(isAr ? 'الطلب غير موجود.' : 'Order not found.');
+        return;
+    }
+
+    const orderNum = formatMarketOrderNum(order);
+    if (!confirm(isAr 
+        ? `هل أنت تأكد من حذف الطلب #${orderNum} نهائياً وإعادة مبلغ (SAR ${order.totalCost || 0}) لحساب الزبون؟` 
+        : `Are you sure you want to permanently delete order #${orderNum} and refund SAR ${order.totalCost || 0} to customer balance?`)) {
+        return;
+    }
+
+    const totalCost = parseFloat(order.totalCost) || 0;
+    const custCode = String(order.customerCode || order.workerId || '').trim();
+    const customerName = order.workerName || order.customerName || 'Customer';
+    const actorLabel = (typeof currentUser !== 'undefined' && currentUser && (currentUser.name || currentUser.email)) ? (currentUser.name || currentUser.email) : 'Operations Manager';
+
+    const updates = {};
+    updates[`companies/${targetComp}/marketOrders/${orderId}`] = null;
+
+    if (totalCost > 0 && custCode) {
+        let currentCoins = 0;
+        if (window.localCustomerRegistry && window.localCustomerRegistry[custCode] && typeof window.localCustomerRegistry[custCode].coins !== 'undefined') {
+            currentCoins = parseFloat(window.localCustomerRegistry[custCode].coins) || 0;
+        }
+        const newCoins = currentCoins + totalCost;
+        updates[`publicCustomerCodes/${custCode}/coins`] = newCoins;
+        updates[`customerCodes/${custCode}/coins`] = newCoins;
+        updates[`companies/${targetComp}/customers/${custCode}/coins`] = newCoins;
+    }
+
+    // Log event in Activity Log
+    const actId = 'act_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+    const logObj = {
+        id: actId,
+        type: 'warehouse_delete',
+        actorName: actorLabel,
+        details: `🗑️ Order #${orderNum} (${customerName}) deleted by ${actorLabel}. SAR ${totalCost} refunded to customer wallet.`,
+        timestamp: Date.now()
+    };
+    updates[`companies/${targetComp}/activityLogs/${actId}`] = logObj;
+
+    db.ref().update(updates).then(() => {
+        ['mvc', 'mvcfresh', 'burgeroov'].forEach(cKey => {
+            if (appData[cKey] && appData[cKey].marketOrders) {
+                delete appData[cKey].marketOrders[orderId];
+            }
+        });
+        renderPrepareSection();
+        renderActivityLog();
+        if (typeof showInAppNotification === 'function') {
+            showInAppNotification(isAr 
+                ? `🗑️ تم حذف الطلب وإعادة (SAR ${totalCost}) لحساب ${customerName} وتسجيل العملية بالسجل بنجاح!` 
+                : `🗑️ Order deleted, SAR ${totalCost} refunded to ${customerName}, and logged in Activity Log successfully!`);
+        }
+    }).catch(err => {
+        console.error("Error deleting prepare order:", err);
+        alert(isAr ? 'حدث خطأ أثناء حذف الطلب.' : 'Error deleting prepare order.');
+    });
+}
+window.deletePrepareOrderAndRefund = deletePrepareOrderAndRefund;
+
 function renderPrepareSection() {
     const grid = document.getElementById('prepare-orders-grid');
     if (!grid) return;
 
     const isAr = currentAppLang === 'ar';
     const filterStatus = document.getElementById('prepare-status-filter')?.value || 'all';
+
+    // Populate Multi-Worker Preparing Staff Assignment HUD
+    const prepAddSelect = document.getElementById('prepare-add-worker-select');
+    const prepBadgesDiv = document.getElementById('prepare-assigned-workers-badges');
+    const staffCountLabel = document.getElementById('prepare-staff-count-label');
+
+    if (prepAddSelect && prepBadgesDiv) {
+        const companyData = getCompanyData();
+        const workers = companyData.workers || [];
+
+        let assigned = companyData.assignedPreparingWorkerIds || [];
+        if (!Array.isArray(assigned)) {
+            assigned = companyData.assignedPreparingWorkerId ? [String(companyData.assignedPreparingWorkerId)] : [];
+        }
+        const assignedStrs = assigned.map(id => String(id));
+
+        if (staffCountLabel) {
+            staffCountLabel.textContent = isAr 
+                ? `طاقم التحضير (${assignedStrs.length})` 
+                : `Preparing Staff (${assignedStrs.length})`;
+        }
+
+        // Populate dropdown with unassigned workers
+        prepAddSelect.innerHTML = `<option value="" style="background: var(--card-bg); color: var(--text-main); font-weight: 800;">+ ${isAr ? 'إضافة موظف' : 'Add Staff'}</option>` + workers.map((w, idx) => {
+            if (!w) return '';
+            const wId = String(w.id || idx);
+            if (assignedStrs.includes(wId)) return '';
+            return `<option value="${wId}" style="background: var(--card-bg); color: var(--text-main); font-weight: 800;">${w.name || `Worker #${idx}`}</option>`;
+        }).join('');
+
+        // Render active worker avatar cards
+        if (assignedStrs.length === 0) {
+            prepBadgesDiv.innerHTML = `<span style="font-size:0.8rem; color:var(--text-muted); font-weight:700; font-style:italic;">${isAr ? '⚠️ لم يتم تعيين موظفي تحضير بعد (اضغط + إضافة موظف)' : '⚠️ No preparing staff assigned yet (Click + Add Staff)'}</span>`;
+        } else {
+            prepBadgesDiv.innerHTML = assignedStrs.map(wId => {
+                const wObj = workers.find(w => w && String(w.id || '') === wId);
+                const wName = wObj ? wObj.name : `Worker #${wId}`;
+                const initial = wName.trim().charAt(0).toUpperCase() || 'W';
+                const phone = wObj ? (wObj.phone || '') : '';
+                const roleLabel = wObj && wObj.role ? wObj.role : (isAr ? 'محضر طلبات' : 'Prep Worker');
+
+                return `
+                    <div class="prep-worker-card-chip" style="background: var(--input-bg); border: 1.5px solid var(--border-color); border-radius: 12px; padding: 5px 10px 5px 6px; display: inline-flex; align-items: center; gap: 8px; box-shadow: var(--shadow-sm); transition: all 0.2s ease;">
+                        <div style="position: relative; width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #f59e0b, #d97706); color: white; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.8rem; box-shadow: 0 2px 6px rgba(245,158,11,0.3);">
+                            ${initial}
+                            <span style="position: absolute; bottom: -1px; right: -1px; width: 8px; height: 8px; border-radius: 50%; background: #10b981; border: 1.5px solid var(--card-bg);"></span>
+                        </div>
+                        <div style="display: flex; flex-direction: column;">
+                            <span style="font-weight: 900; font-size: 0.82rem; color: var(--text-main); line-height: 1.1;">${wName}</span>
+                            <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700;">${phone ? `📱 ${phone}` : roleLabel}</span>
+                        </div>
+                        <button type="button" onclick="togglePreparingWorkerAssignment('${wId}')" style="background: rgba(239,68,68,0.12); border: none; color: #ef4444; border-radius: 50%; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 900; cursor: pointer; line-height: 1; transition: all 0.2s ease; margin-left: 2px;" title="${isAr ? 'إزالة من طاقم التحضير' : 'Remove from staff'}" onmouseover="this.style.background='#ef4444'; this.style.color='#ffffff';" onmouseout="this.style.background='rgba(239,68,68,0.12)'; this.style.color='#ef4444';">✕</button>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
 
     // Collect market orders across ALL loaded companies
     const companyList = ['mvc', 'mvcfresh', 'burgeroov'];
@@ -17412,6 +17597,9 @@ function renderPrepareSection() {
         return;
     }
 
+    const isAdminOrMgr = typeof isUserAdminOrManager === 'function' ? isUserAdminOrManager() : true;
+    const canDelete = isAdminOrMgr || !!(typeof currentUser !== 'undefined' && currentUser && (currentUser.canDeletePrepareOrders || currentUser.role === 'operations'));
+
     grid.innerHTML = allOrders.map(order => {
         const orderNum = formatMarketOrderNum(order);
         const dateStr = order.createdAt ? new Date(order.createdAt).toLocaleString() : '';
@@ -17420,11 +17608,17 @@ function renderPrepareSection() {
         const orderJsonStr = JSON.stringify(order).replace(/'/g, "&#39;").replace(/"/g, "&quot;");
 
         const itemsHTML = (order.items || []).map(item => `
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--input-bg); border-radius: 12px; font-size: 0.92rem; border: 1px solid var(--border-color);">
+            <div style="display: flex; justify-content: space-between; align- items: center; padding: 10px 14px; background: var(--input-bg); border-radius: 12px; font-size: 0.92rem; border: 1px solid var(--border-color);">
                 <span style="font-weight: 900; color: var(--text-main); font-size: 0.95rem;">${sanitizeMarketText(item.name)}</span>
                 <span style="background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #ffffff; font-weight: 900; font-size: 0.85rem; padding: 4px 12px; border-radius: 100px; box-shadow: 0 2px 6px rgba(37,99,235,0.3);">x${item.qty || 1}</span>
             </div>
         `).join('');
+
+        const deleteBtnHTML = canDelete ? `
+            <button type="button" onclick="deletePrepareOrderAndRefund('${order.companyKey}', '${order.id}')" class="btn-danger" style="padding: 10px 14px; font-weight: 900; font-size: 0.82rem; border-radius: 10px; cursor: pointer; border: none; background: linear-gradient(135deg, #ef4444, #dc2626); color: white; white-space: nowrap; box-shadow:0 2px 6px rgba(239,68,68,0.3);" title="${isAr ? 'حذف الطلب وإعادة الرصيد' : 'Delete Order & Refund SR'}">
+                🗑️ ${isAr ? 'إلغاء وحذف' : 'Delete'}
+            </button>
+        ` : '';
 
         return `
             <div class="card" style="margin: 0; padding: 20px; border-radius: 20px; border: 2px solid ${statusInfo.color}; background: var(--card-bg); display: flex; flex-direction: column; justify-content: space-between; gap: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); transition: transform 0.2s ease;">
@@ -17449,18 +17643,19 @@ function renderPrepareSection() {
                     </div>
                 </div>
 
-                <!-- Footer Status Selector & A4 Printable Receipt Button -->
+                <!-- Footer Status Selector, Receipt & Delete Buttons -->
                 <div style="border-top: 1px dashed var(--border-color); padding-top: 14px; display: flex; flex-direction: column; gap: 10px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
-                        <select onchange="updatePrepareOrderStatus('${order.companyKey}', '${order.id}', this.value)" style="flex: 1; padding: 10px 14px; border-radius: 10px; border: 1.5px solid var(--border-color); font-weight: 900; font-size: 0.9rem; background: var(--input-bg); color: var(--text-main); cursor: pointer;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <select onchange="updatePrepareOrderStatus('${order.companyKey}', '${order.id}', this.value)" style="flex: 1; min-width: 140px; padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--border-color); font-weight: 900; font-size: 0.88rem; background: var(--input-bg); color: var(--text-main); cursor: pointer;">
                             <option value="pending" ${order.status === 'pending' ? 'selected' : ''}>⏳ Pending / قيد الانتظار</option>
                             <option value="preparing" ${order.status === 'preparing' ? 'selected' : ''}>👨‍🍳 Preparing / قيد التحضير</option>
                             <option value="delivery" ${order.status === 'delivery' ? 'selected' : ''}>🚚 Out for Delivery / خرج للتوصيل</option>
                             <option value="delivered" ${order.status === 'delivered' ? 'selected' : ''}>✅ Delivered / تم التوصيل</option>
                         </select>
-                        <button type="button" onclick='openMarketOrderReceiptModal(${orderJsonStr})' class="btn-outline" style="padding: 10px 16px; font-weight: 900; font-size: 0.88rem; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap; background: var(--input-bg);">
+                        <button type="button" onclick='openMarketOrderReceiptModal(${orderJsonStr})' class="btn-outline" style="padding: 10px 14px; font-weight: 900; font-size: 0.88rem; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap; background: var(--input-bg);">
                             🧾 ${isAr ? 'الفاتورة' : 'Receipt'}
                         </button>
+                        ${deleteBtnHTML}
                     </div>
                 </div>
             </div>
@@ -19718,6 +19913,43 @@ function deleteVaultNote(noteId) {
 window.deleteVaultNote = deleteVaultNote;
 
 // --- MESSAGING & WHATSAPP GATEWAY SYSTEM ---
+let activeTemplateInputId = 'msg-tpl-task';
+
+function setActiveTemplateInput(id) {
+    activeTemplateInputId = id;
+}
+window.setActiveTemplateInput = setActiveTemplateInput;
+
+function insertTemplateTag(tag) {
+    const el = document.getElementById(activeTemplateInputId || 'msg-tpl-task');
+    if (!el) return;
+
+    const start = el.selectionStart || el.value.length;
+    const end = el.selectionEnd || el.value.length;
+    const text = el.value;
+
+    el.value = text.substring(0, start) + tag + text.substring(end);
+    el.selectionStart = el.selectionEnd = start + tag.length;
+    el.focus();
+}
+window.insertTemplateTag = insertTemplateTag;
+
+function resetTemplateToDefault(type) {
+    const defaults = {
+        task: '📋 مرحباً {worker_name}! تم إسناد مهمة جديدة لك: "{task_title}". افتح اللوحة للمتابعة.',
+        delivery: '🛵 مرحباً {worker_name}! طلب توصيل جديد #{order_id} للعميل: {customer_name}.',
+        prepare: '👨‍🍳 تنبيه التحضير! طلب سوق جديد #{order_id} يحتوي على {items_count} أصناف بحاجة للتحضير.',
+        violation: '⚠️ تنبيه هام {worker_name}: تم تسجيل مخالفة على ملفك بقيمة {amount} ر.س: "{reason}".',
+        reward: '🎉 مبروك {worker_name}! تم إضافة مكافأة لك بقيمة {amount} ر.س: "{reason}".',
+        expiry: '⏰ تنبيه انتهاء الوثيقة: {doc_name} ينتهي خلال {days} أيام بتاريخ {expiry_date}.'
+    };
+    const el = document.getElementById(`msg-tpl-${type}`);
+    if (el && defaults[type]) {
+        el.value = defaults[type];
+    }
+}
+window.resetTemplateToDefault = resetTemplateToDefault;
+
 function renderMessagingSection() {
     const list = document.getElementById('messaging-workers-list');
     if (!list) return;
@@ -19727,9 +19959,11 @@ function renderMessagingSection() {
     const tpls = data.messagingTemplates || {};
     const config = data.messagingConfig || {};
 
-    // Populate Gateway credentials
+    // Populate Gateway credentials & Server URL
+    const serverUrlEl = document.getElementById('wa-server-url');
     const instEl = document.getElementById('wa-instance-id');
     const tokenEl = document.getElementById('wa-token');
+    if (serverUrlEl) serverUrlEl.value = config.serverUrl || 'https://burgeroov-notify.onrender.com';
     if (instEl) instEl.value = config.instanceId || '';
     if (tokenEl) tokenEl.value = config.token || '';
 
@@ -19787,6 +20021,9 @@ function renderMessagingSection() {
             return `<option value="${idx}">${w.name || `Worker #${idx}`}</option>`;
         }).join('');
     }
+
+    // Auto-refresh QR code status on tab open
+    refreshWhatsAppQR();
 }
 window.renderMessagingSection = renderMessagingSection;
 
@@ -19824,7 +20061,7 @@ function saveAllMessagingSettings() {
 
     // Save Gateway Config
     const config = {
-        serverUrl: document.getElementById('wa-server-url')?.value?.trim() || 'https://burgeroov-notify-server.onrender.com'
+        serverUrl: document.getElementById('wa-server-url')?.value?.trim() || 'https://burgeroov-notify.onrender.com'
     };
     db.ref(`companies/${currentCompany}/messagingConfig`).set(config);
 
@@ -19840,7 +20077,7 @@ function refreshWhatsAppQR() {
     const statusText = document.getElementById('wa-connection-text');
     const serverUrlInput = document.getElementById('wa-server-url');
 
-    const baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || 'https://burgeroov-notify-server.onrender.com';
+    const baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || 'https://burgeroov-notify.onrender.com';
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
 
     if (qrImg) {
@@ -19875,7 +20112,7 @@ window.refreshWhatsAppQR = refreshWhatsAppQR;
 
 function logoutWhatsAppSession() {
     const serverUrlInput = document.getElementById('wa-server-url');
-    const baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || 'https://burgeroov-notify-server.onrender.com';
+    const baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || 'https://burgeroov-notify.onrender.com';
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
 
     if (!confirm(isAr 
@@ -19903,7 +20140,7 @@ function getWhatsAppPairingCode() {
     const codeText = document.getElementById('wa-pair-code-text');
 
     const phone = phoneInput ? phoneInput.value.trim() : '';
-    const baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || 'https://burgeroov-notify-server.onrender.com';
+    const baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || 'https://burgeroov-notify.onrender.com';
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
 
     if (!phone || phone.length < 8) {
@@ -19944,7 +20181,7 @@ function sendTestMessagingAlert() {
     const workerIdx = document.getElementById('msg-test-worker')?.value;
     const alertType = document.getElementById('msg-test-type')?.value || 'task';
     const serverUrlInput = document.getElementById('wa-server-url');
-    const baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || 'https://burgeroov-notify-server.onrender.com';
+    const baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || 'https://burgeroov-notify.onrender.com';
 
     const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
     const workers = data.workers || [];

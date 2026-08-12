@@ -257,10 +257,17 @@ async function sendWhatsAppDirect(phone, text) {
 const prevState = {};
 const notifiedGeneralTasks = {};
 const isFirstGeneralTasksLoad = {};
+const companyTemplates = {};
 
 function startNotificationListeners(companyId) {
     console.log(`[Server] Starting listeners for company: ${companyId}...`);
     isFirstGeneralTasksLoad[companyId] = true;
+
+    // Real-Time Listener for Custom Notification Templates
+    db.ref(`companies/${companyId}/messagingTemplates`).on('value', (snap) => {
+        companyTemplates[companyId] = snap.val() || {};
+        console.log(`[Server] [${companyId}] Real-Time Custom Notification Templates Updated.`);
+    });
 
     db.ref(`companies/${companyId}/workers`).on('value', async (snapshot) => {
         const workers = snapshot.val();
@@ -268,6 +275,7 @@ function startNotificationListeners(companyId) {
 
         const sends = [];
         const companyLabel = companyId === 'mvcfresh' ? 'MVC Fresh' : (companyId === 'mvc' ? 'MVC' : 'Burgeroov');
+        const tpls = companyTemplates[companyId] || {};
 
         workers.forEach((after, index) => {
             if (!after) return;
@@ -308,7 +316,11 @@ function startNotificationListeners(companyId) {
                     }
 
                     if (phone && waEnabled) {
-                        const waMsg = `📋 *مهمة جديدة أسندت إليك [${companyLabel}]*\n\nالموظف: ${workerName}\nالمهمة: ${title}\n\nيرجى فتح لوحة المهام للإنجاز.`;
+                        const rawTpl = tpls.task || '📋 *مهمة جديدة أسندت إليك [{company_name}]*\n\nالموظف: {worker_name}\nالمهمة: {task_title}\n\nيرجى فتح لوحة المهام للإنجاز.';
+                        const waMsg = rawTpl
+                            .replace(/{worker_name}/g, workerName)
+                            .replace(/{task_title}/g, title)
+                            .replace(/{company_name}/g, companyLabel);
                         sendWhatsAppDirect(phone, waMsg);
                     }
                 }
@@ -336,7 +348,12 @@ function startNotificationListeners(companyId) {
                 }
 
                 if (phone && waEnabled) {
-                    const waMsg = `🛵 *طلب توصيل جديد [${companyLabel}]*\n\nالمحتفظ بالطلب: ${workerName}\nالعميل: ${customer}\n\nيرجى بدء التوصيل فوراً!`;
+                    const rawTpl = tpls.delivery || '🛵 *طلب توصيل جديد [{company_name}]*\n\nالموظف: {worker_name}\nالعميل: {customer_name}\n\nيرجى بدء التوصيل فوراً!';
+                    const waMsg = rawTpl
+                        .replace(/{worker_name}/g, workerName)
+                        .replace(/{customer_name}/g, customer)
+                        .replace(/{order_id}/g, order.orderId || '101')
+                        .replace(/{company_name}/g, companyLabel);
                     sendWhatsAppDirect(phone, waMsg);
                 }
             }
@@ -347,12 +364,14 @@ function startNotificationListeners(companyId) {
 
             if (afterViol > beforeViol) {
                 let reason = 'تسجيل مخالفة جديدة على ملفك.';
+                let violAmount = '0';
                 if (after.monthlyStats) {
                     const months = Object.keys(after.monthlyStats).sort().reverse();
                     for (const m of months) {
                         const list = after.monthlyStats[m]?.violationsList;
                         if (Array.isArray(list) && list.length > 0) {
                             reason = list[0].reason || reason;
+                            violAmount = list[0].amount || '0';
                             break;
                         }
                     }
@@ -369,7 +388,12 @@ function startNotificationListeners(companyId) {
                 }
 
                 if (phone && waEnabled) {
-                    const waMsg = `⚠️ *تنبيه مخالفة [${companyLabel}]*\n\nالموظف: ${workerName}\nالسبب: ${reason}`;
+                    const rawTpl = tpls.violation || '⚠️ *تنبيه مخالفة [{company_name}]*\n\nالموظف: {worker_name}\nالسبب: {reason}\nالمبلغ: {amount} ر.س';
+                    const waMsg = rawTpl
+                        .replace(/{worker_name}/g, workerName)
+                        .replace(/{reason}/g, reason)
+                        .replace(/{amount}/g, violAmount)
+                        .replace(/{company_name}/g, companyLabel);
                     sendWhatsAppDirect(phone, waMsg);
                 }
             }
@@ -380,15 +404,15 @@ function startNotificationListeners(companyId) {
 
             if (afterRew > beforeRew) {
                 let rewardNote = 'مكافأة جديدة من الإدارة!';
+                let rewardAmount = '0';
                 if (after.monthlyStats) {
                     const months = Object.keys(after.monthlyStats).sort().reverse();
                     for (const m of months) {
                         const list = after.monthlyStats[m]?.rewardsList;
                         if (Array.isArray(list) && list.length > 0) {
                             const r = list[0];
-                            rewardNote = r.reason
-                                ? `${r.reason} (+SAR ${r.amount})`
-                                : `+SAR ${r.amount} reward added!`;
+                            rewardNote = r.reason || 'مكافأة ممتازة';
+                            rewardAmount = r.amount || '0';
                             break;
                         }
                     }
@@ -405,7 +429,12 @@ function startNotificationListeners(companyId) {
                 }
 
                 if (phone && waEnabled) {
-                    const waMsg = `🎉 *مكافأة جديدة [${companyLabel}]*\n\nالموظف: ${workerName}\nالبيان: ${rewardNote}`;
+                    const rawTpl = tpls.reward || '🎉 *مكافأة جديدة [{company_name}]*\n\nالموظف: {worker_name}\nالبيان: {reason}\nالمبلغ: {amount} ر.س';
+                    const waMsg = rawTpl
+                        .replace(/{worker_name}/g, workerName)
+                        .replace(/{reason}/g, rewardNote)
+                        .replace(/{amount}/g, rewardAmount)
+                        .replace(/{company_name}/g, companyLabel);
                     sendWhatsAppDirect(phone, waMsg);
                 }
             }
@@ -489,6 +518,92 @@ function startNotificationListeners(companyId) {
         }
     }, (err) => {
         console.error(`[RTDB] [${companyId}] General Tasks Listener error:`, err.message);
+    });
+
+    // Listener 3: NEW MARKET / KITCHEN PREPARE ORDERS → PREPARING WORKER
+    const notifiedPrepareOrders = {};
+    let isFirstPrepareLoad = true;
+
+    db.ref(`companies/${companyId}/marketOrders`).on('value', async (snapshot) => {
+        const ordersObj = snapshot.val();
+
+        if (isFirstPrepareLoad) {
+            isFirstPrepareLoad = false;
+            if (ordersObj) {
+                Object.keys(ordersObj).forEach(id => {
+                    notifiedPrepareOrders[`${companyId}_${id}`] = true;
+                });
+            }
+            return;
+        }
+
+        if (!ordersObj) return;
+
+        const sends = [];
+        const companyLabel = companyId === 'mvcfresh' ? 'MVC Fresh' : (companyId === 'mvc' ? 'MVC' : 'Burgeroov');
+        const tpls = companyTemplates[companyId] || {};
+
+        const [workersSnap, assignedSnap, assignedOldSnap] = await Promise.all([
+            db.ref(`companies/${companyId}/workers`).once('value'),
+            db.ref(`companies/${companyId}/assignedPreparingWorkerIds`).once('value'),
+            db.ref(`companies/${companyId}/assignedPreparingWorkerId`).once('value')
+        ]);
+
+        const workers = workersSnap.val() || [];
+        let assignedIds = assignedSnap.val() || [];
+        if (!Array.isArray(assignedIds)) {
+            const oldId = assignedOldSnap.val();
+            assignedIds = oldId ? [String(oldId)] : [];
+        }
+        const assignedStrs = assignedIds.map(id => String(id));
+
+        // Find ALL assigned preparing workers
+        let prepWorkers = workers.filter(w => w && (assignedStrs.includes(String(w.id)) || assignedStrs.includes(String(w.phone)) || w.role === 'prepare' || w.role === 'kitchen' || w.isPreparingWorker));
+
+        Object.keys(ordersObj).forEach(id => {
+            const order = ordersObj[id];
+            const cacheKey = `${companyId}_${id}`;
+
+            if (order && (order.status === 'pending' || !order.status) && !notifiedPrepareOrders[cacheKey]) {
+                notifiedPrepareOrders[cacheKey] = true;
+
+                const customerName = order.workerName || order.customerName || 'Customer';
+                const itemsCount = Array.isArray(order.items) ? order.items.length : 1;
+                const orderNum = order.orderNum || id;
+
+                prepWorkers.forEach(prepWorker => {
+                    if (prepWorker.fcmToken) {
+                        sends.push(safeSend({
+                            token: prepWorker.fcmToken,
+                            notification: {
+                                title: `👨‍🍳 New Kitchen Prepare Order #${orderNum} [${companyLabel}]`,
+                                body: `Order for ${customerName} (${itemsCount} items) needs preparation.`
+                            },
+                            data: { type: 'prepare', tab: 'prepare', companyId },
+                            android: { priority: 'high', notification: { channelId: 'burgeroov_orders' } },
+                            apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
+                        }, `[${companyId}] PREPARE ORDER → ${prepWorker.name || 'Prep Worker'}`));
+                    }
+
+                    if (prepWorker.phone && prepWorker.waAlertsEnabled !== false) {
+                        const rawTpl = tpls.prepare || '👨‍🍳 *تنبيه تحضير طلب جديد #{order_id} [{company_name}]*\n\nالعميل: {customer_name}\nعدد الأصناف: {items_count}\n\nيرجى فتح الشاشة والبدء بالتحضير!';
+                        const waMsg = rawTpl
+                            .replace(/{worker_name}/g, prepWorker.name || 'موظف التحضير')
+                            .replace(/{customer_name}/g, customerName)
+                            .replace(/{order_id}/g, orderNum)
+                            .replace(/{items_count}/g, itemsCount)
+                            .replace(/{company_name}/g, companyLabel);
+                        sendWhatsAppDirect(prepWorker.phone, waMsg);
+                    }
+                });
+            }
+        });
+
+        if (sends.length > 0) {
+            await Promise.all(sends);
+        }
+    }, (err) => {
+        console.error(`[RTDB] [${companyId}] Market Orders Listener error:`, err.message);
     });
 }
 

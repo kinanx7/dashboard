@@ -1360,6 +1360,7 @@ const uiTranslations = {
         "title-admin-market-orders": "📦 إدارة طلبات السوق الواردة",
         "tab-prepare": "👨‍🍳 قسم التحضير",
         "title-prepare-section": "👨‍🍳 قسم تحضير وقائمة الطلبات الواردة",
-        "desc-prepare-section": "متابعة وتحضير طلبات العملاء الواردة لحظياً لجميع الشركات."
+        "desc-prepare-section": "متابعة وتحضير طلبات العملاء الواردة لحظياً لجميع الشركات.",
+        "prep_staff_sub": "يستلمون تنبيهات الطلبات المباشرة"
     }
 };
