@@ -395,9 +395,21 @@ async function getPreparingWorkersForCompany(companyId) {
     return Object.values(map);
 }
 
+const notifiedPrepareOrders = {};
+
 // Function to send FCM & WhatsApp alerts for new prepare orders
 async function sendPrepareOrderAlert(companyId, order) {
     if (!order) return;
+    const orderId = order.id || order.orderNum;
+    if (!orderId) return;
+
+    const cacheKey = `${companyId}_${orderId}`;
+    if (notifiedPrepareOrders[cacheKey]) {
+        console.log(`[Prepare Order Alert] Already sent for order ${cacheKey} — skipping duplicate alert.`);
+        return;
+    }
+    notifiedPrepareOrders[cacheKey] = true;
+
     const companyLabel = companyId === 'mvcfresh' ? 'MVC Fresh' : (companyId === 'mvc' ? 'MVC' : 'Burgeroov');
     const tpls = companyTemplates[companyId] || {};
 

@@ -19939,9 +19939,34 @@ function insertTemplateTag(tag) {
     const start = el.selectionStart || el.value.length;
     const end = el.selectionEnd || el.value.length;
     const text = el.value;
+    const selectedText = text.substring(start, end);
 
-    el.value = text.substring(0, start) + tag + text.substring(end);
-    el.selectionStart = el.selectionEnd = start + tag.length;
+    if (tag === '*bold*' || tag === '*') {
+        if (selectedText.length > 0) {
+            const wrapped = `*${selectedText}*`;
+            el.value = text.substring(0, start) + wrapped + text.substring(end);
+            el.selectionStart = el.selectionEnd = start + wrapped.length;
+        } else {
+            const inserted = '*نص عريض*';
+            el.value = text.substring(0, start) + inserted + text.substring(end);
+            el.selectionStart = start + 1;
+            el.selectionEnd = start + inserted.length - 1;
+        }
+    } else if (tag === '_italic_' || tag === '_') {
+        if (selectedText.length > 0) {
+            const wrapped = `_${selectedText}_`;
+            el.value = text.substring(0, start) + wrapped + text.substring(end);
+            el.selectionStart = el.selectionEnd = start + wrapped.length;
+        } else {
+            const inserted = '_نص مائل_';
+            el.value = text.substring(0, start) + inserted + text.substring(end);
+            el.selectionStart = start + 1;
+            el.selectionEnd = start + inserted.length - 1;
+        }
+    } else {
+        el.value = text.substring(0, start) + tag + text.substring(end);
+        el.selectionStart = el.selectionEnd = start + tag.length;
+    }
     el.focus();
 }
 window.insertTemplateTag = insertTemplateTag;
