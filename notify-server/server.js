@@ -77,7 +77,7 @@ async function initWhatsAppEngine() {
         waSocket = makeWASocket({
             auth: state,
             printQRInTerminal: false,
-            browser: ['Burgeroov Portal', 'Chrome', '1.0.0']
+            browser: ['Mac OS', 'Chrome', '121.0.6167.85']
         });
 
         waSocket.ev.on('creds.update', saveCreds);
@@ -123,6 +123,33 @@ app.get('/wa/status', (_req, res) => {
         ...waConnectionState,
         qrAvailable: Boolean(waQrDataUrl)
     });
+});
+
+app.post('/wa/pair-code', async (req, res) => {
+    try {
+        const { phone } = req.body || {};
+        if (!phone) {
+            return res.status(400).json({ error: 'Please provide a valid phone number with country code (e.g. 966501234567).' });
+        }
+        if (waConnectionState.connected) {
+            return res.json({ connected: true, message: 'WhatsApp is already connected & linked!' });
+        }
+        if (!waSocket) {
+            return res.status(531).json({ error: 'WhatsApp engine is initializing. Try again in 5 seconds.' });
+        }
+
+        let cleanPhone = phone.replace(/[^0-9]/g, '');
+        if (cleanPhone.length < 8) {
+            return res.status(400).json({ error: 'Invalid phone number format. Include country code (e.g. 966501234567).' });
+        }
+
+        const code = await waSocket.requestPairingCode(cleanPhone);
+        console.log(`[WhatsApp Pairing Code] Generated for ${cleanPhone}: ${code}`);
+        return res.json({ success: true, pairingCode: code, phone: cleanPhone });
+    } catch (err) {
+        console.error('[WhatsApp Pairing Code Error]:', err.message);
+        return res.status(500).json({ error: err.message });
+    }
 });
 
 app.get('/wa/qr', (req, res) => {

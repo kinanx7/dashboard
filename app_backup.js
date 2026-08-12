@@ -19896,6 +19896,50 @@ function logoutWhatsAppSession() {
 }
 window.logoutWhatsAppSession = logoutWhatsAppSession;
 
+function getWhatsAppPairingCode() {
+    const phoneInput = document.getElementById('wa-pair-phone');
+    const serverUrlInput = document.getElementById('wa-server-url');
+    const codeDisplay = document.getElementById('wa-pair-code-display');
+    const codeText = document.getElementById('wa-pair-code-text');
+
+    const phone = phoneInput ? phoneInput.value.trim() : '';
+    const baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || 'https://burgeroov-notify-server.onrender.com';
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    if (!phone || phone.length < 8) {
+        alert(isAr ? 'يرجى كتابة رقم الهاتف مع رمز الدولة (مثال: 966501234567)' : 'Please enter a valid phone number with country code (e.g. 966501234567)');
+        return;
+    }
+
+    if (codeDisplay) codeDisplay.style.display = 'none';
+
+    fetch(`${baseUrl}/wa/pair-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success && data.pairingCode) {
+            if (codeText) codeText.textContent = data.pairingCode;
+            if (codeDisplay) codeDisplay.style.display = 'block';
+            alert(isAr 
+                ? `🔢 كود الربط المكون من 8 أرقام هو: [ ${data.pairingCode} ]\n\nافتح الواتساب في هاتفك -> الأجهزة المرتبطة -> الربط برقم الهاتف بدلاً من ذلك -> أدخل الكود!` 
+                : `🔢 Your 8-Digit Pairing Code is: [ ${data.pairingCode} ]\n\nOpen WhatsApp on your phone -> Linked Devices -> Link with Phone Number Instead -> Type this code!`);
+        } else if (data.connected) {
+            alert(isAr ? '🟢 الواتساب متصل ومربوط بالفعل!' : '🟢 WhatsApp is already connected & linked!');
+        } else {
+            alert(isAr ? `⚠️ تعذر توليد الكود: ${data.error || 'تأكد من تشغيل الخادم'}` : `⚠️ Failed to generate code: ${data.error || 'Check server status'}`);
+        }
+    })
+    .catch(err => {
+        alert(isAr 
+            ? '❌ تعذر الاتصال بسيرفر Render:\n1. تأكد من عمل Commit & Push للتقييم على GitHub لتحديث السيرفر.\n2. تأكد من صحة رابط السيرفر (Render Server Gateway URL) أعلى الصفحة.' 
+            : '❌ Cannot reach your Render server:\n1. Make sure you committed & pushed the code to GitHub to deploy to Render.\n2. Verify your exact Render Server URL at the top of the Messaging tab.');
+    });
+}
+window.getWhatsAppPairingCode = getWhatsAppPairingCode;
+
 function sendTestMessagingAlert() {
     const workerIdx = document.getElementById('msg-test-worker')?.value;
     const alertType = document.getElementById('msg-test-type')?.value || 'task';

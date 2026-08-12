@@ -3761,27 +3761,44 @@
                 <!-- 3 COLUMN GRID: 1. QR Code / Status | 2. Worker Numbers | 3. Template Customizer -->
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
                     
-                    <!-- CARD 1: WhatsApp Business Connection & QR Code -->
+                    <!-- CARD 1: WhatsApp Business Connection & QR Code / Pairing Code -->
                     <div style="background: var(--input-bg); border-radius: 16px; border: 1px solid var(--border-color); padding: 20px; display: flex; flex-direction: column; justify-content: space-between;">
                         <div>
                             <h3 style="font-size: 1.05rem; font-weight: 900; color: var(--text-main); margin-bottom: 6px; display:flex; align-items:center; gap:8px;">
                                 <span data-i18n="title-wa-connection">📱 WhatsApp Business Connection</span>
                             </h3>
                             <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
-                                Self-hosted on your Render Server. Open WhatsApp Business on your phone (Linked Devices -> Link a Device) and scan the QR code below.
+                                Link your phone using a <strong>Live QR Code</strong> or <strong>8-Digit Code</strong> (bypasses phone camera warnings).
                             </p>
 
                             <!-- Gateway Credentials / Server URL Input -->
-                            <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">
+                            <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
                                 <label style="font-size:0.75rem; font-weight:800; color:var(--text-muted);">Render Server Gateway URL:</label>
                                 <input type="text" id="wa-server-url" value="https://burgeroov-notify-server.onrender.com" placeholder="https://burgeroov-notify-server.onrender.com" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.82rem; font-weight:700;">
                             </div>
 
+                            <!-- 8-DIGIT PHONE PAIRING CODE BOX (RECOMMENDED BYPASS) -->
+                            <div style="background:var(--card-bg); border:1px solid rgba(16,185,129,0.3); padding:12px; border-radius:12px; margin-bottom:12px;">
+                                <div style="font-size:0.8rem; font-weight:800; color:#10b981; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+                                    <span>🔢 Link via 8-Digit Code (No Camera Needed)</span>
+                                </div>
+                                <div style="display:flex; gap:8px; margin-bottom:8px;">
+                                    <input type="tel" id="wa-pair-phone" placeholder="966501234567" style="flex:1; padding:8px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.82rem; font-weight:700;">
+                                    <button type="button" onclick="getWhatsAppPairingCode()" class="btn-success" style="padding:8px 12px; border-radius:8px; font-weight:800; font-size:0.78rem; background:#10b981; color:white; border:none; cursor:pointer; white-space:nowrap;">
+                                        Get Code
+                                    </button>
+                                </div>
+                                <div id="wa-pair-code-display" style="display:none; text-align:center; background:rgba(16,185,129,0.1); padding:10px; border-radius:8px; border:1px dashed #10b981;">
+                                    <span style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">Enter this code on WhatsApp (Linked Devices -> Link with Phone Number):</span>
+                                    <strong id="wa-pair-code-text" style="font-size:1.4rem; letter-spacing:3px; color:#10b981; font-family:monospace;">ABCD-1234</strong>
+                                </div>
+                            </div>
+
                             <!-- QR Code Box Container -->
-                            <div style="text-align: center; background: var(--card-bg); padding: 16px; border-radius: 14px; border: 2px dashed #10b981; margin-bottom: 14px; position: relative;">
-                                <div id="wa-qr-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 160px;">
-                                    <img id="wa-qr-img" src="https://burgeroov-notify-server.onrender.com/wa/qr" alt="WhatsApp QR Code" style="width: 160px; height: 160px; border-radius: 10px; box-shadow: var(--shadow-sm); border: 1px solid var(--border-color);" onerror="this.src='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=MVC_RENDER_GATEWAY_OFFLINE';">
-                                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px; font-weight: 700;">
+                            <div style="text-align: center; background: var(--card-bg); padding: 12px; border-radius: 14px; border: 2px dashed #10b981; margin-bottom: 12px; position: relative;">
+                                <div id="wa-qr-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 140px;">
+                                    <img id="wa-qr-img" src="https://burgeroov-notify-server.onrender.com/wa/qr" alt="WhatsApp QR Code" style="width: 140px; height: 140px; border-radius: 10px; box-shadow: var(--shadow-sm); border: 1px solid var(--border-color);" onerror="this.src='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=MVC_RENDER_GATEWAY_OFFLINE';">
+                                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 6px; font-weight: 700;">
                                         Scan Live QR Code with WhatsApp Business
                                     </div>
                                 </div>
@@ -4863,17 +4880,17 @@
 
     <script defer src="translations.js"></script>
     <!-- Modularized Core & Feature Scripts -->
-    <script defer src="js/core.js?v=83"></script>
-    <script defer src="js/auth.js?v=83"></script>
-    <script defer src="js/adverts_notes.js?v=83"></script>
-    <script defer src="js/sales_costs.js?v=83"></script>
-    <script defer src="js/warehouse.js?v=83"></script>
-    <script defer src="js/tasks.js?v=83"></script>
-    <script defer src="js/drivers.js?v=83"></script>
-    <script defer src="js/ops.js?v=83"></script>
-    <script defer src="js/finance.js?v=83"></script>
-    <script defer src="js/market.js?v=83"></script>
-    <script defer src="js/prepare.js?v=83"></script>
+    <script defer src="js/core.js?v=85"></script>
+    <script defer src="js/auth.js?v=85"></script>
+    <script defer src="js/adverts_notes.js?v=85"></script>
+    <script defer src="js/sales_costs.js?v=85"></script>
+    <script defer src="js/warehouse.js?v=85"></script>
+    <script defer src="js/tasks.js?v=85"></script>
+    <script defer src="js/drivers.js?v=85"></script>
+    <script defer src="js/ops.js?v=85"></script>
+    <script defer src="js/finance.js?v=85"></script>
+    <script defer src="js/market.js?v=85"></script>
+    <script defer src="js/prepare.js?v=85"></script>
     <!-- 3-Month Attendance Report Modal -->
     <div id="modal-3month-attendance-report" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.65); backdrop-filter:blur(4px); display:none; justify-content:center; align-items:center; z-index:999999;">
         <div class="modal-content" style="max-width: 850px; width: 95%; max-height: 88vh; overflow-y: auto; border-radius: 16px; padding: 24px; background:var(--card-bg); box-shadow:0 10px 40px rgba(0,0,0,0.5); margin:auto;">
