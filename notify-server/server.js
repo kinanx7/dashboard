@@ -66,6 +66,10 @@ let waSocket = null;
 let waQrDataUrl = null;
 let waConnectionState = { connected: false, user: null, status: 'initializing' };
 
+// Helper functions to sanitize/unsanitize Firebase RTDB keys (Firebase disallows . # $ / [ ])
+const encodeKey = (str) => String(str || '').replace(/\./g, '%2E').replace(/#/g, '%23').replace(/\$/g, '%24').replace(/\//g, '%2F').replace(/\[/g, '%5B').replace(/\]/g, '%5D');
+const decodeKey = (str) => String(str || '').replace(/%2E/g, '.').replace(/%23/g, '#').replace(/%24/g, '$').replace(/%2F/g, '/').replace(/%5B/g, '[').replace(/%5D/g, ']');
+
 // Firebase RTDB Auth State for WhatsApp (Persistent across Render restarts & redeploys)
 const useFirebaseAuthState = async (dbRef) => {
     let creds;
@@ -73,7 +77,8 @@ const useFirebaseAuthState = async (dbRef) => {
         const credsSnap = await dbRef.child('creds').once('value');
         const credsVal = credsSnap.val();
         if (credsVal) {
-            creds = JSON.parse(JSON.stringify(credsVal), BufferJSON.reviver);
+            const rawStr = typeof credsVal === 'string' ? credsVal : JSON.stringify(credsVal);
+            creds = JSON.parse(rawStr, BufferJSON.reviver);
         } else {
             creds = initAuthCreds();
         }
@@ -91,13 +96,20 @@ const useFirebaseAuthState = async (dbRef) => {
                     await Promise.all(
                         ids.map(async (id) => {
                             try {
-                                const snap = await dbRef.child(`keys/${type}_${id}`).once('value');
+                                const safeKey = `${encodeKey(type)}_${encodeKey(id)}`;
+                                const snap = await dbRef.child(`keys/${safeKey}`).once('value');
                                 let value = snap.val();
-                                if (value) {
-                                    if (type === 'app-state-sync-key' && typeof value === 'object') {
-                                        value = proto.Message.AppStateSyncKeyData.fromObject(value);
+                                if (value !== null && value !== undefined) {
+                                    let parsed;
+                                    if (typeof value === 'string') {
+                                        parsed = JSON.parse(value, BufferJSON.reviver);
+                                    } else {
+                                        parsed = JSON.parse(JSON.stringify(value), BufferJSON.reviver);
                                     }
-                                    data[id] = JSON.parse(JSON.stringify(value), BufferJSON.reviver);
+                                    if (type === 'app-state-sync-key' && parsed && typeof parsed === 'object') {
+                                        parsed = proto.Message.AppStateSyncKeyData.fromObject(parsed);
+                                    }
+                                    data[id] = parsed;
                                 }
                             } catch (err) {
                                 console.warn(`[Firebase Auth State] Error reading key ${type}_${id}:`, err.message);
@@ -111,9 +123,10 @@ const useFirebaseAuthState = async (dbRef) => {
                     for (const category in data) {
                         for (const id in data[category]) {
                             const value = data[category][id];
-                            const keyPath = `keys/${category}_${id}`;
-                            if (value) {
-                                updates[keyPath] = JSON.parse(JSON.stringify(value, BufferJSON.replacer));
+                            const safeKey = `${encodeKey(category)}_${encodeKey(id)}`;
+                            const keyPath = `keys/${safeKey}`;
+                            if (value !== undefined && value !== null) {
+                                updates[keyPath] = JSON.stringify(value, BufferJSON.replacer);
                             } else {
                                 updates[keyPath] = null;
                             }
@@ -131,7 +144,7 @@ const useFirebaseAuthState = async (dbRef) => {
         },
         saveCreds: async () => {
             try {
-                const serialized = JSON.parse(JSON.stringify(creds, BufferJSON.replacer));
+                const serialized = JSON.stringify(creds, BufferJSON.replacer);
                 await dbRef.child('creds').set(serialized);
             } catch (err) {
                 console.error('[Firebase Auth State] Error saving creds:', err.message);
