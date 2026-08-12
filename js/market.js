@@ -1966,6 +1966,10 @@ function renderMarket() {
     const grid = document.getElementById('market-products-grid');
     if (!grid) return;
 
+    if (typeof setupSearchInputClearButtons === 'function') {
+        setupSearchInputClearButtons();
+    }
+
     const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
     const prods = getAllMarketProducts();
     const search = (document.getElementById('market-search-input')?.value || '').trim().toLowerCase();

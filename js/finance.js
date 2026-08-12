@@ -5078,6 +5078,10 @@ function renderReminders() {
     const container = document.getElementById('reminders-list-container');
     if (!container) return;
 
+    if (typeof setupSearchInputClearButtons === 'function') {
+        setupSearchInputClearButtons();
+    }
+
     if (typeof setupRemindersInfiniteScroll === 'function') {
         setupRemindersInfiniteScroll();
     }

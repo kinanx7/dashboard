@@ -1013,6 +1013,10 @@ function renderTasks() {
     // Ensure all existing & new tasks have assigned task numbers
     ensureTaskNumbers();
 
+    if (typeof setupSearchInputClearButtons === 'function') {
+        setupSearchInputClearButtons();
+    }
+
     // Gather Filter Values
     const statusFilter = document.getElementById('tasks-filter-status') ? document.getElementById('tasks-filter-status').value : 'all';
     const selectedWorkerId = document.getElementById('tasks-filter-worker') ? document.getElementById('tasks-filter-worker').value : 'all';

@@ -3637,7 +3637,7 @@
                         style="margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
                         <h3
                             style="font-size: 1.05rem; font-weight: 800; color: var(--text-main); margin:0; display:flex; align-items:center; gap:8px;">
-                            <span data-i18n="title-upload-vault-note">📝 Upload New Information / Document</span>
+                            <span id="vault-form-header-title" data-i18n="title-upload-vault-note">📝 Upload New Information / Document</span>
                         </h3>
                         <button type="button" onclick="toggleVaultAddForm()"
                             style="background:transparent; border:none; color:var(--text-muted); font-weight:800; font-size:1.2rem; cursor:pointer;">✕</button>
@@ -3700,7 +3700,7 @@
                         <button type="button" onclick="toggleVaultAddForm()" class="btn-neutral"
                             style="padding:10px 20px; border-radius:10px; font-weight:800;"
                             data-i18n="btn-cancel">Cancel</button>
-                        <button type="button" onclick="postVaultNote()" class="btn-success"
+                        <button type="button" id="vault-submit-btn" onclick="postVaultNote()" class="btn-success"
                             style="padding:10px 24px; border-radius:10px; font-weight:800; background:linear-gradient(135deg,#10b981,#059669); color:white; border:none; cursor:pointer; box-shadow:0 2px 8px rgba(16,185,129,0.3);"
                             data-i18n="btn-save-vault-note">🔒 Save Information Note</button>
                     </div>

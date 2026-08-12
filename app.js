@@ -6637,6 +6637,10 @@ function renderTasks() {
     // Ensure all existing & new tasks have assigned task numbers
     ensureTaskNumbers();
 
+    if (typeof setupSearchInputClearButtons === 'function') {
+        setupSearchInputClearButtons();
+    }
+
     // Gather Filter Values
     const statusFilter = document.getElementById('tasks-filter-status') ? document.getElementById('tasks-filter-status').value : 'all';
     const selectedWorkerId = document.getElementById('tasks-filter-worker') ? document.getElementById('tasks-filter-worker').value : 'all';
@@ -14188,6 +14192,10 @@ function renderReminders() {
     const container = document.getElementById('reminders-list-container');
     if (!container) return;
 
+    if (typeof setupSearchInputClearButtons === 'function') {
+        setupSearchInputClearButtons();
+    }
+
     if (typeof setupRemindersInfiniteScroll === 'function') {
         setupRemindersInfiniteScroll();
     }
@@ -16498,6 +16506,10 @@ function renderMarket() {
     window.currentMarketRenderLimit = 24;
     const grid = document.getElementById('market-products-grid');
     if (!grid) return;
+
+    if (typeof setupSearchInputClearButtons === 'function') {
+        setupSearchInputClearButtons();
+    }
 
     const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
     const prods = getAllMarketProducts();
@@ -19601,11 +19613,13 @@ window.handleAIChatSubmit = handleAIChatSubmit;
 // =============================================
 let vaultActiveCategoryFilter = 'ALL';
 let currentVaultImageData = null;
+let currentEditingVaultId = null;
 
 function toggleVaultAddForm() {
     const container = document.getElementById('vault-add-form-container');
     if (!container) return;
     if (container.style.display === 'none' || !container.style.display) {
+        if (!currentEditingVaultId) clearVaultForm();
         container.style.display = 'block';
     } else {
         container.style.display = 'none';
@@ -19615,6 +19629,20 @@ function toggleVaultAddForm() {
 window.toggleVaultAddForm = toggleVaultAddForm;
 
 function clearVaultForm() {
+    currentEditingVaultId = null;
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const headerTitle = document.getElementById('vault-form-header-title');
+    const submitBtn = document.getElementById('vault-submit-btn');
+
+    if (headerTitle) {
+        headerTitle.textContent = isAr ? '📝 رفع معلومات أو وثيقة جديدة' : '📝 Upload New Information / Document';
+        headerTitle.setAttribute('data-i18n', 'title-upload-vault-note');
+    }
+    if (submitBtn) {
+        submitBtn.textContent = isAr ? '🔒 حفظ ملاحظة المعلومات' : '🔒 Save Information Note';
+        submitBtn.setAttribute('data-i18n', 'btn-save-vault-note');
+    }
+
     const title = document.getElementById('vault-note-title');
     const cat = document.getElementById('vault-note-category');
     const text = document.getElementById('vault-note-text');
@@ -19687,6 +19715,59 @@ function clearVaultImagePreview() {
 }
 window.clearVaultImagePreview = clearVaultImagePreview;
 
+function editVaultNote(noteId) {
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const notesObj = data.vaultNotes || {};
+    const noteObj = notesObj[noteId];
+    if (!noteObj) return;
+
+    currentEditingVaultId = noteId;
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    const titleEl = document.getElementById('vault-note-title');
+    const catEl = document.getElementById('vault-note-category');
+    const textEl = document.getElementById('vault-note-text');
+    const headerTitle = document.getElementById('vault-form-header-title');
+    const submitBtn = document.getElementById('vault-submit-btn');
+
+    if (titleEl) titleEl.value = noteObj.title || '';
+    if (catEl) catEl.value = noteObj.category || 'General';
+    if (textEl) textEl.value = noteObj.text || '';
+
+    if (headerTitle) {
+        headerTitle.textContent = isAr ? '✏️ تعديل ملاحظة / وثيقة معلومات' : '✏️ Edit Information / Document';
+        headerTitle.setAttribute('data-i18n', 'title-edit-vault-note');
+    }
+    if (submitBtn) {
+        submitBtn.textContent = isAr ? '💾 حفظ التعديلات' : '💾 Save Changes';
+        submitBtn.setAttribute('data-i18n', 'btn-update-vault-note');
+    }
+
+    currentVaultImageData = noteObj.imageUrl || null;
+    const previewImg = document.getElementById('vault-img-preview');
+    const previewContainer = document.getElementById('vault-img-preview-container');
+    const clearBtn = document.getElementById('vault-clear-img-btn');
+    const fileInput = document.getElementById('vault-note-image-file');
+    if (fileInput) fileInput.value = '';
+
+    if (currentVaultImageData) {
+        if (previewImg) previewImg.src = currentVaultImageData;
+        if (previewContainer) previewContainer.style.display = 'block';
+        if (clearBtn) clearBtn.style.display = 'inline-block';
+    } else {
+        if (previewImg) previewImg.src = '';
+        if (previewContainer) previewContainer.style.display = 'none';
+        if (clearBtn) clearBtn.style.display = 'none';
+    }
+
+    const container = document.getElementById('vault-add-form-container');
+    if (container) {
+        container.style.display = 'block';
+        container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+window.editVaultNote = editVaultNote;
+
 function postVaultNote() {
     const titleEl = document.getElementById('vault-note-title');
     const catEl = document.getElementById('vault-note-category');
@@ -19695,28 +19776,41 @@ function postVaultNote() {
     const title = titleEl ? titleEl.value.trim() : '';
     const category = catEl ? catEl.value : 'General';
     const text = textEl ? textEl.value.trim() : '';
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
 
     if (!title && !text && !currentVaultImageData) {
-        if (typeof showInAppNotification === 'function') showInAppNotification("⚠️ Please enter a title, details, or upload an image.");
-        else alert("Please enter a title, details, or upload an image.");
+        const msg = isAr ? "⚠️ يرجى كتابة عنوان أو تفاصيل أو رفع صورة." : "⚠️ Please enter a title, details, or upload an image.";
+        if (typeof showInAppNotification === 'function') showInAppNotification(msg);
+        else alert(msg);
         return;
     }
 
-    const noteId = 'vault_' + Date.now();
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const isEditing = !!currentEditingVaultId;
+    const noteId = currentEditingVaultId || ('vault_' + Date.now());
+    const existingNote = (data.vaultNotes && data.vaultNotes[noteId]) ? data.vaultNotes[noteId] : {};
+
     const noteObj = {
         id: noteId,
-        title: title || 'Information Note',
+        title: title || (isAr ? 'ملاحظة معلومات' : 'Information Note'),
         category: category,
         text: text || '',
         imageUrl: currentVaultImageData || '',
-        createdAt: Date.now(),
-        createdBy: (currentUser && currentUser.email) ? currentUser.email : 'Admin'
+        createdAt: existingNote.createdAt || Date.now(),
+        createdBy: existingNote.createdBy || ((currentUser && currentUser.email) ? currentUser.email : 'Admin'),
+        updatedAt: Date.now()
     };
 
     db.ref('companies/' + currentCompany + '/vaultNotes/' + noteId).set(noteObj)
         .then(() => {
-            if (typeof showInAppNotification === 'function') showInAppNotification("✅ Information note saved successfully!");
-            toggleVaultAddForm();
+            const successMsg = isEditing
+                ? (isAr ? "✅ تم حفظ التعديلات بنجاح!" : "✅ Information note updated successfully!")
+                : (isAr ? "✅ تم حفظ ملاحظة المعلومات بنجاح!" : "✅ Information note saved successfully!");
+            if (typeof showInAppNotification === 'function') showInAppNotification(successMsg);
+
+            const container = document.getElementById('vault-add-form-container');
+            if (container) container.style.display = 'none';
+            clearVaultForm();
             renderVaultNotes();
         })
         .catch(err => {
@@ -19876,6 +19970,7 @@ function renderVaultNotes() {
                         </div>
                         <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
                             <button type="button" onclick="copyVaultText('${n.id}')" title="${isAr ? 'نسخ النص' : 'Copy Text'}" style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: var(--text-main);">${isAr ? '📋 نسخ' : '📋 Copy'}</button>
+                            <button type="button" onclick="editVaultNote('${n.id}')" title="${isAr ? 'تعديل الملاحظة' : 'Edit Note'}" style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: #6366f1;">${isAr ? '✏️ تعديل' : '✏️ Edit'}</button>
                             <button type="button" onclick="deleteVaultNote('${n.id}')" title="${isAr ? 'حذف الملاحظة' : 'Delete Note'}" style="background: rgba(220, 38, 38, 0.1); border: 1px solid rgba(220, 38, 38, 0.25); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: var(--danger);">🗑️</button>
                         </div>
                     </div>
@@ -20294,7 +20389,91 @@ function sendTestMessagingAlert() {
         alert(isAr ? '❌ فشل الاتصال بالخادم: ' + err.message : '❌ Network error: ' + err.message);
     });
 }
-window.sendTestMessagingAlert = sendTestMessagingAlert;
+// Universal Search Bar Clear (X) Button Engine
+function setupSearchInputClearButtons() {
+    const selector = '#reminders-search-input, #market-search-input, #tasks-search-input, #wh-search, #vault-search-input, #map-search-input, input[type="search"], .search-with-clear';
+    const searchInputs = document.querySelectorAll(selector);
+
+    searchInputs.forEach(input => {
+        if (!input) return;
+
+        let wrapper = input.parentElement;
+        if (!wrapper || (!wrapper.classList.contains('search-input-wrapper') && wrapper.tagName !== 'DIV')) {
+            const newWrapper = document.createElement('div');
+            newWrapper.className = 'search-input-wrapper';
+            if (input.style.width) newWrapper.style.width = input.style.width;
+            if (input.style.flex) newWrapper.style.flex = input.style.flex;
+            if (input.style.minWidth) newWrapper.style.minWidth = input.style.minWidth;
+            if (input.style.maxWidth) newWrapper.style.maxWidth = input.style.maxWidth;
+
+            input.parentNode.insertBefore(newWrapper, input);
+            newWrapper.appendChild(input);
+            wrapper = newWrapper;
+        } else {
+            wrapper.classList.add('search-input-wrapper');
+        }
+
+        input.style.paddingLeft = '34px';
+
+        let clearBtn = wrapper.querySelector('.search-clear-btn');
+        if (!clearBtn) {
+            clearBtn = document.createElement('button');
+            clearBtn.type = 'button';
+            clearBtn.className = 'search-clear-btn';
+            clearBtn.innerHTML = '✖';
+            clearBtn.title = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar') ? 'مسح البحث' : 'Clear search';
+            wrapper.insertBefore(clearBtn, input);
+        }
+
+        const updateVisibility = () => {
+            const val = (input.value || '').trim();
+            if (val.length > 0) {
+                clearBtn.style.display = 'flex';
+            } else {
+                clearBtn.style.display = 'none';
+            }
+        };
+
+        if (!input.dataset.clearListenersBound) {
+            input.dataset.clearListenersBound = 'true';
+            input.addEventListener('input', updateVisibility);
+            input.addEventListener('keyup', updateVisibility);
+            input.addEventListener('change', updateVisibility);
+
+            clearBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                input.value = '';
+                clearBtn.style.display = 'none';
+
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('keyup', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+
+                const id = input.id;
+                if (id === 'reminders-search-input') {
+                    if (typeof currentRemindersLimit !== 'undefined') currentRemindersLimit = 20;
+                    if (typeof renderReminders === 'function') renderReminders();
+                } else if (id === 'market-search-input') {
+                    if (typeof renderMarket === 'function') renderMarket();
+                } else if (id === 'tasks-search-input') {
+                    if (typeof renderTasks === 'function') renderTasks();
+                } else if (id === 'wh-search') {
+                    if (typeof renderWarehouse === 'function') renderWarehouse();
+                } else if (id === 'vault-search-input') {
+                    if (typeof renderVaultNotes === 'function') renderVaultNotes();
+                } else if (id === 'map-search-input') {
+                    if (typeof searchMapLocation === 'function') searchMapLocation();
+                }
+
+                input.focus();
+            });
+        }
+
+        updateVisibility();
+    });
+}
+window.setupSearchInputClearButtons = setupSearchInputClearButtons;
 
 // Initial run
 applyTranslations();
@@ -20304,6 +20483,12 @@ if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession) {
     } else if (typeof window.applyCustomerModeUI === 'function') {
         window.applyCustomerModeUI();
     }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupSearchInputClearButtons);
+} else {
+    setTimeout(setupSearchInputClearButtons, 100);
 }
 
 
