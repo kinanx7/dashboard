@@ -235,6 +235,24 @@ async function safeSend(message, label) {
     }
 }
 
+async function sendWhatsAppDirect(phone, text) {
+    if (!phone || !text) return;
+    if (!waConnectionState.connected || !waSocket) {
+        console.log(`[WhatsApp Skip] Engine not linked — skip automated alert to ${phone}`);
+        return;
+    }
+    try {
+        let cleanPhone = phone.replace(/[^0-9]/g, '');
+        if (!cleanPhone.endsWith('@s.whatsapp.net')) {
+            cleanPhone = `${cleanPhone}@s.whatsapp.net`;
+        }
+        await waSocket.sendMessage(cleanPhone, { text });
+        console.log(`💬 [WhatsApp Auto-Sent] → ${phone}: "${text.substring(0, 40)}..."`);
+    } catch (err) {
+        console.error(`❌ [WhatsApp Auto-Send Failed] → ${phone}:`, err.message);
+    }
+}
+
 // ─── Notification Listeners ──────────────────────────────────────────────────
 const prevState = {};
 const notifiedGeneralTasks = {};
@@ -255,6 +273,8 @@ function startNotificationListeners(companyId) {
             if (!after) return;
 
             const fcmToken   = after.fcmToken;
+            const phone      = after.phone;
+            const waEnabled  = after.waAlertsEnabled !== false;
             const workerName = after.name || `Worker #${index}`;
             const cacheKey   = `${companyId}_${index}`;
             const before     = prevState[cacheKey] || null;
@@ -262,7 +282,6 @@ function startNotificationListeners(companyId) {
             prevState[cacheKey] = JSON.parse(JSON.stringify(after));
 
             if (!before) return;
-            if (!fcmToken) return;
 
             // 1. NEW TASK
             const beforeJobs = Array.isArray(before.jobs) ? before.jobs : [];
@@ -274,16 +293,24 @@ function startNotificationListeners(companyId) {
 
                 for (const job of newJobs) {
                     const title = job.title || job.name || 'New task';
-                    sends.push(safeSend({
-                        token: fcmToken,
-                        notification: {
-                            title: `📋 New Task Assigned [${companyLabel}]`,
-                            body:  `${title} — tap to open your task board.`
-                        },
-                        data: { type: 'task', tab: 'tasks', workerName, companyId },
-                        android: { priority: 'high', notification: { channelId: 'burgeroov_tasks' } },
-                        apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
-                    }, `[${companyId}] TASK → ${workerName}: "${title}"`));
+                    
+                    if (fcmToken) {
+                        sends.push(safeSend({
+                            token: fcmToken,
+                            notification: {
+                                title: `📋 New Task Assigned [${companyLabel}]`,
+                                body:  `${title} — tap to open your task board.`
+                            },
+                            data: { type: 'task', tab: 'tasks', workerName, companyId },
+                            android: { priority: 'high', notification: { channelId: 'burgeroov_tasks' } },
+                            apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
+                        }, `[${companyId}] TASK → ${workerName}: "${title}"`));
+                    }
+
+                    if (phone && waEnabled) {
+                        const waMsg = `📋 *مهمة جديدة أسندت إليك [${companyLabel}]*\n\nالموظف: ${workerName}\nالمهمة: ${title}\n\nيرجى فتح لوحة المهام للإنجاز.`;
+                        sendWhatsAppDirect(phone, waMsg);
+                    }
                 }
             }
 
@@ -293,17 +320,25 @@ function startNotificationListeners(companyId) {
 
             if (!hadOrder && hasOrder) {
                 const order    = after.activeOrder;
-                const customer = order.customerName || order.address || 'a customer';
-                sends.push(safeSend({
-                    token: fcmToken,
-                    notification: {
-                        title: `🛵 New Delivery Order [${companyLabel}]`,
-                        body:  `Order for ${customer} — open the app to start.`
-                    },
-                    data: { type: 'delivery', tab: 'drivers', workerName, companyId },
-                    android: { priority: 'high', notification: { channelId: 'burgeroov_orders' } },
-                    apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
-                }, `[${companyId}] ORDER → ${workerName}`));
+                const customer = order.customerName || order.address || 'عميل';
+
+                if (fcmToken) {
+                    sends.push(safeSend({
+                        token: fcmToken,
+                        notification: {
+                            title: `🛵 New Delivery Order [${companyLabel}]`,
+                            body:  `Order for ${customer} — open the app to start.`
+                        },
+                        data: { type: 'delivery', tab: 'drivers', workerName, companyId },
+                        android: { priority: 'high', notification: { channelId: 'burgeroov_orders' } },
+                        apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
+                    }, `[${companyId}] ORDER → ${workerName}`));
+                }
+
+                if (phone && waEnabled) {
+                    const waMsg = `🛵 *طلب توصيل جديد [${companyLabel}]*\n\nالمحتفظ بالطلب: ${workerName}\nالعميل: ${customer}\n\nيرجى بدء التوصيل فوراً!`;
+                    sendWhatsAppDirect(phone, waMsg);
+                }
             }
 
             // 3. NEW VIOLATION
@@ -311,7 +346,7 @@ function startNotificationListeners(companyId) {
             const afterViol  = countAcrossMonths(after?.monthlyStats,  'violationsList');
 
             if (afterViol > beforeViol) {
-                let reason = 'A new violation has been recorded on your profile.';
+                let reason = 'تسجيل مخالفة جديدة على ملفك.';
                 if (after.monthlyStats) {
                     const months = Object.keys(after.monthlyStats).sort().reverse();
                     for (const m of months) {
@@ -322,13 +357,21 @@ function startNotificationListeners(companyId) {
                         }
                     }
                 }
-                sends.push(safeSend({
-                    token: fcmToken,
-                    notification: { title: `⚠️ Violation Recorded [${companyLabel}]`, body: reason },
-                    data: { type: 'violation', tab: 'finance', workerName, companyId },
-                    android: { priority: 'high', notification: { channelId: 'burgeroov_alerts' } },
-                    apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
-                }, `[${companyId}] VIOLATION → ${workerName}`));
+
+                if (fcmToken) {
+                    sends.push(safeSend({
+                        token: fcmToken,
+                        notification: { title: `⚠️ Violation Recorded [${companyLabel}]`, body: reason },
+                        data: { type: 'violation', tab: 'finance', workerName, companyId },
+                        android: { priority: 'high', notification: { channelId: 'burgeroov_alerts' } },
+                        apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
+                    }, `[${companyId}] VIOLATION → ${workerName}`));
+                }
+
+                if (phone && waEnabled) {
+                    const waMsg = `⚠️ *تنبيه مخالفة [${companyLabel}]*\n\nالموظف: ${workerName}\nالسبب: ${reason}`;
+                    sendWhatsAppDirect(phone, waMsg);
+                }
             }
 
             // 4. NEW REWARD
@@ -336,7 +379,7 @@ function startNotificationListeners(companyId) {
             const afterRew  = countAcrossMonths(after?.monthlyStats,  'rewardsList');
 
             if (afterRew > beforeRew) {
-                let rewardNote = 'Your manager gave you a reward — great job!';
+                let rewardNote = 'مكافأة جديدة من الإدارة!';
                 if (after.monthlyStats) {
                     const months = Object.keys(after.monthlyStats).sort().reverse();
                     for (const m of months) {
@@ -350,13 +393,21 @@ function startNotificationListeners(companyId) {
                         }
                     }
                 }
-                sends.push(safeSend({
-                    token: fcmToken,
-                    notification: { title: `🎉 Reward Added [${companyLabel}]`, body: rewardNote },
-                    data: { type: 'reward', tab: 'finance', workerName, companyId },
-                    android: { priority: 'normal', notification: { channelId: 'burgeroov_rewards' } },
-                    apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
-                }, `[${companyId}] REWARD → ${workerName}`));
+
+                if (fcmToken) {
+                    sends.push(safeSend({
+                        token: fcmToken,
+                        notification: { title: `🎉 Reward Added [${companyLabel}]`, body: rewardNote },
+                        data: { type: 'reward', tab: 'finance', workerName, companyId },
+                        android: { priority: 'normal', notification: { channelId: 'burgeroov_rewards' } },
+                        apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
+                    }, `[${companyId}] REWARD → ${workerName}`));
+                }
+
+                if (phone && waEnabled) {
+                    const waMsg = `🎉 *مكافأة جديدة [${companyLabel}]*\n\nالموظف: ${workerName}\nالبيان: ${rewardNote}`;
+                    sendWhatsAppDirect(phone, waMsg);
+                }
             }
         });
 
@@ -401,13 +452,12 @@ function startNotificationListeners(companyId) {
                 const group = task.targetGroupId ? (groups || []).find(g => g && g.id === task.targetGroupId) : null;
 
                 workers.forEach((w, index) => {
-                    if (w && w.fcmToken) {
-                        if (group) {
-                            if (!group.members || !group.members.includes(w.id)) {
-                                return;
-                            }
-                        }
+                    if (!w) return;
+                    if (group && group.members && !group.members.includes(w.id)) {
+                        return;
+                    }
 
+                    if (w.fcmToken) {
                         const notifTitle = group 
                             ? `👥 New Group Task Available [${group.name}]` 
                             : `🌍 New General Task Available [${companyLabel}]`;
@@ -422,6 +472,13 @@ function startNotificationListeners(companyId) {
                             android: { priority: 'high', notification: { channelId: 'burgeroov_tasks' } },
                             apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
                         }, `[${companyId}] GROUP/GENERAL TASK → ${w.name || `Worker #${index}`}: "${title}"`));
+                    }
+
+                    if (w.phone && w.waAlertsEnabled !== false) {
+                        const waMsg = group 
+                            ? `👥 *مهمة جديدة للمجموعة [${group.name}]*\n\nالمهمة: ${title}\n\nيرجى الاطلاع والإنجاز.`
+                            : `🌍 *مهمة عامة جديدة [${companyLabel}]*\n\nالمهمة: ${title}\n\nيرجى قبول المهمة في لوحة المهام.`;
+                        sendWhatsAppDirect(w.phone, waMsg);
                     }
                 });
             }
