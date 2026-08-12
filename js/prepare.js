@@ -2934,6 +2934,428 @@ function setupSearchInputClearButtons() {
 }
 window.setupSearchInputClearButtons = setupSearchInputClearButtons;
 
+// =============================================
+// TASK INQUIRY SYSTEM & DEPARTMENT
+// =============================================
+let currentTaskFormMode = 'assign'; // 'assign' | 'inquiry'
+
+function setTaskFormMode(mode) {
+    currentTaskFormMode = mode;
+    const assignBtn = document.getElementById('task-mode-assign-btn');
+    const inquiryBtn = document.getElementById('task-mode-inquiry-btn');
+    const hudBtn = document.getElementById('task-mode-hud-btn');
+    const assignForm = document.getElementById('task-assign-form');
+    const inquiryForm = document.getElementById('task-inquiry-form');
+    const inqDept = document.getElementById('tasks-inquiry-department');
+
+    if (mode === 'inquiry') {
+        if (assignForm) assignForm.style.display = 'none';
+        if (inquiryForm) inquiryForm.style.display = 'block';
+
+        if (assignBtn) {
+            assignBtn.className = 'btn-outline';
+            assignBtn.style.background = 'var(--input-bg)';
+            assignBtn.style.color = 'var(--text-main)';
+        }
+        if (inquiryBtn) {
+            inquiryBtn.className = 'btn-primary';
+            inquiryBtn.style.background = 'linear-gradient(135deg, #8b5cf6, #6d28d9)';
+            inquiryBtn.style.color = 'white';
+        }
+        if (hudBtn) {
+            hudBtn.className = 'btn-outline';
+            hudBtn.style.background = 'var(--input-bg)';
+            hudBtn.style.color = 'var(--text-main)';
+        }
+        populateInquiryWorkerDropdown();
+    } else if (mode === 'hud') {
+        openInquiriesHUDModal();
+    } else {
+        if (assignForm) assignForm.style.display = 'block';
+        if (inquiryForm) inquiryForm.style.display = 'none';
+
+        if (assignBtn) {
+            assignBtn.className = 'btn-primary';
+            assignBtn.style.background = 'linear-gradient(135deg, #4f46e5, #3730a3)';
+            assignBtn.style.color = 'white';
+        }
+        if (inquiryBtn) {
+            inquiryBtn.className = 'btn-outline';
+            inquiryBtn.style.background = 'var(--input-bg)';
+            inquiryBtn.style.color = 'var(--text-main)';
+        }
+        if (hudBtn) {
+            hudBtn.className = 'btn-outline';
+            hudBtn.style.background = 'var(--input-bg)';
+            hudBtn.style.color = 'var(--text-main)';
+        }
+    }
+}
+window.setTaskFormMode = setTaskFormMode;
+
+function populateInquiryWorkerDropdown() {
+    const sel = document.getElementById('inquiry-worker-select');
+    if (!sel) return;
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const workers = data.workers || [];
+
+    let html = `<option value="">-- ${isAr ? 'اختر الموظف' : 'Choose Employee'} --</option>`;
+    html += `<option value="all">👥 ${isAr ? 'جميع الموظفين (استفسار عام)' : 'All Workers (General Inquiry)'}</option>`;
+
+    workers.forEach(w => {
+        if (w) html += `<option value="${w.id}">👤 ${w.name || ('Worker #' + w.id)}</option>`;
+    });
+
+    sel.innerHTML = html;
+}
+window.populateInquiryWorkerDropdown = populateInquiryWorkerDropdown;
+
+function createInquiry() {
+    const workerSel = document.getElementById('inquiry-worker-select');
+    const questionEl = document.getElementById('inquiry-question-input');
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    const targetWorkerId = workerSel ? workerSel.value : '';
+    const questionText = questionEl ? questionEl.value.trim() : '';
+
+    if (!targetWorkerId || !questionText) {
+        const msg = isAr ? '⚠️ يرجى اختيار الموظف وكتابة نص الاستفسار.' : '⚠️ Please select a worker and type your inquiry question.';
+        if (typeof showInAppNotification === 'function') showInAppNotification(msg);
+        else alert(msg);
+        return;
+    }
+
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const workers = data.workers || [];
+    let targetWorkerName = isAr ? 'جميع الموظفين' : 'All Workers';
+    let targetWorkerPhone = '';
+
+    if (targetWorkerId !== 'all') {
+        const found = workers.find(w => w && String(w.id) === String(targetWorkerId));
+        if (found) {
+            targetWorkerName = found.name || ('Worker #' + found.id);
+            targetWorkerPhone = found.phone || '';
+        }
+    }
+
+    const inqId = 'inq_' + Date.now();
+    const inqObj = {
+        id: inqId,
+        companyKey: currentCompany,
+        workerId: targetWorkerId,
+        workerName: targetWorkerName,
+        workerPhone: targetWorkerPhone,
+        question: questionText,
+        createdAt: Date.now(),
+        createdBy: (currentUser && currentUser.email) ? currentUser.email : 'Manager',
+        status: 'pending',
+        reply: null
+    };
+
+    db.ref(`companies/${currentCompany}/inquiries/${inqId}`).set(inqObj)
+        .then(() => {
+            const successMsg = isAr ? '✅ تم إرسال الاستفسار للموظف بنجاح!' : '✅ Inquiry sent to worker successfully!';
+            if (typeof showInAppNotification === 'function') showInAppNotification(successMsg);
+
+            if (questionEl) questionEl.value = '';
+            renderTasks();
+            renderInquiries();
+        })
+        .catch(err => {
+            console.error("Failed to save inquiry:", err);
+            if (typeof showInAppNotification === 'function') showInAppNotification("❌ Failed to send inquiry: " + err.message);
+        });
+}
+window.createInquiry = createInquiry;
+
+function replyToInquiry(inqId, choice) {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const inputEl = document.getElementById(`inquiry-reply-text-${inqId}`);
+    const replyText = inputEl ? inputEl.value.trim() : '';
+
+    const replyObj = {
+        choice: choice,
+        text: replyText || (choice === 'did_it' ? (isAr ? 'تم الإنجاز' : 'Did it') : (isAr ? 'لم أقم به' : 'Did not do it')),
+        repliedAt: Date.now(),
+        repliedBy: (currentUser && currentUser.email) ? currentUser.email : (isAr ? 'الموظف' : 'Worker')
+    };
+
+    db.ref(`companies/${currentCompany}/inquiries/${inqId}/status`).set('replied');
+    db.ref(`companies/${currentCompany}/inquiries/${inqId}/reply`).set(replyObj)
+        .then(() => {
+            const msg = isAr ? '✅ تم إرسال الرد للإدارة بنجاح!' : '✅ Reply sent to managers successfully!';
+            if (typeof showInAppNotification === 'function') showInAppNotification(msg);
+            renderTasks();
+            renderInquiries();
+        })
+        .catch(err => {
+            console.error("Failed to reply to inquiry:", err);
+            if (typeof showInAppNotification === 'function') showInAppNotification("❌ Failed to send reply: " + err.message);
+        });
+}
+window.replyToInquiry = replyToInquiry;
+
+function deleteInquiry(inqId) {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    if (!confirm(isAr ? 'هل أنت تأكد من حذف هذا الاستفسار؟' : 'Are you sure you want to delete this inquiry?')) return;
+
+    db.ref(`companies/${currentCompany}/inquiries/${inqId}`).remove()
+        .then(() => {
+            if (typeof showInAppNotification === 'function') showInAppNotification(isAr ? 'تم حذف الاستفسار بنجاح!' : 'Inquiry deleted!');
+            renderInquiries();
+            renderInquiriesModal();
+        })
+        .catch(err => console.error("Failed to delete inquiry:", err));
+}
+window.deleteInquiry = deleteInquiry;
+
+function renderInquiries() {
+    const grid = document.getElementById('inquiries-grid');
+    const countBadge = document.getElementById('inquiries-count-badge');
+    const workerFilterSel = document.getElementById('inquiries-filter-worker');
+    if (!grid) return;
+
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const inquiriesObj = data.inquiries || {};
+    let inquiries = Object.values(inquiriesObj);
+
+    if (workerFilterSel && workerFilterSel.options.length <= 1) {
+        const workers = data.workers || [];
+        workers.forEach(w => {
+            if (w) {
+                const opt = document.createElement('option');
+                opt.value = w.id;
+                opt.textContent = w.name || ('Worker #' + w.id);
+                workerFilterSel.appendChild(opt);
+            }
+        });
+    }
+
+    const statusFilter = document.getElementById('inquiries-filter-status') ? document.getElementById('inquiries-filter-status').value : 'all';
+    const workerFilter = workerFilterSel ? workerFilterSel.value : 'all';
+
+    if (statusFilter !== 'all') {
+        inquiries = inquiries.filter(inq => {
+            if (statusFilter === 'pending') return inq.status === 'pending';
+            if (statusFilter === 'did_it') return inq.status === 'replied' && inq.reply && inq.reply.choice === 'did_it';
+            if (statusFilter === 'did_not_do_it') return inq.status === 'replied' && inq.reply && inq.reply.choice === 'did_not_do_it';
+            return true;
+        });
+    }
+
+    if (workerFilter !== 'all') {
+        inquiries = inquiries.filter(inq => String(inq.workerId) === String(workerFilter) || inq.workerId === 'all');
+    }
+
+    inquiries.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+    if (countBadge) {
+        countBadge.textContent = isAr ? `${inquiries.length} استفسارات` : `${inquiries.length} Inquir${inquiries.length === 1 ? 'y' : 'ies'}`;
+    }
+
+    if (inquiries.length === 0) {
+        grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 30px; font-size: 0.9rem;">${isAr ? 'لا توجد استفسارات مطابقة بعد.' : 'No inquiries found.'}</div>`;
+        return;
+    }
+
+    const canManageInquiry = (currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) || (document.body && document.body.classList.contains('perm-tasks'));
+
+    grid.innerHTML = inquiries.map(inq => {
+        const dateStr = inq.createdAt ? new Date(inq.createdAt).toLocaleString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+        const isReplied = inq.status === 'replied';
+        const replyObj = inq.reply || {};
+        const choice = replyObj.choice || '';
+
+        let statusBadge = `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); font-size:0.75rem;">⏳ ${isAr ? 'بانتظار رد الموظف' : 'Pending Reply'}</span>`;
+
+        if (isReplied) {
+            if (choice === 'did_it') {
+                statusBadge = `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-size:0.75rem;">✅ ${isAr ? 'تم الإنجاز (Did It)' : 'Did It'}</span>`;
+            } else {
+                statusBadge = `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); font-size:0.75rem;">❌ ${isAr ? 'لم يتم الإنجاز (Did Not Do It)' : 'Did Not Do It'}</span>`;
+            }
+        }
+
+        const safeQuestion = typeof escapeHtml === 'function' ? escapeHtml(inq.question) : (inq.question || '');
+        const safeWorkerName = typeof escapeHtml === 'function' ? escapeHtml(inq.workerName) : (inq.workerName || 'Worker');
+        const safeReplyText = typeof escapeHtml === 'function' ? escapeHtml(replyObj.text) : (replyObj.text || '');
+
+        const deleteBtn = canManageInquiry ? `<button type="button" onclick="deleteInquiry('${inq.id}')" class="btn-outline" style="background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); font-size:0.75rem; font-weight:800; padding:4px 10px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:4px;" title="${isAr ? 'حذف الاستفسار بعد الاطلاع عليه' : 'Delete Inquiry'}">🗑️ ${isAr ? 'حذف' : 'Delete'}</button>` : '';
+
+        return `
+            <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: var(--shadow-sm); border-top: 4px solid ${isReplied ? (choice === 'did_it' ? '#10b981' : '#ef4444') : '#f59e0b'};">
+                <div>
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+                        <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">🕒 ${dateStr}</span>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            ${statusBadge}
+                            ${deleteBtn}
+                        </div>
+                    </div>
+                    <div style="font-size:0.85rem; font-weight:800; color:var(--primary); margin-bottom:6px;">👤 ${safeWorkerName}</div>
+                    <div style="font-size:0.95rem; font-weight:700; color:var(--text-main); line-height:1.4; word-break:break-word; margin-bottom:12px; background:var(--input-bg); padding:10px 12px; border-radius:10px; border:1px dashed var(--border-color);">
+                        ❓ ${safeQuestion}
+                    </div>
+
+                    ${isReplied ? `
+                        <div style="background: ${choice === 'did_it' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)'}; border: 1px solid ${choice === 'did_it' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)'}; padding:10px 12px; border-radius:10px;">
+                            <div style="font-size:0.75rem; font-weight:800; color:${choice === 'did_it' ? '#10b981' : '#ef4444'}; margin-bottom:4px;">
+                                💬 ${isAr ? 'رد الموظف:' : 'Worker Reply:'}
+                            </div>
+                            <div style="font-size:0.88rem; font-weight:600; color:var(--text-main); white-space:pre-wrap;">${safeReplyText}</div>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+window.renderInquiries = renderInquiries;
+
+// =============================================
+// INQUIRIES POPUP MODAL HUD FUNCTIONS
+// =============================================
+let currentInquiryModalFilter = 'all';
+
+function openInquiriesHUDModal() {
+    const modal = document.getElementById('modal-inquiries-hud');
+    if (!modal) return;
+    modal.style.display = 'flex';
+
+    // Populate worker filter dropdown in modal
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const sel = document.getElementById('modal-inquiries-worker-filter');
+    if (sel && sel.options.length <= 1) {
+        const workers = data.workers || [];
+        workers.forEach(w => {
+            if (w) {
+                const opt = document.createElement('option');
+                opt.value = w.id;
+                opt.textContent = w.name || ('Worker #' + w.id);
+                sel.appendChild(opt);
+            }
+        });
+    }
+
+    renderInquiriesModal();
+}
+window.openInquiriesHUDModal = openInquiriesHUDModal;
+
+function closeInquiriesHUDModal() {
+    const modal = document.getElementById('modal-inquiries-hud');
+    if (modal) modal.style.display = 'none';
+}
+window.closeInquiriesHUDModal = closeInquiriesHUDModal;
+
+function setInquiryModalFilter(filter) {
+    currentInquiryModalFilter = filter;
+    ['all', 'pending', 'did_it', 'did_not_do_it'].forEach(f => {
+        const btn = document.getElementById(`modal-inq-filter-${f}`);
+        if (btn) {
+            if (f === filter) {
+                btn.className = 'btn-primary';
+            } else {
+                btn.className = 'btn-outline';
+            }
+        }
+    });
+    renderInquiriesModal();
+}
+window.setInquiryModalFilter = setInquiryModalFilter;
+
+function renderInquiriesModal() {
+    const grid = document.getElementById('modal-inquiries-grid');
+    const countBadge = document.getElementById('modal-inquiries-count-badge');
+    const workerFilterSel = document.getElementById('modal-inquiries-worker-filter');
+    if (!grid) return;
+
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const inquiriesObj = data.inquiries || {};
+    let inquiries = Object.values(inquiriesObj);
+
+    const workerFilter = workerFilterSel ? workerFilterSel.value : 'all';
+
+    if (currentInquiryModalFilter !== 'all') {
+        inquiries = inquiries.filter(inq => {
+            if (currentInquiryModalFilter === 'pending') return inq.status === 'pending';
+            if (currentInquiryModalFilter === 'did_it') return inq.status === 'replied' && inq.reply && inq.reply.choice === 'did_it';
+            if (currentInquiryModalFilter === 'did_not_do_it') return inq.status === 'replied' && inq.reply && inq.reply.choice === 'did_not_do_it';
+            return true;
+        });
+    }
+
+    if (workerFilter !== 'all') {
+        inquiries = inquiries.filter(inq => String(inq.workerId) === String(workerFilter) || inq.workerId === 'all');
+    }
+
+    inquiries.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+    if (countBadge) {
+        countBadge.textContent = isAr ? `${inquiries.length} استفسارات` : `${inquiries.length} Inquir${inquiries.length === 1 ? 'y' : 'ies'}`;
+    }
+
+    if (inquiries.length === 0) {
+        grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 40px; font-size: 0.95rem;">${isAr ? 'لا توجد استفسارات مطابقة بعد.' : 'No inquiries found.'}</div>`;
+        return;
+    }
+
+    const canManageInquiry = (currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) || (document.body && document.body.classList.contains('perm-tasks'));
+
+    grid.innerHTML = inquiries.map(inq => {
+        const dateStr = inq.createdAt ? new Date(inq.createdAt).toLocaleString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+        const isReplied = inq.status === 'replied';
+        const replyObj = inq.reply || {};
+        const choice = replyObj.choice || '';
+
+        let statusBadge = `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); font-size:0.75rem;">⏳ ${isAr ? 'بانتظار رد الموظف' : 'Pending Reply'}</span>`;
+
+        if (isReplied) {
+            if (choice === 'did_it') {
+                statusBadge = `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-size:0.75rem;">✅ ${isAr ? 'تم الإنجاز (Did It)' : 'Did It'}</span>`;
+            } else {
+                statusBadge = `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); font-size:0.75rem;">❌ ${isAr ? 'لم يتم الإنجاز (Did Not Do It)' : 'Did Not Do It'}</span>`;
+            }
+        }
+
+        const safeQuestion = typeof escapeHtml === 'function' ? escapeHtml(inq.question) : (inq.question || '');
+        const safeWorkerName = typeof escapeHtml === 'function' ? escapeHtml(inq.workerName) : (inq.workerName || 'Worker');
+        const safeReplyText = typeof escapeHtml === 'function' ? escapeHtml(replyObj.text) : (replyObj.text || '');
+
+        const deleteBtn = canManageInquiry ? `<button type="button" onclick="deleteInquiry('${inq.id}')" class="btn-outline" style="background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); font-size:0.75rem; font-weight:800; padding:4px 10px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:4px;" title="${isAr ? 'حذف الاستفسار بعد الاطلاع عليه' : 'Delete Inquiry'}">🗑️ ${isAr ? 'حذف' : 'Delete'}</button>` : '';
+
+        return `
+            <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: var(--shadow-sm); border-top: 4px solid ${isReplied ? (choice === 'did_it' ? '#10b981' : '#ef4444') : '#f59e0b'};">
+                <div>
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+                        <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">🕒 ${dateStr}</span>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            ${statusBadge}
+                            ${deleteBtn}
+                        </div>
+                    </div>
+                    <div style="font-size:0.85rem; font-weight:800; color:var(--primary); margin-bottom:6px;">👤 ${safeWorkerName}</div>
+                    <div style="font-size:0.95rem; font-weight:700; color:var(--text-main); line-height:1.4; word-break:break-word; margin-bottom:12px; background:var(--input-bg); padding:10px 12px; border-radius:10px; border:1px dashed var(--border-color);">
+                        ❓ ${safeQuestion}
+                    </div>
+
+                    ${isReplied ? `
+                        <div style="background: ${choice === 'did_it' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)'}; border: 1px solid ${choice === 'did_it' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)'}; padding:10px 12px; border-radius:10px;">
+                            <div style="font-size:0.75rem; font-weight:800; color:${choice === 'did_it' ? '#10b981' : '#ef4444'}; margin-bottom:4px;">
+                                💬 ${isAr ? 'رد الموظف:' : 'Worker Reply:'}
+                            </div>
+                            <div style="font-size:0.88rem; font-weight:600; color:var(--text-main); white-space:pre-wrap;">${safeReplyText}</div>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+window.renderInquiriesModal = renderInquiriesModal;
+
 // Initial run
 applyTranslations();
 if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession) {

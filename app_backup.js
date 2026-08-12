@@ -5550,6 +5550,9 @@ function switchTab(tab) {
     if (tab === 'messaging' && typeof renderMessagingSection === 'function') {
         renderMessagingSection();
     }
+    if (tab === 'tasks' && typeof renderInquiries === 'function') {
+        renderInquiries();
+    }
 
     // Update the compact bar's active tab label and icon
     const tabMeta = {
@@ -6743,6 +6746,56 @@ function renderTasks() {
         // Sort General tasks newest first
         pendingGeneralTasks.sort((a, b) => getJobTimestamp(b) - getJobTimestamp(a));
 
+        // Render Pending Inquiries for Active Worker (if any)
+        const rawInquiries = data.inquiries || {};
+        const allInquiries = Object.values(rawInquiries);
+        const workerPendingInquiries = allInquiries.filter(inq => {
+            if (!inq || inq.status !== 'pending') return false;
+            if (activeWorker) {
+                return String(inq.workerId) === String(activeWorker.id) || inq.workerId === 'all';
+            }
+            return false;
+        });
+
+        if (workerPendingInquiries.length > 0) {
+            const inqCard = document.createElement('div');
+            inqCard.className = "card";
+            inqCard.style.padding = "20px";
+            inqCard.style.marginBottom = "16px";
+            inqCard.style.border = "2px dashed #8b5cf6";
+            inqCard.style.background = "rgba(139, 92, 246, 0.08)";
+
+            let inqHtml = `<h3 style="margin-top:0; color:#8b5cf6; display:flex; align-items:center; gap:8px; font-size:1.15rem;">❓ ${isAr ? 'استفسارات الإدارة الموجهة إليك' : 'Pending Manager Inquiries for You'}</h3>`;
+
+            workerPendingInquiries.forEach(inq => {
+                const dateStr = inq.createdAt ? new Date(inq.createdAt).toLocaleString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+                const safeQuestion = typeof escapeHtml === 'function' ? escapeHtml(inq.question) : (inq.question || '');
+
+                inqHtml += `
+                    <div style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:16px; margin-bottom:12px;">
+                        <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:6px;">🕒 ${dateStr}</div>
+                        <div style="font-size:1.05rem; font-weight:700; color:var(--text-main); margin-bottom:12px; line-height:1.4;">❓ ${safeQuestion}</div>
+                        
+                        <div style="margin-bottom:12px;">
+                            <textarea id="inquiry-reply-text-${inq.id}" rows="2" placeholder="${isAr ? 'اكتب تفاصيل الإجابة أو التوضيح هنا (اختياري)...' : 'Write reply details or explanation here (optional)...'}" style="width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.85rem; font-family:inherit;"></textarea>
+                        </div>
+
+                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                            <button type="button" onclick="replyToInquiry('${inq.id}', 'did_it')" class="btn-success" style="padding:10px 18px; border-radius:8px; font-weight:800; font-size:0.85rem; background:linear-gradient(135deg, #10b981, #059669); color:white; border:none; cursor:pointer; flex:1; min-width:140px; display:flex; align-items:center; justify-content:center; gap:6px;">
+                                ${isAr ? '✅ تم الإنجاز (Did It)' : '✅ Did It'}
+                            </button>
+                            <button type="button" onclick="replyToInquiry('${inq.id}', 'did_not_do_it')" class="btn-danger" style="padding:10px 18px; border-radius:8px; font-weight:800; font-size:0.85rem; background:linear-gradient(135deg, #ef4444, #dc2626); color:white; border:none; cursor:pointer; flex:1; min-width:140px; display:flex; align-items:center; justify-content:center; gap:6px;">
+                                ${isAr ? '❌ لم أقم به (Did Not Do It)' : '❌ Did Not Do It'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            inqCard.innerHTML = inqHtml;
+            board.appendChild(inqCard);
+        }
+
         if (pendingGeneralTasks.length > 0 && statusFilter !== 'completed') {
             const genCard = document.createElement('div');
             genCard.className = "card";
@@ -6773,7 +6826,7 @@ function renderTasks() {
                 }
 
                 genHtml += `
-                    <div style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                    <div class="general-task-item" ondblclick="if (!event.target.closest('button') && !event.target.closest('input')) openEditTaskModal('general', '${gt.id}', true)" style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; cursor:pointer;" title="${isAr ? 'انقر مرتين للتعديل' : 'Double-click to edit'}">
                         <div>
                             <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">Created: ${gt.date || new Date(getJobTimestamp(gt)).toLocaleString()}</div>
                             <div style="font-size:1.05rem; font-weight:700; color:var(--text-main); display:flex; align-items:center; flex-wrap:wrap; gap:6px;">${taskNumBadge} <span>${gt.title}</span> ${urgencyBadge} ${groupBadge}</div>
@@ -6865,7 +6918,7 @@ function renderTasks() {
             const taskNumBadge = `<span class="badge" style="background:#2563eb; color:#ffffff; font-weight:700; font-size:0.85rem; padding:3px 9px; border-radius:6px; margin-right:6px; box-shadow:0 1px 3px rgba(37,99,235,0.25);" title="Task ${j.taskNum || 1}">${j.taskNum || 1}</span>`;
 
             return `
-                        <div class="mission-item" style="border-left: 4px solid ${doneColor}; display:flex; flex-direction:column; align-items:stretch;">
+                        <div class="mission-item" ondblclick="if (!event.target.closest('button') && !event.target.closest('input') && !event.target.closest('select')) openEditTaskModal('${worker.id}', '${j.id}')" style="border-left: 4px solid ${doneColor}; display:flex; flex-direction:column; align-items:stretch; cursor:pointer;" title="${isAr ? 'انقر مرتين للتعديل' : 'Double-click to edit'}">
                             <div class="flex-between" style="margin-bottom:8px; align-items:flex-start;">
                                 <div>
                                     <div style="font-size: 0.75rem; color:var(--text-muted); margin-bottom:4px;">Assigned: ${j.date || new Date(getJobTimestamp(j)).toLocaleString()}</div>
@@ -16357,7 +16410,7 @@ function renderMarketProductCard(p) {
     }
 
     return `
-        <div class="card market-store-card" style="margin: 0; border: 1px solid ${isHidden ? '#f59e0b' : 'var(--border-color)'}; border-radius: 16px; background: var(--card-bg, #ffffff); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, box-shadow 0.2s ease; box-shadow: 0 4px 14px rgba(0,0,0,0.05); position: relative; ${isHidden ? 'opacity: 0.88;' : ''}">
+        <div class="card market-store-card" ${isAdmin ? `ondblclick="if (!event.target.closest('button') && !event.target.closest('input')) openEditMarketProductModal('${p.id}')"` : ''} style="margin: 0; border: 1px solid ${isHidden ? '#f59e0b' : 'var(--border-color)'}; border-radius: 16px; background: var(--card-bg, #ffffff); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, box-shadow 0.2s ease; box-shadow: 0 4px 14px rgba(0,0,0,0.05); position: relative; ${isHidden ? 'opacity: 0.88;' : ''} ${isAdmin ? 'cursor: pointer;' : ''}" title="${isAdmin ? (isAr ? 'انقر مرتين للتعديل' : 'Double-click to edit') : ''}">
             <div>
                 <div style="width: 100%; aspect-ratio: 1 / 1; position: relative; overflow: hidden; background: #f8fafc; border-bottom: 1px solid var(--border-color);">
                     ${imageContent}
@@ -20475,6 +20528,428 @@ function setupSearchInputClearButtons() {
     });
 }
 window.setupSearchInputClearButtons = setupSearchInputClearButtons;
+
+// =============================================
+// TASK INQUIRY SYSTEM & DEPARTMENT
+// =============================================
+let currentTaskFormMode = 'assign'; // 'assign' | 'inquiry'
+
+function setTaskFormMode(mode) {
+    currentTaskFormMode = mode;
+    const assignBtn = document.getElementById('task-mode-assign-btn');
+    const inquiryBtn = document.getElementById('task-mode-inquiry-btn');
+    const hudBtn = document.getElementById('task-mode-hud-btn');
+    const assignForm = document.getElementById('task-assign-form');
+    const inquiryForm = document.getElementById('task-inquiry-form');
+    const inqDept = document.getElementById('tasks-inquiry-department');
+
+    if (mode === 'inquiry') {
+        if (assignForm) assignForm.style.display = 'none';
+        if (inquiryForm) inquiryForm.style.display = 'block';
+
+        if (assignBtn) {
+            assignBtn.className = 'btn-outline';
+            assignBtn.style.background = 'var(--input-bg)';
+            assignBtn.style.color = 'var(--text-main)';
+        }
+        if (inquiryBtn) {
+            inquiryBtn.className = 'btn-primary';
+            inquiryBtn.style.background = 'linear-gradient(135deg, #8b5cf6, #6d28d9)';
+            inquiryBtn.style.color = 'white';
+        }
+        if (hudBtn) {
+            hudBtn.className = 'btn-outline';
+            hudBtn.style.background = 'var(--input-bg)';
+            hudBtn.style.color = 'var(--text-main)';
+        }
+        populateInquiryWorkerDropdown();
+    } else if (mode === 'hud') {
+        openInquiriesHUDModal();
+    } else {
+        if (assignForm) assignForm.style.display = 'block';
+        if (inquiryForm) inquiryForm.style.display = 'none';
+
+        if (assignBtn) {
+            assignBtn.className = 'btn-primary';
+            assignBtn.style.background = 'linear-gradient(135deg, #4f46e5, #3730a3)';
+            assignBtn.style.color = 'white';
+        }
+        if (inquiryBtn) {
+            inquiryBtn.className = 'btn-outline';
+            inquiryBtn.style.background = 'var(--input-bg)';
+            inquiryBtn.style.color = 'var(--text-main)';
+        }
+        if (hudBtn) {
+            hudBtn.className = 'btn-outline';
+            hudBtn.style.background = 'var(--input-bg)';
+            hudBtn.style.color = 'var(--text-main)';
+        }
+    }
+}
+window.setTaskFormMode = setTaskFormMode;
+
+function populateInquiryWorkerDropdown() {
+    const sel = document.getElementById('inquiry-worker-select');
+    if (!sel) return;
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const workers = data.workers || [];
+
+    let html = `<option value="">-- ${isAr ? 'اختر الموظف' : 'Choose Employee'} --</option>`;
+    html += `<option value="all">👥 ${isAr ? 'جميع الموظفين (استفسار عام)' : 'All Workers (General Inquiry)'}</option>`;
+
+    workers.forEach(w => {
+        if (w) html += `<option value="${w.id}">👤 ${w.name || ('Worker #' + w.id)}</option>`;
+    });
+
+    sel.innerHTML = html;
+}
+window.populateInquiryWorkerDropdown = populateInquiryWorkerDropdown;
+
+function createInquiry() {
+    const workerSel = document.getElementById('inquiry-worker-select');
+    const questionEl = document.getElementById('inquiry-question-input');
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    const targetWorkerId = workerSel ? workerSel.value : '';
+    const questionText = questionEl ? questionEl.value.trim() : '';
+
+    if (!targetWorkerId || !questionText) {
+        const msg = isAr ? '⚠️ يرجى اختيار الموظف وكتابة نص الاستفسار.' : '⚠️ Please select a worker and type your inquiry question.';
+        if (typeof showInAppNotification === 'function') showInAppNotification(msg);
+        else alert(msg);
+        return;
+    }
+
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const workers = data.workers || [];
+    let targetWorkerName = isAr ? 'جميع الموظفين' : 'All Workers';
+    let targetWorkerPhone = '';
+
+    if (targetWorkerId !== 'all') {
+        const found = workers.find(w => w && String(w.id) === String(targetWorkerId));
+        if (found) {
+            targetWorkerName = found.name || ('Worker #' + found.id);
+            targetWorkerPhone = found.phone || '';
+        }
+    }
+
+    const inqId = 'inq_' + Date.now();
+    const inqObj = {
+        id: inqId,
+        companyKey: currentCompany,
+        workerId: targetWorkerId,
+        workerName: targetWorkerName,
+        workerPhone: targetWorkerPhone,
+        question: questionText,
+        createdAt: Date.now(),
+        createdBy: (currentUser && currentUser.email) ? currentUser.email : 'Manager',
+        status: 'pending',
+        reply: null
+    };
+
+    db.ref(`companies/${currentCompany}/inquiries/${inqId}`).set(inqObj)
+        .then(() => {
+            const successMsg = isAr ? '✅ تم إرسال الاستفسار للموظف بنجاح!' : '✅ Inquiry sent to worker successfully!';
+            if (typeof showInAppNotification === 'function') showInAppNotification(successMsg);
+
+            if (questionEl) questionEl.value = '';
+            renderTasks();
+            renderInquiries();
+        })
+        .catch(err => {
+            console.error("Failed to save inquiry:", err);
+            if (typeof showInAppNotification === 'function') showInAppNotification("❌ Failed to send inquiry: " + err.message);
+        });
+}
+window.createInquiry = createInquiry;
+
+function replyToInquiry(inqId, choice) {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const inputEl = document.getElementById(`inquiry-reply-text-${inqId}`);
+    const replyText = inputEl ? inputEl.value.trim() : '';
+
+    const replyObj = {
+        choice: choice,
+        text: replyText || (choice === 'did_it' ? (isAr ? 'تم الإنجاز' : 'Did it') : (isAr ? 'لم أقم به' : 'Did not do it')),
+        repliedAt: Date.now(),
+        repliedBy: (currentUser && currentUser.email) ? currentUser.email : (isAr ? 'الموظف' : 'Worker')
+    };
+
+    db.ref(`companies/${currentCompany}/inquiries/${inqId}/status`).set('replied');
+    db.ref(`companies/${currentCompany}/inquiries/${inqId}/reply`).set(replyObj)
+        .then(() => {
+            const msg = isAr ? '✅ تم إرسال الرد للإدارة بنجاح!' : '✅ Reply sent to managers successfully!';
+            if (typeof showInAppNotification === 'function') showInAppNotification(msg);
+            renderTasks();
+            renderInquiries();
+        })
+        .catch(err => {
+            console.error("Failed to reply to inquiry:", err);
+            if (typeof showInAppNotification === 'function') showInAppNotification("❌ Failed to send reply: " + err.message);
+        });
+}
+window.replyToInquiry = replyToInquiry;
+
+function deleteInquiry(inqId) {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    if (!confirm(isAr ? 'هل أنت تأكد من حذف هذا الاستفسار؟' : 'Are you sure you want to delete this inquiry?')) return;
+
+    db.ref(`companies/${currentCompany}/inquiries/${inqId}`).remove()
+        .then(() => {
+            if (typeof showInAppNotification === 'function') showInAppNotification(isAr ? 'تم حذف الاستفسار بنجاح!' : 'Inquiry deleted!');
+            renderInquiries();
+            renderInquiriesModal();
+        })
+        .catch(err => console.error("Failed to delete inquiry:", err));
+}
+window.deleteInquiry = deleteInquiry;
+
+function renderInquiries() {
+    const grid = document.getElementById('inquiries-grid');
+    const countBadge = document.getElementById('inquiries-count-badge');
+    const workerFilterSel = document.getElementById('inquiries-filter-worker');
+    if (!grid) return;
+
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const inquiriesObj = data.inquiries || {};
+    let inquiries = Object.values(inquiriesObj);
+
+    if (workerFilterSel && workerFilterSel.options.length <= 1) {
+        const workers = data.workers || [];
+        workers.forEach(w => {
+            if (w) {
+                const opt = document.createElement('option');
+                opt.value = w.id;
+                opt.textContent = w.name || ('Worker #' + w.id);
+                workerFilterSel.appendChild(opt);
+            }
+        });
+    }
+
+    const statusFilter = document.getElementById('inquiries-filter-status') ? document.getElementById('inquiries-filter-status').value : 'all';
+    const workerFilter = workerFilterSel ? workerFilterSel.value : 'all';
+
+    if (statusFilter !== 'all') {
+        inquiries = inquiries.filter(inq => {
+            if (statusFilter === 'pending') return inq.status === 'pending';
+            if (statusFilter === 'did_it') return inq.status === 'replied' && inq.reply && inq.reply.choice === 'did_it';
+            if (statusFilter === 'did_not_do_it') return inq.status === 'replied' && inq.reply && inq.reply.choice === 'did_not_do_it';
+            return true;
+        });
+    }
+
+    if (workerFilter !== 'all') {
+        inquiries = inquiries.filter(inq => String(inq.workerId) === String(workerFilter) || inq.workerId === 'all');
+    }
+
+    inquiries.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+    if (countBadge) {
+        countBadge.textContent = isAr ? `${inquiries.length} استفسارات` : `${inquiries.length} Inquir${inquiries.length === 1 ? 'y' : 'ies'}`;
+    }
+
+    if (inquiries.length === 0) {
+        grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 30px; font-size: 0.9rem;">${isAr ? 'لا توجد استفسارات مطابقة بعد.' : 'No inquiries found.'}</div>`;
+        return;
+    }
+
+    const canManageInquiry = (currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) || (document.body && document.body.classList.contains('perm-tasks'));
+
+    grid.innerHTML = inquiries.map(inq => {
+        const dateStr = inq.createdAt ? new Date(inq.createdAt).toLocaleString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+        const isReplied = inq.status === 'replied';
+        const replyObj = inq.reply || {};
+        const choice = replyObj.choice || '';
+
+        let statusBadge = `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); font-size:0.75rem;">⏳ ${isAr ? 'بانتظار رد الموظف' : 'Pending Reply'}</span>`;
+
+        if (isReplied) {
+            if (choice === 'did_it') {
+                statusBadge = `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-size:0.75rem;">✅ ${isAr ? 'تم الإنجاز (Did It)' : 'Did It'}</span>`;
+            } else {
+                statusBadge = `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); font-size:0.75rem;">❌ ${isAr ? 'لم يتم الإنجاز (Did Not Do It)' : 'Did Not Do It'}</span>`;
+            }
+        }
+
+        const safeQuestion = typeof escapeHtml === 'function' ? escapeHtml(inq.question) : (inq.question || '');
+        const safeWorkerName = typeof escapeHtml === 'function' ? escapeHtml(inq.workerName) : (inq.workerName || 'Worker');
+        const safeReplyText = typeof escapeHtml === 'function' ? escapeHtml(replyObj.text) : (replyObj.text || '');
+
+        const deleteBtn = canManageInquiry ? `<button type="button" onclick="deleteInquiry('${inq.id}')" class="btn-outline" style="background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); font-size:0.75rem; font-weight:800; padding:4px 10px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:4px;" title="${isAr ? 'حذف الاستفسار بعد الاطلاع عليه' : 'Delete Inquiry'}">🗑️ ${isAr ? 'حذف' : 'Delete'}</button>` : '';
+
+        return `
+            <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: var(--shadow-sm); border-top: 4px solid ${isReplied ? (choice === 'did_it' ? '#10b981' : '#ef4444') : '#f59e0b'};">
+                <div>
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+                        <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">🕒 ${dateStr}</span>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            ${statusBadge}
+                            ${deleteBtn}
+                        </div>
+                    </div>
+                    <div style="font-size:0.85rem; font-weight:800; color:var(--primary); margin-bottom:6px;">👤 ${safeWorkerName}</div>
+                    <div style="font-size:0.95rem; font-weight:700; color:var(--text-main); line-height:1.4; word-break:break-word; margin-bottom:12px; background:var(--input-bg); padding:10px 12px; border-radius:10px; border:1px dashed var(--border-color);">
+                        ❓ ${safeQuestion}
+                    </div>
+
+                    ${isReplied ? `
+                        <div style="background: ${choice === 'did_it' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)'}; border: 1px solid ${choice === 'did_it' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)'}; padding:10px 12px; border-radius:10px;">
+                            <div style="font-size:0.75rem; font-weight:800; color:${choice === 'did_it' ? '#10b981' : '#ef4444'}; margin-bottom:4px;">
+                                💬 ${isAr ? 'رد الموظف:' : 'Worker Reply:'}
+                            </div>
+                            <div style="font-size:0.88rem; font-weight:600; color:var(--text-main); white-space:pre-wrap;">${safeReplyText}</div>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+window.renderInquiries = renderInquiries;
+
+// =============================================
+// INQUIRIES POPUP MODAL HUD FUNCTIONS
+// =============================================
+let currentInquiryModalFilter = 'all';
+
+function openInquiriesHUDModal() {
+    const modal = document.getElementById('modal-inquiries-hud');
+    if (!modal) return;
+    modal.style.display = 'flex';
+
+    // Populate worker filter dropdown in modal
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const sel = document.getElementById('modal-inquiries-worker-filter');
+    if (sel && sel.options.length <= 1) {
+        const workers = data.workers || [];
+        workers.forEach(w => {
+            if (w) {
+                const opt = document.createElement('option');
+                opt.value = w.id;
+                opt.textContent = w.name || ('Worker #' + w.id);
+                sel.appendChild(opt);
+            }
+        });
+    }
+
+    renderInquiriesModal();
+}
+window.openInquiriesHUDModal = openInquiriesHUDModal;
+
+function closeInquiriesHUDModal() {
+    const modal = document.getElementById('modal-inquiries-hud');
+    if (modal) modal.style.display = 'none';
+}
+window.closeInquiriesHUDModal = closeInquiriesHUDModal;
+
+function setInquiryModalFilter(filter) {
+    currentInquiryModalFilter = filter;
+    ['all', 'pending', 'did_it', 'did_not_do_it'].forEach(f => {
+        const btn = document.getElementById(`modal-inq-filter-${f}`);
+        if (btn) {
+            if (f === filter) {
+                btn.className = 'btn-primary';
+            } else {
+                btn.className = 'btn-outline';
+            }
+        }
+    });
+    renderInquiriesModal();
+}
+window.setInquiryModalFilter = setInquiryModalFilter;
+
+function renderInquiriesModal() {
+    const grid = document.getElementById('modal-inquiries-grid');
+    const countBadge = document.getElementById('modal-inquiries-count-badge');
+    const workerFilterSel = document.getElementById('modal-inquiries-worker-filter');
+    if (!grid) return;
+
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const inquiriesObj = data.inquiries || {};
+    let inquiries = Object.values(inquiriesObj);
+
+    const workerFilter = workerFilterSel ? workerFilterSel.value : 'all';
+
+    if (currentInquiryModalFilter !== 'all') {
+        inquiries = inquiries.filter(inq => {
+            if (currentInquiryModalFilter === 'pending') return inq.status === 'pending';
+            if (currentInquiryModalFilter === 'did_it') return inq.status === 'replied' && inq.reply && inq.reply.choice === 'did_it';
+            if (currentInquiryModalFilter === 'did_not_do_it') return inq.status === 'replied' && inq.reply && inq.reply.choice === 'did_not_do_it';
+            return true;
+        });
+    }
+
+    if (workerFilter !== 'all') {
+        inquiries = inquiries.filter(inq => String(inq.workerId) === String(workerFilter) || inq.workerId === 'all');
+    }
+
+    inquiries.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+    if (countBadge) {
+        countBadge.textContent = isAr ? `${inquiries.length} استفسارات` : `${inquiries.length} Inquir${inquiries.length === 1 ? 'y' : 'ies'}`;
+    }
+
+    if (inquiries.length === 0) {
+        grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 40px; font-size: 0.95rem;">${isAr ? 'لا توجد استفسارات مطابقة بعد.' : 'No inquiries found.'}</div>`;
+        return;
+    }
+
+    const canManageInquiry = (currentUser && (currentUser.role === 'admin' || currentUser.isAdmin)) || (document.body && document.body.classList.contains('perm-tasks'));
+
+    grid.innerHTML = inquiries.map(inq => {
+        const dateStr = inq.createdAt ? new Date(inq.createdAt).toLocaleString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+        const isReplied = inq.status === 'replied';
+        const replyObj = inq.reply || {};
+        const choice = replyObj.choice || '';
+
+        let statusBadge = `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); font-size:0.75rem;">⏳ ${isAr ? 'بانتظار رد الموظف' : 'Pending Reply'}</span>`;
+
+        if (isReplied) {
+            if (choice === 'did_it') {
+                statusBadge = `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-size:0.75rem;">✅ ${isAr ? 'تم الإنجاز (Did It)' : 'Did It'}</span>`;
+            } else {
+                statusBadge = `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); font-size:0.75rem;">❌ ${isAr ? 'لم يتم الإنجاز (Did Not Do It)' : 'Did Not Do It'}</span>`;
+            }
+        }
+
+        const safeQuestion = typeof escapeHtml === 'function' ? escapeHtml(inq.question) : (inq.question || '');
+        const safeWorkerName = typeof escapeHtml === 'function' ? escapeHtml(inq.workerName) : (inq.workerName || 'Worker');
+        const safeReplyText = typeof escapeHtml === 'function' ? escapeHtml(replyObj.text) : (replyObj.text || '');
+
+        const deleteBtn = canManageInquiry ? `<button type="button" onclick="deleteInquiry('${inq.id}')" class="btn-outline" style="background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); font-size:0.75rem; font-weight:800; padding:4px 10px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:4px;" title="${isAr ? 'حذف الاستفسار بعد الاطلاع عليه' : 'Delete Inquiry'}">🗑️ ${isAr ? 'حذف' : 'Delete'}</button>` : '';
+
+        return `
+            <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: var(--shadow-sm); border-top: 4px solid ${isReplied ? (choice === 'did_it' ? '#10b981' : '#ef4444') : '#f59e0b'};">
+                <div>
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+                        <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">🕒 ${dateStr}</span>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            ${statusBadge}
+                            ${deleteBtn}
+                        </div>
+                    </div>
+                    <div style="font-size:0.85rem; font-weight:800; color:var(--primary); margin-bottom:6px;">👤 ${safeWorkerName}</div>
+                    <div style="font-size:0.95rem; font-weight:700; color:var(--text-main); line-height:1.4; word-break:break-word; margin-bottom:12px; background:var(--input-bg); padding:10px 12px; border-radius:10px; border:1px dashed var(--border-color);">
+                        ❓ ${safeQuestion}
+                    </div>
+
+                    ${isReplied ? `
+                        <div style="background: ${choice === 'did_it' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)'}; border: 1px solid ${choice === 'did_it' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)'}; padding:10px 12px; border-radius:10px;">
+                            <div style="font-size:0.75rem; font-weight:800; color:${choice === 'did_it' ? '#10b981' : '#ef4444'}; margin-bottom:4px;">
+                                💬 ${isAr ? 'رد الموظف:' : 'Worker Reply:'}
+                            </div>
+                            <div style="font-size:0.88rem; font-weight:600; color:var(--text-main); white-space:pre-wrap;">${safeReplyText}</div>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+window.renderInquiriesModal = renderInquiriesModal;
 
 // Initial run
 applyTranslations();

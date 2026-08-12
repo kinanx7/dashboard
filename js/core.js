@@ -2064,6 +2064,9 @@ function switchTab(tab) {
     if (tab === 'messaging' && typeof renderMessagingSection === 'function') {
         renderMessagingSection();
     }
+    if (tab === 'tasks' && typeof renderInquiries === 'function') {
+        renderInquiries();
+    }
 
     // Update the compact bar's active tab label and icon
     const tabMeta = {
@@ -2290,6 +2293,9 @@ function switchTab(tab) {
     }
     if (tab === 'messaging' && typeof renderMessagingSection === 'function') {
         renderMessagingSection();
+    }
+    if (tab === 'tasks' && typeof renderInquiries === 'function') {
+        renderInquiries();
     }
 
     // Update the compact bar's active tab label and icon

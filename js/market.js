@@ -1816,7 +1816,7 @@ function renderMarketProductCard(p) {
     }
 
     return `
-        <div class="card market-store-card" style="margin: 0; border: 1px solid ${isHidden ? '#f59e0b' : 'var(--border-color)'}; border-radius: 16px; background: var(--card-bg, #ffffff); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, box-shadow 0.2s ease; box-shadow: 0 4px 14px rgba(0,0,0,0.05); position: relative; ${isHidden ? 'opacity: 0.88;' : ''}">
+        <div class="card market-store-card" ${isAdmin ? `ondblclick="if (!event.target.closest('button') && !event.target.closest('input')) openEditMarketProductModal('${p.id}')"` : ''} style="margin: 0; border: 1px solid ${isHidden ? '#f59e0b' : 'var(--border-color)'}; border-radius: 16px; background: var(--card-bg, #ffffff); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, box-shadow 0.2s ease; box-shadow: 0 4px 14px rgba(0,0,0,0.05); position: relative; ${isHidden ? 'opacity: 0.88;' : ''} ${isAdmin ? 'cursor: pointer;' : ''}" title="${isAdmin ? (isAr ? 'انقر مرتين للتعديل' : 'Double-click to edit') : ''}">
             <div>
                 <div style="width: 100%; aspect-ratio: 1 / 1; position: relative; overflow: hidden; background: #f8fafc; border-bottom: 1px solid var(--border-color);">
                     ${imageContent}

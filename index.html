@@ -1461,8 +1461,24 @@
 
                     <!-- Main Content: Task Assignment & Board -->
                     <div>
+                        <!-- Mode Selector Bar (Assign Task vs Make Inquiry vs View Inquiries HUD) -->
+                        <div class="task-assign-access-only" style="display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
+                            <button type="button" id="task-mode-assign-btn" onclick="setTaskFormMode('assign')" class="btn-primary"
+                                style="padding: 10px 18px; border-radius: 12px; font-weight: 800; font-size: 0.88rem; background: linear-gradient(135deg, #4f46e5, #3730a3); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                                <span data-i18n="btn-mode-assign-task">📋 Assign a Task</span>
+                            </button>
+                            <button type="button" id="task-mode-inquiry-btn" onclick="setTaskFormMode('inquiry')" class="btn-outline"
+                                style="padding: 10px 18px; border-radius: 12px; font-weight: 800; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 6px; background: var(--input-bg);">
+                                <span data-i18n="btn-mode-make-inquiry">❓ Make an Inquiry</span>
+                            </button>
+                            <button type="button" id="task-mode-hud-btn" onclick="setTaskFormMode('hud')" class="btn-outline"
+                                style="padding: 10px 18px; border-radius: 12px; font-weight: 800; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 6px; background: var(--input-bg);">
+                                <span data-i18n="btn-mode-view-inquiries">💬 Task Inquiries & Replies (HUD)</span>
+                            </button>
+                        </div>
+
                         <!-- Assign Task Box -->
-                        <form onsubmit="event.preventDefault(); assignTask();" class="card task-assign-access-only"
+                        <form id="task-assign-form" onsubmit="event.preventDefault(); assignTask();" class="card task-assign-access-only"
                             style="display: block;">
                             <h2 class="card-title" data-i18n="title-assign-tasks">Assign Tasks</h2>
                             <div class="grid-2-col" style="align-items: end;">
@@ -1499,6 +1515,28 @@
                             </div>
                             <button type="submit" style="width: 100%; padding: 12px; margin-top: 16px;"
                                 data-i18n="btn-assign-task">Assign Task to Worker</button>
+                        </form>
+
+                        <!-- Make Inquiry Form (Collapsible/Toggleable) -->
+                        <form id="task-inquiry-form" onsubmit="event.preventDefault(); createInquiry();" class="card task-assign-access-only"
+                            style="display: none; border-top: 4px solid #8b5cf6;">
+                            <h2 class="card-title" style="display:flex; align-items:center; gap:8px;" data-i18n="title-make-inquiry">❓ Send Inquiry to Worker</h2>
+                            <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px; line-height: 1.5;" data-i18n="desc-make-inquiry">
+                                Ask a worker if they completed a specific task or requirement and receive a direct text reply with Did It / Did Not Do It status.
+                            </p>
+                            <div class="grid-2-col" style="align-items: end; margin-bottom: 14px;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label data-i18n="label-assign-to">Target Worker *</label>
+                                    <select id="inquiry-worker-select" required style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-weight:700;">
+                                        <!-- Populated dynamically -->
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 14px;">
+                                <label data-i18n="label-inquiry-question">Inquiry Question / Requirement Details *</label>
+                                <textarea id="inquiry-question-input" rows="3" required placeholder="e.g. Did you check the warehouse freezer temperature at 3 PM today?" data-i18n="[placeholder]placeholder-inquiry-question" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-weight:600; font-size:0.9rem; font-family:inherit; line-height:1.5;"></textarea>
+                            </div>
+                            <button type="submit" class="btn-success" style="width: 100%; padding: 12px; font-weight: 900; background: linear-gradient(135deg, #8b5cf6, #6d28d9); border: none; color: white; border-radius: 10px; cursor: pointer;" data-i18n="btn-send-inquiry">❓ Send Inquiry to Worker</button>
                         </form>
 
                         <!-- Tasks Board -->
@@ -1619,6 +1657,45 @@
 
                             <div id="tasks-board-list" style="display:flex; flex-direction:column; gap:12px;">
                                 <!-- Dynamically populated per user -->
+                            </div>
+                        </div>
+
+                        <!-- Inquiry Sub-Department Section (Admin & Worker Replies View) -->
+                        <div id="tasks-inquiry-department" class="card" style="margin-top: 24px; border-top: 4px solid #8b5cf6;">
+                            <div class="flex-between" style="margin-bottom: 16px; flex-wrap: wrap; gap: 12px; align-items: center;">
+                                <div>
+                                    <h2 class="card-title" style="margin:0; border:none; padding:0; display:flex; align-items:center; gap:8px;">
+                                        <span data-i18n="title-inquiries-dept">❓ Task Inquiries & Worker Replies</span>
+                                        <span id="inquiries-count-badge" class="badge" style="background: rgba(139,92,246,0.15); color: #8b5cf6; border: 1px solid rgba(139,92,246,0.3); font-size: 0.78rem; font-weight: 800; padding: 4px 12px; border-radius: 20px;">0 Inquiries</span>
+                                    </h2>
+                                    <p style="font-size: 0.85rem; color: var(--text-muted); margin: 4px 0 0 0;" data-i18n="desc-inquiries-dept">
+                                        Track all manager questions sent to staff, view worker text responses, and check Did It / Did Not Do It completion status.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Inquiry Filter Toolbar -->
+                            <div style="background: var(--input-bg); padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+                                <div style="flex: 1; min-width: 160px;">
+                                    <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;" data-i18n="label-filter-status">Filter Status:</label>
+                                    <select id="inquiries-filter-status" onchange="renderInquiries()" style="width: 100%; padding: 8px 10px; font-size: 0.85rem; border-radius: 6px; background:var(--card-bg); color:var(--text-main); border:1px solid var(--border-color); font-weight:700;">
+                                        <option value="all" selected data-i18n="opt-inq-all">🌐 All Inquiries</option>
+                                        <option value="pending" data-i18n="opt-inq-pending">⏳ Pending Reply</option>
+                                        <option value="did_it" data-i18n="opt-inq-did-it">✅ Replied: Did It</option>
+                                        <option value="did_not_do_it" data-i18n="opt-inq-did-not-do-it">❌ Replied: Did Not Do It</option>
+                                    </select>
+                                </div>
+                                <div style="flex: 1; min-width: 160px;">
+                                    <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;" data-i18n="label-filter-worker">Filter Worker:</label>
+                                    <select id="inquiries-filter-worker" onchange="renderInquiries()" style="width: 100%; padding: 8px 10px; font-size: 0.85rem; border-radius: 6px; background:var(--card-bg); color:var(--text-main); border:1px solid var(--border-color); font-weight:700;">
+                                        <option value="all" selected data-i18n="opt-workers-all">👥 All Workers</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Inquiry Cards Grid -->
+                            <div id="inquiries-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
+                                <!-- Rendered dynamically by renderInquiries() -->
                             </div>
                         </div>
                     </div>
@@ -4945,17 +5022,17 @@
 
     <script defer src="translations.js"></script>
     <!-- Modularized Core & Feature Scripts -->
-    <script defer src="js/core.js?v=99"></script>
-    <script defer src="js/auth.js?v=99"></script>
-    <script defer src="js/adverts_notes.js?v=99"></script>
-    <script defer src="js/sales_costs.js?v=99"></script>
-    <script defer src="js/warehouse.js?v=99"></script>
-    <script defer src="js/tasks.js?v=99"></script>
-    <script defer src="js/drivers.js?v=99"></script>
-    <script defer src="js/ops.js?v=99"></script>
-    <script defer src="js/finance.js?v=99"></script>
-    <script defer src="js/market.js?v=99"></script>
-    <script defer src="js/prepare.js?v=99"></script>
+    <script defer src="js/core.js?v=112"></script>
+    <script defer src="js/auth.js?v=112"></script>
+    <script defer src="js/adverts_notes.js?v=112"></script>
+    <script defer src="js/sales_costs.js?v=112"></script>
+    <script defer src="js/warehouse.js?v=112"></script>
+    <script defer src="js/tasks.js?v=112"></script>
+    <script defer src="js/drivers.js?v=112"></script>
+    <script defer src="js/ops.js?v=112"></script>
+    <script defer src="js/finance.js?v=112"></script>
+    <script defer src="js/market.js?v=112"></script>
+    <script defer src="js/prepare.js?v=112"></script>
     <!-- 3-Month Attendance Report Modal -->
     <div id="modal-3month-attendance-report" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.65); backdrop-filter:blur(4px); display:none; justify-content:center; align-items:center; z-index:999999;">
         <div class="modal-content" style="max-width: 850px; width: 95%; max-height: 88vh; overflow-y: auto; border-radius: 16px; padding: 24px; background:var(--card-bg); box-shadow:0 10px 40px rgba(0,0,0,0.5); margin:auto;">
@@ -4979,6 +5056,49 @@
 
             <div style="text-align:right; margin-top:20px; border-top:1px solid var(--border-color); padding-top:14px;">
                 <button onclick="close3MonthAttendanceReport()" class="btn-neutral" style="padding:10px 20px;">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Inquiries HUD Popup Modal -->
+    <div id="modal-inquiries-hud" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.7); backdrop-filter:blur(6px); justify-content:center; align-items:center; z-index:999999;">
+        <div class="modal-content" style="max-width: 920px; width: 95%; max-height: 88vh; overflow-y: auto; border-radius: 20px; padding: 24px; background:var(--card-bg); box-shadow:0 20px 50px rgba(0,0,0,0.6); margin:auto; border:1px solid var(--border-color);">
+            <div class="flex-between" style="border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 18px;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div style="width:42px; height:42px; border-radius:12px; background:linear-gradient(135deg, #0284c7, #0369a1); display:flex; align-items:center; justify-content:center; font-size:1.4rem;">💬</div>
+                    <div>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <h2 style="margin:0; font-size:1.35rem; font-weight:800; color:var(--text-main);" data-i18n="title-inquiries-dept">Task Inquiries & Worker Replies</h2>
+                            <span id="modal-inquiries-count-badge" class="badge" style="background:rgba(2, 132, 199, 0.15); color:#0284c7; border:1px solid rgba(2, 132, 199, 0.3); font-size:0.8rem; font-weight:800; padding:3px 10px;">0 Inquiries</span>
+                        </div>
+                        <span style="font-size:0.85rem; color:var(--text-muted);" data-i18n="desc-inquiries-dept">View questions sent to workers and their direct responses (Did It / Did Not Do It).</span>
+                    </div>
+                </div>
+                <button onclick="closeInquiriesHUDModal()" class="btn-neutral" style="padding:6px 12px; font-size:1.2rem; border:none; background:var(--input-bg); border-radius:10px; cursor:pointer; font-weight:800;">✖</button>
+            </div>
+
+            <!-- Modal Filter Bar -->
+            <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; align-items:center; justify-content:space-between; background:var(--input-bg); padding:12px 16px; border-radius:14px; border:1px solid var(--border-color);">
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button type="button" onclick="setInquiryModalFilter('all')" id="modal-inq-filter-all" class="btn-primary" style="padding:6px 14px; font-size:0.82rem; font-weight:700; border-radius:8px;">All</button>
+                    <button type="button" onclick="setInquiryModalFilter('pending')" id="modal-inq-filter-pending" class="btn-outline" style="padding:6px 14px; font-size:0.82rem; font-weight:700; border-radius:8px;">Pending</button>
+                    <button type="button" onclick="setInquiryModalFilter('did_it')" id="modal-inq-filter-did_it" class="btn-outline" style="padding:6px 14px; font-size:0.82rem; font-weight:700; border-radius:8px;">Did It</button>
+                    <button type="button" onclick="setInquiryModalFilter('did_not_do_it')" id="modal-inq-filter-did_not_do_it" class="btn-outline" style="padding:6px 14px; font-size:0.82rem; font-weight:700; border-radius:8px;">Did Not Do It</button>
+                </div>
+                <div style="min-width:180px;">
+                    <select id="modal-inquiries-worker-filter" onchange="renderInquiriesModal()" style="width:100%; padding:6px 10px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.85rem; font-weight:600;">
+                        <option value="all">👥 All Workers</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Modal Inquiry Cards Grid -->
+            <div id="modal-inquiries-grid" class="grid-2-col" style="gap:14px;">
+                <!-- Dynamically Populated -->
+            </div>
+
+            <div style="text-align:right; margin-top:20px; border-top:1px solid var(--border-color); padding-top:14px;">
+                <button onclick="closeInquiriesHUDModal()" class="btn-neutral" style="padding:10px 22px; font-weight:700; border-radius:10px;">Close</button>
             </div>
         </div>
     </div>

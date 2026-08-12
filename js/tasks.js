@@ -1119,6 +1119,56 @@ function renderTasks() {
         // Sort General tasks newest first
         pendingGeneralTasks.sort((a, b) => getJobTimestamp(b) - getJobTimestamp(a));
 
+        // Render Pending Inquiries for Active Worker (if any)
+        const rawInquiries = data.inquiries || {};
+        const allInquiries = Object.values(rawInquiries);
+        const workerPendingInquiries = allInquiries.filter(inq => {
+            if (!inq || inq.status !== 'pending') return false;
+            if (activeWorker) {
+                return String(inq.workerId) === String(activeWorker.id) || inq.workerId === 'all';
+            }
+            return false;
+        });
+
+        if (workerPendingInquiries.length > 0) {
+            const inqCard = document.createElement('div');
+            inqCard.className = "card";
+            inqCard.style.padding = "20px";
+            inqCard.style.marginBottom = "16px";
+            inqCard.style.border = "2px dashed #8b5cf6";
+            inqCard.style.background = "rgba(139, 92, 246, 0.08)";
+
+            let inqHtml = `<h3 style="margin-top:0; color:#8b5cf6; display:flex; align-items:center; gap:8px; font-size:1.15rem;">❓ ${isAr ? 'استفسارات الإدارة الموجهة إليك' : 'Pending Manager Inquiries for You'}</h3>`;
+
+            workerPendingInquiries.forEach(inq => {
+                const dateStr = inq.createdAt ? new Date(inq.createdAt).toLocaleString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+                const safeQuestion = typeof escapeHtml === 'function' ? escapeHtml(inq.question) : (inq.question || '');
+
+                inqHtml += `
+                    <div style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:16px; margin-bottom:12px;">
+                        <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:6px;">🕒 ${dateStr}</div>
+                        <div style="font-size:1.05rem; font-weight:700; color:var(--text-main); margin-bottom:12px; line-height:1.4;">❓ ${safeQuestion}</div>
+                        
+                        <div style="margin-bottom:12px;">
+                            <textarea id="inquiry-reply-text-${inq.id}" rows="2" placeholder="${isAr ? 'اكتب تفاصيل الإجابة أو التوضيح هنا (اختياري)...' : 'Write reply details or explanation here (optional)...'}" style="width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.85rem; font-family:inherit;"></textarea>
+                        </div>
+
+                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                            <button type="button" onclick="replyToInquiry('${inq.id}', 'did_it')" class="btn-success" style="padding:10px 18px; border-radius:8px; font-weight:800; font-size:0.85rem; background:linear-gradient(135deg, #10b981, #059669); color:white; border:none; cursor:pointer; flex:1; min-width:140px; display:flex; align-items:center; justify-content:center; gap:6px;">
+                                ${isAr ? '✅ تم الإنجاز (Did It)' : '✅ Did It'}
+                            </button>
+                            <button type="button" onclick="replyToInquiry('${inq.id}', 'did_not_do_it')" class="btn-danger" style="padding:10px 18px; border-radius:8px; font-weight:800; font-size:0.85rem; background:linear-gradient(135deg, #ef4444, #dc2626); color:white; border:none; cursor:pointer; flex:1; min-width:140px; display:flex; align-items:center; justify-content:center; gap:6px;">
+                                ${isAr ? '❌ لم أقم به (Did Not Do It)' : '❌ Did Not Do It'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            inqCard.innerHTML = inqHtml;
+            board.appendChild(inqCard);
+        }
+
         if (pendingGeneralTasks.length > 0 && statusFilter !== 'completed') {
             const genCard = document.createElement('div');
             genCard.className = "card";
@@ -1149,7 +1199,7 @@ function renderTasks() {
                 }
 
                 genHtml += `
-                    <div style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                    <div class="general-task-item" ondblclick="if (!event.target.closest('button') && !event.target.closest('input')) openEditTaskModal('general', '${gt.id}', true)" style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; cursor:pointer;" title="${isAr ? 'انقر مرتين للتعديل' : 'Double-click to edit'}">
                         <div>
                             <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">Created: ${gt.date || new Date(getJobTimestamp(gt)).toLocaleString()}</div>
                             <div style="font-size:1.05rem; font-weight:700; color:var(--text-main); display:flex; align-items:center; flex-wrap:wrap; gap:6px;">${taskNumBadge} <span>${gt.title}</span> ${urgencyBadge} ${groupBadge}</div>
@@ -1241,7 +1291,7 @@ function renderTasks() {
             const taskNumBadge = `<span class="badge" style="background:#2563eb; color:#ffffff; font-weight:700; font-size:0.85rem; padding:3px 9px; border-radius:6px; margin-right:6px; box-shadow:0 1px 3px rgba(37,99,235,0.25);" title="Task ${j.taskNum || 1}">${j.taskNum || 1}</span>`;
 
             return `
-                        <div class="mission-item" style="border-left: 4px solid ${doneColor}; display:flex; flex-direction:column; align-items:stretch;">
+                        <div class="mission-item" ondblclick="if (!event.target.closest('button') && !event.target.closest('input') && !event.target.closest('select')) openEditTaskModal('${worker.id}', '${j.id}')" style="border-left: 4px solid ${doneColor}; display:flex; flex-direction:column; align-items:stretch; cursor:pointer;" title="${isAr ? 'انقر مرتين للتعديل' : 'Double-click to edit'}">
                             <div class="flex-between" style="margin-bottom:8px; align-items:flex-start;">
                                 <div>
                                     <div style="font-size: 0.75rem; color:var(--text-muted); margin-bottom:4px;">Assigned: ${j.date || new Date(getJobTimestamp(j)).toLocaleString()}</div>

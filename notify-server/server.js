@@ -263,57 +263,37 @@ app.post('/wa/logout', async (_req, res) => {
     }
 });
 
-app.post('/wa/send', async (req, res) => {
-    try {
-        const { phone, text } = req.body || {};
-        if (!phone || !text) {
-            return res.status(400).json({ error: 'Missing phone or text parameter.' });
-        }
-        if (!waConnectionState.connected || !waSocket) {
-            return res.status(531).json({ error: 'WhatsApp engine is not connected. Scan QR code in dashboard.' });
-        }
+// ─── WhatsApp Anti-Spam Queue System (3-Second Staggered Interval) ───────────
+const waQueue = [];
+let isProcessingWaQueue = false;
+const WA_STAGGER_INTERVAL_MS = 3000; // 3 seconds interval between recipients
 
-        let cleanPhone = phone.replace(/[^0-9]/g, '');
-        if (!cleanPhone.endsWith('@s.whatsapp.net')) {
-            cleanPhone = `${cleanPhone}@s.whatsapp.net`;
-        }
-
-        const sentMsg = await waSocket.sendMessage(cleanPhone, { text });
-        console.log(`[WhatsApp Sent] → ${phone}: "${text.substring(0, 40)}..."`);
-        return res.json({ success: true, messageId: sentMsg.key.id, recipient: cleanPhone });
-    } catch (err) {
-        console.error('[WhatsApp Send Error]:', err.message);
-        return res.status(500).json({ error: err.message });
-    }
-});
-
-app.listen(PORT, () => console.log(`[Server] Listening on port ${PORT}`));
-
-// Initialize WhatsApp Engine
-initWhatsAppEngine();
-
-// ─── FCM Push Notification Helpers ──────────────────────────────────────────
-function countAcrossMonths(monthlyStats, field) {
-    if (!monthlyStats) return 0;
-    return Object.values(monthlyStats)
-        .reduce((sum, m) => sum + (Array.isArray(m[field]) ? m[field].length : 0), 0);
+function queueWhatsAppMessage(phone, text) {
+    if (!phone || !text) return;
+    waQueue.push({ phone, text });
+    console.log(`📥 [WhatsApp Anti-Spam Queue] Queued message for ${phone} (Batch Position: #${waQueue.length})`);
+    processWaQueue();
 }
 
-async function safeSend(message, label) {
-    try {
-        const id = await messaging.send(message);
-        console.log(`✅ [${label}] sent — messageId: ${id}`);
-    } catch (err) {
-        if (err.code === 'messaging/registration-token-not-registered' ||
-            err.code === 'messaging/invalid-registration-token') {
-            console.warn(`⚠️  [${label}] stale token — worker needs to reopen app.`);
-        } else {
-            console.error(`❌ [${label}] failed:`, err.message);
+async function processWaQueue() {
+    if (isProcessingWaQueue) return;
+    isProcessingWaQueue = true;
+
+    while (waQueue.length > 0) {
+        const item = waQueue.shift();
+        if (item && item.phone && item.text) {
+            await executeWhatsAppDispatch(item.phone, item.text);
+            if (waQueue.length > 0) {
+                console.log(`⏳ [WhatsApp Anti-Spam Safety Queue] Waiting 3 seconds before notifying next recipient (${waQueue.length} remaining in queue)...`);
+                await new Promise(resolve => setTimeout(resolve, WA_STAGGER_INTERVAL_MS));
+            }
         }
     }
+
+    isProcessingWaQueue = false;
 }
 
-async function sendWhatsAppDirect(phone, text) {
+async function executeWhatsAppDispatch(phone, text) {
     if (!phone || !text) return;
     if (!waConnectionState.connected || !waSocket) {
         console.log(`[WhatsApp Skip] Engine not linked — skip automated alert to ${phone}`);
@@ -325,11 +305,33 @@ async function sendWhatsAppDirect(phone, text) {
             cleanPhone = `${cleanPhone}@s.whatsapp.net`;
         }
         await waSocket.sendMessage(cleanPhone, { text });
-        console.log(`💬 [WhatsApp Auto-Sent] → ${phone}: "${text.substring(0, 40)}..."`);
+        console.log(`💬 [WhatsApp Sent (3s Staggered Queue)] → ${phone}: "${text.substring(0, 40)}..."`);
     } catch (err) {
-        console.error(`❌ [WhatsApp Auto-Send Failed] → ${phone}:`, err.message);
+        console.error(`❌ [WhatsApp Send Failed] → ${phone}:`, err.message);
     }
 }
+
+async function sendWhatsAppDirect(phone, text) {
+    queueWhatsAppMessage(phone, text);
+}
+
+app.post('/wa/send', async (req, res) => {
+    try {
+        const { phone, text } = req.body || {};
+        if (!phone || !text) {
+            return res.status(400).json({ error: 'Missing phone or text parameter.' });
+        }
+        if (!waConnectionState.connected || !waSocket) {
+            return res.status(531).json({ error: 'WhatsApp engine is not connected. Scan QR code in dashboard.' });
+        }
+
+        queueWhatsAppMessage(phone, text);
+        return res.json({ success: true, message: 'Message queued safely for dispatch with 3-second anti-spam interval.' });
+    } catch (err) {
+        console.error('[WhatsApp Send Error]:', err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
 
 // ─── Notification Listeners Global State ─────────────────────────────────────
 const prevState = {};
