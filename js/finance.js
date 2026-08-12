@@ -5165,7 +5165,7 @@ function renderReminders() {
         const sendTaskBtn = `<button onclick="convertReminderToTask('${r.id}')" class="btn-outline" style="padding:5px 10px; font-size:0.75rem; border-radius:8px; border:1px solid var(--secondary); color:var(--secondary); font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" title="${isAr ? 'تحويل لمهمة' : 'As Task'}">📋 ${isAr ? 'مهمة' : 'Task'}</button>`;
 
         container.innerHTML += `
-            <div class="reminder-leaderboard-row" style="border:${theme.border}; background:${theme.bg};">
+            <div class="reminder-leaderboard-row" ondblclick="if (!event.target.closest('button')) openEditReminderModal('${r.id}')" style="border:${theme.border}; background:${theme.bg}; cursor:pointer;" title="${isAr ? 'انقر مرتين لتعديل التذكير' : 'Double-click to edit reminder'}">
                 <!-- Col 1: Title, Status Badge & Cycle -->
                 <div style="min-width:0;">
                     <strong style="font-size:1.05rem; color:var(--text-main); display:block; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${r.title}</strong>

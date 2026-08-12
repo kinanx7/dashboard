@@ -2377,7 +2377,7 @@ function renderVaultNotes() {
         const safeCreatedBy = typeof escapeHtml === 'function' ? escapeHtml(n.createdBy || (isAr ? 'المدير' : 'Admin')) : (n.createdBy || (isAr ? 'المدير' : 'Admin'));
 
         return `
-            <div class="ledger-card" style="
+            <div class="ledger-card" ondblclick="if (!event.target.closest('button')) editVaultNote('${n.id}')" style="
                 margin: 0;
                 padding: 16px;
                 border-radius: 14px;
@@ -2388,7 +2388,8 @@ function renderVaultNotes() {
                 justify-content: space-between;
                 box-shadow: var(--shadow-sm);
                 transition: transform 0.2s ease, box-shadow 0.2s ease;
-            ">
+                cursor: pointer;
+            " title="${isAr ? 'انقر مرتين لتعديل الملاحظة' : 'Double-click to edit note'}">
                 <div>
                     <!-- Image Card (If Uploaded) -->
                     ${n.imageUrl ? `
