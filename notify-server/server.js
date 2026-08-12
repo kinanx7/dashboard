@@ -15,6 +15,7 @@ const admin   = require('firebase-admin');
 const express = require('express');
 const { makeWASocket, useMultiFileAuthState, DisconnectReason, BufferJSON, initAuthCreds, proto } = require('@whiskeysockets/baileys');
 const QRCode = require('qrcode');
+const pino = require('pino');
 const fs = require('fs');
 const path = require('path');
 
@@ -161,6 +162,7 @@ async function initWhatsAppEngine() {
 
         waSocket = makeWASocket({
             auth: state,
+            logger: pino({ level: 'silent' }),
             printQRInTerminal: false,
             browser: ['Mac OS', 'Chrome', '121.0.6167.85']
         });
