@@ -13,7 +13,7 @@
 
 const admin   = require('firebase-admin');
 const express = require('express');
-const { makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { makeWASocket, useMultiFileAuthState, DisconnectReason, BufferJSON, initAuthCreds, proto } = require('@whiskeysockets/baileys');
 const QRCode = require('qrcode');
 const fs = require('fs');
 const path = require('path');
@@ -61,18 +61,90 @@ app.get(['/ping', '/health'], (_req, res) => {
 
 app.get('/', (_req, res) => res.send('Burgeroov Notification & WhatsApp Gateway Server is running ✅'));
 
-// ─── Self-Hosted WhatsApp Web Engine (Baileys) ─────────────────────────────
+// ─── Self-Hosted WhatsApp Web Engine (Baileys + Firebase Persistent Auth) ───
 let waSocket = null;
 let waQrDataUrl = null;
 let waConnectionState = { connected: false, user: null, status: 'initializing' };
 
-async function initWhatsAppEngine() {
-    console.log('[WhatsApp Engine] Initializing self-hosted WhatsApp Web Gateway...');
+// Firebase RTDB Auth State for WhatsApp (Persistent across Render restarts & redeploys)
+const useFirebaseAuthState = async (dbRef) => {
+    let creds;
     try {
-        const authDir = path.join(__dirname, 'auth_info_baileys');
-        if (!fs.existsSync(authDir)) fs.mkdirSync(authDir, { recursive: true });
+        const credsSnap = await dbRef.child('creds').once('value');
+        const credsVal = credsSnap.val();
+        if (credsVal) {
+            creds = JSON.parse(JSON.stringify(credsVal), BufferJSON.reviver);
+        } else {
+            creds = initAuthCreds();
+        }
+    } catch (e) {
+        console.warn('[Firebase Auth State] Failed to load creds from Firebase, initializing fresh:', e.message);
+        creds = initAuthCreds();
+    }
 
-        const { state, saveCreds } = await useMultiFileAuthState(authDir);
+    return {
+        state: {
+            creds,
+            keys: {
+                get: async (type, ids) => {
+                    const data = {};
+                    await Promise.all(
+                        ids.map(async (id) => {
+                            try {
+                                const snap = await dbRef.child(`keys/${type}_${id}`).once('value');
+                                let value = snap.val();
+                                if (value) {
+                                    if (type === 'app-state-sync-key' && typeof value === 'object') {
+                                        value = proto.Message.AppStateSyncKeyData.fromObject(value);
+                                    }
+                                    data[id] = JSON.parse(JSON.stringify(value), BufferJSON.reviver);
+                                }
+                            } catch (err) {
+                                console.warn(`[Firebase Auth State] Error reading key ${type}_${id}:`, err.message);
+                            }
+                        })
+                    );
+                    return data;
+                },
+                set: async (data) => {
+                    const updates = {};
+                    for (const category in data) {
+                        for (const id in data[category]) {
+                            const value = data[category][id];
+                            const keyPath = `keys/${category}_${id}`;
+                            if (value) {
+                                updates[keyPath] = JSON.parse(JSON.stringify(value, BufferJSON.replacer));
+                            } else {
+                                updates[keyPath] = null;
+                            }
+                        }
+                    }
+                    if (Object.keys(updates).length > 0) {
+                        try {
+                            await dbRef.update(updates);
+                        } catch (err) {
+                            console.error('[Firebase Auth State] Error saving key updates:', err.message);
+                        }
+                    }
+                }
+            }
+        },
+        saveCreds: async () => {
+            try {
+                const serialized = JSON.parse(JSON.stringify(creds, BufferJSON.replacer));
+                await dbRef.child('creds').set(serialized);
+            } catch (err) {
+                console.error('[Firebase Auth State] Error saving creds:', err.message);
+            }
+        }
+    };
+};
+
+async function initWhatsAppEngine() {
+    console.log('[WhatsApp Engine] Initializing self-hosted WhatsApp Web Gateway with Firebase Auth Persistence...');
+    try {
+        const authRef = db.ref('whatsapp_auth_baileys');
+        const { state, saveCreds } = await useFirebaseAuthState(authRef);
 
         waSocket = makeWASocket({
             auth: state,
@@ -96,7 +168,7 @@ async function initWhatsAppEngine() {
             }
 
             if (connection === 'open') {
-                console.log('[WhatsApp Engine] ✅ WhatsApp Connection ACTIVE & LINKED!');
+                console.log('[WhatsApp Engine] ✅ WhatsApp Connection ACTIVE & LINKED (Persisted in Firebase)!');
                 waQrDataUrl = null;
                 const userJid = waSocket.user ? waSocket.user.id : 'WhatsApp User';
                 waConnectionState = { connected: true, user: userJid, status: 'connected' };
@@ -108,6 +180,9 @@ async function initWhatsAppEngine() {
                 waConnectionState = { connected: false, user: null, status: 'disconnected' };
                 if (shouldReconnect) {
                     setTimeout(() => initWhatsAppEngine(), 3000);
+                } else {
+                    console.log('[WhatsApp Engine] Logged out from WhatsApp. Wiping Firebase auth state...');
+                    try { await authRef.remove(); } catch(e){}
                 }
             }
         });
@@ -173,6 +248,9 @@ app.post('/wa/logout', async (_req, res) => {
         if (waSocket) {
             try { await waSocket.logout(); } catch(e){}
         }
+        try {
+            await db.ref('whatsapp_auth_baileys').remove();
+        } catch(e){}
         const authDir = path.join(__dirname, 'auth_info_baileys');
         if (fs.existsSync(authDir)) {
             fs.rmSync(authDir, { recursive: true, force: true });
@@ -253,12 +331,136 @@ async function sendWhatsAppDirect(phone, text) {
     }
 }
 
-// ─── Notification Listeners ──────────────────────────────────────────────────
-const prevState = {};
-const notifiedGeneralTasks = {};
-const isFirstGeneralTasksLoad = {};
-const companyTemplates = {};
+// Helper to safely get preparing workers across all company nodes & formats
+async function getPreparingWorkersForCompany(companyId) {
+    const companyList = [companyId, 'mvc', 'mvcfresh', 'burgeroov'];
+    const uniqueList = [...new Set(companyList.filter(Boolean))];
+    const foundWorkers = [];
 
+    for (const cKey of uniqueList) {
+        try {
+            const [workersSnap, assignedSnap, assignedOldSnap] = await Promise.all([
+                db.ref(`companies/${cKey}/workers`).once('value'),
+                db.ref(`companies/${cKey}/assignedPreparingWorkerIds`).once('value'),
+                db.ref(`companies/${cKey}/assignedPreparingWorkerId`).once('value')
+            ]);
+
+            const rawWorkers = workersSnap.val();
+            let wList = [];
+            if (Array.isArray(rawWorkers)) {
+                wList = rawWorkers;
+            } else if (rawWorkers && typeof rawWorkers === 'object') {
+                wList = Object.values(rawWorkers);
+            }
+
+            let aIds = [];
+            const rawAssigned = assignedSnap.val();
+            if (Array.isArray(rawAssigned)) {
+                aIds = rawAssigned;
+            } else if (rawAssigned && typeof rawAssigned === 'object') {
+                aIds = Object.values(rawAssigned);
+            } else {
+                const oldId = assignedOldSnap.val();
+                if (oldId) aIds = [oldId];
+            }
+
+            const aStrs = aIds.map(id => String(id).trim());
+
+            wList.forEach((w, idx) => {
+                if (!w) return;
+                const wId = String(w.id || idx).trim();
+                const wPhone = String(w.phone || '').trim();
+                if (aStrs.includes(wId) || aStrs.includes(wPhone) || w.role === 'prepare' || w.role === 'kitchen' || w.isPreparingWorker) {
+                    foundWorkers.push(w);
+                }
+            });
+        } catch (e) {
+            console.error(`[getPreparingWorkersForCompany] Error for ${cKey}:`, e.message);
+        }
+    }
+
+    // De-duplicate workers by phone or id
+    const map = {};
+    foundWorkers.forEach(w => {
+        const key = w.phone || w.id || w.name;
+        if (key) map[key] = w;
+    });
+
+    return Object.values(map);
+}
+
+// Function to send FCM & WhatsApp alerts for new prepare orders
+async function sendPrepareOrderAlert(companyId, order) {
+    if (!order) return;
+    const companyLabel = companyId === 'mvcfresh' ? 'MVC Fresh' : (companyId === 'mvc' ? 'MVC' : 'Burgeroov');
+    const tpls = companyTemplates[companyId] || {};
+
+    const prepWorkers = await getPreparingWorkersForCompany(companyId);
+    console.log(`[Prepare Order Alert] Found ${prepWorkers.length} assigned preparing workers for company ${companyId}`);
+
+    if (prepWorkers.length === 0) {
+        console.warn(`[Prepare Order Alert] ⚠️ No assigned preparing workers found for ${companyId}!`);
+        return;
+    }
+
+    const customerName = order.workerName || order.customerName || 'Customer';
+    const itemsCount = Array.isArray(order.items) ? order.items.length : 1;
+    const orderNum = order.orderNum || order.id || '#000000';
+    const sends = [];
+
+    prepWorkers.forEach(prepWorker => {
+        const workerName = prepWorker.name || 'Prep Worker';
+        const fcmToken = prepWorker.fcmToken;
+        const phone = prepWorker.phone;
+        const waEnabled = prepWorker.waAlertsEnabled !== false;
+
+        if (fcmToken) {
+            sends.push(safeSend({
+                token: fcmToken,
+                notification: {
+                    title: `👨‍🍳 New Kitchen Prepare Order ${orderNum} [${companyLabel}]`,
+                    body: `Order for ${customerName} (${itemsCount} items) needs preparation.`
+                },
+                data: { type: 'prepare', tab: 'prepare', companyId },
+                android: { priority: 'high', notification: { channelId: 'burgeroov_orders' } },
+                apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
+            }, `[${companyId}] PREPARE ORDER → ${workerName}`));
+        }
+
+        if (phone && waEnabled) {
+            const rawTpl = tpls.prepare || '👨‍🍳 *تنبيه تحضير طلب جديد {order_id} [{company_name}]*\n\nالعميل: {customer_name}\nعدد الأصناف: {items_count}\n\nيرجى فتح الشاشة والبدء بالتحضير!';
+            const waMsg = rawTpl
+                .replace(/{worker_name}/g, workerName)
+                .replace(/{customer_name}/g, customerName)
+                .replace(/{order_id}/g, orderNum)
+                .replace(/{items_count}/g, itemsCount)
+                .replace(/{company_name}/g, companyLabel);
+            sendWhatsAppDirect(phone, waMsg);
+        }
+    });
+
+    if (sends.length > 0) {
+        await Promise.all(sends);
+    }
+}
+
+// Dedicated HTTP API endpoint to trigger prepare order notifications
+app.post('/notify/prepare', async (req, res) => {
+    try {
+        const { companyId, order } = req.body || {};
+        if (!order) {
+            return res.status(400).json({ error: 'Missing order parameter' });
+        }
+        const cKey = companyId || order.companyKey || 'mvc';
+        await sendPrepareOrderAlert(cKey, order);
+        return res.json({ success: true, message: 'Prepare order notifications dispatched successfully.' });
+    } catch (err) {
+        console.error('[Notify Prepare Error]:', err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// Listener 3: NEW MARKET / KITCHEN PREPARE ORDERS → PREPARING WORKER
 function startNotificationListeners(companyId) {
     console.log(`[Server] Starting listeners for company: ${companyId}...`);
     isFirstGeneralTasksLoad[companyId] = true;
@@ -277,7 +479,14 @@ function startNotificationListeners(companyId) {
         const companyLabel = companyId === 'mvcfresh' ? 'MVC Fresh' : (companyId === 'mvc' ? 'MVC' : 'Burgeroov');
         const tpls = companyTemplates[companyId] || {};
 
-        workers.forEach((after, index) => {
+        let workerList = [];
+        if (Array.isArray(workers)) {
+            workerList = workers;
+        } else if (workers && typeof workers === 'object') {
+            workerList = Object.values(workers);
+        }
+
+        workerList.forEach((after, index) => {
             if (!after) return;
 
             const fcmToken   = after.fcmToken;
@@ -468,8 +677,21 @@ function startNotificationListeners(companyId) {
             db.ref(`companies/${companyId}/workers`).once('value'),
             db.ref(`companies/${companyId}/taskGroups`).once('value')
         ]);
-        const workers = workersSnapshot.val() || [];
-        const groups = groupsSnapshot.val() || [];
+        const rawWorkers = workersSnapshot.val();
+        let workers = [];
+        if (Array.isArray(rawWorkers)) {
+            workers = rawWorkers;
+        } else if (rawWorkers && typeof rawWorkers === 'object') {
+            workers = Object.values(rawWorkers);
+        }
+
+        const rawGroups = groupsSnapshot.val();
+        let groups = [];
+        if (Array.isArray(rawGroups)) {
+            groups = rawGroups;
+        } else if (rawGroups && typeof rawGroups === 'object') {
+            groups = Object.values(rawGroups);
+        }
 
         Object.keys(tasksObj).forEach(taskId => {
             const task = tasksObj[taskId];
@@ -539,69 +761,15 @@ function startNotificationListeners(companyId) {
 
         if (!ordersObj) return;
 
-        const sends = [];
-        const companyLabel = companyId === 'mvcfresh' ? 'MVC Fresh' : (companyId === 'mvc' ? 'MVC' : 'Burgeroov');
-        const tpls = companyTemplates[companyId] || {};
-
-        const [workersSnap, assignedSnap, assignedOldSnap] = await Promise.all([
-            db.ref(`companies/${companyId}/workers`).once('value'),
-            db.ref(`companies/${companyId}/assignedPreparingWorkerIds`).once('value'),
-            db.ref(`companies/${companyId}/assignedPreparingWorkerId`).once('value')
-        ]);
-
-        const workers = workersSnap.val() || [];
-        let assignedIds = assignedSnap.val() || [];
-        if (!Array.isArray(assignedIds)) {
-            const oldId = assignedOldSnap.val();
-            assignedIds = oldId ? [String(oldId)] : [];
-        }
-        const assignedStrs = assignedIds.map(id => String(id));
-
-        // Find ALL assigned preparing workers
-        let prepWorkers = workers.filter(w => w && (assignedStrs.includes(String(w.id)) || assignedStrs.includes(String(w.phone)) || w.role === 'prepare' || w.role === 'kitchen' || w.isPreparingWorker));
-
         Object.keys(ordersObj).forEach(id => {
             const order = ordersObj[id];
             const cacheKey = `${companyId}_${id}`;
 
             if (order && (order.status === 'pending' || !order.status) && !notifiedPrepareOrders[cacheKey]) {
                 notifiedPrepareOrders[cacheKey] = true;
-
-                const customerName = order.workerName || order.customerName || 'Customer';
-                const itemsCount = Array.isArray(order.items) ? order.items.length : 1;
-                const orderNum = order.orderNum || id;
-
-                prepWorkers.forEach(prepWorker => {
-                    if (prepWorker.fcmToken) {
-                        sends.push(safeSend({
-                            token: prepWorker.fcmToken,
-                            notification: {
-                                title: `👨‍🍳 New Kitchen Prepare Order #${orderNum} [${companyLabel}]`,
-                                body: `Order for ${customerName} (${itemsCount} items) needs preparation.`
-                            },
-                            data: { type: 'prepare', tab: 'prepare', companyId },
-                            android: { priority: 'high', notification: { channelId: 'burgeroov_orders' } },
-                            apns:    { payload: { aps: { sound: 'default', badge: 1 } } }
-                        }, `[${companyId}] PREPARE ORDER → ${prepWorker.name || 'Prep Worker'}`));
-                    }
-
-                    if (prepWorker.phone && prepWorker.waAlertsEnabled !== false) {
-                        const rawTpl = tpls.prepare || '👨‍🍳 *تنبيه تحضير طلب جديد #{order_id} [{company_name}]*\n\nالعميل: {customer_name}\nعدد الأصناف: {items_count}\n\nيرجى فتح الشاشة والبدء بالتحضير!';
-                        const waMsg = rawTpl
-                            .replace(/{worker_name}/g, prepWorker.name || 'موظف التحضير')
-                            .replace(/{customer_name}/g, customerName)
-                            .replace(/{order_id}/g, orderNum)
-                            .replace(/{items_count}/g, itemsCount)
-                            .replace(/{company_name}/g, companyLabel);
-                        sendWhatsAppDirect(prepWorker.phone, waMsg);
-                    }
-                });
+                sendPrepareOrderAlert(companyId, order);
             }
         });
-
-        if (sends.length > 0) {
-            await Promise.all(sends);
-        }
     }, (err) => {
         console.error(`[RTDB] [${companyId}] Market Orders Listener error:`, err.message);
     });

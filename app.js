@@ -15611,6 +15611,18 @@ function submitMarketOrder() {
         closeMarketCartModal();
         renderMarket();
         openMarketOrderReceiptModal(purchasedOrder);
+
+        // Dispatch instant alert to notify-server for assigned preparing workers
+        try {
+            const serverUrl = document.getElementById('wa-server-url')?.value?.trim() || 'https://burgeroov-notify.onrender.com';
+            fetch(`${serverUrl}/notify/prepare`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ companyId: currentCompany, order: purchasedOrder })
+            }).then(r => r.json()).then(res => {
+                console.log("Prepare order notification response:", res);
+            }).catch(err => console.warn("Prepare order notify HTTP dispatch error:", err));
+        } catch(e) {}
     }).catch(err => {
         console.error("Error submitting order:", err);
         alert(isAr ? 'حدث خطأ أثناء إرسال الطلب.' : 'Error submitting order.');
