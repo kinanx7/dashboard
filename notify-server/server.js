@@ -395,6 +395,32 @@ async function getPreparingWorkersForCompany(companyId) {
     return Object.values(map);
 }
 
+// Universal helper to replace template tags across all event types
+function formatCustomTemplate(rawTpl, data = {}) {
+    if (!rawTpl) return '';
+    let text = rawTpl;
+
+    const workerName = data.workerName || data.worker_name || 'الموظف';
+    const taskTitle = data.taskTitle || data.task_title || data.title || 'المهمة';
+    const orderId = data.orderId || data.order_id || data.orderNum || '#000000';
+    const customerName = data.customerName || data.customer_name || 'العميل';
+    const amount = data.amount || '0';
+    const reason = data.reason || 'تنبيه إداري';
+    const companyName = data.companyName || data.company_name || 'شبكة إم في سي';
+    const itemsCount = data.itemsCount || data.items_count || '1';
+
+    text = text.replace(/{worker_name}/g, workerName)
+               .replace(/{task_title}/g, taskTitle)
+               .replace(/{order_id}/g, orderId)
+               .replace(/{customer_name}/g, customerName)
+               .replace(/{amount}/g, amount)
+               .replace(/{reason}/g, reason)
+               .replace(/{company_name}/g, companyName)
+               .replace(/{items_count}/g, itemsCount);
+
+    return text;
+}
+
 const notifiedPrepareOrders = {};
 
 // Function to send FCM & WhatsApp alerts for new prepare orders
@@ -447,12 +473,13 @@ async function sendPrepareOrderAlert(companyId, order) {
 
         if (phone && waEnabled) {
             const rawTpl = tpls.prepare || '👨‍🍳 *تنبيه تحضير طلب جديد {order_id} [{company_name}]*\n\nالعميل: {customer_name}\nعدد الأصناف: {items_count}\n\nيرجى فتح الشاشة والبدء بالتحضير!';
-            const waMsg = rawTpl
-                .replace(/{worker_name}/g, workerName)
-                .replace(/{customer_name}/g, customerName)
-                .replace(/{order_id}/g, orderNum)
-                .replace(/{items_count}/g, itemsCount)
-                .replace(/{company_name}/g, companyLabel);
+            const waMsg = formatCustomTemplate(rawTpl, {
+                workerName,
+                customerName,
+                orderId: orderNum,
+                itemsCount,
+                companyName: companyLabel
+            });
             sendWhatsAppDirect(phone, waMsg);
         }
     });
@@ -544,10 +571,11 @@ function startNotificationListeners(companyId) {
 
                     if (phone && waEnabled) {
                         const rawTpl = tpls.task || '📋 *مهمة جديدة أسندت إليك [{company_name}]*\n\nالموظف: {worker_name}\nالمهمة: {task_title}\n\nيرجى فتح لوحة المهام للإنجاز.';
-                        const waMsg = rawTpl
-                            .replace(/{worker_name}/g, workerName)
-                            .replace(/{task_title}/g, title)
-                            .replace(/{company_name}/g, companyLabel);
+                        const waMsg = formatCustomTemplate(rawTpl, {
+                            workerName,
+                            taskTitle: title,
+                            companyName: companyLabel
+                        });
                         sendWhatsAppDirect(phone, waMsg);
                     }
                 }
@@ -576,11 +604,12 @@ function startNotificationListeners(companyId) {
 
                 if (phone && waEnabled) {
                     const rawTpl = tpls.delivery || '🛵 *طلب توصيل جديد [{company_name}]*\n\nالموظف: {worker_name}\nالعميل: {customer_name}\n\nيرجى بدء التوصيل فوراً!';
-                    const waMsg = rawTpl
-                        .replace(/{worker_name}/g, workerName)
-                        .replace(/{customer_name}/g, customer)
-                        .replace(/{order_id}/g, order.orderId || '101')
-                        .replace(/{company_name}/g, companyLabel);
+                    const waMsg = formatCustomTemplate(rawTpl, {
+                        workerName,
+                        customerName: customer,
+                        orderId: order.orderId || '101',
+                        companyName: companyLabel
+                    });
                     sendWhatsAppDirect(phone, waMsg);
                 }
             }
@@ -616,11 +645,12 @@ function startNotificationListeners(companyId) {
 
                 if (phone && waEnabled) {
                     const rawTpl = tpls.violation || '⚠️ *تنبيه مخالفة [{company_name}]*\n\nالموظف: {worker_name}\nالسبب: {reason}\nالمبلغ: {amount} ر.س';
-                    const waMsg = rawTpl
-                        .replace(/{worker_name}/g, workerName)
-                        .replace(/{reason}/g, reason)
-                        .replace(/{amount}/g, violAmount)
-                        .replace(/{company_name}/g, companyLabel);
+                    const waMsg = formatCustomTemplate(rawTpl, {
+                        workerName,
+                        reason,
+                        amount: violAmount,
+                        companyName: companyLabel
+                    });
                     sendWhatsAppDirect(phone, waMsg);
                 }
             }
@@ -657,11 +687,12 @@ function startNotificationListeners(companyId) {
 
                 if (phone && waEnabled) {
                     const rawTpl = tpls.reward || '🎉 *مكافأة جديدة [{company_name}]*\n\nالموظف: {worker_name}\nالبيان: {reason}\nالمبلغ: {amount} ر.س';
-                    const waMsg = rawTpl
-                        .replace(/{worker_name}/g, workerName)
-                        .replace(/{reason}/g, rewardNote)
-                        .replace(/{amount}/g, rewardAmount)
-                        .replace(/{company_name}/g, companyLabel);
+                    const waMsg = formatCustomTemplate(rawTpl, {
+                        workerName,
+                        reason: rewardNote,
+                        amount: rewardAmount,
+                        companyName: companyLabel
+                    });
                     sendWhatsAppDirect(phone, waMsg);
                 }
             }

@@ -16072,86 +16072,86 @@ function cancelMarketOrder(orderId, optCompanyKey) {
     updates[`companies/${targetComp}/marketOrders/${orderId}/cancelledAt`] = Date.now();
 
     if (totalCost > 0) {
-        if (isCustomerOrder && custCode) {
-            let currentCoins = 0;
-            if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && String(currentCustomerSession.code || currentCustomerSession.id).trim() === custCode && typeof currentCustomerSession.coins !== 'undefined') {
-                currentCoins = parseFloat(currentCustomerSession.coins) || 0;
-            } else {
-                let maxFound = 0;
-                ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
-                    if (appData[c] && appData[c].customers && appData[c].customers[custCode] && typeof appData[c].customers[custCode].coins !== 'undefined') {
-                        const val = parseFloat(appData[c].customers[custCode].coins) || 0;
-                        if (val > maxFound) maxFound = val;
-                    }
-                });
-                if (window.localCustomerRegistry && window.localCustomerRegistry[custCode] && typeof window.localCustomerRegistry[custCode].coins !== 'undefined') {
-                    const val = parseFloat(window.localCustomerRegistry[custCode].coins) || 0;
-                    if (val > maxFound) maxFound = val;
+        // 1. REFUND CUSTOMER COINS (If order is associated with a customer code or customer order)
+        if (custCode) {
+            let maxFoundCoins = 0;
+            ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
+                if (appData[c] && appData[c].customers && appData[c].customers[custCode] && typeof appData[c].customers[custCode].coins !== 'undefined') {
+                    const val = parseFloat(appData[c].customers[custCode].coins) || 0;
+                    if (val > maxFoundCoins) maxFoundCoins = val;
                 }
-                currentCoins = maxFound;
+            });
+            if (window.localCustomerRegistry && window.localCustomerRegistry[custCode] && typeof window.localCustomerRegistry[custCode].coins !== 'undefined') {
+                const val = parseFloat(window.localCustomerRegistry[custCode].coins) || 0;
+                if (val > maxFoundCoins) maxFoundCoins = val;
+            }
+            if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && String(currentCustomerSession.code || currentCustomerSession.id).trim() === custCode && typeof currentCustomerSession.coins !== 'undefined') {
+                const val = parseFloat(currentCustomerSession.coins) || 0;
+                if (val > maxFoundCoins) maxFoundCoins = val;
             }
 
-            const newCoins = currentCoins + totalCost;
+            const newCustCoins = maxFoundCoins + totalCost;
 
-            updates[`publicCustomerCodes/${custCode}/coins`] = newCoins;
-            updates[`customerCodes/${custCode}/coins`] = newCoins;
-            updates[`customers/${custCode}/coins`] = newCoins;
+            updates[`publicCustomerCodes/${custCode}/coins`] = newCustCoins;
+            updates[`customerCodes/${custCode}/coins`] = newCustCoins;
+            updates[`customers/${custCode}/coins`] = newCustCoins;
             ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
-                updates[`companies/${c}/customers/${custCode}/coins`] = newCoins;
+                updates[`companies/${c}/customers/${custCode}/coins`] = newCustCoins;
                 if (appData[c] && appData[c].customers && appData[c].customers[custCode]) {
-                    appData[c].customers[custCode].coins = newCoins;
+                    appData[c].customers[custCode].coins = newCustCoins;
                 }
             });
 
             if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && String(currentCustomerSession.code || currentCustomerSession.id).trim() === custCode) {
-                currentCustomerSession.coins = newCoins;
-                try {
-                    localStorage.setItem('mvc_customer_session', JSON.stringify(currentCustomerSession));
-                } catch (e) { }
-            }
-
-            try {
-                db.ref(`publicCustomerCodes/${custCode}/coins`).transaction(cv => (cv || 0) + totalCost);
-                db.ref(`customerCodes/${custCode}/coins`).transaction(cv => (cv || 0) + totalCost);
-            } catch (e) { }
-        } else {
-            const targetWorkerId = custCode || (order.workerId ? String(order.workerId).trim() : getCurrentWorkerId());
-            let workerCoins = 0;
-
-            if (appData[targetComp] && appData[targetComp].workers && appData[targetComp].workers[targetWorkerId] && typeof appData[targetComp].workers[targetWorkerId].coins !== 'undefined') {
-                workerCoins = parseFloat(appData[targetComp].workers[targetWorkerId].coins) || 0;
-            } else if (appData[targetComp] && appData[targetComp].userCoins && typeof appData[targetComp].userCoins[targetWorkerId] !== 'undefined') {
-                workerCoins = parseFloat(appData[targetComp].userCoins[targetWorkerId]) || 0;
-            } else {
-                const localCoins = localStorage.getItem('mvc_admin_coins_' + targetWorkerId) || localStorage.getItem('mvc_admin_coins');
-                if (localCoins !== null && !isNaN(parseFloat(localCoins))) {
-                    workerCoins = parseFloat(localCoins);
-                } else {
-                    workerCoins = getUserCoins();
-                }
-            }
-
-            const newWorkerCoins = workerCoins + totalCost;
-            updates[`companies/${targetComp}/workers/${targetWorkerId}/coins`] = newWorkerCoins;
-            updates[`companies/${targetComp}/userCoins/${targetWorkerId}`] = newWorkerCoins;
-
-            if (appData[targetComp]) {
-                if (!appData[targetComp].userCoins) appData[targetComp].userCoins = {};
-                appData[targetComp].userCoins[targetWorkerId] = newWorkerCoins;
-                if (appData[targetComp].workers && appData[targetComp].workers[targetWorkerId]) {
-                    appData[targetComp].workers[targetWorkerId].coins = newWorkerCoins;
-                }
-            }
-
-            const currentWId = getCurrentWorkerId();
-            if (!targetWorkerId || targetWorkerId === currentWId || targetWorkerId === 'admin' || targetWorkerId === 'owner' || (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.isAdmin))) {
-                try {
-                    localStorage.setItem('mvc_admin_coins_' + targetWorkerId, newWorkerCoins);
-                    localStorage.setItem('mvc_admin_coins_' + currentWId, newWorkerCoins);
-                    localStorage.setItem('mvc_admin_coins', newWorkerCoins);
-                } catch (e) { }
+                currentCustomerSession.coins = newCustCoins;
+                try { localStorage.setItem('mvc_customer_session', JSON.stringify(currentCustomerSession)); } catch (e) { }
             }
         }
+
+        // 2. REFUND ADMIN / WORKER COINS
+        const currentWId = getCurrentWorkerId();
+        const targetWorkerId = (order.workerId ? String(order.workerId).trim() : '') || currentWId;
+
+        let currentWorkerCoins = getUserCoins();
+        ['mvc', 'mvcfresh', 'burgeroov'].forEach(cKey => {
+            if (appData[cKey] && appData[cKey].workers && appData[cKey].workers[targetWorkerId] && typeof appData[cKey].workers[targetWorkerId].coins !== 'undefined') {
+                const val = parseFloat(appData[cKey].workers[targetWorkerId].coins) || 0;
+                if (val > currentWorkerCoins) currentWorkerCoins = val;
+            }
+            if (appData[cKey] && appData[cKey].userCoins && typeof appData[cKey].userCoins[targetWorkerId] !== 'undefined') {
+                const val = parseFloat(appData[cKey].userCoins[targetWorkerId]) || 0;
+                if (val > currentWorkerCoins) currentWorkerCoins = val;
+            }
+        });
+
+        const newWorkerCoins = currentWorkerCoins + totalCost;
+
+        ['mvc', 'mvcfresh', 'burgeroov'].forEach(cKey => {
+            updates[`companies/${cKey}/workers/${targetWorkerId}/coins`] = newWorkerCoins;
+            updates[`companies/${cKey}/userCoins/${targetWorkerId}`] = newWorkerCoins;
+            if (currentWId && currentWId !== targetWorkerId) {
+                updates[`companies/${cKey}/workers/${currentWId}/coins`] = newWorkerCoins;
+                updates[`companies/${cKey}/userCoins/${currentWId}`] = newWorkerCoins;
+            }
+
+            if (appData[cKey]) {
+                if (!appData[cKey].userCoins) appData[cKey].userCoins = {};
+                appData[cKey].userCoins[targetWorkerId] = newWorkerCoins;
+                appData[cKey].userCoins[currentWId] = newWorkerCoins;
+                if (appData[cKey].workers && appData[cKey].workers[targetWorkerId]) {
+                    appData[cKey].workers[targetWorkerId].coins = newWorkerCoins;
+                }
+                if (appData[cKey].workers && appData[cKey].workers[currentWId]) {
+                    appData[cKey].workers[currentWId].coins = newWorkerCoins;
+                }
+            }
+        });
+
+        try {
+            localStorage.setItem('mvc_admin_coins_' + targetWorkerId, newWorkerCoins);
+            localStorage.setItem('mvc_admin_coins_' + currentWId, newWorkerCoins);
+            localStorage.setItem('mvc_admin_coins', newWorkerCoins);
+        } catch (e) { }
 
         const refId = 'rf_' + Date.now();
         updates[`companies/${targetComp}/coinTransactions/${refId}`] = {
@@ -17292,18 +17292,28 @@ function renderAdminCustomersList() {
 
     const isAr = currentAppLang === 'ar';
     const data = getCompanyData();
-    let customersMap = data.customers || {};
+    let customersMap = {};
 
-    if (Object.keys(customersMap).length === 0 && typeof appData !== 'undefined') {
-        customersMap = {};
-        ['mvc', 'mvcfresh', 'burgeroov'].forEach(cKey => {
-            if (appData[cKey] && appData[cKey].customers) {
-                Object.assign(customersMap, appData[cKey].customers);
-            }
-        });
+    ['mvc', 'mvcfresh', 'burgeroov'].forEach(cKey => {
+        if (appData[cKey] && appData[cKey].customers) {
+            Object.assign(customersMap, appData[cKey].customers);
+        }
+    });
+
+    if (window.localCustomerRegistry) {
+        Object.assign(customersMap, window.localCustomerRegistry);
+    }
+    if (data.customers) {
+        Object.assign(customersMap, data.customers);
     }
 
-    const customers = Object.values(customersMap);
+    const customers = Object.entries(customersMap).map(([codeKey, custObj]) => {
+        const cleanCode = (custObj && (custObj.code || custObj.accessCode || custObj.id)) ? String(custObj.code || custObj.accessCode || custObj.id).trim() : String(codeKey).trim();
+        return {
+            ...(custObj || {}),
+            code: cleanCode
+        };
+    }).filter(c => c && c.code && c.code !== 'undefined' && c.code !== 'null');
 
     if (customers.length === 0) {
         if (typeof db !== 'undefined' && !window.hasFetchedAdminCustomers) {
@@ -17383,7 +17393,11 @@ window.addCustomerCoins = addCustomerCoins;
 function deleteCustomerCode(code) {
     const isAr = currentAppLang === 'ar';
     const cleanCode = String(code).trim();
-    if (!confirm(isAr ? 'هل أنت تأكد من حذف هذا العميل؟' : 'Are you sure you want to delete this customer?')) return;
+    if (!cleanCode || cleanCode === 'undefined' || cleanCode === 'null') {
+        alert(isAr ? 'كود العميل غير صالح للحذف.' : 'Invalid customer code to delete.');
+        return;
+    }
+    if (!confirm(isAr ? `هل أنت تأكد من حذف العميل صاحب الكود (${cleanCode})؟` : `Are you sure you want to delete customer (${cleanCode})?`)) return;
 
     const updates = {};
     updates[`publicCustomerCodes/${cleanCode}`] = null;
@@ -17393,8 +17407,16 @@ function deleteCustomerCode(code) {
         updates[`companies/${c}/customers/${cleanCode}`] = null;
     });
 
-    if (appData[currentCompany] && appData[currentCompany].customers) {
-        delete appData[currentCompany].customers[cleanCode];
+    ['mvc', 'mvcfresh', 'burgeroov'].forEach(cKey => {
+        if (appData[cKey] && appData[cKey].customers) {
+            delete appData[cKey].customers[cleanCode];
+        }
+    });
+    if (window.localCustomerRegistry) {
+        delete window.localCustomerRegistry[cleanCode];
+    }
+    if (window.globalCustomerCodes) {
+        delete window.globalCustomerCodes[cleanCode];
     }
 
     db.ref().update(updates).then(() => {
