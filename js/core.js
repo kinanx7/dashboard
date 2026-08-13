@@ -1474,7 +1474,7 @@ function markLockedTabs() {
         ranks: true,
         notes: true,
         summary: true,
-        attendance: isAdmin || document.body.classList.contains('perm-attendance'),
+        attendance: true,
         tasks: true,
         warehouse: isAdmin || document.body.classList.contains('perm-warehouse'),
         drivers: isAdmin || document.body.classList.contains('perm-drivers') || document.body.classList.contains('is-driver'),

@@ -1474,7 +1474,7 @@ function markLockedTabs() {
         ranks: true,
         notes: true,
         summary: true,
-        attendance: isAdmin || document.body.classList.contains('perm-attendance'),
+        attendance: true,
         tasks: true,
         warehouse: isAdmin || document.body.classList.contains('perm-warehouse'),
         drivers: isAdmin || document.body.classList.contains('perm-drivers') || document.body.classList.contains('is-driver'),
@@ -3496,26 +3496,68 @@ function editManagerNote(id) {
         return;
     }
 
-    const newText = prompt(isAr ? 'تعديل الملاحظة:' : 'Edit note text:', note.text || '');
-    if (newText === null) return;
-    const trimmed = newText.trim();
-    if (!trimmed && !note.attachmentData) {
+    const modal = document.getElementById('edit-note-modal');
+    const inputHidden = document.getElementById('edit-note-id-hidden');
+    const textInput = document.getElementById('edit-note-text-input');
+
+    if (modal && inputHidden && textInput) {
+        inputHidden.value = id;
+        textInput.value = note.text || '';
+        modal.style.display = 'flex';
+    } else {
+        const newText = prompt(isAr ? 'تعديل الملاحظة:' : 'Edit note text:', note.text || '');
+        if (newText === null) return;
+        const trimmed = newText.trim();
+        saveEditedManagerNoteDirect(id, trimmed);
+    }
+}
+
+function closeEditNoteModal() {
+    const modal = document.getElementById('edit-note-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function saveEditedManagerNote() {
+    const isAr = currentAppLang === 'ar';
+    const inputHidden = document.getElementById('edit-note-id-hidden');
+    const textInput = document.getElementById('edit-note-text-input');
+    if (!inputHidden || !textInput) return;
+
+    const id = inputHidden.value;
+    const trimmed = textInput.value.trim();
+
+    const notes = getNotesArray();
+    const note = notes.find(n => n && n.id === id);
+
+    if (!trimmed && note && !note.attachmentData) {
         alert(isAr ? 'لا يمكن ترك الملاحظة فارغة.' : 'Note content cannot be empty.');
         return;
     }
 
+    saveEditedManagerNoteDirect(id, trimmed);
+}
+
+function saveEditedManagerNoteDirect(id, trimmedText) {
+    const isAr = currentAppLang === 'ar';
     const now = Date.now();
-    note.text = trimmed;
+    const notes = getNotesArray();
+    const note = notes.find(n => n && n.id === id);
+    if (note) note.text = trimmedText;
+
     db.ref(`companies/${currentCompany}/managerNotes/${id}`).update({
-        text: trimmed,
+        text: trimmedText,
         editedAt: now
     }).then(() => {
+        closeEditNoteModal();
         renderNotes();
     }).catch(err => {
         console.error("Error editing note:", err);
         alert(isAr ? 'حدث خطأ أثناء تعديل الملاحظة.' : 'Error editing note.');
     });
 }
+
+window.closeEditNoteModal = closeEditNoteModal;
+window.saveEditedManagerNote = saveEditedManagerNote;
 
 function addNoteReply(noteId) {
     const input = document.getElementById(`reply-input-${noteId}`);
@@ -12030,7 +12072,15 @@ function setWorkerVacationStatus(markActive) {
 
 function renderAttendance() {
     const isAr = currentAppLang === 'ar';
+    const companyData = getCompanyData();
+    const workers = companyData.workers || [];
     const datePicker = document.getElementById('attendance-date-picker');
+    const dateStr = datePicker ? datePicker.value : '';
+    const attendanceMap = (companyData.attendance || {})[dateStr] || {};
+    const isAttAdmin = currentUser && (currentUser.role === 'admin' || document.body.classList.contains('perm-attendance'));
+    const currentEmail = currentUser && currentUser.email ? currentUser.email.toLowerCase() : '';
+    const myWorker = workers.find(w => w.email && w.email.toLowerCase() === currentEmail);
+
     if (datePicker && !datePicker.value) {
         const today = new Date();
         const yyyy = today.getFullYear();
@@ -12048,7 +12098,6 @@ function renderAttendance() {
         vacDatePicker.value = `${yyyy}-${mm}-${dd}`;
     }
 
-    const dateStr = datePicker ? datePicker.value : '';
     if (!dateStr) return;
 
     const tbody = document.getElementById('attendance-table-body');
@@ -12056,10 +12105,6 @@ function renderAttendance() {
 
     tbody.innerHTML = '';
 
-    const companyData = getCompanyData();
-    const isAttAdmin = currentUser && (currentUser.role === 'admin' || document.body.classList.contains('perm-attendance'));
-    const currentEmail = currentUser && currentUser.email ? currentUser.email.toLowerCase() : '';
-    const myWorker = companyData.workers.find(w => w.email && w.email.toLowerCase() === currentEmail);
     const workerOnlyCard = document.querySelector('.attendance-worker-only');
     if (workerOnlyCard) {
         if (myWorker) {
@@ -12068,6 +12113,74 @@ function renderAttendance() {
         } else {
             workerOnlyCard.style.display = 'none';
             document.body.classList.remove('has-worker-profile');
+        }
+    }
+
+    // Manager Exit Request Review HUD
+    const managerExitCard = document.getElementById('exit-requests-manager-card');
+    const managerExitList = document.getElementById('exit-requests-manager-list');
+
+    if (managerExitCard) {
+        if (isAttAdmin) {
+            managerExitCard.style.display = 'block';
+            if (managerExitList) {
+                managerExitList.innerHTML = '';
+                const activeExitRequests = [];
+                workers.forEach(w => {
+                    const att = attendanceMap[w.id];
+                    if (att && att.exitRequest && (att.exitRequest.status === 'pending' || att.exitRequest.status === 'approved')) {
+                        activeExitRequests.push({ worker: w, req: att.exitRequest });
+                    }
+                });
+
+                if (activeExitRequests.length === 0) {
+                    managerExitList.innerHTML = `<p style="font-size:0.85rem; color:var(--text-muted); text-align:center; margin:0; padding:10px;">${isAr ? 'لا توجد طلبات إذن خروج معلقة حالياً.' : 'No pending exit permission requests currently.'}</p>`;
+                } else {
+                    activeExitRequests.forEach(({ worker: w, req }) => {
+                        let statusBadge = '';
+                        let actionBtns = '';
+                        let borderCol = '#f59e0b';
+
+                        const returnTimeText = req.returnTime ? ` ➔ ${req.returnTime}` : '';
+
+                        if (req.status === 'pending') {
+                            statusBadge = `<span class="badge" style="background:#d97706; color:#fff; font-weight:700;">⏳ ${isAr ? 'طلب إذن خروج بانتظار الموافقة' : 'Exit Request Pending Approval'}</span>`;
+                            actionBtns = `
+                                <div style="display:flex; gap:8px; margin-top:10px; justify-content:flex-end; flex-wrap:wrap;">
+                                    <button onclick="handleExitRequest('${w.id}', 'reject')" class="btn-outline-danger" style="padding:6px 14px; font-size:0.8rem; font-weight:700;">❌ ${isAr ? 'رفض الطلب' : 'Reject'}</button>
+                                    <button onclick="handleExitRequest('${w.id}', 'approve')" class="btn-success" style="padding:6px 14px; font-size:0.8rem; font-weight:700; background:#16a34a; border-color:#16a34a;">✅ ${isAr ? 'موافقة (إذن خروج)' : 'Approve Exit'}</button>
+                                </div>
+                            `;
+                        } else if (req.status === 'approved') {
+                            borderCol = '#dc2626';
+                            statusBadge = `<span class="badge" style="background:#dc2626; color:#fff; font-weight:700;">🚪 ${isAr ? 'خارج مقر العمل' : 'OUT of Work Area'}</span>`;
+                            actionBtns = `
+                                <div style="display:flex; gap:8px; margin-top:10px; justify-content:flex-end;">
+                                    <button onclick="handleExitRequest('${w.id}', 'returned')" class="btn-warning" style="padding:6px 14px; font-size:0.8rem; font-weight:700; background:#d97706; border-color:#d97706;">↩️ ${isAr ? 'تأكيد العودة للعمل' : 'Confirm Return'}</button>
+                                </div>
+                            `;
+                        }
+
+                        managerExitList.innerHTML += `
+                            <div class="ledger-card" style="border-left: 4px solid ${borderCol}; padding: 12px 16px; background:var(--input-bg); border-radius:10px;">
+                                <div class="flex-between" style="align-items:flex-start; flex-wrap:wrap; gap:8px;">
+                                    <div>
+                                        <strong style="font-size:1rem; color:var(--text-main);">${w.name}</strong>
+                                        <span style="font-size:0.75rem; color:var(--text-muted); display:block; margin-top:2px;">🕒 ${isAr ? 'وقت الخروج المطلوب:' : 'Exit Time:'} <strong>${req.time}${returnTimeText}</strong></span>
+                                        <div style="font-size:0.85rem; margin-top:6px; color:var(--text-main);">${isAr ? 'السبب:' : 'Reason:'} <em>${req.reason}</em></div>
+                                    </div>
+                                    <div style="text-align:right;">
+                                        ${statusBadge}
+                                    </div>
+                                </div>
+                                ${actionBtns}
+                            </div>
+                        `;
+                    });
+                }
+            }
+        } else {
+            managerExitCard.style.display = 'none';
         }
     }
 
@@ -12080,9 +12193,6 @@ function renderAttendance() {
     if (penaltyInput && !penaltyInput.matches(':focus')) {
         penaltyInput.value = companyData.latePenaltySAR !== undefined ? companyData.latePenaltySAR : '';
     }
-
-    const workers = companyData.workers || [];
-    const attendanceMap = (companyData.attendance || {})[dateStr] || {};
 
     if (workers.length === 0) {
         tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">${isAr ? 'لا يوجد موظفون مسجلون.' : 'No workers registered.'}</td></tr>`;

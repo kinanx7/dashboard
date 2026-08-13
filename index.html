@@ -478,7 +478,7 @@
                     <button id="tab-prepare" class="dept-tab" onclick="switchTab('prepare')"
                         data-i18n="tab-prepare">👨‍🍳
                         Prepare</button>
-                    <button id="tab-ai-assistant" class="dept-tab admin-only" onclick="switchTab('ai-assistant')"
+                    <button id="tab-ai-assistant" class="dept-tab" onclick="switchTab('ai-assistant')"
                         data-i18n="tab-ai-assistant">🤖
                         AI Assistant</button>
                     <button id="tab-vault" class="dept-tab" onclick="switchTab('vault')"
@@ -1228,6 +1228,21 @@
                     </div>
                 </div>
 
+                <!-- Attendance Manager Exit Permission Review HUD (Visible to Admins & Attendance Managers) -->
+                <div id="exit-requests-manager-card" class="card"
+                    style="border-top: 4px solid #f59e0b; margin-top: 24px; display: none;">
+                    <h2 class="card-title" style="display:flex; align-items:center; gap:8px;">
+                        <span>🚪</span> <span data-i18n="title-manager-exit-hud">Exit Permission Requests Review (Attendance Manager)</span>
+                    </h2>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;"
+                        data-i18n="desc-manager-exit-hud">
+                        Review and approve or reject worker exit permission requests.
+                    </p>
+                    <div id="exit-requests-manager-list" style="display:flex; flex-direction:column; gap:10px;">
+                        <!-- JS Injected Requests -->
+                    </div>
+                </div>
+
                 <!-- Worker Self-View: Request temporary exit -->
                 <div class="attendance-worker-only card"
                     style="border-top: 4px solid var(--warning); margin-top: 24px;">
@@ -1237,12 +1252,17 @@
                         Request temporary permission from the attendance manager to exit the work area.
                     </p>
                     <div style="display:flex; gap:12px; align-items:end; flex-wrap:wrap;">
-                        <div class="form-group" style="margin-bottom:0; flex:1; min-width:150px;">
+                        <div class="form-group" style="margin-bottom:0; flex:1; min-width:130px;">
                             <label data-i18n="label-exit-time">Exit Time</label>
                             <input type="time" id="attendance-exit-time"
                                 style="padding:10px; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);" />
                         </div>
-                        <div class="form-group" style="margin-bottom:0; flex:2; min-width:200px;">
+                        <div class="form-group" style="margin-bottom:0; flex:1; min-width:130px;">
+                            <label data-i18n="label-return-time">Return Time</label>
+                            <input type="time" id="attendance-return-time"
+                                style="padding:10px; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);" />
+                        </div>
+                        <div class="form-group" style="margin-bottom:0; flex:2; min-width:180px;">
                             <label data-i18n="label-exit-reason">Reason</label>
                             <input type="text" id="attendance-exit-reason"
                                 placeholder="e.g. Lunch break, personal chore"
@@ -3868,7 +3888,7 @@
         <!-- ========================================== -->
         <!-- VIEW 19: MESSAGING & WHATSAPP GATEWAY VIEW -->
         <!-- ========================================== -->
-        <div id="view-messaging" class="view-section admin-only" style="grid-template-columns: 1fr;">
+        <div id="view-messaging" class="view-section" style="grid-template-columns: 1fr;">
             <div class="card" style="width: 100%; border-top: 4px solid #10b981; box-sizing: border-box;">
                 
                 <!-- MODE SWAP SWITCH BAR -->
@@ -4476,6 +4496,41 @@
             <button onclick="document.getElementById('apk-permission-modal').style.display='none'" class="btn-success"
                 style="width: 100%; padding: 12px; font-size: 1rem; border-radius: 8px; cursor: pointer;">Got it,
                 thanks!</button>
+        </div>
+    </div>
+
+    <!-- Edit Note Modal -->
+    <div id="edit-note-modal"
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); z-index: 11000; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px);">
+        <div
+            style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 16px; padding: 24px; max-width: 520px; width: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); box-sizing: border-box;">
+            <div
+                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px solid var(--border-color); padding-bottom:12px;">
+                <h3
+                    style="color: var(--text-main); font-size: 1.2rem; font-weight: 700; margin: 0; display:flex; align-items:center; gap:8px;">
+                    <span>✏️</span> <span data-i18n="title-edit-note">Edit Manager Note</span>
+                </h3>
+                <button type="button" onclick="closeEditNoteModal()"
+                    style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.4rem; line-height:1;">✖</button>
+            </div>
+
+            <form onsubmit="event.preventDefault(); saveEditedManagerNote();">
+                <input type="hidden" id="edit-note-id-hidden">
+
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label data-i18n="label-note-content" style="font-weight:700; font-size:0.88rem;">Note Content</label>
+                    <textarea id="edit-note-text-input" rows="5"
+                        placeholder="Type note message here..."
+                        style="width:100%; padding:12px; border-radius:10px; background:var(--input-bg); color:var(--text-main); border:1px solid var(--border-color); font-family:inherit; resize:vertical; box-sizing:border-box; font-size:0.95rem; line-height:1.4;"></textarea>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px;">
+                    <button type="button" onclick="closeEditNoteModal()" class="btn-outline"
+                        style="padding:10px 18px; border-radius:10px; font-weight:700;">Cancel</button>
+                    <button type="submit" class="btn-primary"
+                        style="padding:10px 22px; border-radius:10px; font-weight:800; background:linear-gradient(135deg, #4f46e5, #3730a3); border:none; color:white;">💾 Save Note</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -5347,7 +5402,7 @@
                 onclick="switchTab('activity'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">📜</span><span data-i18n="tab-activity">Activity Log</span>
             </button>
-            <button class="mob-dept-item mob-sheet-tab admin-only" data-tab="reminders"
+            <button class="mob-dept-item mob-sheet-tab" data-tab="reminders"
                 onclick="switchTab('reminders'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">⏰</span><span data-i18n="tab-reminders">Reminders</span>
             </button>
@@ -5359,15 +5414,15 @@
                 onclick="switchTab('prepare'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">👨‍🍳</span><span data-i18n="tab-prepare">Prepare</span>
             </button>
-            <button class="mob-dept-item mob-sheet-tab admin-only" data-tab="ai-assistant"
+            <button class="mob-dept-item mob-sheet-tab" data-tab="ai-assistant"
                 onclick="switchTab('ai-assistant'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">🤖</span><span data-i18n="tab-ai-assistant">AI Assistant</span>
             </button>
-            <button class="mob-dept-item mob-sheet-tab admin-only" data-tab="vault"
+            <button class="mob-dept-item mob-sheet-tab" data-tab="vault"
                 onclick="switchTab('vault'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">📁</span><span data-i18n="tab-vault">Informations</span>
             </button>
-            <button class="mob-dept-item mob-sheet-tab admin-only" data-tab="messaging"
+            <button class="mob-dept-item mob-sheet-tab" data-tab="messaging"
                 onclick="switchTab('messaging'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">💬</span><span data-i18n="tab-messaging">Messaging</span>
             </button>

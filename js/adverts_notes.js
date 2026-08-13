@@ -67,26 +67,68 @@ function editManagerNote(id) {
         return;
     }
 
-    const newText = prompt(isAr ? 'تعديل الملاحظة:' : 'Edit note text:', note.text || '');
-    if (newText === null) return;
-    const trimmed = newText.trim();
-    if (!trimmed && !note.attachmentData) {
+    const modal = document.getElementById('edit-note-modal');
+    const inputHidden = document.getElementById('edit-note-id-hidden');
+    const textInput = document.getElementById('edit-note-text-input');
+
+    if (modal && inputHidden && textInput) {
+        inputHidden.value = id;
+        textInput.value = note.text || '';
+        modal.style.display = 'flex';
+    } else {
+        const newText = prompt(isAr ? 'تعديل الملاحظة:' : 'Edit note text:', note.text || '');
+        if (newText === null) return;
+        const trimmed = newText.trim();
+        saveEditedManagerNoteDirect(id, trimmed);
+    }
+}
+
+function closeEditNoteModal() {
+    const modal = document.getElementById('edit-note-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function saveEditedManagerNote() {
+    const isAr = currentAppLang === 'ar';
+    const inputHidden = document.getElementById('edit-note-id-hidden');
+    const textInput = document.getElementById('edit-note-text-input');
+    if (!inputHidden || !textInput) return;
+
+    const id = inputHidden.value;
+    const trimmed = textInput.value.trim();
+
+    const notes = getNotesArray();
+    const note = notes.find(n => n && n.id === id);
+
+    if (!trimmed && note && !note.attachmentData) {
         alert(isAr ? 'لا يمكن ترك الملاحظة فارغة.' : 'Note content cannot be empty.');
         return;
     }
 
+    saveEditedManagerNoteDirect(id, trimmed);
+}
+
+function saveEditedManagerNoteDirect(id, trimmedText) {
+    const isAr = currentAppLang === 'ar';
     const now = Date.now();
-    note.text = trimmed;
+    const notes = getNotesArray();
+    const note = notes.find(n => n && n.id === id);
+    if (note) note.text = trimmedText;
+
     db.ref(`companies/${currentCompany}/managerNotes/${id}`).update({
-        text: trimmed,
+        text: trimmedText,
         editedAt: now
     }).then(() => {
+        closeEditNoteModal();
         renderNotes();
     }).catch(err => {
         console.error("Error editing note:", err);
         alert(isAr ? 'حدث خطأ أثناء تعديل الملاحظة.' : 'Error editing note.');
     });
 }
+
+window.closeEditNoteModal = closeEditNoteModal;
+window.saveEditedManagerNote = saveEditedManagerNote;
 
 function addNoteReply(noteId) {
     const input = document.getElementById(`reply-input-${noteId}`);
