@@ -6388,6 +6388,22 @@ function assignTask() {
                 if (document.getElementById('task-deadline')) document.getElementById('task-deadline').value = '';
                 if (document.getElementById('task-urgency')) document.getElementById('task-urgency').value = 'normal';
                 document.getElementById('task-worker-select').value = '';
+                
+                // Send WhatsApp to group members
+                if (typeof sendWhatsAppDirect === 'function' && Array.isArray(group.members)) {
+                    const allWorkers = (companyData.workers || []);
+                    const companyLabel = (typeof currentCompany !== 'undefined' ? currentCompany : '').toUpperCase();
+                    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+                    group.members.forEach(memberId => {
+                        const w = allWorkers.find(wItem => wItem && (wItem.id === memberId || String(wItem.id) === String(memberId)));
+                        if (w && w.phone && w.waAlertsEnabled !== false) {
+                            const waMsg = isAr
+                                ? `👥 *مهمة جديدة للمجموعة [${group.name}]*\n\nالمهمة: ${text}\n\nيرجى فتح لوحة المهام للإنجاز.`
+                                : `👥 *New Group Task [${group.name}]*\n\nTask: ${text}\n\nPlease check your task board.`;
+                            sendWhatsAppDirect(w.phone, waMsg);
+                        }
+                    });
+                }
                 renderAll();
             })
             .catch(err => console.error("Error creating group task:", err));
@@ -6417,6 +6433,21 @@ function assignTask() {
                 if (document.getElementById('task-deadline')) document.getElementById('task-deadline').value = '';
                 if (document.getElementById('task-urgency')) document.getElementById('task-urgency').value = 'normal';
                 document.getElementById('task-worker-select').value = '';
+
+                // Send WhatsApp to all company workers
+                if (typeof sendWhatsAppDirect === 'function') {
+                    const allWorkers = (getCompanyData().workers || []);
+                    const companyLabel = (typeof currentCompany !== 'undefined' ? currentCompany : '').toUpperCase();
+                    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+                    allWorkers.forEach(w => {
+                        if (w && w.phone && w.waAlertsEnabled !== false) {
+                            const waMsg = isAr
+                                ? `🌍 *مهمة عامة جديدة [${companyLabel}]*\n\nالمهمة: ${text}\n\nيرجى الاطلاع والقبول في لوحة المهام.`
+                                : `🌍 *New General Task [${companyLabel}]*\n\nTask: ${text}\n\nPlease open task board to accept.`;
+                            sendWhatsAppDirect(w.phone, waMsg);
+                        }
+                    });
+                }
             })
             .catch(err => console.error("Error creating general task:", err));
         return;
@@ -6451,14 +6482,38 @@ function assignTask() {
         .then(() => {
             logActivity('task', worker.id, worker.name, `Assigned task ${assignedTaskNum} to ${worker.name}: "${text}"`);
             
-            // Direct fail-safe WhatsApp dispatch from dashboard
-            if (worker.phone && worker.waAlertsEnabled !== false && typeof sendWhatsAppDirect === 'function') {
+            const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+            // 1. Check if worker has phone number
+            if (!worker.phone) {
+                alert(isAr 
+                    ? `⚠️ تنبيه: تم حفظ المهمة بنجاح، لكن الموظف (${worker.name}) ليس لديه رقم هاتف مسجل في ملفه! يرجى إضافة رقم الهاتف لإرسال وتساب.`
+                    : `⚠️ Notice: Task saved, but worker (${worker.name}) does not have a phone number in their profile! Please add a phone number to send WhatsApp.`);
+                return;
+            }
+
+            // 2. Check if WhatsApp alerts are disabled for this worker
+            if (worker.waAlertsEnabled === false) {
+                console.warn(`WhatsApp alerts disabled for worker ${worker.name}`);
+                return;
+            }
+
+            // 3. Dispatch WhatsApp message and check response feedback
+            if (typeof sendWhatsAppDirect === 'function') {
                 const companyLabel = (typeof currentCompany !== 'undefined' ? currentCompany : '').toUpperCase();
-                const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
                 const waMsg = isAr 
                     ? `📋 *مهمة جديدة أسندت إليك [${companyLabel}]*\n\nالموظف: ${worker.name}\nالمهمة: ${text}\n\nيرجى فتح لوحة المهام للإنجاز.`
                     : `📋 *New Task Assigned [${companyLabel}]*\n\nWorker: ${worker.name}\nTask: ${text}\n\nPlease open your task board to complete it.`;
-                sendWhatsAppDirect(worker.phone, waMsg);
+                
+                sendWhatsAppDirect(worker.phone, waMsg).then(res => {
+                    if (res && res.error) {
+                        alert(isAr 
+                            ? `⚠️ تم حفظ المهمة في اللوحة، ولكن فشل إرسال الوتساب:\n"${res.error}"\n\nيرجى التأكد من ربط الوتساب في قسم (💬 المراسلة).`
+                            : `⚠️ Task saved in app, but WhatsApp delivery failed:\n"${res.error}"\n\nPlease check WhatsApp connection in 💬 Messaging.`);
+                    } else if (res && res.success) {
+                        console.log(`✅ WhatsApp task notification delivered directly to ${worker.name} (${worker.phone})`);
+                    }
+                });
             }
         })
         .catch(err => console.error("Error assigning task:", err));
@@ -20480,13 +20535,14 @@ function formatMessagingText(rawTpl, replacements = {}) {
 window.formatMessagingText = formatMessagingText;
 
 function sendWhatsAppDirect(phone, text) {
-    if (!phone || !text) return Promise.resolve(false);
-    const cleanPhone = String(phone).replace(/[^0-9+]/g, '').trim();
-    if (!cleanPhone) return Promise.resolve(false);
+    if (!phone || !text) return Promise.resolve({ success: false, error: 'Missing phone or text' });
+    const cleanPhone = String(phone).replace(/[^0-9]/g, '').trim();
+    if (!cleanPhone) return Promise.resolve({ success: false, error: 'Invalid phone format' });
 
     const serverUrlInput = document.getElementById('wa-server-url');
     const config = typeof getCompanyData === 'function' ? (getCompanyData().messagingConfig || {}) : {};
-    const baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || config.serverUrl || 'https://burgeroov-notify.onrender.com';
+    let baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || config.serverUrl || 'https://burgeroov-notify.onrender.com';
+    baseUrl = baseUrl.replace(/\/+$/, '');
 
     const formattedText = formatMessagingText(text);
 
@@ -20495,14 +20551,14 @@ function sendWhatsAppDirect(phone, text) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: cleanPhone, text: formattedText })
     })
-    .then(res => res.json())
+    .then(res => res.json().catch(() => ({ success: false, error: `HTTP ${res.status} ${res.statusText}` })))
     .then(data => {
-        console.log(`WhatsApp direct message sent to ${cleanPhone}:`, data);
-        return data.success;
+        console.log(`WhatsApp direct message result for ${cleanPhone}:`, data);
+        return data;
     })
     .catch(err => {
         console.warn(`WhatsApp direct message HTTP error for ${cleanPhone}:`, err);
-        return false;
+        return { success: false, error: err.message || 'Failed to fetch (Network error)' };
     });
 }
 window.sendWhatsAppDirect = sendWhatsAppDirect;

@@ -32,6 +32,22 @@ admin.initializeApp({
 const db        = admin.database();
 const messaging = admin.messaging();
 
+// Helper to safely send Firebase Cloud Messaging (FCM) notifications
+async function safeSend(payload, logLabel = 'FCM Notification') {
+    if (!payload || !payload.token) return null;
+    try {
+        const response = await messaging.send(payload);
+        console.log(`✅ [FCM Sent] ${logLabel} -> ID: ${response}`);
+        return response;
+    } catch (err) {
+        console.error(`❌ [FCM Error] ${logLabel} -> ${err.message}`);
+        if (err.code === 'messaging/registration-token-not-registered' || err.code === 'messaging/invalid-registration-token') {
+            console.warn(`[FCM Clean] Token for ${logLabel} is expired or invalid.`);
+        }
+        return null;
+    }
+}
+
 // ─── Express App Setup ───────────────────────────────────────────────────────
 const app  = express();
 const PORT = process.env.PORT || 3000;

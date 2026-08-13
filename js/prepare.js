@@ -2766,13 +2766,14 @@ function formatMessagingText(rawTpl, replacements = {}) {
 window.formatMessagingText = formatMessagingText;
 
 function sendWhatsAppDirect(phone, text) {
-    if (!phone || !text) return Promise.resolve(false);
-    const cleanPhone = String(phone).replace(/[^0-9+]/g, '').trim();
-    if (!cleanPhone) return Promise.resolve(false);
+    if (!phone || !text) return Promise.resolve({ success: false, error: 'Missing phone or text' });
+    const cleanPhone = String(phone).replace(/[^0-9]/g, '').trim();
+    if (!cleanPhone) return Promise.resolve({ success: false, error: 'Invalid phone format' });
 
     const serverUrlInput = document.getElementById('wa-server-url');
     const config = typeof getCompanyData === 'function' ? (getCompanyData().messagingConfig || {}) : {};
-    const baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || config.serverUrl || 'https://burgeroov-notify.onrender.com';
+    let baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || config.serverUrl || 'https://burgeroov-notify.onrender.com';
+    baseUrl = baseUrl.replace(/\/+$/, '');
 
     const formattedText = formatMessagingText(text);
 
@@ -2781,14 +2782,14 @@ function sendWhatsAppDirect(phone, text) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: cleanPhone, text: formattedText })
     })
-    .then(res => res.json())
+    .then(res => res.json().catch(() => ({ success: false, error: `HTTP ${res.status} ${res.statusText}` })))
     .then(data => {
-        console.log(`WhatsApp direct message sent to ${cleanPhone}:`, data);
-        return data.success;
+        console.log(`WhatsApp direct message result for ${cleanPhone}:`, data);
+        return data;
     })
     .catch(err => {
         console.warn(`WhatsApp direct message HTTP error for ${cleanPhone}:`, err);
-        return false;
+        return { success: false, error: err.message || 'Failed to fetch (Network error)' };
     });
 }
 window.sendWhatsAppDirect = sendWhatsAppDirect;
