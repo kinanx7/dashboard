@@ -1524,6 +1524,61 @@
                                 style="padding: 10px 18px; border-radius: 12px; font-weight: 800; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 6px; background: var(--input-bg);">
                                 <span data-i18n="btn-mode-cycle-task">🔁 Task Cycle</span>
                             </button>
+                            <button type="button" id="task-mode-constant-btn" onclick="setTaskFormMode('constant')" class="btn-outline"
+                                style="padding: 10px 18px; border-radius: 12px; font-weight: 800; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 6px; background: var(--input-bg);">
+                                <span data-i18n="btn-mode-constant-tasks">📌 Constant Tasks / Responsibilities</span>
+                            </button>
+                        </div>
+
+                        <!-- Constant Tasks & Worker Responsibilities Container (Admin / Task Manager) -->
+                        <div id="constant-tasks-container" class="card task-assign-access-only" style="display: none; margin-bottom: 20px;">
+                            <div class="flex-between" style="align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+                                <h2 class="card-title" style="margin:0; border:none; padding:0; display:flex; align-items:center; gap:8px;" data-i18n="title-constant-tasks-mgmt">
+                                    <span>📌</span> <span>Constant Tasks & Worker Responsibilities</span>
+                                </h2>
+                                <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700;" data-i18n="desc-constant-tasks-mgmt">Assign recurring duties to employees.</span>
+                            </div>
+
+                            <!-- Pre-defined preset shortcuts -->
+                            <div style="background: var(--input-bg); border-radius: 12px; padding: 12px; border: 1px solid var(--border-color); margin-bottom: 16px;">
+                                <label style="font-size: 0.8rem; font-weight: 800; color: var(--text-muted); display: block; margin-bottom: 8px;" data-i18n="label-preset-shortcuts">💡 Fast Preset Responsibilities Shortcuts:</label>
+                                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                    <button type="button" onclick="fillConstantTaskPreset('🧹 Cleaning Tables', 'daily', 'cleaning')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);">🧹 Cleaning Tables</button>
+                                    <button type="button" onclick="fillConstantTaskPreset('📦 Uploading & Unloading Staff/Stock', 'daily', 'staff')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);">📦 Uploading Staff/Stock</button>
+                                    <button type="button" onclick="fillConstantTaskPreset('💵 Cashier & POS Operations', 'shift', 'cashier')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);">💵 Cashier & POS</button>
+                                    <button type="button" onclick="fillConstantTaskPreset('👨‍🍳 Kitchen Prep & Sanitization', 'daily', 'kitchen')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);">👨‍🍳 Kitchen Prep</button>
+                                    <button type="button" onclick="fillConstantTaskPreset('🗑️ Waste & Trash Management', '2 times/shift', 'cleaning')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);">🗑️ Waste Disposal</button>
+                                    <button type="button" onclick="fillConstantTaskPreset('📝 Daily Inventory Check', 'end of shift', 'inventory')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);">📝 Daily Inventory</button>
+                                </div>
+                            </div>
+
+                            <!-- Constant Task Assignment Form -->
+                            <form onsubmit="event.preventDefault(); addConstantTask();">
+                                <div class="grid-3-col" style="gap: 12px; margin-bottom: 14px;">
+                                    <div class="form-group" style="margin-bottom:0;">
+                                        <label data-i18n="label-select-worker">Select Employee</label>
+                                        <select id="constant-task-worker-select" onchange="renderConstantTasks()">
+                                            <option value="" data-i18n="opt-choose-emp">-- Choose Employee --</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom:0;">
+                                        <label data-i18n="label-responsibility-title">Responsibility / Task Title</label>
+                                        <input type="text" id="constant-task-title" placeholder="e.g. Clean Dining Tables" required>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom:0;">
+                                        <label data-i18n="label-responsibility-amount">Amount / Frequency / Target</label>
+                                        <input type="text" id="constant-task-amount" placeholder="e.g. 3 times per shift, or 50 items">
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <button type="submit" class="btn-success" style="padding: 10px 22px; border-radius: 10px; font-weight: 800; font-size: 0.9rem;" data-i18n="btn-assign-constant-task">➕ Assign Constant Task</button>
+                                </div>
+                            </form>
+
+                            <!-- Constant Tasks Assigned List per Worker -->
+                            <div id="constant-tasks-manager-list" style="margin-top: 20px;">
+                                <!-- Rendered dynamically -->
+                            </div>
                         </div>
 
                         <!-- Assign Task Box -->
@@ -1588,6 +1643,19 @@
                             <button type="submit" class="btn-success" style="width: 100%; padding: 12px; font-weight: 900; background: linear-gradient(135deg, #8b5cf6, #6d28d9); border: none; color: white; border-radius: 10px; cursor: pointer;" data-i18n="btn-send-inquiry">❓ Send Inquiry to Worker</button>
                         </form>
 
+                        <!-- Worker Constant Tasks & Responsibilities HUD Card -->
+                        <div id="worker-constant-tasks-card" class="card" style="display: none; background: linear-gradient(135deg, var(--card-bg), var(--input-bg)); border-top: 4px solid #6366f1; margin-bottom: 20px;">
+                            <div class="flex-between" style="align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                                <h2 class="card-title" style="margin:0; border:none; padding:0; display:flex; align-items:center; gap:8px;">
+                                    <span>📌</span> <span id="worker-constant-tasks-title" data-i18n="title-my-constant-tasks">My Responsibilities & Constant Tasks</span>
+                                </h2>
+                                <span id="worker-constant-tasks-count" class="badge" style="background: #6366f1; color: #fff; font-size: 0.85rem; font-weight: 800; padding: 4px 10px; border-radius: 12px;">0 Responsibilities</span>
+                            </div>
+                            <div id="worker-constant-tasks-list" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;">
+                                <!-- JS Injected Constant Tasks -->
+                            </div>
+                        </div>
+
                         <!-- Tasks Board -->
                         <div class="card">
                             <h2 class="card-title" data-i18n="title-tasks-board">📋 Tasks Board & Worker Performance
@@ -1636,10 +1704,11 @@
                                 </div>
                             </div>
 
+
                             <!-- Filter Controls Bar -->
-                            <div
+                            <div id="tasks-filter-controls-bar" class="task-assign-access-only"
                                 style="background: var(--card-bg); padding: 14px; border-radius: 10px; border: 1px solid var(--border-color); margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
-                                <div style="flex: 1; min-width: 150px;">
+                                <div id="tasks-search-container" class="task-assign-access-only" style="flex: 1; min-width: 150px;">
                                     <label
                                         style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;"
                                         data-i18n="label-search-task">🔍 Search Task Number or Text:</label>
@@ -1647,7 +1716,7 @@
                                         placeholder="e.g. 3, clean..." data-i18n="[placeholder]placeholder-search-task"
                                         style="width: 100%; padding: 8px 10px; font-size: 0.85rem; border-radius: 6px; background: var(--input-bg); color: var(--text-main); border: 1px solid var(--border-color); box-sizing: border-box;">
                                 </div>
-                                <div style="flex: 1; min-width: 140px;">
+                                <div id="tasks-status-filter-container" class="task-assign-access-only" style="flex: 1; min-width: 140px;">
                                     <label
                                         style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;"
                                         data-i18n="label-filter-status">Filter Status:</label>
@@ -1659,7 +1728,7 @@
                                         <option value="completed" data-i18n="opt-tasks-completed">✅ Completed</option>
                                     </select>
                                 </div>
-                                <div style="flex: 1; min-width: 160px;">
+                                <div id="tasks-worker-filter-container" class="task-assign-access-only" style="flex: 1; min-width: 160px;">
                                     <label
                                         style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;"
                                         data-i18n="label-filter-worker">Filter Worker:</label>
@@ -1668,7 +1737,7 @@
                                         <option value="all" selected data-i18n="opt-workers-all">👥 All Workers</option>
                                     </select>
                                 </div>
-                                <div style="flex: 1; min-width: 150px;">
+                                <div id="tasks-timeframe-filter-container" class="task-assign-access-only" style="flex: 1; min-width: 150px;">
                                     <label
                                         style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;"
                                         data-i18n="label-timeframe-filter">Timeframe Filter:</label>
@@ -1709,44 +1778,7 @@
                             </div>
                         </div>
 
-                        <!-- Inquiry Sub-Department Section (Admin & Worker Replies View) -->
-                        <div id="tasks-inquiry-department" class="card" style="margin-top: 24px; border-top: 4px solid #8b5cf6;">
-                            <div class="flex-between" style="margin-bottom: 16px; flex-wrap: wrap; gap: 12px; align-items: center;">
-                                <div>
-                                    <h2 class="card-title" style="margin:0; border:none; padding:0; display:flex; align-items:center; gap:8px;">
-                                        <span data-i18n="title-inquiries-dept">❓ Task Inquiries & Worker Replies</span>
-                                        <span id="inquiries-count-badge" class="badge" style="background: rgba(139,92,246,0.15); color: #8b5cf6; border: 1px solid rgba(139,92,246,0.3); font-size: 0.78rem; font-weight: 800; padding: 4px 12px; border-radius: 20px;">0 Inquiries</span>
-                                    </h2>
-                                    <p style="font-size: 0.85rem; color: var(--text-muted); margin: 4px 0 0 0;" data-i18n="desc-inquiries-dept">
-                                        Track all manager questions sent to staff, view worker text responses, and check Did It / Did Not Do It completion status.
-                                    </p>
-                                </div>
-                            </div>
 
-                            <!-- Inquiry Filter Toolbar -->
-                            <div style="background: var(--input-bg); padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
-                                <div style="flex: 1; min-width: 160px;">
-                                    <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;" data-i18n="label-filter-status">Filter Status:</label>
-                                    <select id="inquiries-filter-status" onchange="renderInquiries()" style="width: 100%; padding: 8px 10px; font-size: 0.85rem; border-radius: 6px; background:var(--card-bg); color:var(--text-main); border:1px solid var(--border-color); font-weight:700;">
-                                        <option value="all" selected data-i18n="opt-inq-all">🌐 All Inquiries</option>
-                                        <option value="pending" data-i18n="opt-inq-pending">⏳ Pending Reply</option>
-                                        <option value="did_it" data-i18n="opt-inq-did-it">✅ Replied: Did It</option>
-                                        <option value="did_not_do_it" data-i18n="opt-inq-did-not-do-it">❌ Replied: Did Not Do It</option>
-                                    </select>
-                                </div>
-                                <div style="flex: 1; min-width: 160px;">
-                                    <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;" data-i18n="label-filter-worker">Filter Worker:</label>
-                                    <select id="inquiries-filter-worker" onchange="renderInquiries()" style="width: 100%; padding: 8px 10px; font-size: 0.85rem; border-radius: 6px; background:var(--card-bg); color:var(--text-main); border:1px solid var(--border-color); font-weight:700;">
-                                        <option value="all" selected data-i18n="opt-workers-all">👥 All Workers</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <!-- Inquiry Cards Grid -->
-                            <div id="inquiries-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
-                                <!-- Rendered dynamically by renderInquiries() -->
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -4588,6 +4620,41 @@
                         data-i18n="btn-cancel">Cancel</button>
                     <button type="submit" class="btn-success" style="padding:10px 22px; font-weight:700;"
                         data-i18n="btn-save-changes">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Transfer Constant Task Modal -->
+    <div id="transfer-constant-task-modal"
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.75); z-index: 11000; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px);">
+        <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 16px; padding: 24px; max-width: 480px; width: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); box-sizing: border-box;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px solid var(--border-color); padding-bottom:12px;">
+                <h3 style="color: var(--text-main); font-size: 1.2rem; font-weight: 700; margin: 0; display:flex; align-items:center; gap:8px;">
+                    <span>🔁</span> <span data-i18n="title-transfer-constant-task">Transfer Responsibility to Another Worker</span>
+                </h3>
+                <button type="button" onclick="closeTransferConstantTaskModal()" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.4rem; line-height:1;">✖</button>
+            </div>
+
+            <form onsubmit="event.preventDefault(); transferConstantTask();">
+                <input type="hidden" id="transfer-constant-from-worker-id">
+                <input type="hidden" id="transfer-constant-task-id">
+
+                <div style="background:var(--input-bg); padding:12px; border-radius:10px; border:1px solid var(--border-color); margin-bottom:16px;">
+                    <span style="font-size:0.8rem; color:var(--text-muted); display:block; font-weight:700;">Task to Transfer:</span>
+                    <strong id="transfer-constant-task-title-display" style="font-size:1rem; color:var(--text-main); display:block; margin-top:2px;"></strong>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label data-i18n="label-transfer-to-worker" style="font-weight:700;">Transfer To Worker</label>
+                    <select id="transfer-constant-target-worker-select" style="width:100%; padding:10px; border-radius:8px; background:var(--input-bg); color:var(--text-main); border:1px solid var(--border-color);" required>
+                        <option value="">-- Choose Target Worker --</option>
+                    </select>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px;">
+                    <button type="button" onclick="closeTransferConstantTaskModal()" class="btn-outline" style="padding:10px 18px; border-radius:10px; font-weight:700;">Cancel</button>
+                    <button type="submit" class="btn-primary" style="padding:10px 22px; border-radius:10px; font-weight:800; background:linear-gradient(135deg, #10b981, #047857); border:none; color:white;">🔁 Confirm Transfer</button>
                 </div>
             </form>
         </div>

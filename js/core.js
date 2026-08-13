@@ -1527,6 +1527,10 @@ function ensureArraysExist(data) {
         if (!w.jobs) w.jobs = [];
         else if (!Array.isArray(w.jobs)) w.jobs = Object.values(w.jobs);
         w.jobs = w.jobs.filter(j => j && j.id);
+
+        if (!w.constantTasks) w.constantTasks = [];
+        else if (!Array.isArray(w.constantTasks)) w.constantTasks = Object.values(w.constantTasks);
+        w.constantTasks = w.constantTasks.filter(ct => ct && (ct.id || ct.title));
     });
 
     if (data.generalTasks && !Array.isArray(data.generalTasks)) {
@@ -2458,7 +2462,10 @@ function renderAll() {
     }
     else if (currentTab === 'ranks') { if (typeof renderRanksTable === 'function') renderRanksTable(); }
     else if (currentTab === 'attendance') { if (typeof renderAttendance === 'function') renderAttendance(); }
-    else if (currentTab === 'tasks') { if (typeof renderTasks === 'function') renderTasks(); }
+    else if (currentTab === 'tasks') {
+        if (typeof renderTasks === 'function') renderTasks();
+        if (typeof renderConstantTasks === 'function') renderConstantTasks();
+    }
     else if (currentTab === 'finance') {
         if (typeof renderFinanceTable === 'function') renderFinanceTable();
         if (typeof renderFinDetails === 'function') renderFinDetails();

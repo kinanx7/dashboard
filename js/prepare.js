@@ -3799,53 +3799,51 @@ function setTaskFormMode(mode) {
     const assignBtn = document.getElementById('task-mode-assign-btn');
     const inquiryBtn = document.getElementById('task-mode-inquiry-btn');
     const hudBtn = document.getElementById('task-mode-hud-btn');
+    const cycleBtn = document.getElementById('task-mode-cycle-btn');
+    const constantBtn = document.getElementById('task-mode-constant-btn');
+
     const assignForm = document.getElementById('task-assign-form');
     const inquiryForm = document.getElementById('task-inquiry-form');
-    const inqDept = document.getElementById('tasks-inquiry-department');
+    const constantContainer = document.getElementById('constant-tasks-container');
 
     if (mode === 'inquiry') {
         if (assignForm) assignForm.style.display = 'none';
         if (inquiryForm) inquiryForm.style.display = 'block';
+        if (constantContainer) constantContainer.style.display = 'none';
 
-        if (assignBtn) {
-            assignBtn.className = 'btn-outline';
-            assignBtn.style.background = 'var(--input-bg)';
-            assignBtn.style.color = 'var(--text-main)';
-        }
-        if (inquiryBtn) {
-            inquiryBtn.className = 'btn-primary';
-            inquiryBtn.style.background = 'linear-gradient(135deg, #8b5cf6, #6d28d9)';
-            inquiryBtn.style.color = 'white';
-        }
-        if (hudBtn) {
-            hudBtn.className = 'btn-outline';
-            hudBtn.style.background = 'var(--input-bg)';
-            hudBtn.style.color = 'var(--text-main)';
-        }
+        if (assignBtn) { assignBtn.className = 'btn-outline'; assignBtn.style.background = 'var(--input-bg)'; assignBtn.style.color = 'var(--text-main)'; }
+        if (inquiryBtn) { inquiryBtn.className = 'btn-primary'; inquiryBtn.style.background = 'linear-gradient(135deg, #8b5cf6, #6d28d9)'; inquiryBtn.style.color = 'white'; }
+        if (hudBtn) { hudBtn.className = 'btn-outline'; hudBtn.style.background = 'var(--input-bg)'; hudBtn.style.color = 'var(--text-main)'; }
+        if (cycleBtn) { cycleBtn.className = 'btn-outline'; cycleBtn.style.background = 'var(--input-bg)'; cycleBtn.style.color = 'var(--text-main)'; }
+        if (constantBtn) { constantBtn.className = 'btn-outline'; constantBtn.style.background = 'var(--input-bg)'; constantBtn.style.color = 'var(--text-main)'; }
+
         populateInquiryWorkerDropdown();
     } else if (mode === 'hud') {
         openInquiriesHUDModal();
     } else if (mode === 'cycle') {
         openTaskCycleHUDModal();
+    } else if (mode === 'constant') {
+        if (assignForm) assignForm.style.display = 'none';
+        if (inquiryForm) inquiryForm.style.display = 'none';
+        if (constantContainer) constantContainer.style.display = 'block';
+
+        if (assignBtn) { assignBtn.className = 'btn-outline'; assignBtn.style.background = 'var(--input-bg)'; assignBtn.style.color = 'var(--text-main)'; }
+        if (inquiryBtn) { inquiryBtn.className = 'btn-outline'; inquiryBtn.style.background = 'var(--input-bg)'; inquiryBtn.style.color = 'var(--text-main)'; }
+        if (hudBtn) { hudBtn.className = 'btn-outline'; hudBtn.style.background = 'var(--input-bg)'; hudBtn.style.color = 'var(--text-main)'; }
+        if (cycleBtn) { cycleBtn.className = 'btn-outline'; cycleBtn.style.background = 'var(--input-bg)'; cycleBtn.style.color = 'var(--text-main)'; }
+        if (constantBtn) { constantBtn.className = 'btn-primary'; constantBtn.style.background = 'linear-gradient(135deg, #6366f1, #4f46e5)'; constantBtn.style.color = 'white'; }
+
+        if (typeof renderConstantTasks === 'function') renderConstantTasks();
     } else {
         if (assignForm) assignForm.style.display = 'block';
         if (inquiryForm) inquiryForm.style.display = 'none';
+        if (constantContainer) constantContainer.style.display = 'none';
 
-        if (assignBtn) {
-            assignBtn.className = 'btn-primary';
-            assignBtn.style.background = 'linear-gradient(135deg, #4f46e5, #3730a3)';
-            assignBtn.style.color = 'white';
-        }
-        if (inquiryBtn) {
-            inquiryBtn.className = 'btn-outline';
-            inquiryBtn.style.background = 'var(--input-bg)';
-            inquiryBtn.style.color = 'var(--text-main)';
-        }
-        if (hudBtn) {
-            hudBtn.className = 'btn-outline';
-            hudBtn.style.background = 'var(--input-bg)';
-            hudBtn.style.color = 'var(--text-main)';
-        }
+        if (assignBtn) { assignBtn.className = 'btn-primary'; assignBtn.style.background = 'linear-gradient(135deg, #4f46e5, #3730a3)'; assignBtn.style.color = 'white'; }
+        if (inquiryBtn) { inquiryBtn.className = 'btn-outline'; inquiryBtn.style.background = 'var(--input-bg)'; inquiryBtn.style.color = 'var(--text-main)'; }
+        if (hudBtn) { hudBtn.className = 'btn-outline'; hudBtn.style.background = 'var(--input-bg)'; hudBtn.style.color = 'var(--text-main)'; }
+        if (cycleBtn) { cycleBtn.className = 'btn-outline'; cycleBtn.style.background = 'var(--input-bg)'; cycleBtn.style.color = 'var(--text-main)'; }
+        if (constantBtn) { constantBtn.className = 'btn-outline'; constantBtn.style.background = 'var(--input-bg)'; constantBtn.style.color = 'var(--text-main)'; }
     }
 }
 window.setTaskFormMode = setTaskFormMode;

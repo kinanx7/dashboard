@@ -1527,6 +1527,10 @@ function ensureArraysExist(data) {
         if (!w.jobs) w.jobs = [];
         else if (!Array.isArray(w.jobs)) w.jobs = Object.values(w.jobs);
         w.jobs = w.jobs.filter(j => j && j.id);
+
+        if (!w.constantTasks) w.constantTasks = [];
+        else if (!Array.isArray(w.constantTasks)) w.constantTasks = Object.values(w.constantTasks);
+        w.constantTasks = w.constantTasks.filter(ct => ct && (ct.id || ct.title));
     });
 
     if (data.generalTasks && !Array.isArray(data.generalTasks)) {
@@ -2458,7 +2462,10 @@ function renderAll() {
     }
     else if (currentTab === 'ranks') { if (typeof renderRanksTable === 'function') renderRanksTable(); }
     else if (currentTab === 'attendance') { if (typeof renderAttendance === 'function') renderAttendance(); }
-    else if (currentTab === 'tasks') { if (typeof renderTasks === 'function') renderTasks(); }
+    else if (currentTab === 'tasks') {
+        if (typeof renderTasks === 'function') renderTasks();
+        if (typeof renderConstantTasks === 'function') renderConstantTasks();
+    }
     else if (currentTab === 'finance') {
         if (typeof renderFinanceTable === 'function') renderFinanceTable();
         if (typeof renderFinDetails === 'function') renderFinDetails();
@@ -7455,7 +7462,29 @@ function renderTasks() {
     const isAdmin = currentUser && currentUser.role === 'admin';
     const data = getCompanyData();
     const activeWorker = typeof getActiveWorker === 'function' ? getActiveWorker() : null;
-    const canEditTask = isAdmin || document.body.classList.contains('perm-tasks') || (activeWorker && activeWorker.perms && (activeWorker.perms.tasks === true || activeWorker.perms.tasks === 'true'));
+    const canEditTask = isAdmin || document.body.classList.contains('perm-tasks') || (activeWorker && activeWorker.perms && (activeWorker.perms.tasks === true || activeWorker.perms.tasks === 'true')) || (currentUser && currentUser.perms && (currentUser.perms.tasks === true || currentUser.perms.tasks === 'true'));
+
+    // Gating filter controls bar and filter inputs for task managers only
+    const filterControlsBar = document.getElementById('tasks-filter-controls-bar');
+    if (filterControlsBar) {
+        filterControlsBar.style.display = canEditTask ? 'flex' : 'none';
+    }
+    const searchContainer = document.getElementById('tasks-search-container');
+    if (searchContainer) {
+        searchContainer.style.display = canEditTask ? 'block' : 'none';
+    }
+    const statusFilterContainer = document.getElementById('tasks-status-filter-container');
+    if (statusFilterContainer) {
+        statusFilterContainer.style.display = canEditTask ? 'block' : 'none';
+    }
+    const workerFilterContainer = document.getElementById('tasks-worker-filter-container');
+    if (workerFilterContainer) {
+        workerFilterContainer.style.display = canEditTask ? 'block' : 'none';
+    }
+    const timeframeFilterContainer = document.getElementById('tasks-timeframe-filter-container');
+    if (timeframeFilterContainer) {
+        timeframeFilterContainer.style.display = canEditTask ? 'block' : 'none';
+    }
 
     // Ensure all existing & new tasks have assigned task numbers
     ensureTaskNumbers();
@@ -7672,8 +7701,12 @@ function renderTasks() {
     }
 
     visibleWorkers.forEach(worker => {
+        let constantTasks = worker.constantTasks || [];
+        if (!Array.isArray(constantTasks)) constantTasks = Object.values(constantTasks);
+        constantTasks = constantTasks.filter(ct => ct && (ct.id || ct.title));
+
         let jobs = worker.jobs ? [...worker.jobs] : [];
-        if (jobs.length === 0) return;
+        if (jobs.length === 0 && constantTasks.length === 0) return;
 
         // Apply Status Filter
         if (statusFilter === 'completed') {
@@ -7685,10 +7718,32 @@ function renderTasks() {
         // Apply Date Filter & Search Query Filter
         jobs = jobs.filter(j => passesDateFilter(getJobTimestamp(j)) && passesSearchFilter(j));
 
-        if (jobs.length === 0) return;
-
         // Sort Newest Tasks to the Top
         jobs.sort((a, b) => getJobTimestamp(b) - getJobTimestamp(a));
+
+        // Render Constant Responsibilities & Tasks Banner for Worker
+        let constantTasksHtml = '';
+        if (constantTasks.length > 0) {
+            constantTasksHtml = `
+                <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), var(--input-bg)); border: 1px solid rgba(99, 102, 241, 0.25); border-left: 4px solid #6366f1; border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;">
+                    <div style="font-weight: 800; font-size: 0.88rem; color: #6366f1; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;">
+                        <span>📌 ${isAr ? 'المهام والمسؤوليات المستمرة المكلف بها:' : 'Assigned Responsibilities & Constant Tasks:'}</span>
+                        <span class="badge" style="background: #6366f1; color: white; font-size: 0.75rem; font-weight: 800; padding: 2px 8px; border-radius: 10px;">${constantTasks.length} ${isAr ? 'مسؤوليات' : 'Responsibilities'}</span>
+                    </div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        ${constantTasks.map(ct => `
+                            <div style="background: var(--card-bg); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 8px; min-width: 180px; flex: 1;">
+                                <span style="font-size: 1.1rem;">📌</span>
+                                <div>
+                                    <div style="font-weight: 800; font-size: 0.85rem; color: var(--text-main);">${ct.title}</div>
+                                    <div style="font-size: 0.73rem; color: var(--text-muted);">📋 ${isAr ? 'الكمية / التكرار:' : 'Amount:'} <strong style="color: #6366f1;">${ct.amount || (isAr ? 'يومي' : 'Daily')}</strong></div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
 
         let jobsHtml = jobs.map(j => {
             const editBtn = isAdmin ? `<button onclick="openEditTaskModal('${worker.id}', '${j.id}')" style="background:none; border:none; color: var(--secondary); cursor:pointer; font-size:1rem; padding:0 4px;" title="${isAr ? 'تعديل المهمة' : 'Edit Task'}">✏️</button>` : '';
@@ -7771,6 +7826,7 @@ function renderTasks() {
                     <div style="margin-bottom:12px; border-bottom:1px solid var(--border-color); padding-bottom:8px;">
                         <strong style="color:var(--text-main); font-size:1.1rem;">${worker.name}</strong> <span style="font-size:0.8rem; color:var(--text-muted); margin-left:8px;">${worker.role}</span>
                     </div>
+                    ${constantTasksHtml}
                     ${jobsHtml}
                 `;
         board.appendChild(div);
@@ -8123,37 +8179,323 @@ function saveEditedTask() {
                 logActivity('task', 'general', 'General Pool', `Moved task from ${origWorker.name} to general pool: "${newTitle}"`);
                 closeEditTaskModal();
                 renderAll();
-            }).catch(err => console.error("Error moving task to general pool:", err));
-        } else {
-            // Reassigned to another worker
-            const newWorkerIndex = (companyData.workers || []).findIndex(w => w.id === newAssignee);
-            if (newWorkerIndex === -1) return;
-            const newWorker = companyData.workers[newWorkerIndex];
-            if (!newWorker.jobs) newWorker.jobs = [];
-
-            origWorker.jobs.splice(jobIndex, 1);
-
-            const reassignedJob = {
-                ...job,
-                title: newTitle,
-                urgency: newUrgency,
-                deadlineMins: newDeadline
-            };
-
-            newWorker.jobs.push(reassignedJob);
-
-            const updates = {};
-            updates[`companies/${currentCompany}/workers/${origWorkerIndex}/jobs`] = origWorker.jobs;
-            updates[`companies/${currentCompany}/workers/${newWorkerIndex}/jobs`] = newWorker.jobs;
-
-            db.ref().update(updates).then(() => {
-                logActivity('task', newWorker.id, newWorker.name, `Reassigned task from ${origWorker.name} to ${newWorker.name}: "${newTitle}"`);
-                closeEditTaskModal();
-                renderAll();
             }).catch(err => console.error("Error reassigning task to another worker:", err));
         }
     }
 }
+
+// =====================================================================
+// CONSTANT TASKS & WORKER RESPONSIBILITIES SYSTEM
+// =====================================================================
+
+function fillConstantTaskPreset(title, amount, category) {
+    const titleInput = document.getElementById('constant-task-title');
+    const amountInput = document.getElementById('constant-task-amount');
+    if (titleInput) titleInput.value = title;
+    if (amountInput) amountInput.value = amount;
+    if (titleInput) titleInput.focus();
+}
+window.fillConstantTaskPreset = fillConstantTaskPreset;
+
+function addConstantTask() {
+    const isAr = currentAppLang === 'ar';
+    const workerSelect = document.getElementById('constant-task-worker-select');
+    const workerId = workerSelect ? workerSelect.value : '';
+    const title = document.getElementById('constant-task-title') ? document.getElementById('constant-task-title').value.trim() : '';
+    const amount = document.getElementById('constant-task-amount') ? document.getElementById('constant-task-amount').value.trim() : '';
+
+    if (!workerId || !title) {
+        alert(isAr ? 'الرجاء اختيار الموظف وكتابة عنوان المهمة المستمرة.' : 'Please select an employee and enter responsibility title.');
+        return;
+    }
+
+    const companyData = getCompanyData();
+    const workers = companyData.workers || [];
+    const workerIndex = workers.findIndex(w => String(w.id) === String(workerId));
+    if (workerIndex === -1) return;
+
+    const worker = workers[workerIndex];
+    if (!worker.constantTasks || !Array.isArray(worker.constantTasks)) {
+        worker.constantTasks = Object.values(worker.constantTasks || {});
+    }
+
+    const newConstantTask = {
+        id: 'ct-' + Date.now().toString(),
+        title: title,
+        amount: amount || (isAr ? 'يومي' : 'Daily'),
+        assignedAt: Date.now(),
+        assignedBy: currentUser ? currentUser.email : 'Admin'
+    };
+
+    worker.constantTasks.push(newConstantTask);
+
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/constantTasks`).set(worker.constantTasks)
+        .then(() => {
+            if (typeof logActivity === 'function') {
+                logActivity('task_constant', worker.id, worker.name, `Assigned constant task to ${worker.name}: "${title}" (${amount})`);
+            }
+            alert(isAr ? `تمت إضافة المهمة المستمرة "${title}" لـ ${worker.name} بنجاح!` : `Constant task "${title}" assigned to ${worker.name} successfully!`);
+            if (document.getElementById('constant-task-title')) document.getElementById('constant-task-title').value = '';
+            if (document.getElementById('constant-task-amount')) document.getElementById('constant-task-amount').value = '';
+            renderConstantTasks();
+        })
+        .catch(err => console.error("Error adding constant task:", err));
+}
+window.addConstantTask = addConstantTask;
+
+function removeConstantTask(workerId, taskId) {
+    const isAr = currentAppLang === 'ar';
+    if (!confirm(isAr ? 'هل أنت تأكد من حذف هذه المهمة المستمرة؟' : 'Are you sure you want to delete this constant task responsibility?')) return;
+
+    const companyData = getCompanyData();
+    const workers = companyData.workers || [];
+    const workerIndex = workers.findIndex(w => String(w.id) === String(workerId));
+    if (workerIndex === -1) return;
+
+    const worker = workers[workerIndex];
+    if (!worker.constantTasks || !Array.isArray(worker.constantTasks)) {
+        worker.constantTasks = Object.values(worker.constantTasks || {});
+    }
+
+    worker.constantTasks = worker.constantTasks.filter(ct => String(ct.id) !== String(taskId));
+
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/constantTasks`).set(worker.constantTasks)
+        .then(() => {
+            if (typeof logActivity === 'function') {
+                logActivity('task_constant_delete', worker.id, worker.name, `Removed constant task from ${worker.name}`);
+            }
+            renderConstantTasks();
+        })
+        .catch(err => console.error("Error removing constant task:", err));
+}
+window.removeConstantTask = removeConstantTask;
+
+function openTransferConstantTaskModal(fromWorkerId, taskId) {
+    const modal = document.getElementById('transfer-constant-task-modal');
+    if (!modal) return;
+
+    const isAr = currentAppLang === 'ar';
+    const companyData = getCompanyData();
+    const workers = companyData.workers || [];
+    const fromWorker = workers.find(w => String(w.id) === String(fromWorkerId));
+    if (!fromWorker || !fromWorker.constantTasks) return;
+
+    let fromTasks = fromWorker.constantTasks;
+    if (!Array.isArray(fromTasks)) fromTasks = Object.values(fromTasks);
+
+    const task = fromTasks.find(ct => String(ct.id) === String(taskId));
+    if (!task) return;
+
+    document.getElementById('transfer-constant-from-worker-id').value = fromWorkerId;
+    document.getElementById('transfer-constant-task-id').value = taskId;
+    document.getElementById('transfer-constant-task-title-display').textContent = `${task.title} (${task.amount || ''})`;
+
+    const targetSelect = document.getElementById('transfer-constant-target-worker-select');
+    if (targetSelect) {
+        let html = `<option value="">-- ${isAr ? 'اختر الموظف البديل' : 'Choose Target Worker'} --</option>`;
+        workers.forEach(w => {
+            if (String(w.id) !== String(fromWorkerId)) {
+                html += `<option value="${w.id}">👤 ${w.name}</option>`;
+            }
+        });
+        targetSelect.innerHTML = html;
+    }
+
+    modal.style.display = 'flex';
+}
+window.openTransferConstantTaskModal = openTransferConstantTaskModal;
+
+function closeTransferConstantTaskModal() {
+    const modal = document.getElementById('transfer-constant-task-modal');
+    if (modal) modal.style.display = 'none';
+}
+window.closeTransferConstantTaskModal = closeTransferConstantTaskModal;
+
+function transferConstantTask() {
+    const isAr = currentAppLang === 'ar';
+    const fromWorkerId = document.getElementById('transfer-constant-from-worker-id').value;
+    const taskId = document.getElementById('transfer-constant-task-id').value;
+    const targetWorkerId = document.getElementById('transfer-constant-target-worker-select').value;
+
+    if (!fromWorkerId || !taskId || !targetWorkerId) {
+        alert(isAr ? 'يرجى اختيار الموظف المستهدف لنقل المهمة إليه.' : 'Please select the target worker to transfer the task to.');
+        return;
+    }
+
+    const companyData = getCompanyData();
+    const workers = companyData.workers || [];
+
+    const fromWorkerIndex = workers.findIndex(w => String(w.id) === String(fromWorkerId));
+    const targetWorkerIndex = workers.findIndex(w => String(w.id) === String(targetWorkerId));
+
+    if (fromWorkerIndex === -1 || targetWorkerIndex === -1) return;
+
+    const fromWorker = workers[fromWorkerIndex];
+    const targetWorker = workers[targetWorkerIndex];
+
+    if (!fromWorker.constantTasks || !Array.isArray(fromWorker.constantTasks)) {
+        fromWorker.constantTasks = Object.values(fromWorker.constantTasks || {});
+    }
+    if (!targetWorker.constantTasks || !Array.isArray(targetWorker.constantTasks)) {
+        targetWorker.constantTasks = Object.values(targetWorker.constantTasks || {});
+    }
+
+    const taskIndex = fromWorker.constantTasks.findIndex(ct => String(ct.id) === String(taskId));
+    if (taskIndex === -1) return;
+
+    const [transferredTask] = fromWorker.constantTasks.splice(taskIndex, 1);
+    transferredTask.assignedAt = Date.now();
+    transferredTask.transferredFrom = fromWorker.name;
+
+    targetWorker.constantTasks.push(transferredTask);
+
+    const updates = {};
+    updates[`companies/${currentCompany}/workers/${fromWorkerIndex}/constantTasks`] = fromWorker.constantTasks;
+    updates[`companies/${currentCompany}/workers/${targetWorkerIndex}/constantTasks`] = targetWorker.constantTasks;
+
+    db.ref().update(updates)
+        .then(() => {
+            if (typeof logActivity === 'function') {
+                logActivity('task_constant_transfer', targetWorker.id, targetWorker.name, `Transferred constant task "${transferredTask.title}" from ${fromWorker.name} to ${targetWorker.name}`);
+            }
+            alert(isAr ? `تم نقل المهمة المستمرة "${transferredTask.title}" إلى ${targetWorker.name} بنجاح!` : `Constant task "${transferredTask.title}" transferred to ${targetWorker.name} successfully!`);
+            closeTransferConstantTaskModal();
+            renderConstantTasks();
+        })
+        .catch(err => console.error("Error transferring constant task:", err));
+}
+window.transferConstantTask = transferConstantTask;
+
+function renderConstantTasks() {
+    const isAr = currentAppLang === 'ar';
+    const companyData = getCompanyData();
+    const workers = companyData.workers || [];
+
+    // 1. Populate Manager Worker Select dropdown
+    const select = document.getElementById('constant-task-worker-select');
+    if (select && select.options.length <= 1) {
+        let html = `<option value="">-- ${isAr ? 'اختر الموظف' : 'Choose Employee'} --</option>`;
+        workers.forEach(w => {
+            html += `<option value="${w.id}">👤 ${w.name}</option>`;
+        });
+        select.innerHTML = html;
+    }
+
+    // 2. Render Manager Constant Tasks List
+    const managerList = document.getElementById('constant-tasks-manager-list');
+    if (managerList) {
+        const selectedWorkerId = select ? select.value : '';
+        let targetWorkers = workers;
+        if (selectedWorkerId) {
+            targetWorkers = workers.filter(w => String(w.id) === String(selectedWorkerId));
+        }
+
+        let html = '';
+        let totalCount = 0;
+
+        targetWorkers.forEach(w => {
+            let tasks = w.constantTasks || [];
+            if (!Array.isArray(tasks)) tasks = Object.values(tasks);
+            tasks = tasks.filter(ct => ct && (ct.id || ct.title));
+
+            if (tasks.length > 0) {
+                totalCount += tasks.length;
+                html += `
+                    <div class="ledger-card" style="margin-bottom: 14px; background: var(--input-bg); border-radius: 12px; padding: 14px; border: 1px solid var(--border-color);">
+                        <div class="flex-between" style="margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                            <strong style="font-size: 1rem; color: var(--text-main);">👤 ${w.name}</strong>
+                            <span class="badge" style="background: #6366f1; color: #fff; font-weight: 800;">${tasks.length} ${isAr ? 'مهام مستمرة' : 'Constant Tasks'}</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px;">
+                            ${tasks.map(ct => `
+                                <div style="background: var(--card-bg); padding: 12px; border-radius: 10px; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                                    <div>
+                                        <div style="font-weight: 800; color: var(--text-main); font-size: 0.92rem;">📌 ${ct.title}</div>
+                                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">🕒 ${isAr ? 'الكمية / التكرار:' : 'Target:'} <strong style="color:#6366f1;">${ct.amount || (isAr ? 'يومي' : 'Daily')}</strong></div>
+                                    </div>
+                                    <div style="display: flex; gap: 6px; flex-shrink: 0;">
+                                        <button type="button" onclick="openTransferConstantTaskModal('${w.id}', '${ct.id}')" class="btn-outline" style="padding: 4px 8px; font-size: 0.75rem; border-radius: 6px; font-weight: 700; cursor: pointer; border: 1px solid #10b981; color: #10b981;" title="${isAr ? 'نقل المهمة لموظف آخر' : 'Transfer task'}">🔁 ${isAr ? 'نقل' : 'Transfer'}</button>
+                                        <button type="button" onclick="removeConstantTask('${w.id}', '${ct.id}')" class="btn-outline-danger" style="padding: 4px 8px; font-size: 0.75rem; border-radius: 6px; font-weight: 700; cursor: pointer;" title="${isAr ? 'حذف المهمة' : 'Delete task'}">🗑️</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+        });
+
+        if (!html) {
+            html = `<p style="text-align: center; color: var(--text-muted); padding: 20px; font-size: 0.9rem;">${isAr ? 'لا توجد مهام مستمرة مخصصة حالياً.' : 'No constant tasks assigned yet.'}</p>`;
+        }
+
+        managerList.innerHTML = html;
+    }
+
+    // 3. Render Worker's Own Constant Tasks Card (#worker-constant-tasks-card)
+    const workerCard = document.getElementById('worker-constant-tasks-card');
+    const workerList = document.getElementById('worker-constant-tasks-list');
+    const countBadge = document.getElementById('worker-constant-tasks-count');
+    const cardTitle = document.getElementById('worker-constant-tasks-title');
+
+    if (workerCard && workerList) {
+        const isAdmin = currentUser && currentUser.role === 'admin';
+        let myWorker = null;
+
+        // Non-admin workers match via email or active worker profile
+        const currentEmail = currentUser && currentUser.email ? currentUser.email.toLowerCase() : '';
+        if (currentEmail) {
+            myWorker = workers.find(w => w.email && w.email.toLowerCase() === currentEmail);
+        }
+        if (!myWorker && typeof getActiveWorker === 'function') {
+            const activeW = getActiveWorker();
+            if (activeW) {
+                myWorker = workers.find(w => 
+                    (w.id && activeW.id && String(w.id) === String(activeW.id)) ||
+                    (w.email && activeW.email && w.email.toLowerCase() === activeW.email.toLowerCase()) ||
+                    (w.name && activeW.name && String(w.name).trim().toLowerCase() === String(activeW.name).trim().toLowerCase())
+                );
+            }
+        }
+
+        // Admin accounts manage all constant tasks via the Constant Tasks Panel above and NEVER see a personal missions card.
+        // Non-admin workers see their assigned constant tasks card.
+        if (isAdmin) {
+            workerCard.style.display = 'none';
+        } else if (myWorker) {
+            workerCard.style.display = 'block';
+            let myTasks = myWorker.constantTasks || [];
+            if (!Array.isArray(myTasks)) myTasks = Object.values(myTasks);
+            myTasks = myTasks.filter(ct => ct && (ct.id || ct.title));
+
+            if (cardTitle) {
+                cardTitle.textContent = isAr ? `مسؤولياتي والمهام المستمرة (${myWorker.name})` : `My Responsibilities & Constant Tasks (${myWorker.name})`;
+            }
+
+            if (countBadge) {
+                countBadge.textContent = `${myTasks.length} ${isAr ? 'مسؤوليات مستمرة' : 'Responsibilities'}`;
+            }
+
+            if (myTasks.length === 0) {
+                workerList.innerHTML = `<p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">${isAr ? 'لا توجد مسؤوليات مستمرة مسندة إليك حالياً.' : 'No constant responsibilities assigned to you currently.'}</p>`;
+            } else {
+                workerList.innerHTML = myTasks.map(ct => `
+                    <div style="background: var(--card-bg); padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 10px; min-width: 200px; flex: 1;">
+                        <span style="font-size: 1.2rem;">📌</span>
+                        <div>
+                            <div style="font-weight: 800; font-size: 0.9rem; color: var(--text-main);">${ct.title}</div>
+                            <div style="font-size: 0.76rem; color: var(--text-muted);">📋 ${isAr ? 'المطلوب / الكمية:' : 'Amount:'} <strong style="color: #6366f1;">${ct.amount || (isAr ? 'يومي' : 'Daily')}</strong></div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        } else {
+            // General fallback if no worker matches
+            workerCard.style.display = 'none';
+        }
+    }
+}
+window.renderConstantTasks = renderConstantTasks;
 
 
 // --- AUTOMATIC IN-SCOPE WINDOW EXPORTS ---
@@ -8194,6 +8536,7 @@ if (typeof deleteGeneralTask === 'function') window.deleteGeneralTask = deleteGe
 if (typeof openEditTaskModal === 'function') window.openEditTaskModal = openEditTaskModal;
 if (typeof closeEditTaskModal === 'function') window.closeEditTaskModal = closeEditTaskModal;
 if (typeof saveEditedTask === 'function') window.saveEditedTask = saveEditedTask;
+if (typeof renderConstantTasks === 'function') window.renderConstantTasks = renderConstantTasks;
 
 
 /**
@@ -22420,53 +22763,51 @@ function setTaskFormMode(mode) {
     const assignBtn = document.getElementById('task-mode-assign-btn');
     const inquiryBtn = document.getElementById('task-mode-inquiry-btn');
     const hudBtn = document.getElementById('task-mode-hud-btn');
+    const cycleBtn = document.getElementById('task-mode-cycle-btn');
+    const constantBtn = document.getElementById('task-mode-constant-btn');
+
     const assignForm = document.getElementById('task-assign-form');
     const inquiryForm = document.getElementById('task-inquiry-form');
-    const inqDept = document.getElementById('tasks-inquiry-department');
+    const constantContainer = document.getElementById('constant-tasks-container');
 
     if (mode === 'inquiry') {
         if (assignForm) assignForm.style.display = 'none';
         if (inquiryForm) inquiryForm.style.display = 'block';
+        if (constantContainer) constantContainer.style.display = 'none';
 
-        if (assignBtn) {
-            assignBtn.className = 'btn-outline';
-            assignBtn.style.background = 'var(--input-bg)';
-            assignBtn.style.color = 'var(--text-main)';
-        }
-        if (inquiryBtn) {
-            inquiryBtn.className = 'btn-primary';
-            inquiryBtn.style.background = 'linear-gradient(135deg, #8b5cf6, #6d28d9)';
-            inquiryBtn.style.color = 'white';
-        }
-        if (hudBtn) {
-            hudBtn.className = 'btn-outline';
-            hudBtn.style.background = 'var(--input-bg)';
-            hudBtn.style.color = 'var(--text-main)';
-        }
+        if (assignBtn) { assignBtn.className = 'btn-outline'; assignBtn.style.background = 'var(--input-bg)'; assignBtn.style.color = 'var(--text-main)'; }
+        if (inquiryBtn) { inquiryBtn.className = 'btn-primary'; inquiryBtn.style.background = 'linear-gradient(135deg, #8b5cf6, #6d28d9)'; inquiryBtn.style.color = 'white'; }
+        if (hudBtn) { hudBtn.className = 'btn-outline'; hudBtn.style.background = 'var(--input-bg)'; hudBtn.style.color = 'var(--text-main)'; }
+        if (cycleBtn) { cycleBtn.className = 'btn-outline'; cycleBtn.style.background = 'var(--input-bg)'; cycleBtn.style.color = 'var(--text-main)'; }
+        if (constantBtn) { constantBtn.className = 'btn-outline'; constantBtn.style.background = 'var(--input-bg)'; constantBtn.style.color = 'var(--text-main)'; }
+
         populateInquiryWorkerDropdown();
     } else if (mode === 'hud') {
         openInquiriesHUDModal();
     } else if (mode === 'cycle') {
         openTaskCycleHUDModal();
+    } else if (mode === 'constant') {
+        if (assignForm) assignForm.style.display = 'none';
+        if (inquiryForm) inquiryForm.style.display = 'none';
+        if (constantContainer) constantContainer.style.display = 'block';
+
+        if (assignBtn) { assignBtn.className = 'btn-outline'; assignBtn.style.background = 'var(--input-bg)'; assignBtn.style.color = 'var(--text-main)'; }
+        if (inquiryBtn) { inquiryBtn.className = 'btn-outline'; inquiryBtn.style.background = 'var(--input-bg)'; inquiryBtn.style.color = 'var(--text-main)'; }
+        if (hudBtn) { hudBtn.className = 'btn-outline'; hudBtn.style.background = 'var(--input-bg)'; hudBtn.style.color = 'var(--text-main)'; }
+        if (cycleBtn) { cycleBtn.className = 'btn-outline'; cycleBtn.style.background = 'var(--input-bg)'; cycleBtn.style.color = 'var(--text-main)'; }
+        if (constantBtn) { constantBtn.className = 'btn-primary'; constantBtn.style.background = 'linear-gradient(135deg, #6366f1, #4f46e5)'; constantBtn.style.color = 'white'; }
+
+        if (typeof renderConstantTasks === 'function') renderConstantTasks();
     } else {
         if (assignForm) assignForm.style.display = 'block';
         if (inquiryForm) inquiryForm.style.display = 'none';
+        if (constantContainer) constantContainer.style.display = 'none';
 
-        if (assignBtn) {
-            assignBtn.className = 'btn-primary';
-            assignBtn.style.background = 'linear-gradient(135deg, #4f46e5, #3730a3)';
-            assignBtn.style.color = 'white';
-        }
-        if (inquiryBtn) {
-            inquiryBtn.className = 'btn-outline';
-            inquiryBtn.style.background = 'var(--input-bg)';
-            inquiryBtn.style.color = 'var(--text-main)';
-        }
-        if (hudBtn) {
-            hudBtn.className = 'btn-outline';
-            hudBtn.style.background = 'var(--input-bg)';
-            hudBtn.style.color = 'var(--text-main)';
-        }
+        if (assignBtn) { assignBtn.className = 'btn-primary'; assignBtn.style.background = 'linear-gradient(135deg, #4f46e5, #3730a3)'; assignBtn.style.color = 'white'; }
+        if (inquiryBtn) { inquiryBtn.className = 'btn-outline'; inquiryBtn.style.background = 'var(--input-bg)'; inquiryBtn.style.color = 'var(--text-main)'; }
+        if (hudBtn) { hudBtn.className = 'btn-outline'; hudBtn.style.background = 'var(--input-bg)'; hudBtn.style.color = 'var(--text-main)'; }
+        if (cycleBtn) { cycleBtn.className = 'btn-outline'; cycleBtn.style.background = 'var(--input-bg)'; cycleBtn.style.color = 'var(--text-main)'; }
+        if (constantBtn) { constantBtn.className = 'btn-outline'; constantBtn.style.background = 'var(--input-bg)'; constantBtn.style.color = 'var(--text-main)'; }
     }
 }
 window.setTaskFormMode = setTaskFormMode;
