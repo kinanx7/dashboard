@@ -6450,6 +6450,16 @@ function assignTask() {
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
         .then(() => {
             logActivity('task', worker.id, worker.name, `Assigned task ${assignedTaskNum} to ${worker.name}: "${text}"`);
+            
+            // Direct fail-safe WhatsApp dispatch from dashboard
+            if (worker.phone && worker.waAlertsEnabled !== false && typeof sendWhatsAppDirect === 'function') {
+                const companyLabel = (typeof currentCompany !== 'undefined' ? currentCompany : '').toUpperCase();
+                const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+                const waMsg = isAr 
+                    ? `📋 *مهمة جديدة أسندت إليك [${companyLabel}]*\n\nالموظف: ${worker.name}\nالمهمة: ${text}\n\nيرجى فتح لوحة المهام للإنجاز.`
+                    : `📋 *New Task Assigned [${companyLabel}]*\n\nWorker: ${worker.name}\nTask: ${text}\n\nPlease open your task board to complete it.`;
+                sendWhatsAppDirect(worker.phone, waMsg);
+            }
         })
         .catch(err => console.error("Error assigning task:", err));
 }
