@@ -468,6 +468,22 @@ function formatCustomTemplate(rawTpl, data = {}) {
     return text;
 }
 
+// Helper function to count violations or rewards across monthly stats
+function countAcrossMonths(monthlyStats, listName) {
+    if (!monthlyStats || typeof monthlyStats !== 'object') return 0;
+    let total = 0;
+    Object.values(monthlyStats).forEach(monthObj => {
+        if (monthObj && monthObj[listName]) {
+            if (Array.isArray(monthObj[listName])) {
+                total += monthObj[listName].length;
+            } else if (typeof monthObj[listName] === 'object') {
+                total += Object.keys(monthObj[listName]).length;
+            }
+        }
+    });
+    return total;
+}
+
 const notifiedPrepareOrders = {};
 
 // Function to send FCM & WhatsApp alerts for new prepare orders
