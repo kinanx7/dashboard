@@ -20807,6 +20807,415 @@ function sendTestMessagingAlert() {
         alert(isAr ? '❌ فشل الاتصال بالخادم: ' + err.message : '❌ Network error: ' + err.message);
     });
 }
+
+// ─── General Advertisement Broadcast Engine ────────────────────────────────
+let adRecipients = [];
+let selectedAdGroupFilter = 'ALL';
+let selectedAdImageBase64 = null;
+let activeAdBroadcastTimer = null;
+let isAdBroadcastRunning = false;
+
+function toggleMessagingViewMode(mode) {
+    const gatewayContainer = document.getElementById('msg-mode-gateway-container');
+    const adContainer = document.getElementById('msg-mode-ad-container');
+    const btnGateway = document.getElementById('btn-msg-mode-gateway');
+    const btnAd = document.getElementById('btn-msg-mode-ad');
+
+    if (mode === 'ad') {
+        if (gatewayContainer) gatewayContainer.style.display = 'none';
+        if (adContainer) adContainer.style.display = 'block';
+
+        if (btnGateway) {
+            btnGateway.className = 'btn-neutral';
+            btnGateway.style.background = 'var(--input-bg)';
+            btnGateway.style.color = 'var(--text-main)';
+            btnGateway.style.border = '1px solid var(--border-color)';
+        }
+        if (btnAd) {
+            btnAd.className = 'btn-primary';
+            btnAd.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+            btnAd.style.color = 'white';
+            btnAd.style.border = 'none';
+        }
+        renderAdRecipientsList();
+    } else {
+        if (gatewayContainer) gatewayContainer.style.display = 'block';
+        if (adContainer) adContainer.style.display = 'none';
+
+        if (btnGateway) {
+            btnGateway.className = 'btn-primary';
+            btnGateway.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+            btnGateway.style.color = 'white';
+            btnGateway.style.border = 'none';
+        }
+        if (btnAd) {
+            btnAd.className = 'btn-neutral';
+            btnAd.style.background = 'var(--input-bg)';
+            btnAd.style.color = 'var(--text-main)';
+            btnAd.style.border = '1px solid var(--border-color)';
+        }
+    }
+}
+window.toggleMessagingViewMode = toggleMessagingViewMode;
+
+function recalculateAdRecipientGroups() {
+    adRecipients.forEach((item, idx) => {
+        item.tag = `#${idx + 1}`;
+        item.group = Math.floor(idx / 50) + 1;
+    });
+}
+
+function addAdRecipientFromForm() {
+    const nameEl = document.getElementById('ad-input-name');
+    const phoneEl = document.getElementById('ad-input-phone');
+
+    const name = nameEl ? nameEl.value.trim() : '';
+    const phone = phoneEl ? phoneEl.value.trim() : '';
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    if (!phone || phone.length < 8) {
+        alert(isAr ? 'يرجى كتابة رقم هاتف صحيح مع رمز الدولة.' : 'Please enter a valid phone number with country code.');
+        return;
+    }
+
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+
+    adRecipients.push({
+        id: 'ad_rec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+        name: name || `Contact #${adRecipients.length + 1}`,
+        phone: cleanPhone,
+        tag: `#${adRecipients.length + 1}`,
+        group: Math.floor(adRecipients.length / 50) + 1
+    });
+
+    recalculateAdRecipientGroups();
+
+    if (nameEl) nameEl.value = '';
+    if (phoneEl) phoneEl.value = '';
+
+    renderAdRecipientsList();
+}
+window.addAdRecipientFromForm = addAdRecipientFromForm;
+
+function deleteAdRecipient(id) {
+    adRecipients = adRecipients.filter(item => item.id !== id);
+    recalculateAdRecipientGroups();
+    renderAdRecipientsList();
+}
+window.deleteAdRecipient = deleteAdRecipient;
+
+function openBulkImportAdModal() {
+    const modal = document.getElementById('ad-bulk-import-modal');
+    if (modal) modal.style.display = 'flex';
+}
+window.openBulkImportAdModal = openBulkImportAdModal;
+
+function closeBulkImportAdModal() {
+    const modal = document.getElementById('ad-bulk-import-modal');
+    if (modal) modal.style.display = 'none';
+}
+window.closeBulkImportAdModal = closeBulkImportAdModal;
+
+function processBulkImportAdRecipients() {
+    const textarea = document.getElementById('ad-bulk-import-textarea');
+    if (!textarea) return;
+    const rawText = textarea.value;
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    if (!rawText.trim()) {
+        alert(isAr ? 'يرجى لصق قائمة الأرقام أولاً.' : 'Please paste text containing phone numbers.');
+        return;
+    }
+
+    const lines = rawText.split('\n');
+    let addedCount = 0;
+
+    lines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        let parts = trimmed.split(/,|\t|;/);
+        let phone = parts[0] ? parts[0].replace(/[^0-9]/g, '') : '';
+        let name = parts[1] ? parts[1].trim() : '';
+
+        if (!phone && parts.length > 1) {
+            phone = parts[1].replace(/[^0-9]/g, '');
+            name = parts[0].trim();
+        }
+
+        if (phone && phone.length >= 8) {
+            adRecipients.push({
+                id: 'ad_rec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                name: name || `Contact #${adRecipients.length + 1}`,
+                phone: phone,
+                tag: `#${adRecipients.length + 1}`,
+                group: Math.floor(adRecipients.length / 50) + 1
+            });
+            addedCount++;
+        }
+    });
+
+    recalculateAdRecipientGroups();
+    textarea.value = '';
+    closeBulkImportAdModal();
+    renderAdRecipientsList();
+
+    alert(isAr 
+        ? `✅ تم استيراد ${addedCount} رقم بنجاح وتصنيفها في المجموعات!` 
+        : `✅ Successfully imported ${addedCount} contacts and assigned group tags!`);
+}
+window.processBulkImportAdRecipients = processBulkImportAdRecipients;
+
+function handleAdImageUpload(evt) {
+    const file = evt.target?.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        selectedAdImageBase64 = e.target.result;
+        const preview = document.getElementById('ad-image-preview');
+        const container = document.getElementById('ad-image-preview-container');
+        const removeBtn = document.getElementById('btn-ad-remove-img');
+
+        if (preview) preview.src = selectedAdImageBase64;
+        if (container) container.style.display = 'block';
+        if (removeBtn) removeBtn.style.display = 'inline-block';
+    };
+    reader.readAsDataURL(file);
+}
+window.handleAdImageUpload = handleAdImageUpload;
+
+function removeAdImage() {
+    selectedAdImageBase64 = null;
+    const fileInput = document.getElementById('ad-image-file-input');
+    const container = document.getElementById('ad-image-preview-container');
+    const removeBtn = document.getElementById('btn-ad-remove-img');
+
+    if (fileInput) fileInput.value = '';
+    if (container) container.style.display = 'none';
+    if (removeBtn) removeBtn.style.display = 'none';
+}
+window.removeAdImage = removeAdImage;
+
+function insertAdTemplateTag(tag) {
+    const el = document.getElementById('ad-broadcast-text');
+    if (!el) return;
+    const start = el.selectionStart || el.value.length;
+    const end = el.selectionEnd || el.value.length;
+    el.value = el.value.substring(0, start) + tag + el.value.substring(end);
+    el.focus();
+    el.selectionStart = el.selectionEnd = start + tag.length;
+}
+window.insertAdTemplateTag = insertAdTemplateTag;
+
+function setAdGroupFilter(grp, btnEl) {
+    selectedAdGroupFilter = grp;
+    renderAdRecipientsList();
+}
+window.setAdGroupFilter = setAdGroupFilter;
+
+function renderAdRecipientsList() {
+    recalculateAdRecipientGroups();
+
+    const pillsContainer = document.getElementById('ad-group-filter-pills');
+    const selectEl = document.getElementById('ad-target-group-select');
+    const tbody = document.getElementById('ad-recipients-tbody');
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    // Determine total groups
+    const totalCount = adRecipients.length;
+    const groupCount = Math.ceil(totalCount / 50) || 1;
+
+    // Render Pills
+    if (pillsContainer) {
+        let html = `<button type="button" onclick="setAdGroupFilter('ALL', this)" style="padding:4px 10px; border-radius:14px; font-weight:800; font-size:0.75rem; border:1px solid var(--border-color); cursor:pointer; background:${selectedAdGroupFilter === 'ALL' ? 'var(--primary)' : 'var(--card-bg)'}; color:${selectedAdGroupFilter === 'ALL' ? 'white' : 'var(--text-main)'};">
+            ${isAr ? 'الكل' : 'All'} (${totalCount})
+        </button>`;
+
+        for (let g = 1; g <= groupCount; g++) {
+            const startIdx = (g - 1) * 50 + 1;
+            const endIdx = Math.min(g * 50, totalCount);
+            const countInGrp = adRecipients.filter(r => r.group === g).length;
+            if (countInGrp === 0 && g > 1) continue;
+
+            const isSelected = (selectedAdGroupFilter === g || selectedAdGroupFilter === String(g));
+            html += `<button type="button" onclick="setAdGroupFilter(${g}, this)" style="padding:4px 10px; border-radius:14px; font-weight:800; font-size:0.75rem; border:1px solid var(--border-color); cursor:pointer; background:${isSelected ? 'var(--primary)' : 'var(--card-bg)'}; color:${isSelected ? 'white' : 'var(--text-main)'};">
+                ${isAr ? 'المجموعة' : 'Group'} ${g} (#${startIdx}-${endIdx})
+            </button>`;
+        }
+
+        pillsContainer.innerHTML = html;
+    }
+
+    // Render Target Select Dropdown Options
+    if (selectEl) {
+        let optsHtml = `<option value="ALL">${isAr ? '🌐 جميع المستلمين والمجموعات' : '🌐 All Recipients & Groups'} (${totalCount})</option>`;
+        for (let g = 1; g <= groupCount; g++) {
+            const startIdx = (g - 1) * 50 + 1;
+            const endIdx = Math.min(g * 50, totalCount);
+            const countInGrp = adRecipients.filter(r => r.group === g).length;
+            if (countInGrp === 0 && g > 1) continue;
+            optsHtml += `<option value="${g}">${isAr ? 'المجموعة' : 'Group'} ${g} (#${startIdx}-${endIdx}) — [${countInGrp} ${isAr ? 'أرقام' : 'phones'}]</option>`;
+        }
+        selectEl.innerHTML = optsHtml;
+    }
+
+    // Filter Table Rows
+    const filtered = adRecipients.filter(r => {
+        if (selectedAdGroupFilter === 'ALL') return true;
+        return r.group === Number(selectedAdGroupFilter);
+    });
+
+    if (tbody) {
+        if (filtered.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted); font-weight:700;">${isAr ? 'لا توجد أرقام مسجلة. أضف شخصاً أو استورد قائمة أعلاه.' : 'No recipients found. Add a person or import numbers above.'}</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = filtered.map(r => `
+            <tr style="border-bottom:1px solid var(--border-color);">
+                <td style="padding:8px 12px; font-weight:900; color:#10b981; font-family:monospace;">${r.tag}</td>
+                <td style="padding:8px 12px; font-weight:700; color:var(--text-main);">${r.name}</td>
+                <td style="padding:8px 12px; font-weight:700; color:var(--text-muted); font-family:monospace;">${r.phone}</td>
+                <td style="padding:8px 12px; text-align:right;">
+                    <button type="button" onclick="deleteAdRecipient('${r.id}')" style="background:rgba(239,68,68,0.12); color:#ef4444; border:1px solid rgba(239,68,68,0.3); border-radius:6px; padding:3px 8px; font-size:0.75rem; font-weight:800; cursor:pointer;">✕ Delete</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+}
+window.renderAdRecipientsList = renderAdRecipientsList;
+
+function startAdBroadcast() {
+    const textEl = document.getElementById('ad-broadcast-text');
+    const targetGroupVal = document.getElementById('ad-target-group-select')?.value || 'ALL';
+    const serverUrlInput = document.getElementById('wa-server-url');
+    const baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || 'https://burgeroov-notify.onrender.com';
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    const rawMessage = textEl ? textEl.value.trim() : '';
+
+    if (!rawMessage) {
+        alert(isAr ? 'يرجى كتابة نص رسالة الإعلان أولاً.' : 'Please enter the advertisement message text first.');
+        return;
+    }
+
+    // Filter recipients
+    let recipientsToSend = adRecipients.filter(r => {
+        if (targetGroupVal === 'ALL') return true;
+        return r.group === Number(targetGroupVal);
+    });
+
+    if (recipientsToSend.length === 0) {
+        alert(isAr ? 'لا توجد أرقام مستلمين في المجموعة المختارة للإرسال!' : 'No recipient numbers found in the selected target group!');
+        return;
+    }
+
+    if (!confirm(isAr 
+        ? `هل أنت أأكد من بدء إرسال الإعلان عبر الواتساب إلى [${recipientsToSend.length}] رقم هاتف مع فاصل زمني 5 ثوانٍ بين كل رقم؟` 
+        : `Are you sure you want to start broadcasting to [${recipientsToSend.length}] phone numbers with a 5-second interval between each number?`)) {
+        return;
+    }
+
+    isAdBroadcastRunning = true;
+    const startBtn = document.getElementById('btn-start-ad-broadcast');
+    const cancelBtn = document.getElementById('btn-cancel-ad-broadcast');
+    const statusText = document.getElementById('ad-hud-status-text');
+    const counterText = document.getElementById('ad-hud-counter-text');
+    const progressBar = document.getElementById('ad-hud-progress-bar');
+    const logBox = document.getElementById('ad-hud-log');
+
+    if (startBtn) startBtn.style.display = 'none';
+    if (cancelBtn) cancelBtn.style.display = 'inline-block';
+
+    const compData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const companyName = compData.name || 'BURGEROOV';
+
+    let currentIndex = 0;
+    const total = recipientsToSend.length;
+
+    if (logBox) logBox.innerHTML = `🚀 [Broadcast Started] Target: ${total} recipients with 5-second interval...\n`;
+
+    function sendNext() {
+        if (!isAdBroadcastRunning) {
+            if (statusText) statusText.textContent = isAr ? '🛑 تم إلغاء البث بواسطة المستخدم' : '🛑 Broadcast Cancelled by User';
+            if (logBox) logBox.innerHTML += `\n🛑 Broadcast cancelled by user.`;
+            if (startBtn) startBtn.style.display = 'inline-block';
+            if (cancelBtn) cancelBtn.style.display = 'none';
+            return;
+        }
+
+        if (currentIndex >= total) {
+            isAdBroadcastRunning = false;
+            if (statusText) statusText.textContent = isAr ? '✅ اكتمل بث الإعلانات بنجاح!' : '✅ Broadcast Completed Successfully!';
+            if (counterText) counterText.textContent = `${total} / ${total}`;
+            if (progressBar) progressBar.style.width = '100%';
+            if (logBox) logBox.innerHTML += `\n✅ All ${total} WhatsApp messages dispatched cleanly.`;
+            if (startBtn) startBtn.style.display = 'inline-block';
+            if (cancelBtn) cancelBtn.style.display = 'none';
+            return;
+        }
+
+        const recipient = recipientsToSend[currentIndex];
+        const pct = Math.round(((currentIndex + 1) / total) * 100);
+
+        if (statusText) statusText.textContent = isAr ? `🚀 جاري الإرسال (${currentIndex + 1}/${total}): ${recipient.name} (${recipient.tag})` : `🚀 Sending (${currentIndex + 1}/${total}): ${recipient.name} (${recipient.tag})`;
+        if (counterText) counterText.textContent = `${currentIndex + 1} / ${total}`;
+        if (progressBar) progressBar.style.width = `${pct}%`;
+
+        // Replace tags
+        let textToSend = rawMessage
+            .replace(/{name}/gi, recipient.name)
+            .replace(/{number_tag}/gi, recipient.tag)
+            .replace(/{company_name}/gi, companyName);
+
+        fetch(`${baseUrl}/wa/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                phone: recipient.phone, 
+                text: textToSend,
+                image: selectedAdImageBase64
+            })
+        })
+        .then(res => res.json())
+        .then(resData => {
+            if (resData.success) {
+                if (logBox) logBox.innerHTML += `💬 [${recipient.tag}] Sent to ${recipient.name} (${recipient.phone})\n`;
+            } else {
+                if (logBox) logBox.innerHTML += `⚠️ [${recipient.tag}] ${recipient.name}: ${resData.error || 'Failed'}\n`;
+            }
+        })
+        .catch(err => {
+            if (logBox) logBox.innerHTML += `❌ [${recipient.tag}] ${recipient.name} Error: ${err.message}\n`;
+        });
+
+        currentIndex++;
+
+        if (currentIndex < total && isAdBroadcastRunning) {
+            activeAdBroadcastTimer = setTimeout(sendNext, 5000);
+        } else if (currentIndex >= total) {
+            setTimeout(sendNext, 1000);
+        }
+    }
+
+    sendNext();
+}
+window.startAdBroadcast = startAdBroadcast;
+
+function cancelAdBroadcast() {
+    isAdBroadcastRunning = false;
+    if (activeAdBroadcastTimer) clearTimeout(activeAdBroadcastTimer);
+
+    const startBtn = document.getElementById('btn-start-ad-broadcast');
+    const cancelBtn = document.getElementById('btn-cancel-ad-broadcast');
+    const statusText = document.getElementById('ad-hud-status-text');
+
+    if (startBtn) startBtn.style.display = 'inline-block';
+    if (cancelBtn) cancelBtn.style.display = 'none';
+    if (statusText) statusText.textContent = '🛑 Broadcast Stopped';
+}
+window.cancelAdBroadcast = cancelAdBroadcast;
 // Universal Search Bar Clear (X) Button Engine
 function setupSearchInputClearButtons() {
     const selector = '#reminders-search-input, #market-search-input, #tasks-search-input, #wh-search, #vault-search-input, #map-search-input, input[type="search"], .search-with-clear';

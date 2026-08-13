@@ -283,9 +283,9 @@ const waQueue = [];
 let isProcessingWaQueue = false;
 const WA_STAGGER_INTERVAL_MS = 3000; // 3 seconds interval between recipients
 
-function queueWhatsAppMessage(phone, text) {
+function queueWhatsAppMessage(phone, text, image = null) {
     if (!phone || !text) return;
-    waQueue.push({ phone, text });
+    waQueue.push({ phone, text, image });
     console.log(`📥 [WhatsApp Anti-Spam Queue] Queued message for ${phone} (Batch Position: #${waQueue.length})`);
     processWaQueue();
 }
@@ -297,7 +297,7 @@ async function processWaQueue() {
     while (waQueue.length > 0) {
         const item = waQueue.shift();
         if (item && item.phone && item.text) {
-            await executeWhatsAppDispatch(item.phone, item.text);
+            await executeWhatsAppDispatch(item.phone, item.text, item.image);
             if (waQueue.length > 0) {
                 console.log(`⏳ [WhatsApp Anti-Spam Safety Queue] Waiting 3 seconds before notifying next recipient (${waQueue.length} remaining in queue)...`);
                 await new Promise(resolve => setTimeout(resolve, WA_STAGGER_INTERVAL_MS));
@@ -308,7 +308,7 @@ async function processWaQueue() {
     isProcessingWaQueue = false;
 }
 
-async function executeWhatsAppDispatch(phone, text) {
+async function executeWhatsAppDispatch(phone, text, image = null) {
     if (!phone || !text) return;
     if (!waConnectionState.connected || !waSocket) {
         console.log(`[WhatsApp Skip] Engine not linked — skip automated alert to ${phone}`);
@@ -319,20 +319,33 @@ async function executeWhatsAppDispatch(phone, text) {
         if (!cleanPhone.endsWith('@s.whatsapp.net')) {
             cleanPhone = `${cleanPhone}@s.whatsapp.net`;
         }
-        await waSocket.sendMessage(cleanPhone, { text });
-        console.log(`💬 [WhatsApp Sent (3s Staggered Queue)] → ${phone}: "${text.substring(0, 40)}..."`);
+        
+        if (image) {
+            if (typeof image === 'string' && image.startsWith('data:image/')) {
+                const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+                const imgBuffer = Buffer.from(base64Data, 'base64');
+                await waSocket.sendMessage(cleanPhone, { image: imgBuffer, caption: text });
+            } else if (typeof image === 'string' && (image.startsWith('http://') || image.startsWith('https://'))) {
+                await waSocket.sendMessage(cleanPhone, { image: { url: image }, caption: text });
+            } else {
+                await waSocket.sendMessage(cleanPhone, { text });
+            }
+        } else {
+            await waSocket.sendMessage(cleanPhone, { text });
+        }
+        console.log(`💬 [WhatsApp Sent (Staggered Queue)] → ${phone}: "${text.substring(0, 40)}..." ${image ? '🖼️ (With Image)' : ''}`);
     } catch (err) {
         console.error(`❌ [WhatsApp Send Failed] → ${phone}:`, err.message);
     }
 }
 
-async function sendWhatsAppDirect(phone, text) {
-    queueWhatsAppMessage(phone, text);
+async function sendWhatsAppDirect(phone, text, image = null) {
+    queueWhatsAppMessage(phone, text, image);
 }
 
 app.post('/wa/send', async (req, res) => {
     try {
-        const { phone, text } = req.body || {};
+        const { phone, text, image } = req.body || {};
         if (!phone || !text) {
             return res.status(400).json({ error: 'Missing phone or text parameter.' });
         }
@@ -340,8 +353,8 @@ app.post('/wa/send', async (req, res) => {
             return res.status(531).json({ error: 'WhatsApp engine is not connected. Scan QR code in dashboard.' });
         }
 
-        queueWhatsAppMessage(phone, text);
-        return res.json({ success: true, message: 'Message queued safely for dispatch with 3-second anti-spam interval.' });
+        queueWhatsAppMessage(phone, text, image);
+        return res.json({ success: true, message: 'Message queued safely for dispatch with anti-spam interval.' });
     } catch (err) {
         console.error('[WhatsApp Send Error]:', err.message);
         return res.status(500).json({ error: err.message });
