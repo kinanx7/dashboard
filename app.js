@@ -3540,19 +3540,48 @@ function saveEditedManagerNote() {
 function saveEditedManagerNoteDirect(id, trimmedText) {
     const isAr = currentAppLang === 'ar';
     const now = Date.now();
+    const targetStr = String(id);
+    const data = getCompanyData();
     const notes = getNotesArray();
-    const note = notes.find(n => n && n.id === id);
-    if (note) note.text = trimmedText;
 
+    // 1. Update memory notes array
+    const note = notes.find(n => n && String(n.id) === targetStr);
+    if (note) {
+        note.text = trimmedText;
+        note.editedAt = now;
+    }
+
+    if (Array.isArray(data.managerNotes)) {
+        const targetNote = data.managerNotes.find(n => n && String(n.id) === targetStr);
+        if (targetNote) {
+            targetNote.text = trimmedText;
+            targetNote.editedAt = now;
+        }
+    } else if (data.managerNotes && typeof data.managerNotes === 'object') {
+        if (data.managerNotes[id]) {
+            data.managerNotes[id].text = trimmedText;
+            data.managerNotes[id].editedAt = now;
+        }
+        if (data.managerNotes[targetStr]) {
+            data.managerNotes[targetStr].text = trimmedText;
+            data.managerNotes[targetStr].editedAt = now;
+        }
+    }
+
+    closeEditNoteModal();
+    renderNotes();
+
+    // 2. Persist to Firebase RTDB
     db.ref(`companies/${currentCompany}/managerNotes/${id}`).update({
         text: trimmedText,
         editedAt: now
     }).then(() => {
-        closeEditNoteModal();
         renderNotes();
     }).catch(err => {
         console.error("Error editing note:", err);
-        alert(isAr ? 'حدث خطأ أثناء تعديل الملاحظة.' : 'Error editing note.');
+        // Fallback: full node set
+        db.ref(`companies/${currentCompany}/managerNotes`).set(data.managerNotes)
+            .then(() => renderNotes());
     });
 }
 
@@ -12074,13 +12103,8 @@ function renderAttendance() {
     const isAr = currentAppLang === 'ar';
     const companyData = getCompanyData();
     const workers = companyData.workers || [];
-    const datePicker = document.getElementById('attendance-date-picker');
-    const dateStr = datePicker ? datePicker.value : '';
-    const attendanceMap = (companyData.attendance || {})[dateStr] || {};
-    const isAttAdmin = currentUser && (currentUser.role === 'admin' || document.body.classList.contains('perm-attendance'));
-    const currentEmail = currentUser && currentUser.email ? currentUser.email.toLowerCase() : '';
-    const myWorker = workers.find(w => w.email && w.email.toLowerCase() === currentEmail);
 
+    const datePicker = document.getElementById('attendance-date-picker');
     if (datePicker && !datePicker.value) {
         const today = new Date();
         const yyyy = today.getFullYear();
@@ -12098,12 +12122,18 @@ function renderAttendance() {
         vacDatePicker.value = `${yyyy}-${mm}-${dd}`;
     }
 
+    const dateStr = datePicker ? datePicker.value : '';
     if (!dateStr) return;
 
     const tbody = document.getElementById('attendance-table-body');
     if (!tbody) return;
 
     tbody.innerHTML = '';
+
+    const attendanceMap = (companyData.attendance || {})[dateStr] || {};
+    const isAttAdmin = currentUser && (currentUser.role === 'admin' || document.body.classList.contains('perm-attendance'));
+    const currentEmail = currentUser && currentUser.email ? currentUser.email.toLowerCase() : '';
+    const myWorker = workers.find(w => w.email && w.email.toLowerCase() === currentEmail);
 
     const workerOnlyCard = document.querySelector('.attendance-worker-only');
     if (workerOnlyCard) {

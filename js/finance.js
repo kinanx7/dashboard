@@ -2090,13 +2090,8 @@ function renderAttendance() {
     const isAr = currentAppLang === 'ar';
     const companyData = getCompanyData();
     const workers = companyData.workers || [];
-    const datePicker = document.getElementById('attendance-date-picker');
-    const dateStr = datePicker ? datePicker.value : '';
-    const attendanceMap = (companyData.attendance || {})[dateStr] || {};
-    const isAttAdmin = currentUser && (currentUser.role === 'admin' || document.body.classList.contains('perm-attendance'));
-    const currentEmail = currentUser && currentUser.email ? currentUser.email.toLowerCase() : '';
-    const myWorker = workers.find(w => w.email && w.email.toLowerCase() === currentEmail);
 
+    const datePicker = document.getElementById('attendance-date-picker');
     if (datePicker && !datePicker.value) {
         const today = new Date();
         const yyyy = today.getFullYear();
@@ -2114,12 +2109,18 @@ function renderAttendance() {
         vacDatePicker.value = `${yyyy}-${mm}-${dd}`;
     }
 
+    const dateStr = datePicker ? datePicker.value : '';
     if (!dateStr) return;
 
     const tbody = document.getElementById('attendance-table-body');
     if (!tbody) return;
 
     tbody.innerHTML = '';
+
+    const attendanceMap = (companyData.attendance || {})[dateStr] || {};
+    const isAttAdmin = currentUser && (currentUser.role === 'admin' || document.body.classList.contains('perm-attendance'));
+    const currentEmail = currentUser && currentUser.email ? currentUser.email.toLowerCase() : '';
+    const myWorker = workers.find(w => w.email && w.email.toLowerCase() === currentEmail);
 
     const workerOnlyCard = document.querySelector('.attendance-worker-only');
     if (workerOnlyCard) {

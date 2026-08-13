@@ -111,19 +111,48 @@ function saveEditedManagerNote() {
 function saveEditedManagerNoteDirect(id, trimmedText) {
     const isAr = currentAppLang === 'ar';
     const now = Date.now();
+    const targetStr = String(id);
+    const data = getCompanyData();
     const notes = getNotesArray();
-    const note = notes.find(n => n && n.id === id);
-    if (note) note.text = trimmedText;
 
+    // 1. Update memory notes array
+    const note = notes.find(n => n && String(n.id) === targetStr);
+    if (note) {
+        note.text = trimmedText;
+        note.editedAt = now;
+    }
+
+    if (Array.isArray(data.managerNotes)) {
+        const targetNote = data.managerNotes.find(n => n && String(n.id) === targetStr);
+        if (targetNote) {
+            targetNote.text = trimmedText;
+            targetNote.editedAt = now;
+        }
+    } else if (data.managerNotes && typeof data.managerNotes === 'object') {
+        if (data.managerNotes[id]) {
+            data.managerNotes[id].text = trimmedText;
+            data.managerNotes[id].editedAt = now;
+        }
+        if (data.managerNotes[targetStr]) {
+            data.managerNotes[targetStr].text = trimmedText;
+            data.managerNotes[targetStr].editedAt = now;
+        }
+    }
+
+    closeEditNoteModal();
+    renderNotes();
+
+    // 2. Persist to Firebase RTDB
     db.ref(`companies/${currentCompany}/managerNotes/${id}`).update({
         text: trimmedText,
         editedAt: now
     }).then(() => {
-        closeEditNoteModal();
         renderNotes();
     }).catch(err => {
         console.error("Error editing note:", err);
-        alert(isAr ? 'حدث خطأ أثناء تعديل الملاحظة.' : 'Error editing note.');
+        // Fallback: full node set
+        db.ref(`companies/${currentCompany}/managerNotes`).set(data.managerNotes)
+            .then(() => renderNotes());
     });
 }
 
