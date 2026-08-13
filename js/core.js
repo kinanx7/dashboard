@@ -1424,7 +1424,27 @@ function applyUserRoles() {
         if (wPerms.adverts || deptPrivacy.adverts === 'public') document.body.classList.add('perm-adverts');
         if (wPerms.attendance) document.body.classList.add('perm-attendance');
         if (wPerms.tasks) document.body.classList.add('perm-tasks');
-        if (wPerms.prepare) document.body.classList.add('perm-prepare');
+        
+        let isAssignedPrep = false;
+        if (worker && worker.id) {
+            const compData = getCompanyData();
+            let assigned = compData.assignedPreparingWorkerIds || [];
+            if (!Array.isArray(assigned) && compData.assignedPreparingWorkerId) {
+                assigned = [String(compData.assignedPreparingWorkerId)];
+            }
+            if (assigned.map(String).includes(String(worker.id))) {
+                isAssignedPrep = true;
+            }
+        }
+        if (wPerms.prepare || isAssignedPrep) document.body.classList.add('perm-prepare');
+        if (wPerms.vault) document.body.classList.add('perm-vault');
+        if (wPerms.reminders) document.body.classList.add('perm-reminders');
+        if (wPerms.messaging) document.body.classList.add('perm-messaging');
+        if (wPerms.ai_chat) document.body.classList.add('perm-ai-assistant');
+        if (wPerms.activity) document.body.classList.add('perm-activity');
+        if (wPerms.market) document.body.classList.add('perm-market');
+        if (wPerms.summary) document.body.classList.add('perm-summary');
+
         if (isDriver) document.body.classList.add('is-driver');
         if (typeof checkWorkerSystemViolationAlerts === 'function') {
             checkWorkerSystemViolationAlerts(worker);
@@ -1450,17 +1470,25 @@ function markLockedTabs() {
 
     // Map: tabId → does current user have access?
     const access = {
+        ops: true,
+        ranks: true,
+        notes: true,
+        summary: true,
+        attendance: isAdmin || document.body.classList.contains('perm-attendance'),
+        tasks: true,
         warehouse: isAdmin || document.body.classList.contains('perm-warehouse'),
         drivers: isAdmin || document.body.classList.contains('perm-drivers') || document.body.classList.contains('is-driver'),
         finance: isAdmin || document.body.classList.contains('perm-finance'),
+        adverts: isAdmin || document.body.classList.contains('perm-adverts'),
+        activity: isAdmin || document.body.classList.contains('perm-activity'),
         managing: isAdmin || document.body.classList.contains('perm-sales'),
         costs: isAdmin || document.body.classList.contains('perm-costs'),
-        adverts: isAdmin || document.body.classList.contains('perm-adverts'),
-        activity: isAdmin,
-        reminders: isAdmin,
-        market: isAdmin || isCustomer,
+        reminders: isAdmin || document.body.classList.contains('perm-reminders'),
+        market: isAdmin || isCustomer || document.body.classList.contains('perm-market'),
         prepare: isAdmin || document.body.classList.contains('perm-prepare'),
         'ai-assistant': isAdmin,
+        vault: isAdmin || document.body.classList.contains('perm-vault'),
+        messaging: isAdmin || document.body.classList.contains('perm-messaging')
     };
 
     Object.entries(access).forEach(([tabId, hasAccess]) => {
@@ -2074,7 +2102,6 @@ function switchTab(tab) {
     if (isLocked) {
         const label = document.getElementById('locked-dept-label');
         if (label && tabBtn) {
-            // Strip the ⛓️ emoji appended by CSS ::after (it's not in textContent)
             label.textContent = tabBtn.textContent.trim();
         }
     }

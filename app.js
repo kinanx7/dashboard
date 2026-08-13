@@ -1,3 +1,7 @@
+/**
+ * Core global variables, navigation (switchTab), translations, Firebase init, FCM token & tick helpers
+ */
+
 function escapeHtml(str) {
     if (str === null || str === undefined) return '';
     return String(str)
@@ -236,7 +240,6 @@ function hideInAppNotification() {
 }
 
 var authMode = 'login';
-window.authMode = authMode;
 
 let currentCustomerSession = null;
 try {
@@ -245,14 +248,12 @@ try {
 } catch (e) {
     currentCustomerSession = null;
 }
-window.currentCustomerSession = currentCustomerSession;
 
 let localCustomerRegistry = {};
 try {
     const cachedReg = localStorage.getItem('mvc_global_customer_registry');
     if (cachedReg) localCustomerRegistry = JSON.parse(cachedReg);
 } catch (e) { }
-window.localCustomerRegistry = localCustomerRegistry;
 
 function initPublicCustomerSync() {
     if (typeof window !== 'undefined' && window.db) {
@@ -571,8 +572,6 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 var auth = firebase.auth();
 var db = firebase.database();
-window.auth = auth;
-window.db = db;
 initPublicCustomerSync();
 
 // --- Auth UI Helpers ---
@@ -1425,7 +1424,27 @@ function applyUserRoles() {
         if (wPerms.adverts || deptPrivacy.adverts === 'public') document.body.classList.add('perm-adverts');
         if (wPerms.attendance) document.body.classList.add('perm-attendance');
         if (wPerms.tasks) document.body.classList.add('perm-tasks');
-        if (wPerms.prepare) document.body.classList.add('perm-prepare');
+        
+        let isAssignedPrep = false;
+        if (worker && worker.id) {
+            const compData = getCompanyData();
+            let assigned = compData.assignedPreparingWorkerIds || [];
+            if (!Array.isArray(assigned) && compData.assignedPreparingWorkerId) {
+                assigned = [String(compData.assignedPreparingWorkerId)];
+            }
+            if (assigned.map(String).includes(String(worker.id))) {
+                isAssignedPrep = true;
+            }
+        }
+        if (wPerms.prepare || isAssignedPrep) document.body.classList.add('perm-prepare');
+        if (wPerms.vault) document.body.classList.add('perm-vault');
+        if (wPerms.reminders) document.body.classList.add('perm-reminders');
+        if (wPerms.messaging) document.body.classList.add('perm-messaging');
+        if (wPerms.ai_chat) document.body.classList.add('perm-ai-assistant');
+        if (wPerms.activity) document.body.classList.add('perm-activity');
+        if (wPerms.market) document.body.classList.add('perm-market');
+        if (wPerms.summary) document.body.classList.add('perm-summary');
+
         if (isDriver) document.body.classList.add('is-driver');
         if (typeof checkWorkerSystemViolationAlerts === 'function') {
             checkWorkerSystemViolationAlerts(worker);
@@ -1451,17 +1470,25 @@ function markLockedTabs() {
 
     // Map: tabId → does current user have access?
     const access = {
+        ops: true,
+        ranks: true,
+        notes: true,
+        summary: true,
+        attendance: isAdmin || document.body.classList.contains('perm-attendance'),
+        tasks: true,
         warehouse: isAdmin || document.body.classList.contains('perm-warehouse'),
         drivers: isAdmin || document.body.classList.contains('perm-drivers') || document.body.classList.contains('is-driver'),
         finance: isAdmin || document.body.classList.contains('perm-finance'),
+        adverts: isAdmin || document.body.classList.contains('perm-adverts'),
+        activity: isAdmin || document.body.classList.contains('perm-activity'),
         managing: isAdmin || document.body.classList.contains('perm-sales'),
         costs: isAdmin || document.body.classList.contains('perm-costs'),
-        adverts: isAdmin || document.body.classList.contains('perm-adverts'),
-        activity: isAdmin,
-        reminders: isAdmin,
-        market: isAdmin || isCustomer,
+        reminders: isAdmin || document.body.classList.contains('perm-reminders'),
+        market: isAdmin || isCustomer || document.body.classList.contains('perm-market'),
         prepare: isAdmin || document.body.classList.contains('perm-prepare'),
         'ai-assistant': isAdmin,
+        vault: isAdmin || document.body.classList.contains('perm-vault'),
+        messaging: isAdmin || document.body.classList.contains('perm-messaging')
     };
 
     Object.entries(access).forEach(([tabId, hasAccess]) => {
@@ -1885,6 +1912,660 @@ function saveTokenForCompany(companyId, email, token) {
 }
 
 
+
+let currentAppLang = localStorage.getItem("burgeroov_lang") || "en";
+
+function t(key) {
+    return (uiTranslations[currentAppLang] && uiTranslations[currentAppLang][key]) || key;
+}
+
+function applyTranslations() {
+    if (currentAppLang !== "en" && currentAppLang !== "ar") {
+        currentAppLang = "en";
+    }
+    document.documentElement.dir = currentAppLang === "ar" ? "rtl" : "ltr";
+
+    const langBtn = document.getElementById("lang-toggle-btn");
+    if (langBtn) {
+        langBtn.innerText = currentAppLang === "ar" ? "🌐 English" : "🌐 عربي";
+    }
+    const langBtnMob = document.getElementById("lang-toggle-btn-mob");
+    if (langBtnMob) {
+        langBtnMob.innerText = currentAppLang === "ar" ? "🌐 English" : "🌐 عربي";
+    }
+
+    const langDict = { ...(uiTranslations[currentAppLang] || uiTranslations["en"] || {}) };
+
+    // Dynamic translations based on selected company
+    if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession) {
+        langDict['app-title'] = currentAppLang === 'ar' ? 'سوق عملاء MVC' : 'MVC Customer Market';
+        document.title = 'MVC Customer Market';
+    } else if (currentCompany === 'mvc') {
+        langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات إم في سي فريش' : 'MVC Fresh Operations Portal';
+        langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة تحكم إم في سي فريش' : 'Login to MVC Fresh Dashboard';
+        document.title = 'MVC Fresh Management Portal';
+    } else if (currentCompany === 'mvcfresh') {
+        langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات إم في سي فريش' : 'MVC Fresh Operations Portal';
+        langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة تحكم إم في سي فريش' : 'Login to MVC Fresh Dashboard';
+        document.title = 'MVC Fresh Management Portal';
+    } else {
+        langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات برجروف' : 'Burgeroov Operations Portal';
+        langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة التحكم' : 'Login to Dashboard';
+        document.title = 'Burgeroov Management Portal';
+    }
+
+    document.querySelectorAll("[data-i18n]").forEach(el => {
+        let key = el.getAttribute("data-i18n");
+        let isPlaceholder = false;
+        if (key.startsWith("[placeholder]")) {
+            isPlaceholder = true;
+            key = key.replace("[placeholder]", "");
+        }
+        const translation = langDict[key];
+
+        if (translation) {
+            if (isPlaceholder || (el.tagName === "INPUT" && el.hasAttribute("placeholder")) || (el.tagName === "TEXTAREA" && el.hasAttribute("placeholder"))) {
+                el.placeholder = translation;
+            } else {
+                el.innerHTML = translation;
+            }
+        }
+    });
+
+    if (typeof applyDarkMode === "function") {
+        applyDarkMode();
+    }
+}
+
+function toggleLanguage(event) {
+    if (event) event.stopPropagation();
+    currentAppLang = currentAppLang === "en" ? "ar" : "en";
+    localStorage.setItem("burgeroov_lang", currentAppLang);
+
+    if (typeof renderAll === "function") renderAll();
+    applyTranslations();
+    if (typeof applyDarkMode === "function") applyDarkMode();
+}
+
+
+function getVisibleWorkers() {
+    const workers = getCompanyData().workers;
+    if (!currentUser) return [];
+
+    const email = currentUser.email.toLowerCase();
+    const admins = getCompanyData().admins || { "kinan,rahal@hotmail,com": true };
+    const isAdmin = email === 'kinan.rahal@hotmail.com' || admins[email.replace(/\./g, ',')] === true;
+
+    const worker = workers.find(w => w.email && w.email.toLowerCase() === email);
+    const hasFinancePerm = worker && worker.permissions && worker.permissions.finance;
+
+    if (isAdmin || hasFinancePerm) {
+        return workers;
+    } else {
+        return workers.filter(w => w.email && w.email.toLowerCase() === email);
+    }
+}
+
+// --- ADMIN / MANAGER ACCESS SYSTEM ---
+
+function setDatePickerLimits() {
+    const dateInput = document.getElementById('log-date');
+    const [year, month] = currentGlobalMonth.split('-');
+    const lastDay = new Date(year, month, 0).getDate();
+    dateInput.min = `${currentGlobalMonth}-01`; dateInput.max = `${currentGlobalMonth}-${lastDay}`;
+    dateInput.value = '';
+}
+
+
+function formatTimestamp() {
+    const d = new Date(); const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const m = d.getMinutes().toString().padStart(2, '0'); const h = d.getHours().toString().padStart(2, '0');
+    return `${months[d.getMonth()]} ${d.getDate()}, ${h}:${m}`;
+}
+
+function formatDuration(ms) {
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+}
+
+function compressImage(file, callback) {
+    const reader = new FileReader(); reader.readAsDataURL(file);
+    reader.onload = event => {
+        const img = new Image(); img.src = event.target.result;
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 500; let scaleSize = MAX_WIDTH / img.width; if (scaleSize > 1) scaleSize = 1;
+            canvas.width = img.width * scaleSize; canvas.height = img.height * scaleSize;
+            const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            callback(canvas.toDataURL('image/jpeg', 0.6));
+        }
+    };
+}
+
+function showImage(src) { document.getElementById('image-modal-content').src = src; document.getElementById('image-modal').style.display = 'flex'; }
+
+function toggleDetails(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.style.display === 'none' || el.style.display === '') {
+        el.style.display = 'block';
+        if (id.startsWith('wh-logs-')) {
+            window.expandedWhLogs = window.expandedWhLogs || {};
+            window.expandedWhLogs[id] = true;
+        }
+    } else {
+        el.style.display = 'none';
+        if (id.startsWith('wh-logs-')) {
+            window.expandedWhLogs = window.expandedWhLogs || {};
+            delete window.expandedWhLogs[id];
+        }
+    }
+}
+
+function downloadBackup() {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ burgeroov: appData.burgeroov }));
+    const a = document.createElement('a'); a.href = dataStr;
+    a.download = `burgeroov_backup_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+}
+function triggerRestore() { document.getElementById('backup-file-input').click(); }
+function processRestoreFile(event) {
+    const file = event.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            const parsedData = JSON.parse(e.target.result);
+            if (parsedData.burgeroov) {
+                appData.burgeroov = parsedData.burgeroov;
+                saveData();
+                alert("Backup restored and synced to cloud successfully!");
+            } else { alert("Invalid backup file."); }
+        } catch (err) { alert("Could not read file."); }
+    };
+    reader.readAsText(file); event.target.value = '';
+}
+
+// --- UI NAVIGATION & GLOBALS ---
+function switchTab(tab) {
+    if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && tab !== 'market') {
+        tab = 'market';
+    }
+    currentTab = tab;
+
+    // --- Check if this tab is locked for the current user ---
+    const tabBtn = document.getElementById(`tab-${tab}`);
+    const isLocked = tabBtn ? tabBtn.classList.contains('tab-locked') : false;
+
+    // Update the locked view label with the department name
+    if (isLocked) {
+        const label = document.getElementById('locked-dept-label');
+        if (label && tabBtn) {
+            label.textContent = tabBtn.textContent.trim();
+        }
+    }
+
+    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant', 'vault', 'messaging'];
+
+    allTabs.forEach(t => {
+        const btn = document.getElementById(`tab-${t}`);
+        const view = document.getElementById(`view-${t}`);
+        const isActive = tab === t;
+        if (btn) btn.classList.toggle('active-tab', isActive);
+        // Only show the real view if NOT locked
+        if (view) view.classList.toggle('active-view', isActive && !isLocked);
+
+        // Sync quick-bar buttons (by id)
+        const qBtn = document.getElementById(`mob-tab-${t}`);
+        if (qBtn) qBtn.classList.toggle('active-tab', isActive);
+
+        // Sync dept-sheet buttons (by data-tab attribute)
+        document.querySelectorAll(`.mob-sheet-tab[data-tab="${t}"]`).forEach(el => {
+            el.classList.toggle('active-tab', isActive);
+        });
+    });
+
+    if (tab === 'vault' && typeof renderVaultNotes === 'function') {
+        renderVaultNotes();
+    }
+    if (tab === 'messaging' && typeof renderMessagingSection === 'function') {
+        renderMessagingSection();
+    }
+    if (tab === 'tasks' && typeof renderInquiries === 'function') {
+        renderInquiries();
+    }
+
+    // Update the compact bar's active tab label and icon
+    const tabMeta = {
+        ops: { icon: '⚙️', label: 'Operations' },
+        ranks: { icon: '🏆', label: 'Ranks' },
+        tasks: { icon: '📋', label: 'Tasks' },
+        warehouse: { icon: '📦', label: 'Warehouse' },
+        drivers: { icon: '🚚', label: 'Drivers' },
+        finance: { icon: '💰', label: 'Finance' },
+        summary: { icon: '📊', label: 'Summary' },
+        managing: { icon: '💵', label: 'Sales' },
+        costs: { icon: '📉', label: 'Costs' },
+        adverts: { icon: '📢', label: 'Ads' },
+        notes: { icon: '📝', label: 'Notes' },
+        reminders: { icon: '⏰', label: 'Reminders' },
+        market: { icon: '🏪', label: 'Market' },
+        prepare: { icon: '👨‍🍳', label: 'Prepare' },
+        vault: { icon: '📁', label: 'Informations' },
+        messaging: { icon: '💬', label: 'Messaging' },
+    };
+    const meta = tabMeta[tab] || { icon: '⚙️', label: tab };
+    const iconEl = document.getElementById('mob-active-icon');
+    const labelEl = document.getElementById('mob-active-label');
+    if (iconEl) iconEl.textContent = meta.icon;
+    if (labelEl) labelEl.textContent = meta.label;
+
+    // Show or hide the locked overlay
+    const lockedView = document.getElementById('view-locked');
+    if (lockedView) lockedView.classList.toggle('active-view', isLocked);
+
+    if (!isLocked) {
+        renderAll();
+        if (tab === 'reminders' && typeof renderReminders === 'function') {
+            if (typeof currentRemindersLimit !== 'undefined') {
+                currentRemindersLimit = 20;
+            }
+            renderReminders();
+        }
+        if (tab === 'market' && typeof renderMarket === 'function') {
+            renderMarket();
+        }
+        if (tab === 'prepare' && typeof renderPrepareSection === 'function') {
+            renderPrepareSection();
+        }
+        // Fixes Leaflet map rendering bug when switching tabs
+        if (tab === 'adverts' && promoMap) {
+            setTimeout(() => { promoMap.invalidateSize(); }, 500);
+        }
+    }
+}
+
+// --- MOBILE DEPARTMENT MENU ---
+window.openMobDeptMenu = function () {
+    const backdrop = document.getElementById('mob-dept-backdrop');
+    const sheet = document.getElementById('mob-dept-sheet');
+    if (backdrop) backdrop.classList.add('open');
+    if (sheet) sheet.classList.add('open');
+    document.body.style.overflow = 'hidden';
+};
+
+window.closeMobDeptMenu = function () {
+    const backdrop = document.getElementById('mob-dept-backdrop');
+    const sheet = document.getElementById('mob-dept-sheet');
+    if (backdrop) backdrop.classList.remove('open');
+    if (sheet) {
+        sheet.classList.remove('open');
+    }
+    document.body.style.overflow = '';
+};
+
+// Close menu on Escape key
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeMobDeptMenu();
+});
+
+
+function getMonthlyStats(worker, monthStr) {
+    if (!worker.monthlyStats) worker.monthlyStats = {};
+    if (!worker.monthlyStats[monthStr]) {
+        worker.monthlyStats[monthStr] = {
+            custodyList: [],
+            violationsList: [],
+            rewardsList: [],
+            costs: 0,
+            paymentsList: [],
+            deliveriesList: [],
+            legacyDeliveries: 0,
+            overtimeList: []
+        };
+    } else if (!worker.monthlyStats[monthStr].overtimeList) {
+        worker.monthlyStats[monthStr].overtimeList = [];
+    }
+    return worker.monthlyStats[monthStr];
+}
+
+function getLogsForMonth(worker, monthStr) { return worker.logs.filter(l => l.date.startsWith(monthStr)); }
+
+function calculateViolationsTotal(violationsList) {
+    if (!violationsList) return 0;
+    return violationsList.reduce((sum, v) => {
+        if (v.status === 'waived') return sum;
+        if (v.status === 'active' || !v.status) return sum + parseFloat(v.amount);
+        if (v.status === 'pending') {
+            const deadline = v.timestamp + (v.graceDays * 86400000);
+            if (Date.now() >= deadline) return sum + parseFloat(v.amount);
+        }
+        return sum;
+    }, 0);
+}
+
+function calculatePaymentsTotal(paymentsList) {
+    if (!paymentsList) return 0;
+    return paymentsList.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+}
+
+function calculateRewardsTotal(rewardsList) {
+    if (!rewardsList) return 0;
+    return rewardsList.reduce((sum, r) => sum + parseFloat(r.amount), 0);
+}
+
+function calculateOvertimeTotal(overtimeList) {
+    if (!overtimeList) return 0;
+    return overtimeList.reduce((sum, o) => sum + parseFloat(o.amount || 0), 0);
+}
+
+function calculateCustodyTotal(custodyList) {
+    if (!custodyList) return 0;
+    return custodyList.reduce((sum, c) => {
+        if (c.type === 'given') return sum + parseFloat(c.amount);
+        if (c.type === 'returned') return sum - parseFloat(c.amount);
+        return sum;
+    }, 0);
+}
+
+function getCumulativeBalance(worker, maxMonthStr) {
+    const allMonths = Object.keys(worker.monthlyStats || {}).sort();
+    let balance = parseFloat(worker.initialBalance || 0);
+    for (const m of allMonths) {
+        const stats = worker.monthlyStats[m];
+        const base = parseFloat(worker.income || 0);
+        const rew = calculateRewardsTotal(stats.rewardsList);
+        const viol = calculateViolationsTotal(stats.violationsList);
+
+        const sysViolDeduction = typeof getSystemViolationDeductionsForMonth === 'function' ? getSystemViolationDeductionsForMonth(worker, m) : 0;
+        const lateDeduction = typeof getLateDeductionsForMonth === 'function' ? getLateDeductionsForMonth(worker, m) : 0;
+        const volumeReward = typeof getDriverVolumeRewardsForMonth === 'function' ? getDriverVolumeRewardsForMonth(worker, m) : 0;
+        const ov = calculateOvertimeTotal(stats.overtimeList);
+        const netThisMonth = base + rew + volumeReward + ov - viol - sysViolDeduction - lateDeduction;
+        const paidThisMonth = calculatePaymentsTotal(stats.paymentsList);
+        balance += (netThisMonth - paidThisMonth);
+        if (m === maxMonthStr) break;
+    }
+    return balance;
+}
+
+function handleMonthChange() {
+    const input = document.getElementById('global-month').value;
+    if (input) {
+        currentGlobalMonth = input;
+        showingAllHistory = false;
+        setDatePickerLimits();
+        runAutoLogger();
+        renderAll();
+        checkStockAlerts();
+    }
+}
+
+function setDatePickerLimits() {
+    const dateInput = document.getElementById('log-date');
+    const [year, month] = currentGlobalMonth.split('-');
+    const lastDay = new Date(year, month, 0).getDate();
+    dateInput.min = `${currentGlobalMonth}-01`; dateInput.max = `${currentGlobalMonth}-${lastDay}`;
+    dateInput.value = '';
+}
+
+function toggleVacationDays() {
+    const type = document.getElementById('log-type').value;
+    document.getElementById('vacation-days-group').style.display = type === 'vacation' ? 'block' : 'none';
+}
+
+// --- DATA EXPORT LOGIC ---
+
+function switchTab(tab) {
+    if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && tab !== 'market') {
+        tab = 'market';
+    }
+    currentTab = tab;
+
+    // --- Check if this tab is locked for the current user ---
+    const tabBtn = document.getElementById(`tab-${tab}`);
+    const isLocked = tabBtn ? tabBtn.classList.contains('tab-locked') : false;
+
+    // Update the locked view label with the department name
+    if (isLocked) {
+        const label = document.getElementById('locked-dept-label');
+        if (label && tabBtn) {
+            // Strip the ⛓️ emoji appended by CSS ::after (it's not in textContent)
+            label.textContent = tabBtn.textContent.trim();
+        }
+    }
+
+    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant', 'vault', 'messaging'];
+
+    allTabs.forEach(t => {
+        const btn = document.getElementById(`tab-${t}`);
+        const view = document.getElementById(`view-${t}`);
+        const isActive = tab === t;
+        if (btn) btn.classList.toggle('active-tab', isActive);
+        // Only show the real view if NOT locked
+        if (view) view.classList.toggle('active-view', isActive && !isLocked);
+
+        // Sync quick-bar buttons (by id)
+        const qBtn = document.getElementById(`mob-tab-${t}`);
+        if (qBtn) qBtn.classList.toggle('active-tab', isActive);
+
+        // Sync dept-sheet buttons (by data-tab attribute)
+        document.querySelectorAll(`.mob-sheet-tab[data-tab="${t}"]`).forEach(el => {
+            el.classList.toggle('active-tab', isActive);
+        });
+    });
+
+    if (tab === 'vault' && typeof renderVaultNotes === 'function') {
+        renderVaultNotes();
+    }
+    if (tab === 'messaging' && typeof renderMessagingSection === 'function') {
+        renderMessagingSection();
+    }
+    if (tab === 'tasks' && typeof renderInquiries === 'function') {
+        renderInquiries();
+    }
+
+    // Update the compact bar's active tab label and icon
+    const tabMeta = {
+        ops: { icon: '⚙️', label: 'Operations' },
+        ranks: { icon: '🏆', label: 'Ranks' },
+        tasks: { icon: '📋', label: 'Tasks' },
+        warehouse: { icon: '📦', label: 'Warehouse' },
+        drivers: { icon: '🚚', label: 'Drivers' },
+        finance: { icon: '💰', label: 'Finance' },
+        summary: { icon: '📊', label: 'Summary' },
+        managing: { icon: '💵', label: 'Sales' },
+        costs: { icon: '📉', label: 'Costs' },
+        adverts: { icon: '📢', label: 'Ads' },
+        notes: { icon: '📝', label: 'Notes' },
+        reminders: { icon: '⏰', label: 'Reminders' },
+        market: { icon: '🏪', label: 'Market' },
+        prepare: { icon: '👨‍🍳', label: 'Prepare' },
+        vault: { icon: '📁', label: 'Informations' },
+        messaging: { icon: '💬', label: 'Messaging' },
+    };
+    const meta = tabMeta[tab] || { icon: '⚙️', label: tab };
+    const iconEl = document.getElementById('mob-active-icon');
+    const labelEl = document.getElementById('mob-active-label');
+    if (iconEl) iconEl.textContent = meta.icon;
+    if (labelEl) labelEl.textContent = meta.label;
+
+    // Show or hide the locked overlay
+    const lockedView = document.getElementById('view-locked');
+    if (lockedView) lockedView.classList.toggle('active-view', isLocked);
+
+    if (!isLocked) {
+        renderAll();
+        if (tab === 'reminders' && typeof renderReminders === 'function') {
+            if (typeof currentRemindersLimit !== 'undefined') {
+                currentRemindersLimit = 20;
+            }
+            renderReminders();
+        }
+        if (tab === 'market' && typeof renderMarket === 'function') {
+            renderMarket();
+        }
+        if (tab === 'prepare' && typeof renderPrepareSection === 'function') {
+            renderPrepareSection();
+        }
+        // Fixes Leaflet map rendering bug when switching tabs
+        if (tab === 'adverts' && promoMap) {
+            setTimeout(() => { promoMap.invalidateSize(); }, 500);
+        }
+    }
+}
+
+// --- MOBILE DEPARTMENT MENU ---
+window.openMobDeptMenu = function () {
+    const backdrop = document.getElementById('mob-dept-backdrop');
+    const sheet = document.getElementById('mob-dept-sheet');
+    if (backdrop) backdrop.classList.add('open');
+    if (sheet) sheet.classList.add('open');
+    document.body.style.overflow = 'hidden';
+};
+
+window.closeMobDeptMenu = function () {
+    const backdrop = document.getElementById('mob-dept-backdrop');
+    const sheet = document.getElementById('mob-dept-sheet');
+    if (backdrop) backdrop.classList.remove('open');
+    if (sheet) {
+        sheet.classList.remove('open');
+    }
+    document.body.style.overflow = '';
+};
+
+// Close menu on Escape key
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeMobDeptMenu();
+});
+
+
+
+
+function renderAll() {
+    if (typeof renderBranches === 'function') renderBranches();
+    if (typeof renderViolationRules === 'function') renderViolationRules();
+    if (typeof populateWorkerDropdowns === 'function') populateWorkerDropdowns();
+    if (typeof renderWarehouse === 'function') renderWarehouse();
+    if (typeof renderManagersList === 'function') renderManagersList();
+    if (typeof renderWorkerViolationPanel === 'function') renderWorkerViolationPanel();
+
+    if (currentTab === 'ops') {
+        if (typeof renderOpsWorkersTable === 'function') renderOpsWorkersTable();
+        if (typeof renderOpsDetails === 'function') renderOpsDetails();
+        if (typeof renderSelectedWorkerSysViolations === 'function') renderSelectedWorkerSysViolations();
+    }
+    else if (currentTab === 'ranks') { if (typeof renderRanksTable === 'function') renderRanksTable(); }
+    else if (currentTab === 'attendance') { if (typeof renderAttendance === 'function') renderAttendance(); }
+    else if (currentTab === 'tasks') { if (typeof renderTasks === 'function') renderTasks(); }
+    else if (currentTab === 'finance') {
+        if (typeof renderFinanceTable === 'function') renderFinanceTable();
+        if (typeof renderFinDetails === 'function') renderFinDetails();
+        if (typeof renderFinanceSpendArea === 'function') renderFinanceSpendArea();
+    }
+    else if (currentTab === 'summary') {
+        if (typeof renderSummaryTable === 'function') renderSummaryTable();
+        if (typeof renderLeaderboard === 'function') renderLeaderboard();
+    }
+    else if (currentTab === 'drivers') {
+        if (typeof renderDriversList === 'function') renderDriversList();
+        if (typeof renderDriverPanel === 'function') renderDriverPanel();
+        if (typeof renderDriverVolumeRewards === 'function') renderDriverVolumeRewards();
+    }
+    else if (currentTab === 'adverts') { if (typeof renderAdverts === 'function') renderAdverts(); }
+    else if (currentTab === 'notes') { if (typeof renderNotes === 'function') renderNotes(); }
+    else if (currentTab === 'activity') { if (typeof renderActivityLog === 'function') renderActivityLog(); }
+    else if (currentTab === 'managing') { if (typeof renderManaging === 'function') renderManaging(); }
+    else if (currentTab === 'costs') { if (typeof renderCosts === 'function') renderCosts(); }
+    else if (currentTab === 'reminders') { if (typeof renderReminders === 'function') renderReminders(); }
+    else if (currentTab === 'market') { if (typeof renderMarket === 'function') renderMarket(); }
+    else if (currentTab === 'ai-assistant') { if (typeof renderAIAssistant === 'function') renderAIAssistant(); }
+
+    if (typeof renderPaymentRequests === 'function') renderPaymentRequests();
+    if (typeof renderWorkerCustodyRequests === 'function') renderWorkerCustodyRequests();
+    if (typeof renderPendingCustodyRequests === 'function') renderPendingCustodyRequests();
+    if (typeof renderAcceptedCustodyReleases === 'function') renderAcceptedCustodyReleases();
+    if (typeof applyUserTabOrder === 'function') applyUserTabOrder();
+}
+
+
+function startGlobalTick() {
+    if (typeof globalInterval !== 'undefined' && globalInterval) clearInterval(globalInterval);
+    globalInterval = setInterval(() => {
+        if (typeof updateActiveDriverTimer === 'function') updateActiveDriverTimer();
+        if (typeof updateViolationTimers === 'function') updateViolationTimers();
+        if (typeof updateTaskTimers === 'function') updateTaskTimers();
+    }, 1000);
+}
+
+window.getVisibleWorkers = getVisibleWorkers;
+window.formatTimestamp = formatTimestamp;
+window.formatDuration = formatDuration;
+window.compressImage = compressImage;
+window.showImage = showImage;
+window.toggleDetails = toggleDetails;
+window.switchTab = switchTab;
+if (typeof openMobDeptMenu === 'function') window.openMobDeptMenu = openMobDeptMenu;
+if (typeof closeMobDeptMenu === 'function') window.closeMobDeptMenu = closeMobDeptMenu;
+window.renderAll = renderAll;
+window.startGlobalTick = startGlobalTick;
+window.setDatePickerLimits = setDatePickerLimits;
+window.applyTranslations = applyTranslations;
+window.toggleLanguage = toggleLanguage;
+window.t = t;
+
+
+// --- AUTOMATIC IN-SCOPE WINDOW EXPORTS ---
+if (typeof translateDynamicTerm === 'function') window.translateDynamicTerm = translateDynamicTerm;
+if (typeof playNotifSound === 'function') window.playNotifSound = playNotifSound;
+if (typeof showInAppNotification === 'function') window.showInAppNotification = showInAppNotification;
+if (typeof hideInAppNotification === 'function') window.hideInAppNotification = hideInAppNotification;
+if (typeof initPublicCustomerSync === 'function') window.initPublicCustomerSync = initPublicCustomerSync;
+if (typeof startGlobalNotificationListeners === 'function') window.startGlobalNotificationListeners = startGlobalNotificationListeners;
+if (typeof _cfgSecret === 'function') window._cfgSecret = _cfgSecret;
+if (typeof togglePassword === 'function') window.togglePassword = togglePassword;
+if (typeof toggleConfirmPassword === 'function') window.toggleConfirmPassword = toggleConfirmPassword;
+if (typeof resetPassword === 'function') window.resetPassword = resetPassword;
+if (typeof setTodayDisplay === 'function') window.setTodayDisplay = setTodayDisplay;
+if (typeof applyDarkMode === 'function') window.applyDarkMode = applyDarkMode;
+if (typeof toggleDarkMode === 'function') window.toggleDarkMode = toggleDarkMode;
+if (typeof parseAdminsSnap === 'function') window.parseAdminsSnap = parseAdminsSnap;
+if (typeof parseWorkersSnap === 'function') window.parseWorkersSnap = parseWorkersSnap;
+if (typeof getCompanyData === 'function') window.getCompanyData = getCompanyData;
+if (typeof showUnassignedOverlay === 'function') window.showUnassignedOverlay = showUnassignedOverlay;
+if (typeof hideUnassignedOverlay === 'function') window.hideUnassignedOverlay = hideUnassignedOverlay;
+if (typeof checkUnassignedUserAccess === 'function') window.checkUnassignedUserAccess = checkUnassignedUserAccess;
+if (typeof toggleAuthMode === 'function') window.toggleAuthMode = toggleAuthMode;
+if (typeof handleAuthSubmit === 'function') window.handleAuthSubmit = handleAuthSubmit;
+if (typeof logout === 'function') window.logout = logout;
+if (typeof applyUserRoles === 'function') window.applyUserRoles = applyUserRoles;
+if (typeof markLockedTabs === 'function') window.markLockedTabs = markLockedTabs;
+if (typeof ensureArraysExist === 'function') window.ensureArraysExist = ensureArraysExist;
+if (typeof listenToCloudData === 'function') window.listenToCloudData = listenToCloudData;
+if (typeof saveData === 'function') window.saveData = saveData;
+if (typeof initFCMToken === 'function') window.initFCMToken = initFCMToken;
+if (typeof saveWorkerFCMToken === 'function') window.saveWorkerFCMToken = saveWorkerFCMToken;
+if (typeof saveTokenForCompany === 'function') window.saveTokenForCompany = saveTokenForCompany;
+if (typeof downloadBackup === 'function') window.downloadBackup = downloadBackup;
+if (typeof triggerRestore === 'function') window.triggerRestore = triggerRestore;
+if (typeof processRestoreFile === 'function') window.processRestoreFile = processRestoreFile;
+if (typeof getMonthlyStats === 'function') window.getMonthlyStats = getMonthlyStats;
+if (typeof getLogsForMonth === 'function') window.getLogsForMonth = getLogsForMonth;
+if (typeof calculateViolationsTotal === 'function') window.calculateViolationsTotal = calculateViolationsTotal;
+if (typeof calculatePaymentsTotal === 'function') window.calculatePaymentsTotal = calculatePaymentsTotal;
+if (typeof calculateRewardsTotal === 'function') window.calculateRewardsTotal = calculateRewardsTotal;
+if (typeof calculateOvertimeTotal === 'function') window.calculateOvertimeTotal = calculateOvertimeTotal;
+if (typeof calculateCustodyTotal === 'function') window.calculateCustodyTotal = calculateCustodyTotal;
+if (typeof getCumulativeBalance === 'function') window.getCumulativeBalance = getCumulativeBalance;
+if (typeof handleMonthChange === 'function') window.handleMonthChange = handleMonthChange;
+if (typeof toggleVacationDays === 'function') window.toggleVacationDays = toggleVacationDays;
+
+
+/**
+ * Authentication, login/logout, user profile modals & Customer Code sessions
+ */
+
 function migrateMonthlyData() {
     let migrated = false;
     let company = getCompanyData();
@@ -2191,29 +2872,40 @@ function deleteManager(email) {
 
 function loadWorkerPerms() {
     const wId = document.getElementById('perm-worker-select').value;
+    const permKeys = ['wh', 'drv', 'fin', 'sales', 'costs', 'adverts', 'attendance', 'tasks', 'prepare', 'vault', 'reminders', 'messaging', 'activity', 'market'];
+    
     if (!wId) {
-        document.getElementById('perm-wh').checked = false;
-        document.getElementById('perm-drv').checked = false;
-        document.getElementById('perm-fin').checked = false;
-        document.getElementById('perm-sales').checked = false;
-        document.getElementById('perm-costs').checked = false;
-        document.getElementById('perm-adverts').checked = false;
-        document.getElementById('perm-attendance').checked = false;
-        if (document.getElementById('perm-tasks')) document.getElementById('perm-tasks').checked = false;
+        permKeys.forEach(k => {
+            const el = document.getElementById(`perm-${k}`);
+            if (el) el.checked = false;
+        });
         return;
     }
     const worker = getCompanyData().workers.find(w => w.id === wId);
     if (!worker) return;
-    const p = worker.permissions || { warehouse: false, drivers: false, finance: false, sales: false, costs: false, adverts: false, attendance: false, tasks: false };
-    document.getElementById('perm-wh').checked = !!p.warehouse;
-    document.getElementById('perm-drv').checked = !!p.drivers;
-    document.getElementById('perm-fin').checked = !!p.finance;
-    document.getElementById('perm-sales').checked = !!p.sales;
-    document.getElementById('perm-costs').checked = !!p.costs;
-    document.getElementById('perm-adverts').checked = !!p.adverts;
-    document.getElementById('perm-attendance').checked = !!p.attendance;
-    if (document.getElementById('perm-tasks')) document.getElementById('perm-tasks').checked = !!p.tasks;
-    if (document.getElementById('perm-prepare')) document.getElementById('perm-prepare').checked = !!p.prepare;
+    const p = worker.permissions || {};
+
+    const keyMap = {
+        wh: 'warehouse',
+        drv: 'drivers',
+        fin: 'finance',
+        sales: 'sales',
+        costs: 'costs',
+        adverts: 'adverts',
+        attendance: 'attendance',
+        tasks: 'tasks',
+        prepare: 'prepare',
+        vault: 'vault',
+        reminders: 'reminders',
+        messaging: 'messaging',
+        activity: 'activity',
+        market: 'market'
+    };
+
+    Object.entries(keyMap).forEach(([domKey, dataKey]) => {
+        const el = document.getElementById(`perm-${domKey}`);
+        if (el) el.checked = !!p[dataKey];
+    });
 }
 
 function saveWorkerPerms() {
@@ -2222,16 +2914,27 @@ function saveWorkerPerms() {
     const workerIndex = getCompanyData().workers.findIndex(w => w.id === wId);
     if (workerIndex === -1) return;
     const worker = getCompanyData().workers[workerIndex];
+
+    const getVal = (id) => {
+        const el = document.getElementById(id);
+        return el ? el.checked : false;
+    };
+
     worker.permissions = {
-        warehouse: document.getElementById('perm-wh').checked,
-        drivers: document.getElementById('perm-drv').checked,
-        finance: document.getElementById('perm-fin').checked,
-        sales: document.getElementById('perm-sales').checked,
-        costs: document.getElementById('perm-costs').checked,
-        adverts: document.getElementById('perm-adverts').checked,
-        attendance: document.getElementById('perm-attendance').checked,
-        tasks: document.getElementById('perm-tasks') ? document.getElementById('perm-tasks').checked : false,
-        prepare: document.getElementById('perm-prepare') ? document.getElementById('perm-prepare').checked : false
+        warehouse: getVal('perm-wh'),
+        drivers: getVal('perm-drv'),
+        finance: getVal('perm-fin'),
+        sales: getVal('perm-sales'),
+        costs: getVal('perm-costs'),
+        adverts: getVal('perm-adverts'),
+        attendance: getVal('perm-attendance'),
+        tasks: getVal('perm-tasks'),
+        prepare: getVal('perm-prepare'),
+        vault: getVal('perm-vault'),
+        reminders: getVal('perm-reminders'),
+        messaging: getVal('perm-messaging'),
+        activity: getVal('perm-activity'),
+        market: getVal('perm-market')
     };
 
     // Targeted write to worker permissions path
@@ -2695,6 +3398,39 @@ function postManagerNote() {
         });
 }
 
+
+// --- AUTOMATIC IN-SCOPE WINDOW EXPORTS ---
+if (typeof migrateMonthlyData === 'function') window.migrateMonthlyData = migrateMonthlyData;
+if (typeof startGlobalTick === 'function') window.startGlobalTick = startGlobalTick;
+if (typeof updateTaskTimers === 'function') window.updateTaskTimers = updateTaskTimers;
+if (typeof updateViolationTimers === 'function') window.updateViolationTimers = updateViolationTimers;
+if (typeof getDaysInMonth === 'function') window.getDaysInMonth = getDaysInMonth;
+if (typeof runAutoLogger === 'function') window.runAutoLogger = runAutoLogger;
+if (typeof getVisibleWorkers === 'function') window.getVisibleWorkers = getVisibleWorkers;
+if (typeof renderManagersList === 'function') window.renderManagersList = renderManagersList;
+if (typeof addManager === 'function') window.addManager = addManager;
+if (typeof deleteManager === 'function') window.deleteManager = deleteManager;
+if (typeof loadWorkerPerms === 'function') window.loadWorkerPerms = loadWorkerPerms;
+if (typeof saveWorkerPerms === 'function') window.saveWorkerPerms = saveWorkerPerms;
+if (typeof saveMonthlySales === 'function') window.saveMonthlySales = saveMonthlySales;
+if (typeof triggerNoteImageUpload === 'function') window.triggerNoteImageUpload = triggerNoteImageUpload;
+if (typeof handleNoteImageSelected === 'function') window.handleNoteImageSelected = handleNoteImageSelected;
+if (typeof toggleVoiceRecording === 'function') window.toggleVoiceRecording = toggleVoiceRecording;
+if (typeof stopVoiceRecording === 'function') window.stopVoiceRecording = stopVoiceRecording;
+if (typeof updateNoteAttachmentPreview === 'function') window.updateNoteAttachmentPreview = updateNoteAttachmentPreview;
+if (typeof clearNoteAttachment === 'function') window.clearNoteAttachment = clearNoteAttachment;
+if (typeof triggerReplyImageUpload === 'function') window.triggerReplyImageUpload = triggerReplyImageUpload;
+if (typeof toggleReplyVoiceRecording === 'function') window.toggleReplyVoiceRecording = toggleReplyVoiceRecording;
+if (typeof stopReplyVoiceRecording === 'function') window.stopReplyVoiceRecording = stopReplyVoiceRecording;
+if (typeof updateReplyAttachmentPreview === 'function') window.updateReplyAttachmentPreview = updateReplyAttachmentPreview;
+if (typeof clearReplyAttachment === 'function') window.clearReplyAttachment = clearReplyAttachment;
+if (typeof postManagerNote === 'function') window.postManagerNote = postManagerNote;
+
+
+/**
+ * Manager notes board, attachments & advert banners
+ */
+
 function getNotesArray() {
     const raw = getCompanyData().managerNotes || {};
     if (Array.isArray(raw)) return raw;
@@ -2745,7 +3481,6 @@ function deleteManagerNote(id) {
 }
 window.deleteManagerNote = deleteManagerNote;
 window.editManagerNote = editManagerNote;
-window.postManagerNote = postManagerNote;
 
 function editManagerNote(id) {
     const isAr = currentAppLang === 'ar';
@@ -2753,21 +3488,11 @@ function editManagerNote(id) {
     const note = notes.find(n => n && n.id === id);
     if (!note) return;
 
-    const now = Date.now();
-    const noteTime = note.timestamp || parseInt(note.id) || 0;
-    const ageMs = now - noteTime;
-    const TWO_MINS_MS = 2 * 60 * 1000;
-
     const isAuthor = currentUser && currentUser.email && note.author && (note.author.toLowerCase() === currentUser.email.toLowerCase());
     const isAdmin = currentUser && currentUser.role === 'admin';
 
     if (!isAuthor && !isAdmin) {
         alert(isAr ? 'لا يمكنك تعديل هذه الملاحظة.' : 'You do not have permission to edit this note.');
-        return;
-    }
-
-    if (ageMs > TWO_MINS_MS) {
-        alert(isAr ? 'عذراً، لا يمكن تعديل الملاحظة بعد مرور أكثر من دقيقتين من نشرها.' : 'Notes can only be edited within 2 minutes of publishing.');
         return;
     }
 
@@ -2779,6 +3504,7 @@ function editManagerNote(id) {
         return;
     }
 
+    const now = Date.now();
     note.text = trimmed;
     db.ref(`companies/${currentCompany}/managerNotes/${id}`).update({
         text: trimmed,
@@ -2922,7 +3648,7 @@ function renderNotes() {
         const authorBadge = `<span style="font-size:0.85rem; font-weight:700; color:var(--text-main); display:inline-flex; align-items:center; gap:4px; background:var(--input-bg); padding:3px 10px; border-radius:6px; border:1px solid var(--border-color);" title="${isAr ? 'كاتب الملاحظة' : 'Author'}">👤 ${authorDisplayName}</span>`;
 
         let editBtn = '';
-        if ((isAuthor || isAdmin) && isWithin2Mins) {
+        if (isAuthor || isAdmin) {
             editBtn = `<button onclick="editManagerNote('${n.id}')" class="btn-outline" style="padding:2px 8px; font-size:0.75rem; border-radius:4px; border:1px solid var(--primary); color:var(--primary); font-weight:600; cursor:pointer; margin-left:6px;" title="${isAr ? 'تعديل الملاحظة' : 'Edit note'}">✏️ ${isAr ? 'تعديل' : 'Edit'}</button>`;
         }
 
@@ -3008,7 +3734,8 @@ function renderNotes() {
                     </div>
                 ` : '';
 
-        let textHtml = n.text ? `<div style="font-size:1.1rem; color:var(--text-main); white-space: pre-wrap; line-height: 1.6; margin-bottom: 16px;">${n.text}</div>` : '';
+        const canEditNote = isAuthor || isAdmin;
+        let textHtml = n.text ? `<div ${canEditNote ? `ondblclick="editManagerNote('${n.id}')" title="${isAr ? 'انقر مرتين لتعديل الملاحظة' : 'Double-click to edit note'}" style="font-size:1.1rem; color:var(--text-main); white-space: pre-wrap; line-height: 1.6; margin-bottom: 16px; cursor:pointer;"` : 'style="font-size:1.1rem; color:var(--text-main); white-space: pre-wrap; line-height: 1.6; margin-bottom: 16px;"'}>${n.text}</div>` : '';
         let attachmentHtml = '';
         if (n.attachmentType === 'image' && n.attachmentData) {
             attachmentHtml = `
@@ -3041,6 +3768,16 @@ function renderNotes() {
         feed.appendChild(div);
     });
 }
+
+
+// --- AUTOMATIC IN-SCOPE WINDOW EXPORTS ---
+if (typeof getNotesArray === 'function') window.getNotesArray = getNotesArray;
+if (typeof renderNotes === 'function') window.renderNotes = renderNotes;
+
+
+/**
+ * Sales tracker, past day sales, deposits, spend orders & Costs tracker
+ */
 
 // --- SALES & POS SYSTEM ---
 let currentSalesTimeframe = 'day';
@@ -5222,6 +5959,59 @@ function checkStockAlerts() {
     } else { alertBox.style.display = 'none'; }
 }
 
+
+// --- AUTOMATIC IN-SCOPE WINDOW EXPORTS ---
+if (typeof setSalesTimeframe === 'function') window.setSalesTimeframe = setSalesTimeframe;
+if (typeof setSalesChartType === 'function') window.setSalesChartType = setSalesChartType;
+if (typeof addIncomeSource === 'function') window.addIncomeSource = addIncomeSource;
+if (typeof deleteIncomeSource === 'function') window.deleteIncomeSource = deleteIncomeSource;
+if (typeof logSaleTransaction === 'function') window.logSaleTransaction = logSaleTransaction;
+if (typeof deleteSaleTransaction === 'function') window.deleteSaleTransaction = deleteSaleTransaction;
+if (typeof logPastSaleTransaction === 'function') window.logPastSaleTransaction = logPastSaleTransaction;
+if (typeof logDepositTransaction === 'function') window.logDepositTransaction = logDepositTransaction;
+if (typeof deleteDepositTransaction === 'function') window.deleteDepositTransaction = deleteDepositTransaction;
+if (typeof showSwapSelect === 'function') window.showSwapSelect = showSwapSelect;
+if (typeof cancelSwapSelect === 'function') window.cancelSwapSelect = cancelSwapSelect;
+if (typeof swapSaleMethod === 'function') window.swapSaleMethod = swapSaleMethod;
+if (typeof toggleSalesMethod === 'function') window.toggleSalesMethod = toggleSalesMethod;
+if (typeof renderManaging === 'function') window.renderManaging = renderManaging;
+if (typeof logDirectSpendGeneric === 'function') window.logDirectSpendGeneric = logDirectSpendGeneric;
+if (typeof logDirectSpend === 'function') window.logDirectSpend = logDirectSpend;
+if (typeof logDirectSpendFromSales === 'function') window.logDirectSpendFromSales = logDirectSpendFromSales;
+if (typeof renderFinanceSpendArea === 'function') window.renderFinanceSpendArea = renderFinanceSpendArea;
+if (typeof submitSpendOrder === 'function') window.submitSpendOrder = submitSpendOrder;
+if (typeof cancelSpendOrder === 'function') window.cancelSpendOrder = cancelSpendOrder;
+if (typeof rejectSpendOrder === 'function') window.rejectSpendOrder = rejectSpendOrder;
+if (typeof acceptSpendOrder === 'function') window.acceptSpendOrder = acceptSpendOrder;
+if (typeof deleteSpendLog === 'function') window.deleteSpendLog = deleteSpendLog;
+if (typeof renderSpendOrders === 'function') window.renderSpendOrders = renderSpendOrders;
+if (typeof setCostsTimeframe === 'function') window.setCostsTimeframe = setCostsTimeframe;
+if (typeof addCostCategory === 'function') window.addCostCategory = addCostCategory;
+if (typeof deleteCostCategory === 'function') window.deleteCostCategory = deleteCostCategory;
+if (typeof logCostTransaction === 'function') window.logCostTransaction = logCostTransaction;
+if (typeof deleteCostTransaction === 'function') window.deleteCostTransaction = deleteCostTransaction;
+if (typeof logPastCostTransaction === 'function') window.logPastCostTransaction = logPastCostTransaction;
+if (typeof renderCosts === 'function') window.renderCosts = renderCosts;
+if (typeof getLocalKey === 'function') window.getLocalKey = getLocalKey;
+if (typeof exportCostsPDF === 'function') window.exportCostsPDF = exportCostsPDF;
+if (typeof addWhFolder === 'function') window.addWhFolder = addWhFolder;
+if (typeof deleteWhFolder === 'function') window.deleteWhFolder = deleteWhFolder;
+if (typeof renderWhFolders === 'function') window.renderWhFolders = renderWhFolders;
+if (typeof addWarehouseItem === 'function') window.addWarehouseItem = addWarehouseItem;
+if (typeof updateWarehouseStock === 'function') window.updateWarehouseStock = updateWarehouseStock;
+if (typeof editMaxStock === 'function') window.editMaxStock = editMaxStock;
+if (typeof editRiskAmount === 'function') window.editRiskAmount = editRiskAmount;
+if (typeof deleteWarehouseItem === 'function') window.deleteWarehouseItem = deleteWarehouseItem;
+if (typeof showMoveSelect === 'function') window.showMoveSelect = showMoveSelect;
+if (typeof cancelMoveSelect === 'function') window.cancelMoveSelect = cancelMoveSelect;
+if (typeof executeMove === 'function') window.executeMove = executeMove;
+if (typeof checkStockAlerts === 'function') window.checkStockAlerts = checkStockAlerts;
+
+
+/**
+ * Warehouse inventory management, categories, stock levels & PDF exports
+ */
+
 function renderWarehouse() {
     if (typeof checkStockAlerts === 'function') {
         checkStockAlerts();
@@ -5475,52 +6265,6 @@ function exportWarehousePDF() {
 }
 
 // --- UTILITIES ---
-function formatTimestamp() {
-    const d = new Date(); const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const m = d.getMinutes().toString().padStart(2, '0'); const h = d.getHours().toString().padStart(2, '0');
-    return `${months[d.getMonth()]} ${d.getDate()}, ${h}:${m}`;
-}
-
-function formatDuration(ms) {
-    const h = Math.floor(ms / 3600000);
-    const m = Math.floor((ms % 3600000) / 60000);
-    if (h > 0) return `${h}h ${m}m`;
-    return `${m}m`;
-}
-
-function compressImage(file, callback) {
-    const reader = new FileReader(); reader.readAsDataURL(file);
-    reader.onload = event => {
-        const img = new Image(); img.src = event.target.result;
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const MAX_WIDTH = 500; let scaleSize = MAX_WIDTH / img.width; if (scaleSize > 1) scaleSize = 1;
-            canvas.width = img.width * scaleSize; canvas.height = img.height * scaleSize;
-            const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            callback(canvas.toDataURL('image/jpeg', 0.6));
-        }
-    };
-}
-
-function showImage(src) { document.getElementById('image-modal-content').src = src; document.getElementById('image-modal').style.display = 'flex'; }
-
-function toggleDetails(id) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    if (el.style.display === 'none' || el.style.display === '') {
-        el.style.display = 'block';
-        if (id.startsWith('wh-logs-')) {
-            window.expandedWhLogs = window.expandedWhLogs || {};
-            window.expandedWhLogs[id] = true;
-        }
-    } else {
-        el.style.display = 'none';
-        if (id.startsWith('wh-logs-')) {
-            window.expandedWhLogs = window.expandedWhLogs || {};
-            delete window.expandedWhLogs[id];
-        }
-    }
-}
 
 function downloadBackup() {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ burgeroov: appData.burgeroov }));
@@ -5546,129 +6290,18 @@ function processRestoreFile(event) {
 }
 
 // --- UI NAVIGATION & GLOBALS ---
-function switchTab(tab) {
-    if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && tab !== 'market') {
-        tab = 'market';
-    }
-    currentTab = tab;
 
-    // --- Check if this tab is locked for the current user ---
-    const tabBtn = document.getElementById(`tab-${tab}`);
-    const isLocked = tabBtn ? tabBtn.classList.contains('tab-locked') : false;
+// --- AUTOMATIC IN-SCOPE WINDOW EXPORTS ---
+if (typeof renderWarehouse === 'function') window.renderWarehouse = renderWarehouse;
+if (typeof exportWarehousePDF === 'function') window.exportWarehousePDF = exportWarehousePDF;
+if (typeof downloadBackup === 'function') window.downloadBackup = downloadBackup;
+if (typeof triggerRestore === 'function') window.triggerRestore = triggerRestore;
+if (typeof processRestoreFile === 'function') window.processRestoreFile = processRestoreFile;
 
-    // Update the locked view label with the department name
-    if (isLocked) {
-        const label = document.getElementById('locked-dept-label');
-        if (label && tabBtn) {
-            // Strip the ⛓️ emoji appended by CSS ::after (it's not in textContent)
-            label.textContent = tabBtn.textContent.trim();
-        }
-    }
 
-    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant', 'vault', 'messaging'];
-
-    allTabs.forEach(t => {
-        const btn = document.getElementById(`tab-${t}`);
-        const view = document.getElementById(`view-${t}`);
-        const isActive = tab === t;
-        if (btn) btn.classList.toggle('active-tab', isActive);
-        // Only show the real view if NOT locked
-        if (view) view.classList.toggle('active-view', isActive && !isLocked);
-
-        // Sync quick-bar buttons (by id)
-        const qBtn = document.getElementById(`mob-tab-${t}`);
-        if (qBtn) qBtn.classList.toggle('active-tab', isActive);
-
-        // Sync dept-sheet buttons (by data-tab attribute)
-        document.querySelectorAll(`.mob-sheet-tab[data-tab="${t}"]`).forEach(el => {
-            el.classList.toggle('active-tab', isActive);
-        });
-    });
-
-    if (tab === 'vault' && typeof renderVaultNotes === 'function') {
-        renderVaultNotes();
-    }
-    if (tab === 'messaging' && typeof renderMessagingSection === 'function') {
-        renderMessagingSection();
-    }
-    if (tab === 'tasks' && typeof renderInquiries === 'function') {
-        renderInquiries();
-    }
-
-    // Update the compact bar's active tab label and icon
-    const tabMeta = {
-        ops: { icon: '⚙️', label: 'Operations' },
-        ranks: { icon: '🏆', label: 'Ranks' },
-        tasks: { icon: '📋', label: 'Tasks' },
-        warehouse: { icon: '📦', label: 'Warehouse' },
-        drivers: { icon: '🚚', label: 'Drivers' },
-        finance: { icon: '💰', label: 'Finance' },
-        summary: { icon: '📊', label: 'Summary' },
-        managing: { icon: '💵', label: 'Sales' },
-        costs: { icon: '📉', label: 'Costs' },
-        adverts: { icon: '📢', label: 'Ads' },
-        notes: { icon: '📝', label: 'Notes' },
-        reminders: { icon: '⏰', label: 'Reminders' },
-        market: { icon: '🏪', label: 'Market' },
-        prepare: { icon: '👨‍🍳', label: 'Prepare' },
-        vault: { icon: '📁', label: 'Informations' },
-        messaging: { icon: '💬', label: 'Messaging' },
-    };
-    const meta = tabMeta[tab] || { icon: '⚙️', label: tab };
-    const iconEl = document.getElementById('mob-active-icon');
-    const labelEl = document.getElementById('mob-active-label');
-    if (iconEl) iconEl.textContent = meta.icon;
-    if (labelEl) labelEl.textContent = meta.label;
-
-    // Show or hide the locked overlay
-    const lockedView = document.getElementById('view-locked');
-    if (lockedView) lockedView.classList.toggle('active-view', isLocked);
-
-    if (!isLocked) {
-        renderAll();
-        if (tab === 'reminders' && typeof renderReminders === 'function') {
-            if (typeof currentRemindersLimit !== 'undefined') {
-                currentRemindersLimit = 20;
-            }
-            renderReminders();
-        }
-        if (tab === 'market' && typeof renderMarket === 'function') {
-            renderMarket();
-        }
-        if (tab === 'prepare' && typeof renderPrepareSection === 'function') {
-            renderPrepareSection();
-        }
-        // Fixes Leaflet map rendering bug when switching tabs
-        if (tab === 'adverts' && promoMap) {
-            setTimeout(() => { promoMap.invalidateSize(); }, 500);
-        }
-    }
-}
-
-// --- MOBILE DEPARTMENT MENU ---
-window.openMobDeptMenu = function () {
-    const backdrop = document.getElementById('mob-dept-backdrop');
-    const sheet = document.getElementById('mob-dept-sheet');
-    if (backdrop) backdrop.classList.add('open');
-    if (sheet) sheet.classList.add('open');
-    document.body.style.overflow = 'hidden';
-};
-
-window.closeMobDeptMenu = function () {
-    const backdrop = document.getElementById('mob-dept-backdrop');
-    const sheet = document.getElementById('mob-dept-sheet');
-    if (backdrop) backdrop.classList.remove('open');
-    if (sheet) {
-        sheet.classList.remove('open');
-    }
-    document.body.style.overflow = '';
-};
-
-// Close menu on Escape key
-document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') closeMobDeptMenu();
-});
-
+/**
+ * Department tab switcher, task catalog, task assignment & timers
+ */
 
 function getMonthlyStats(worker, monthStr) {
     if (!worker.monthlyStats) worker.monthlyStats = {};
@@ -6348,12 +6981,21 @@ function ensureTaskNumbers() {
 window.ensureTaskNumbers = ensureTaskNumbers;
 
 function assignTask() {
+    const isAr = currentAppLang === 'ar';
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    const activeWorker = typeof getActiveWorker === 'function' ? getActiveWorker() : null;
+    const canGiveTasks = isAdmin || document.body.classList.contains('perm-tasks') || (activeWorker && activeWorker.perms && (activeWorker.perms.tasks === true || activeWorker.perms.tasks === 'true'));
+    if (!canGiveTasks) {
+        alert(isAr ? '⛔ ليس لديك صلاحية إنشاء أو إسناد المهام. فقط المدير أو من يملك صلاحية المهام يمكنه ذلك!' : '⛔ You do not have permission to assign or create tasks.');
+        return;
+    }
+
     const workerId = document.getElementById('task-worker-select').value;
     const text = document.getElementById('task-assign-input').value.trim();
     const urgency = document.getElementById('task-urgency') ? document.getElementById('task-urgency').value : 'normal';
     const deadlineMins = document.getElementById('task-deadline') ? parseInt(document.getElementById('task-deadline').value) || 0 : 0;
 
-    if (!workerId || !text) { alert("Select an employee and describe a task."); return; }
+    if (!workerId || !text) { alert(isAr ? "الرجاء اختيار الموظف وكتابة تفاصيل المهمة." : "Select an employee and describe a task."); return; }
 
     const assignedTaskNum = getNextTaskNum();
 
@@ -6453,7 +7095,6 @@ function assignTask() {
         return;
     }
 
-    const activeWorker = getActiveWorker();
     const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
     if (workerIndex === -1) return;
     const worker = getCompanyData().workers[workerIndex];
@@ -6742,6 +7383,8 @@ function renderTasks() {
 
     const isAdmin = currentUser && currentUser.role === 'admin';
     const data = getCompanyData();
+    const activeWorker = typeof getActiveWorker === 'function' ? getActiveWorker() : null;
+    const canEditTask = isAdmin || document.body.classList.contains('perm-tasks') || (activeWorker && activeWorker.perms && (activeWorker.perms.tasks === true || activeWorker.perms.tasks === 'true'));
 
     // Ensure all existing & new tasks have assigned task numbers
     ensureTaskNumbers();
@@ -6832,13 +7475,11 @@ function renderTasks() {
     if (selectedWorkerId === 'all') {
         const rawGenTasks = data.generalTasks || {};
         const generalTasks = Array.isArray(rawGenTasks) ? rawGenTasks : Object.values(rawGenTasks);
-        const activeWorker = getActiveWorker();
-        const hasTaskAccess = isAdmin || document.body.classList.contains('perm-tasks') || (activeWorker && activeWorker.perms && (activeWorker.perms.tasks === true || activeWorker.perms.tasks === 'true'));
         let pendingGeneralTasks = generalTasks.filter(gt => {
             if (!gt || gt.status !== 'pending') return false;
             if (!passesDateFilter(getJobTimestamp(gt))) return false;
             if (!passesSearchFilter(gt)) return false;
-            if (hasTaskAccess) return true; // Admin and workers with task access see ALL general tasks!
+            if (canEditTask) return true; // Admin and managers with task access see ALL general tasks!
             if (!gt.targetGroupId) return true; // Available to everyone
 
             const groups = data.taskGroups || [];
@@ -6931,8 +7572,10 @@ function renderTasks() {
                         </div>`;
                 }
 
+                const genDblClickAttr = canEditTask ? `ondblclick="if (!event.target.closest('button') && !event.target.closest('input')) openEditTaskModal('general', '${gt.id}', true)" title="${isAr ? 'انقر مرتين للتعديل' : 'Double-click to edit'}"` : '';
+
                 genHtml += `
-                    <div class="general-task-item" ondblclick="if (!event.target.closest('button') && !event.target.closest('input')) openEditTaskModal('general', '${gt.id}', true)" style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; cursor:pointer;" title="${isAr ? 'انقر مرتين للتعديل' : 'Double-click to edit'}">
+                    <div class="general-task-item" ${genDblClickAttr} style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; ${canEditTask ? 'cursor:pointer;' : ''}">
                         <div>
                             <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">Created: ${gt.date || new Date(getJobTimestamp(gt)).toLocaleString()}</div>
                             <div style="font-size:1.05rem; font-weight:700; color:var(--text-main); display:flex; align-items:center; flex-wrap:wrap; gap:6px;">${taskNumBadge} <span>${gt.title}</span> ${urgencyBadge} ${groupBadge}</div>
@@ -7023,8 +7666,10 @@ function renderTasks() {
             let isGeneralBadge = j.isGeneral ? `<span class="badge" style="background:var(--info); color:var(--text-light); margin-right:8px; font-size:0.75rem; vertical-align:middle;">🌍 General Task</span>` : '';
             const taskNumBadge = `<span class="badge" style="background:#2563eb; color:#ffffff; font-weight:700; font-size:0.85rem; padding:3px 9px; border-radius:6px; margin-right:6px; box-shadow:0 1px 3px rgba(37,99,235,0.25);" title="Task ${j.taskNum || 1}">${j.taskNum || 1}</span>`;
 
+            const workerDblClickAttr = canEditTask ? `ondblclick="if (!event.target.closest('button') && !event.target.closest('input') && !event.target.closest('select')) openEditTaskModal('${worker.id}', '${j.id}')" title="${isAr ? 'انقر مرتين للتعديل' : 'Double-click to edit'}"` : '';
+
             return `
-                        <div class="mission-item" ondblclick="if (!event.target.closest('button') && !event.target.closest('input') && !event.target.closest('select')) openEditTaskModal('${worker.id}', '${j.id}')" style="border-left: 4px solid ${doneColor}; display:flex; flex-direction:column; align-items:stretch; cursor:pointer;" title="${isAr ? 'انقر مرتين للتعديل' : 'Double-click to edit'}">
+                        <div class="mission-item" ${workerDblClickAttr} style="border-left: 4px solid ${doneColor}; display:flex; flex-direction:column; align-items:stretch; ${canEditTask ? 'cursor:pointer;' : ''}">
                             <div class="flex-between" style="margin-bottom:8px; align-items:flex-start;">
                                 <div>
                                     <div style="font-size: 0.75rem; color:var(--text-muted); margin-bottom:4px;">Assigned: ${j.date || new Date(getJobTimestamp(j)).toLocaleString()}</div>
@@ -7170,6 +7815,15 @@ function deleteGeneralTask(taskId) {
 }
 
 function openEditTaskModal(workerId, taskId, isGeneral = false) {
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    const activeWorker = typeof getActiveWorker === 'function' ? getActiveWorker() : null;
+    const canEditTask = isAdmin || document.body.classList.contains('perm-tasks') || (activeWorker && activeWorker.perms && (activeWorker.perms.tasks === true || activeWorker.perms.tasks === 'true'));
+
+    if (!canEditTask) {
+        alert(currentAppLang === 'ar' ? '⚠️ ليس لديك صلاحية لتعديل المهام.' : '⚠️ You do not have permission to edit tasks.');
+        return;
+    }
+
     const modal = document.getElementById('edit-task-modal');
     if (!modal) return;
 
@@ -7254,6 +7908,15 @@ function closeEditTaskModal() {
 }
 
 function saveEditedTask() {
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    const activeWorker = typeof getActiveWorker === 'function' ? getActiveWorker() : null;
+    const canEditTask = isAdmin || document.body.classList.contains('perm-tasks') || (activeWorker && activeWorker.perms && (activeWorker.perms.tasks === true || activeWorker.perms.tasks === 'true'));
+
+    if (!canEditTask) {
+        alert(currentAppLang === 'ar' ? '⚠️ ليس لديك صلاحية لتعديل المهام.' : '⚠️ You do not have permission to edit tasks.');
+        return;
+    }
+
     const isAr = currentAppLang === 'ar';
     const taskId = document.getElementById('edit-task-id-hidden').value;
     const origWorkerId = document.getElementById('edit-task-original-worker-hidden').value;
@@ -7420,6 +8083,51 @@ function saveEditedTask() {
         }
     }
 }
+
+
+// --- AUTOMATIC IN-SCOPE WINDOW EXPORTS ---
+if (typeof getMonthlyStats === 'function') window.getMonthlyStats = getMonthlyStats;
+if (typeof getLogsForMonth === 'function') window.getLogsForMonth = getLogsForMonth;
+if (typeof calculateViolationsTotal === 'function') window.calculateViolationsTotal = calculateViolationsTotal;
+if (typeof calculatePaymentsTotal === 'function') window.calculatePaymentsTotal = calculatePaymentsTotal;
+if (typeof calculateRewardsTotal === 'function') window.calculateRewardsTotal = calculateRewardsTotal;
+if (typeof calculateOvertimeTotal === 'function') window.calculateOvertimeTotal = calculateOvertimeTotal;
+if (typeof calculateCustodyTotal === 'function') window.calculateCustodyTotal = calculateCustodyTotal;
+if (typeof getCumulativeBalance === 'function') window.getCumulativeBalance = getCumulativeBalance;
+if (typeof handleMonthChange === 'function') window.handleMonthChange = handleMonthChange;
+if (typeof setDatePickerLimits === 'function') window.setDatePickerLimits = setDatePickerLimits;
+if (typeof toggleVacationDays === 'function') window.toggleVacationDays = toggleVacationDays;
+if (typeof getExportData === 'function') window.getExportData = getExportData;
+if (typeof exportToExcel === 'function') window.exportToExcel = exportToExcel;
+if (typeof exportToPDF === 'function') window.exportToPDF = exportToPDF;
+if (typeof exportWorkerFinancePDF === 'function') window.exportWorkerFinancePDF = exportWorkerFinancePDF;
+if (typeof addViolationRule === 'function') window.addViolationRule = addViolationRule;
+if (typeof deleteViolationRule === 'function') window.deleteViolationRule = deleteViolationRule;
+if (typeof renderViolationRules === 'function') window.renderViolationRules = renderViolationRules;
+if (typeof autoFillViolation === 'function') window.autoFillViolation = autoFillViolation;
+if (typeof applyDetailedViolation === 'function') window.applyDetailedViolation = applyDetailedViolation;
+if (typeof saveViolationRecord === 'function') window.saveViolationRecord = saveViolationRecord;
+if (typeof deleteDetailedViolation === 'function') window.deleteDetailedViolation = deleteDetailedViolation;
+if (typeof resolveViolation === 'function') window.resolveViolation = resolveViolation;
+if (typeof manuallyUpdateRank === 'function') window.manuallyUpdateRank = manuallyUpdateRank;
+if (typeof renderRanksTable === 'function') window.renderRanksTable = renderRanksTable;
+if (typeof assignTask === 'function') window.assignTask = assignTask;
+if (typeof seeTask === 'function') window.seeTask = seeTask;
+if (typeof completeTask === 'function') window.completeTask = completeTask;
+if (typeof toggleTaskDone === 'function') window.toggleTaskDone = toggleTaskDone;
+if (typeof deleteTask === 'function') window.deleteTask = deleteTask;
+if (typeof getJobTimestamp === 'function') window.getJobTimestamp = getJobTimestamp;
+if (typeof renderTasks === 'function') window.renderTasks = renderTasks;
+if (typeof acceptGeneralTask === 'function') window.acceptGeneralTask = acceptGeneralTask;
+if (typeof deleteGeneralTask === 'function') window.deleteGeneralTask = deleteGeneralTask;
+if (typeof openEditTaskModal === 'function') window.openEditTaskModal = openEditTaskModal;
+if (typeof closeEditTaskModal === 'function') window.closeEditTaskModal = closeEditTaskModal;
+if (typeof saveEditedTask === 'function') window.saveEditedTask = saveEditedTask;
+
+
+/**
+ * Driver dispatch board, active status, delivery provisions & pool orders
+ */
 
 // --- DRIVERS SYSTEM ---
 function selectDriver(driverId) {
@@ -8859,6 +9567,58 @@ function renderAll() {
     }
 }
 
+
+// --- AUTOMATIC IN-SCOPE WINDOW EXPORTS ---
+if (typeof selectDriver === 'function') window.selectDriver = selectDriver;
+if (typeof toggleDriverPrepTime === 'function') window.toggleDriverPrepTime = toggleDriverPrepTime;
+if (typeof startDriverOrder === 'function') window.startDriverOrder = startDriverOrder;
+if (typeof pickupDriverOrder === 'function') window.pickupDriverOrder = pickupDriverOrder;
+if (typeof forceOrderReady === 'function') window.forceOrderReady = forceOrderReady;
+if (typeof finishDriverOrder === 'function') window.finishDriverOrder = finishDriverOrder;
+if (typeof deleteDeliveryRecord === 'function') window.deleteDeliveryRecord = deleteDeliveryRecord;
+if (typeof deleteLegacyDelivery === 'function') window.deleteLegacyDelivery = deleteLegacyDelivery;
+if (typeof updateActiveDriverTimer === 'function') window.updateActiveDriverTimer = updateActiveDriverTimer;
+if (typeof calcTime === 'function') window.calcTime = calcTime;
+if (typeof renderDriversList === 'function') window.renderDriversList = renderDriversList;
+if (typeof promoteToDriver === 'function') window.promoteToDriver = promoteToDriver;
+if (typeof demoteFromDriver === 'function') window.demoteFromDriver = demoteFromDriver;
+if (typeof updateSelectedDriverProvisions === 'function') window.updateSelectedDriverProvisions = updateSelectedDriverProvisions;
+if (typeof renderDriverVolumeRewards === 'function') window.renderDriverVolumeRewards = renderDriverVolumeRewards;
+if (typeof addDriverVolumeReward === 'function') window.addDriverVolumeReward = addDriverVolumeReward;
+if (typeof deleteDriverVolumeReward === 'function') window.deleteDriverVolumeReward = deleteDriverVolumeReward;
+if (typeof renderDriverPanel === 'function') window.renderDriverPanel = renderDriverPanel;
+if (typeof addPaymentRecord === 'function') window.addPaymentRecord = addPaymentRecord;
+if (typeof deletePaymentRecord === 'function') window.deletePaymentRecord = deletePaymentRecord;
+if (typeof addRewardRecord === 'function') window.addRewardRecord = addRewardRecord;
+if (typeof deleteRewardRecord === 'function') window.deleteRewardRecord = deleteRewardRecord;
+if (typeof addCustodyRecord === 'function') window.addCustodyRecord = addCustodyRecord;
+if (typeof deleteCustodyRecord === 'function') window.deleteCustodyRecord = deleteCustodyRecord;
+if (typeof addBranch === 'function') window.addBranch = addBranch;
+if (typeof deleteBranch === 'function') window.deleteBranch = deleteBranch;
+if (typeof addWorker === 'function') window.addWorker = addWorker;
+if (typeof deleteWorker === 'function') window.deleteWorker = deleteWorker;
+if (typeof setInitialBalance === 'function') window.setInitialBalance = setInitialBalance;
+if (typeof getAveragePerfection === 'function') window.getAveragePerfection = getAveragePerfection;
+if (typeof updateFinancialRecord === 'function') window.updateFinancialRecord = updateFinancialRecord;
+if (typeof handleOpsWorkerChange === 'function') window.handleOpsWorkerChange = handleOpsWorkerChange;
+if (typeof handleFinWorkerChange === 'function') window.handleFinWorkerChange = handleFinWorkerChange;
+if (typeof addDailyLog === 'function') window.addDailyLog = addDailyLog;
+if (typeof deleteLog === 'function') window.deleteLog = deleteLog;
+if (typeof setAdvertTool === 'function') window.setAdvertTool = setAdvertTool;
+if (typeof finishPolygonDraw === 'function') window.finishPolygonDraw = finishPolygonDraw;
+if (typeof cancelMapItem === 'function') window.cancelMapItem = cancelMapItem;
+if (typeof saveMapItem === 'function') window.saveMapItem = saveMapItem;
+if (typeof initPromoMap === 'function') window.initPromoMap = initPromoMap;
+if (typeof deleteAdvertPin === 'function') window.deleteAdvertPin = deleteAdvertPin;
+if (typeof renderAdverts === 'function') window.renderAdverts = renderAdverts;
+if (typeof searchMapLocation === 'function') window.searchMapLocation = searchMapLocation;
+if (typeof renderAll === 'function') window.renderAll = renderAll;
+
+
+/**
+ * Ops dashboard, worker tables, shift check-in/clock-out details
+ */
+
 function renderWorkerViolationPanel() {
     const panel = document.getElementById('worker-violation-panel');
     const list = document.getElementById('worker-violations-list');
@@ -9171,6 +9931,19 @@ function renderOpsDetails() {
 }
 
 // FINANCIAL TAB RENDERING
+
+// --- AUTOMATIC IN-SCOPE WINDOW EXPORTS ---
+if (typeof renderWorkerViolationPanel === 'function') window.renderWorkerViolationPanel = renderWorkerViolationPanel;
+if (typeof renderBranches === 'function') window.renderBranches = renderBranches;
+if (typeof populateWorkerDropdowns === 'function') window.populateWorkerDropdowns = populateWorkerDropdowns;
+if (typeof renderOpsWorkersTable === 'function') window.renderOpsWorkersTable = renderOpsWorkersTable;
+if (typeof renderOpsDetails === 'function') window.renderOpsDetails = renderOpsDetails;
+
+
+/**
+ * Finance summary, attendance logs, salary advances, shifts & activity log
+ */
+
 function renderFinanceTable() {
     const tbody = document.querySelector('#finance-workers-table');
     if (!tbody) return;
@@ -9891,79 +10664,6 @@ function renderSummaryTable() {
 }
 
 
-let currentAppLang = localStorage.getItem("burgeroov_lang") || "en";
-
-function t(key) {
-    return (uiTranslations[currentAppLang] && uiTranslations[currentAppLang][key]) || key;
-}
-
-function applyTranslations() {
-    if (currentAppLang !== "en" && currentAppLang !== "ar") {
-        currentAppLang = "en";
-    }
-    document.documentElement.dir = currentAppLang === "ar" ? "rtl" : "ltr";
-
-    const langBtn = document.getElementById("lang-toggle-btn");
-    if (langBtn) {
-        langBtn.innerText = currentAppLang === "ar" ? "🌐 English" : "🌐 عربي";
-    }
-    const langBtnMob = document.getElementById("lang-toggle-btn-mob");
-    if (langBtnMob) {
-        langBtnMob.innerText = currentAppLang === "ar" ? "🌐 English" : "🌐 عربي";
-    }
-
-    const langDict = { ...(uiTranslations[currentAppLang] || uiTranslations["en"] || {}) };
-
-    // Dynamic translations based on selected company
-    if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession) {
-        langDict['app-title'] = currentAppLang === 'ar' ? 'سوق عملاء MVC' : 'MVC Customer Market';
-        document.title = 'MVC Customer Market';
-    } else if (currentCompany === 'mvc') {
-        langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات إم في سي فريش' : 'MVC Fresh Operations Portal';
-        langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة تحكم إم في سي فريش' : 'Login to MVC Fresh Dashboard';
-        document.title = 'MVC Fresh Management Portal';
-    } else if (currentCompany === 'mvcfresh') {
-        langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات إم في سي فريش' : 'MVC Fresh Operations Portal';
-        langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة تحكم إم في سي فريش' : 'Login to MVC Fresh Dashboard';
-        document.title = 'MVC Fresh Management Portal';
-    } else {
-        langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات برجروف' : 'Burgeroov Operations Portal';
-        langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة التحكم' : 'Login to Dashboard';
-        document.title = 'Burgeroov Management Portal';
-    }
-
-    document.querySelectorAll("[data-i18n]").forEach(el => {
-        let key = el.getAttribute("data-i18n");
-        let isPlaceholder = false;
-        if (key.startsWith("[placeholder]")) {
-            isPlaceholder = true;
-            key = key.replace("[placeholder]", "");
-        }
-        const translation = langDict[key];
-
-        if (translation) {
-            if (isPlaceholder || (el.tagName === "INPUT" && el.hasAttribute("placeholder")) || (el.tagName === "TEXTAREA" && el.hasAttribute("placeholder"))) {
-                el.placeholder = translation;
-            } else {
-                el.innerHTML = translation;
-            }
-        }
-    });
-
-    if (typeof applyDarkMode === "function") {
-        applyDarkMode();
-    }
-}
-
-function toggleLanguage(event) {
-    if (event) event.stopPropagation();
-    currentAppLang = currentAppLang === "en" ? "ar" : "en";
-    localStorage.setItem("burgeroov_lang", currentAppLang);
-
-    if (typeof renderAll === "function") renderAll();
-    applyTranslations();
-    if (typeof applyDarkMode === "function") applyDarkMode();
-}
 
 // --- GAMIFICATION LEADERBOARDS (EMPLOYEES & DRIVERS) ---
 function saveRankingSettings() {
@@ -11042,20 +11742,12 @@ window.acceptPaymentRequest = acceptPaymentRequest;
 window.rejectPaymentRequest = rejectPaymentRequest;
 window.undoAcceptPaymentRequest = undoAcceptPaymentRequest;
 window.confirmPaymentGiven = confirmPaymentGiven;
-window.deletePaymentRecord = deletePaymentRecord;
 window.renderPaymentRequests = renderPaymentRequests;
 window.renderDailyPayouts = renderDailyPayouts;
 window.saveHighMoneyThreshold = saveHighMoneyThreshold;
 window.renderHighMoneyApprovals = renderHighMoneyApprovals;
 window.managerAcceptPaymentRequest = managerAcceptPaymentRequest;
 window.managerRejectPaymentRequest = managerRejectPaymentRequest;
-window.showSwapSelect = showSwapSelect;
-window.cancelSwapSelect = cancelSwapSelect;
-window.swapSaleMethod = swapSaleMethod;
-window.togglePassword = togglePassword;
-window.toggleConfirmPassword = toggleConfirmPassword;
-window.toggleAuthMode = toggleAuthMode;
-window.handleAuthSubmit = handleAuthSubmit;
 
 // --- ATTENDANCE SYSTEM ---
 
@@ -12171,8 +12863,6 @@ window.clearAllActivityLogs = clearAllActivityLogs;
 window.markWorkerAttendance = markWorkerAttendance;
 window.clearWorkerAttendance = clearWorkerAttendance;
 window.renderAttendance = renderAttendance;
-window.addManager = addManager;
-window.deleteManager = deleteManager;
 window.logActivity = logActivity;
 window.renderActivityLog = renderActivityLog;
 window.deleteActivityLog = deleteActivityLog;
@@ -12570,10 +13260,6 @@ window.deleteSystemViolation = deleteSystemViolation;
 window.toggleWorkerCloseStatus = toggleWorkerCloseStatus;
 window.saveLateSettings = saveLateSettings;
 window.getLateDeductionsForMonth = getLateDeductionsForMonth;
-window.updateSelectedDriverProvisions = updateSelectedDriverProvisions;
-window.renderDriverVolumeRewards = renderDriverVolumeRewards;
-window.addDriverVolumeReward = addDriverVolumeReward;
-window.deleteDriverVolumeReward = deleteDriverVolumeReward;
 window.getDriverVolumeRewardsForMonth = getDriverVolumeRewardsForMonth;
 
 // ========================================================
@@ -13719,15 +14405,6 @@ window.removeMemberFromGroup = removeMemberFromGroup;
 window.renderTaskGroups = renderTaskGroups;
 
 // Spend Order System
-window.submitSpendOrder = submitSpendOrder;
-window.cancelSpendOrder = cancelSpendOrder;
-window.rejectSpendOrder = rejectSpendOrder;
-window.acceptSpendOrder = acceptSpendOrder;
-window.deleteSpendLog = deleteSpendLog;
-window.renderSpendOrders = renderSpendOrders;
-window.logDirectSpend = logDirectSpend;
-window.logDirectSpendFromSales = logDirectSpendFromSales;
-window.renderFinanceSpendArea = renderFinanceSpendArea;
 
 // Form Toggling for Sales Section
 function switchSalesForm(formId) {
@@ -13751,16 +14428,8 @@ function switchSalesForm(formId) {
     }
 }
 window.switchSalesForm = switchSalesForm;
-window.editRiskAmount = editRiskAmount;
-window.showUnassignedOverlay = showUnassignedOverlay;
-window.hideUnassignedOverlay = hideUnassignedOverlay;
-window.checkUnassignedUserAccess = checkUnassignedUserAccess;
-window.openEditTaskModal = openEditTaskModal;
-window.closeEditTaskModal = closeEditTaskModal;
-window.saveEditedTask = saveEditedTask;
 window.editPaymentRequestAmount = editPaymentRequestAmount;
 window.editCustodyRequestAmount = editCustodyRequestAmount;
-window.editManagerNote = editManagerNote;
 
 // =========================================================================
 // CUSTOM DEPARTMENT TAB BUTTON DRAG & DROP REORDERING ENGINE
@@ -14769,6 +15438,29 @@ try {
 } catch (e) {
     marketCart = [];
 }
+
+
+// --- AUTOMATIC IN-SCOPE WINDOW EXPORTS ---
+if (typeof renderFinanceTable === 'function') window.renderFinanceTable = renderFinanceTable;
+if (typeof renderFinDetails === 'function') window.renderFinDetails = renderFinDetails;
+if (typeof renderSummaryTable === 'function') window.renderSummaryTable = renderSummaryTable;
+if (typeof renderLeaderboard === 'function') window.renderLeaderboard = renderLeaderboard;
+if (typeof getActiveWorker === 'function') window.getActiveWorker = getActiveWorker;
+if (typeof calculateLateness === 'function') window.calculateLateness = calculateLateness;
+if (typeof setWorkerVacationStatus === 'function') window.setWorkerVacationStatus = setWorkerVacationStatus;
+if (typeof translateActivityLogDetails === 'function') window.translateActivityLogDetails = translateActivityLogDetails;
+if (typeof showWorkerAlertOverlay === 'function') window.showWorkerAlertOverlay = showWorkerAlertOverlay;
+if (typeof initTabDragEvents === 'function') window.initTabDragEvents = initTabDragEvents;
+if (typeof applyUserTabOrder === 'function') window.applyUserTabOrder = applyUserTabOrder;
+if (typeof reorderTabContainer === 'function') window.reorderTabContainer = reorderTabContainer;
+if (typeof isReminderAlerting === 'function') window.isReminderAlerting = isReminderAlerting;
+if (typeof getReminderColorTheme === 'function') window.getReminderColorTheme = getReminderColorTheme;
+if (typeof formatReminderDate === 'function') window.formatReminderDate = formatReminderDate;
+
+
+/**
+ * Market product grid, shopping cart, checkout, coin transactions & admin product editor
+ */
 
 let currentMarketCategoryFilter = 'all';
 let currentMarketPage = 1;
@@ -17666,6 +18358,14 @@ function deleteCustomerCode(code) {
 window.deleteCustomerCode = deleteCustomerCode;
 
 function togglePreparingWorkerAssignment(workerId) {
+    const isAr = currentAppLang === 'ar';
+    const isAdmin = document.body.classList.contains('role-admin');
+    if (!isAdmin) {
+        alert(isAr 
+            ? '⛔ ليس لديك صلاحية إسناد أو إزالة طاقم التحضير. فقط المدير يمكنه ذلك!' 
+            : '⛔ You do not have permission to assign or remove preparing staff. Only Managers can edit staff.');
+        return;
+    }
     if (!workerId || typeof db === 'undefined' || typeof currentCompany === 'undefined') return;
 
     const companyData = getCompanyData();
@@ -17695,13 +18395,12 @@ window.assignPreparingWorker = togglePreparingWorkerAssignment;
 
 function deletePrepareOrderAndRefund(companyKey, orderId) {
     const isAr = currentAppLang === 'ar';
-    const isAdminOrMgr = typeof isUserAdminOrManager === 'function' ? isUserAdminOrManager() : true;
-    const canDelete = isAdminOrMgr || !!(typeof currentUser !== 'undefined' && currentUser && (currentUser.canDeletePrepareOrders || currentUser.role === 'operations'));
+    const canDelete = document.body.classList.contains('role-admin');
 
     if (!canDelete) {
         alert(isAr 
-            ? '⛔ ليس لديك صلاحية حذف الطلبات وإعادة الرصيد. فقط موظف العمليات / المدير يمكنه ذلك!' 
-            : '⛔ You do not have permission to delete orders and refund SR balance.');
+            ? '⛔ ليس لديك صلاحية حذف الطلبات وإعادة الرصيد. فقط المدير يمكنه ذلك!' 
+            : '⛔ You do not have permission to delete orders and refund SR balance. Only Managers can delete orders.');
         return;
     }
 
@@ -17771,6 +18470,19 @@ function deletePrepareOrderAndRefund(companyKey, orderId) {
 }
 window.deletePrepareOrderAndRefund = deletePrepareOrderAndRefund;
 
+
+// --- AUTOMATIC IN-SCOPE WINDOW EXPORTS ---
+if (typeof getCurrentWorkerId === 'function') window.getCurrentWorkerId = getCurrentWorkerId;
+if (typeof getUserCoins === 'function') window.getUserCoins = getUserCoins;
+if (typeof renderMarketCartItems === 'function') window.renderMarketCartItems = renderMarketCartItems;
+if (typeof closeCustomerManagementModal === 'function') window.closeCustomerManagementModal = closeCustomerManagementModal;
+if (typeof processCustomerLogin === 'function') window.processCustomerLogin = processCustomerLogin;
+
+
+/**
+ * Kitchen prepare view, status updates & A4 printable receipt modal
+ */
+
 function renderPrepareSection() {
     const grid = document.getElementById('prepare-orders-grid');
     if (!grid) return;
@@ -17793,23 +18505,30 @@ function renderPrepareSection() {
         }
         const assignedStrs = assigned.map(id => String(id));
 
+        const isAdmin = document.body.classList.contains('role-admin');
+
         if (staffCountLabel) {
             staffCountLabel.textContent = isAr 
                 ? `طاقم التحضير (${assignedStrs.length})` 
                 : `Preparing Staff (${assignedStrs.length})`;
         }
 
-        // Populate dropdown with unassigned workers
-        prepAddSelect.innerHTML = `<option value="" style="background: var(--card-bg); color: var(--text-main); font-weight: 800;">+ ${isAr ? 'إضافة موظف' : 'Add Staff'}</option>` + workers.map((w, idx) => {
-            if (!w) return '';
-            const wId = String(w.id || idx);
-            if (assignedStrs.includes(wId)) return '';
-            return `<option value="${wId}" style="background: var(--card-bg); color: var(--text-main); font-weight: 800;">${w.name || `Worker #${idx}`}</option>`;
-        }).join('');
+        // Populate dropdown with unassigned workers (visible to admins only)
+        if (prepAddSelect) {
+            prepAddSelect.style.display = isAdmin ? 'inline-block' : 'none';
+            if (isAdmin) {
+                prepAddSelect.innerHTML = `<option value="" style="background: var(--card-bg); color: var(--text-main); font-weight: 800;">+ ${isAr ? 'إضافة موظف' : 'Add Staff'}</option>` + workers.map((w, idx) => {
+                    if (!w) return '';
+                    const wId = String(w.id || idx);
+                    if (assignedStrs.includes(wId)) return '';
+                    return `<option value="${wId}" style="background: var(--card-bg); color: var(--text-main); font-weight: 800;">${w.name || `Worker #${idx}`}</option>`;
+                }).join('');
+            }
+        }
 
         // Render active worker avatar cards
         if (assignedStrs.length === 0) {
-            prepBadgesDiv.innerHTML = `<span style="font-size:0.8rem; color:var(--text-muted); font-weight:700; font-style:italic;">${isAr ? '⚠️ لم يتم تعيين موظفي تحضير بعد (اضغط + إضافة موظف)' : '⚠️ No preparing staff assigned yet (Click + Add Staff)'}</span>`;
+            prepBadgesDiv.innerHTML = `<span style="font-size:0.8rem; color:var(--text-muted); font-weight:700; font-style:italic;">${isAr ? '⚠️ لم يتم تعيين موظفي تحضير بعد' : '⚠️ No preparing staff assigned yet'}</span>`;
         } else {
             prepBadgesDiv.innerHTML = assignedStrs.map(wId => {
                 const wObj = workers.find(w => w && String(w.id || '') === wId);
@@ -17817,6 +18536,8 @@ function renderPrepareSection() {
                 const initial = wName.trim().charAt(0).toUpperCase() || 'W';
                 const phone = wObj ? (wObj.phone || '') : '';
                 const roleLabel = wObj && wObj.role ? wObj.role : (isAr ? 'محضر طلبات' : 'Prep Worker');
+
+                const removeBtnHTML = isAdmin ? `<button type="button" onclick="togglePreparingWorkerAssignment('${wId}')" style="background: rgba(239,68,68,0.12); border: none; color: #ef4444; border-radius: 50%; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 900; cursor: pointer; line-height: 1; transition: all 0.2s ease; margin-left: 2px;" title="${isAr ? 'إزالة من طاقم التحضير' : 'Remove from staff'}" onmouseover="this.style.background='#ef4444'; this.style.color='#ffffff';" onmouseout="this.style.background='rgba(239,68,68,0.12)'; this.style.color='#ef4444';">✕</button>` : '';
 
                 return `
                     <div class="prep-worker-card-chip" style="background: var(--input-bg); border: 1.5px solid var(--border-color); border-radius: 12px; padding: 5px 10px 5px 6px; display: inline-flex; align-items: center; gap: 8px; box-shadow: var(--shadow-sm); transition: all 0.2s ease;">
@@ -17828,7 +18549,7 @@ function renderPrepareSection() {
                             <span style="font-weight: 900; font-size: 0.82rem; color: var(--text-main); line-height: 1.1;">${wName}</span>
                             <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700;">${phone ? `📱 ${phone}` : roleLabel}</span>
                         </div>
-                        <button type="button" onclick="togglePreparingWorkerAssignment('${wId}')" style="background: rgba(239,68,68,0.12); border: none; color: #ef4444; border-radius: 50%; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 900; cursor: pointer; line-height: 1; transition: all 0.2s ease; margin-left: 2px;" title="${isAr ? 'إزالة من طاقم التحضير' : 'Remove from staff'}" onmouseover="this.style.background='#ef4444'; this.style.color='#ffffff';" onmouseout="this.style.background='rgba(239,68,68,0.12)'; this.style.color='#ef4444';">✕</button>
+                        ${removeBtnHTML}
                     </div>
                 `;
             }).join('');
@@ -17870,8 +18591,7 @@ function renderPrepareSection() {
         return;
     }
 
-    const isAdminOrMgr = typeof isUserAdminOrManager === 'function' ? isUserAdminOrManager() : true;
-    const canDelete = isAdminOrMgr || !!(typeof currentUser !== 'undefined' && currentUser && (currentUser.canDeletePrepareOrders || currentUser.role === 'operations'));
+    const canDelete = document.body.classList.contains('role-admin');
 
     grid.innerHTML = allOrders.map(order => {
         const orderNum = formatMarketOrderNum(order);
@@ -22412,3 +23132,13 @@ if (document.readyState === 'loading') {
 
 
 
+
+
+// --- AUTOMATIC IN-SCOPE WINDOW EXPORTS ---
+if (typeof _getSecureFallbackAIKey === 'function') window._getSecureFallbackAIKey = _getSecureFallbackAIKey;
+if (typeof getBestGeminiModelName === 'function') window.getBestGeminiModelName = getBestGeminiModelName;
+if (typeof sendTestMessagingAlert === 'function') window.sendTestMessagingAlert = sendTestMessagingAlert;
+if (typeof recalculateAdRecipientGroups === 'function') window.recalculateAdRecipientGroups = recalculateAdRecipientGroups;
+if (typeof sendNext === 'function') window.sendNext = sendNext;
+if (typeof getGMT3Time === 'function') window.getGMT3Time = getGMT3Time;
+if (typeof checkScheduledTaskCycles === 'function') window.checkScheduledTaskCycles = checkScheduledTaskCycles;

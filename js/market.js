@@ -2898,6 +2898,14 @@ function deleteCustomerCode(code) {
 window.deleteCustomerCode = deleteCustomerCode;
 
 function togglePreparingWorkerAssignment(workerId) {
+    const isAr = currentAppLang === 'ar';
+    const isAdmin = document.body.classList.contains('role-admin');
+    if (!isAdmin) {
+        alert(isAr 
+            ? '⛔ ليس لديك صلاحية إسناد أو إزالة طاقم التحضير. فقط المدير يمكنه ذلك!' 
+            : '⛔ You do not have permission to assign or remove preparing staff. Only Managers can edit staff.');
+        return;
+    }
     if (!workerId || typeof db === 'undefined' || typeof currentCompany === 'undefined') return;
 
     const companyData = getCompanyData();
@@ -2927,13 +2935,12 @@ window.assignPreparingWorker = togglePreparingWorkerAssignment;
 
 function deletePrepareOrderAndRefund(companyKey, orderId) {
     const isAr = currentAppLang === 'ar';
-    const isAdminOrMgr = typeof isUserAdminOrManager === 'function' ? isUserAdminOrManager() : true;
-    const canDelete = isAdminOrMgr || !!(typeof currentUser !== 'undefined' && currentUser && (currentUser.canDeletePrepareOrders || currentUser.role === 'operations'));
+    const canDelete = document.body.classList.contains('role-admin');
 
     if (!canDelete) {
         alert(isAr 
-            ? '⛔ ليس لديك صلاحية حذف الطلبات وإعادة الرصيد. فقط موظف العمليات / المدير يمكنه ذلك!' 
-            : '⛔ You do not have permission to delete orders and refund SR balance.');
+            ? '⛔ ليس لديك صلاحية حذف الطلبات وإعادة الرصيد. فقط المدير يمكنه ذلك!' 
+            : '⛔ You do not have permission to delete orders and refund SR balance. Only Managers can delete orders.');
         return;
     }
 

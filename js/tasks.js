@@ -680,12 +680,21 @@ function ensureTaskNumbers() {
 window.ensureTaskNumbers = ensureTaskNumbers;
 
 function assignTask() {
+    const isAr = currentAppLang === 'ar';
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    const activeWorker = typeof getActiveWorker === 'function' ? getActiveWorker() : null;
+    const canGiveTasks = isAdmin || document.body.classList.contains('perm-tasks') || (activeWorker && activeWorker.perms && (activeWorker.perms.tasks === true || activeWorker.perms.tasks === 'true'));
+    if (!canGiveTasks) {
+        alert(isAr ? '⛔ ليس لديك صلاحية إنشاء أو إسناد المهام. فقط المدير أو من يملك صلاحية المهام يمكنه ذلك!' : '⛔ You do not have permission to assign or create tasks.');
+        return;
+    }
+
     const workerId = document.getElementById('task-worker-select').value;
     const text = document.getElementById('task-assign-input').value.trim();
     const urgency = document.getElementById('task-urgency') ? document.getElementById('task-urgency').value : 'normal';
     const deadlineMins = document.getElementById('task-deadline') ? parseInt(document.getElementById('task-deadline').value) || 0 : 0;
 
-    if (!workerId || !text) { alert("Select an employee and describe a task."); return; }
+    if (!workerId || !text) { alert(isAr ? "الرجاء اختيار الموظف وكتابة تفاصيل المهمة." : "Select an employee and describe a task."); return; }
 
     const assignedTaskNum = getNextTaskNum();
 
@@ -785,7 +794,6 @@ function assignTask() {
         return;
     }
 
-    const activeWorker = getActiveWorker();
     const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
     if (workerIndex === -1) return;
     const worker = getCompanyData().workers[workerIndex];
@@ -1074,6 +1082,8 @@ function renderTasks() {
 
     const isAdmin = currentUser && currentUser.role === 'admin';
     const data = getCompanyData();
+    const activeWorker = typeof getActiveWorker === 'function' ? getActiveWorker() : null;
+    const canEditTask = isAdmin || document.body.classList.contains('perm-tasks') || (activeWorker && activeWorker.perms && (activeWorker.perms.tasks === true || activeWorker.perms.tasks === 'true'));
 
     // Ensure all existing & new tasks have assigned task numbers
     ensureTaskNumbers();
@@ -1164,13 +1174,11 @@ function renderTasks() {
     if (selectedWorkerId === 'all') {
         const rawGenTasks = data.generalTasks || {};
         const generalTasks = Array.isArray(rawGenTasks) ? rawGenTasks : Object.values(rawGenTasks);
-        const activeWorker = getActiveWorker();
-        const hasTaskAccess = isAdmin || document.body.classList.contains('perm-tasks') || (activeWorker && activeWorker.perms && (activeWorker.perms.tasks === true || activeWorker.perms.tasks === 'true'));
         let pendingGeneralTasks = generalTasks.filter(gt => {
             if (!gt || gt.status !== 'pending') return false;
             if (!passesDateFilter(getJobTimestamp(gt))) return false;
             if (!passesSearchFilter(gt)) return false;
-            if (hasTaskAccess) return true; // Admin and workers with task access see ALL general tasks!
+            if (canEditTask) return true; // Admin and managers with task access see ALL general tasks!
             if (!gt.targetGroupId) return true; // Available to everyone
 
             const groups = data.taskGroups || [];
@@ -1263,8 +1271,10 @@ function renderTasks() {
                         </div>`;
                 }
 
+                const genDblClickAttr = canEditTask ? `ondblclick="if (!event.target.closest('button') && !event.target.closest('input')) openEditTaskModal('general', '${gt.id}', true)" title="${isAr ? 'انقر مرتين للتعديل' : 'Double-click to edit'}"` : '';
+
                 genHtml += `
-                    <div class="general-task-item" ondblclick="if (!event.target.closest('button') && !event.target.closest('input')) openEditTaskModal('general', '${gt.id}', true)" style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; cursor:pointer;" title="${isAr ? 'انقر مرتين للتعديل' : 'Double-click to edit'}">
+                    <div class="general-task-item" ${genDblClickAttr} style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; ${canEditTask ? 'cursor:pointer;' : ''}">
                         <div>
                             <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">Created: ${gt.date || new Date(getJobTimestamp(gt)).toLocaleString()}</div>
                             <div style="font-size:1.05rem; font-weight:700; color:var(--text-main); display:flex; align-items:center; flex-wrap:wrap; gap:6px;">${taskNumBadge} <span>${gt.title}</span> ${urgencyBadge} ${groupBadge}</div>
@@ -1355,8 +1365,10 @@ function renderTasks() {
             let isGeneralBadge = j.isGeneral ? `<span class="badge" style="background:var(--info); color:var(--text-light); margin-right:8px; font-size:0.75rem; vertical-align:middle;">🌍 General Task</span>` : '';
             const taskNumBadge = `<span class="badge" style="background:#2563eb; color:#ffffff; font-weight:700; font-size:0.85rem; padding:3px 9px; border-radius:6px; margin-right:6px; box-shadow:0 1px 3px rgba(37,99,235,0.25);" title="Task ${j.taskNum || 1}">${j.taskNum || 1}</span>`;
 
+            const workerDblClickAttr = canEditTask ? `ondblclick="if (!event.target.closest('button') && !event.target.closest('input') && !event.target.closest('select')) openEditTaskModal('${worker.id}', '${j.id}')" title="${isAr ? 'انقر مرتين للتعديل' : 'Double-click to edit'}"` : '';
+
             return `
-                        <div class="mission-item" ondblclick="if (!event.target.closest('button') && !event.target.closest('input') && !event.target.closest('select')) openEditTaskModal('${worker.id}', '${j.id}')" style="border-left: 4px solid ${doneColor}; display:flex; flex-direction:column; align-items:stretch; cursor:pointer;" title="${isAr ? 'انقر مرتين للتعديل' : 'Double-click to edit'}">
+                        <div class="mission-item" ${workerDblClickAttr} style="border-left: 4px solid ${doneColor}; display:flex; flex-direction:column; align-items:stretch; ${canEditTask ? 'cursor:pointer;' : ''}">
                             <div class="flex-between" style="margin-bottom:8px; align-items:flex-start;">
                                 <div>
                                     <div style="font-size: 0.75rem; color:var(--text-muted); margin-bottom:4px;">Assigned: ${j.date || new Date(getJobTimestamp(j)).toLocaleString()}</div>
@@ -1502,6 +1514,15 @@ function deleteGeneralTask(taskId) {
 }
 
 function openEditTaskModal(workerId, taskId, isGeneral = false) {
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    const activeWorker = typeof getActiveWorker === 'function' ? getActiveWorker() : null;
+    const canEditTask = isAdmin || document.body.classList.contains('perm-tasks') || (activeWorker && activeWorker.perms && (activeWorker.perms.tasks === true || activeWorker.perms.tasks === 'true'));
+
+    if (!canEditTask) {
+        alert(currentAppLang === 'ar' ? '⚠️ ليس لديك صلاحية لتعديل المهام.' : '⚠️ You do not have permission to edit tasks.');
+        return;
+    }
+
     const modal = document.getElementById('edit-task-modal');
     if (!modal) return;
 
@@ -1586,6 +1607,15 @@ function closeEditTaskModal() {
 }
 
 function saveEditedTask() {
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    const activeWorker = typeof getActiveWorker === 'function' ? getActiveWorker() : null;
+    const canEditTask = isAdmin || document.body.classList.contains('perm-tasks') || (activeWorker && activeWorker.perms && (activeWorker.perms.tasks === true || activeWorker.perms.tasks === 'true'));
+
+    if (!canEditTask) {
+        alert(currentAppLang === 'ar' ? '⚠️ ليس لديك صلاحية لتعديل المهام.' : '⚠️ You do not have permission to edit tasks.');
+        return;
+    }
+
     const isAr = currentAppLang === 'ar';
     const taskId = document.getElementById('edit-task-id-hidden').value;
     const origWorkerId = document.getElementById('edit-task-original-worker-hidden').value;

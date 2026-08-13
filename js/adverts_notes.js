@@ -59,21 +59,11 @@ function editManagerNote(id) {
     const note = notes.find(n => n && n.id === id);
     if (!note) return;
 
-    const now = Date.now();
-    const noteTime = note.timestamp || parseInt(note.id) || 0;
-    const ageMs = now - noteTime;
-    const TWO_MINS_MS = 2 * 60 * 1000;
-
     const isAuthor = currentUser && currentUser.email && note.author && (note.author.toLowerCase() === currentUser.email.toLowerCase());
     const isAdmin = currentUser && currentUser.role === 'admin';
 
     if (!isAuthor && !isAdmin) {
         alert(isAr ? 'لا يمكنك تعديل هذه الملاحظة.' : 'You do not have permission to edit this note.');
-        return;
-    }
-
-    if (ageMs > TWO_MINS_MS) {
-        alert(isAr ? 'عذراً، لا يمكن تعديل الملاحظة بعد مرور أكثر من دقيقتين من نشرها.' : 'Notes can only be edited within 2 minutes of publishing.');
         return;
     }
 
@@ -85,6 +75,7 @@ function editManagerNote(id) {
         return;
     }
 
+    const now = Date.now();
     note.text = trimmed;
     db.ref(`companies/${currentCompany}/managerNotes/${id}`).update({
         text: trimmed,
@@ -228,7 +219,7 @@ function renderNotes() {
         const authorBadge = `<span style="font-size:0.85rem; font-weight:700; color:var(--text-main); display:inline-flex; align-items:center; gap:4px; background:var(--input-bg); padding:3px 10px; border-radius:6px; border:1px solid var(--border-color);" title="${isAr ? 'كاتب الملاحظة' : 'Author'}">👤 ${authorDisplayName}</span>`;
 
         let editBtn = '';
-        if ((isAuthor || isAdmin) && isWithin2Mins) {
+        if (isAuthor || isAdmin) {
             editBtn = `<button onclick="editManagerNote('${n.id}')" class="btn-outline" style="padding:2px 8px; font-size:0.75rem; border-radius:4px; border:1px solid var(--primary); color:var(--primary); font-weight:600; cursor:pointer; margin-left:6px;" title="${isAr ? 'تعديل الملاحظة' : 'Edit note'}">✏️ ${isAr ? 'تعديل' : 'Edit'}</button>`;
         }
 
@@ -314,7 +305,8 @@ function renderNotes() {
                     </div>
                 ` : '';
 
-        let textHtml = n.text ? `<div style="font-size:1.1rem; color:var(--text-main); white-space: pre-wrap; line-height: 1.6; margin-bottom: 16px;">${n.text}</div>` : '';
+        const canEditNote = isAuthor || isAdmin;
+        let textHtml = n.text ? `<div ${canEditNote ? `ondblclick="editManagerNote('${n.id}')" title="${isAr ? 'انقر مرتين لتعديل الملاحظة' : 'Double-click to edit note'}" style="font-size:1.1rem; color:var(--text-main); white-space: pre-wrap; line-height: 1.6; margin-bottom: 16px; cursor:pointer;"` : 'style="font-size:1.1rem; color:var(--text-main); white-space: pre-wrap; line-height: 1.6; margin-bottom: 16px;"'}>${n.text}</div>` : '';
         let attachmentHtml = '';
         if (n.attachmentType === 'image' && n.attachmentData) {
             attachmentHtml = `

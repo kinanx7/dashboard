@@ -24,23 +24,30 @@ function renderPrepareSection() {
         }
         const assignedStrs = assigned.map(id => String(id));
 
+        const isAdmin = document.body.classList.contains('role-admin');
+
         if (staffCountLabel) {
             staffCountLabel.textContent = isAr 
                 ? `طاقم التحضير (${assignedStrs.length})` 
                 : `Preparing Staff (${assignedStrs.length})`;
         }
 
-        // Populate dropdown with unassigned workers
-        prepAddSelect.innerHTML = `<option value="" style="background: var(--card-bg); color: var(--text-main); font-weight: 800;">+ ${isAr ? 'إضافة موظف' : 'Add Staff'}</option>` + workers.map((w, idx) => {
-            if (!w) return '';
-            const wId = String(w.id || idx);
-            if (assignedStrs.includes(wId)) return '';
-            return `<option value="${wId}" style="background: var(--card-bg); color: var(--text-main); font-weight: 800;">${w.name || `Worker #${idx}`}</option>`;
-        }).join('');
+        // Populate dropdown with unassigned workers (visible to admins only)
+        if (prepAddSelect) {
+            prepAddSelect.style.display = isAdmin ? 'inline-block' : 'none';
+            if (isAdmin) {
+                prepAddSelect.innerHTML = `<option value="" style="background: var(--card-bg); color: var(--text-main); font-weight: 800;">+ ${isAr ? 'إضافة موظف' : 'Add Staff'}</option>` + workers.map((w, idx) => {
+                    if (!w) return '';
+                    const wId = String(w.id || idx);
+                    if (assignedStrs.includes(wId)) return '';
+                    return `<option value="${wId}" style="background: var(--card-bg); color: var(--text-main); font-weight: 800;">${w.name || `Worker #${idx}`}</option>`;
+                }).join('');
+            }
+        }
 
         // Render active worker avatar cards
         if (assignedStrs.length === 0) {
-            prepBadgesDiv.innerHTML = `<span style="font-size:0.8rem; color:var(--text-muted); font-weight:700; font-style:italic;">${isAr ? '⚠️ لم يتم تعيين موظفي تحضير بعد (اضغط + إضافة موظف)' : '⚠️ No preparing staff assigned yet (Click + Add Staff)'}</span>`;
+            prepBadgesDiv.innerHTML = `<span style="font-size:0.8rem; color:var(--text-muted); font-weight:700; font-style:italic;">${isAr ? '⚠️ لم يتم تعيين موظفي تحضير بعد' : '⚠️ No preparing staff assigned yet'}</span>`;
         } else {
             prepBadgesDiv.innerHTML = assignedStrs.map(wId => {
                 const wObj = workers.find(w => w && String(w.id || '') === wId);
@@ -48,6 +55,8 @@ function renderPrepareSection() {
                 const initial = wName.trim().charAt(0).toUpperCase() || 'W';
                 const phone = wObj ? (wObj.phone || '') : '';
                 const roleLabel = wObj && wObj.role ? wObj.role : (isAr ? 'محضر طلبات' : 'Prep Worker');
+
+                const removeBtnHTML = isAdmin ? `<button type="button" onclick="togglePreparingWorkerAssignment('${wId}')" style="background: rgba(239,68,68,0.12); border: none; color: #ef4444; border-radius: 50%; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 900; cursor: pointer; line-height: 1; transition: all 0.2s ease; margin-left: 2px;" title="${isAr ? 'إزالة من طاقم التحضير' : 'Remove from staff'}" onmouseover="this.style.background='#ef4444'; this.style.color='#ffffff';" onmouseout="this.style.background='rgba(239,68,68,0.12)'; this.style.color='#ef4444';">✕</button>` : '';
 
                 return `
                     <div class="prep-worker-card-chip" style="background: var(--input-bg); border: 1.5px solid var(--border-color); border-radius: 12px; padding: 5px 10px 5px 6px; display: inline-flex; align-items: center; gap: 8px; box-shadow: var(--shadow-sm); transition: all 0.2s ease;">
@@ -59,7 +68,7 @@ function renderPrepareSection() {
                             <span style="font-weight: 900; font-size: 0.82rem; color: var(--text-main); line-height: 1.1;">${wName}</span>
                             <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700;">${phone ? `📱 ${phone}` : roleLabel}</span>
                         </div>
-                        <button type="button" onclick="togglePreparingWorkerAssignment('${wId}')" style="background: rgba(239,68,68,0.12); border: none; color: #ef4444; border-radius: 50%; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 900; cursor: pointer; line-height: 1; transition: all 0.2s ease; margin-left: 2px;" title="${isAr ? 'إزالة من طاقم التحضير' : 'Remove from staff'}" onmouseover="this.style.background='#ef4444'; this.style.color='#ffffff';" onmouseout="this.style.background='rgba(239,68,68,0.12)'; this.style.color='#ef4444';">✕</button>
+                        ${removeBtnHTML}
                     </div>
                 `;
             }).join('');
@@ -101,8 +110,7 @@ function renderPrepareSection() {
         return;
     }
 
-    const isAdminOrMgr = typeof isUserAdminOrManager === 'function' ? isUserAdminOrManager() : true;
-    const canDelete = isAdminOrMgr || !!(typeof currentUser !== 'undefined' && currentUser && (currentUser.canDeletePrepareOrders || currentUser.role === 'operations'));
+    const canDelete = document.body.classList.contains('role-admin');
 
     grid.innerHTML = allOrders.map(order => {
         const orderNum = formatMarketOrderNum(order);

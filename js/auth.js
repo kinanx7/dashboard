@@ -308,29 +308,40 @@ function deleteManager(email) {
 
 function loadWorkerPerms() {
     const wId = document.getElementById('perm-worker-select').value;
+    const permKeys = ['wh', 'drv', 'fin', 'sales', 'costs', 'adverts', 'attendance', 'tasks', 'prepare', 'vault', 'reminders', 'messaging', 'activity', 'market'];
+    
     if (!wId) {
-        document.getElementById('perm-wh').checked = false;
-        document.getElementById('perm-drv').checked = false;
-        document.getElementById('perm-fin').checked = false;
-        document.getElementById('perm-sales').checked = false;
-        document.getElementById('perm-costs').checked = false;
-        document.getElementById('perm-adverts').checked = false;
-        document.getElementById('perm-attendance').checked = false;
-        if (document.getElementById('perm-tasks')) document.getElementById('perm-tasks').checked = false;
+        permKeys.forEach(k => {
+            const el = document.getElementById(`perm-${k}`);
+            if (el) el.checked = false;
+        });
         return;
     }
     const worker = getCompanyData().workers.find(w => w.id === wId);
     if (!worker) return;
-    const p = worker.permissions || { warehouse: false, drivers: false, finance: false, sales: false, costs: false, adverts: false, attendance: false, tasks: false };
-    document.getElementById('perm-wh').checked = !!p.warehouse;
-    document.getElementById('perm-drv').checked = !!p.drivers;
-    document.getElementById('perm-fin').checked = !!p.finance;
-    document.getElementById('perm-sales').checked = !!p.sales;
-    document.getElementById('perm-costs').checked = !!p.costs;
-    document.getElementById('perm-adverts').checked = !!p.adverts;
-    document.getElementById('perm-attendance').checked = !!p.attendance;
-    if (document.getElementById('perm-tasks')) document.getElementById('perm-tasks').checked = !!p.tasks;
-    if (document.getElementById('perm-prepare')) document.getElementById('perm-prepare').checked = !!p.prepare;
+    const p = worker.permissions || {};
+
+    const keyMap = {
+        wh: 'warehouse',
+        drv: 'drivers',
+        fin: 'finance',
+        sales: 'sales',
+        costs: 'costs',
+        adverts: 'adverts',
+        attendance: 'attendance',
+        tasks: 'tasks',
+        prepare: 'prepare',
+        vault: 'vault',
+        reminders: 'reminders',
+        messaging: 'messaging',
+        activity: 'activity',
+        market: 'market'
+    };
+
+    Object.entries(keyMap).forEach(([domKey, dataKey]) => {
+        const el = document.getElementById(`perm-${domKey}`);
+        if (el) el.checked = !!p[dataKey];
+    });
 }
 
 function saveWorkerPerms() {
@@ -339,16 +350,27 @@ function saveWorkerPerms() {
     const workerIndex = getCompanyData().workers.findIndex(w => w.id === wId);
     if (workerIndex === -1) return;
     const worker = getCompanyData().workers[workerIndex];
+
+    const getVal = (id) => {
+        const el = document.getElementById(id);
+        return el ? el.checked : false;
+    };
+
     worker.permissions = {
-        warehouse: document.getElementById('perm-wh').checked,
-        drivers: document.getElementById('perm-drv').checked,
-        finance: document.getElementById('perm-fin').checked,
-        sales: document.getElementById('perm-sales').checked,
-        costs: document.getElementById('perm-costs').checked,
-        adverts: document.getElementById('perm-adverts').checked,
-        attendance: document.getElementById('perm-attendance').checked,
-        tasks: document.getElementById('perm-tasks') ? document.getElementById('perm-tasks').checked : false,
-        prepare: document.getElementById('perm-prepare') ? document.getElementById('perm-prepare').checked : false
+        warehouse: getVal('perm-wh'),
+        drivers: getVal('perm-drv'),
+        finance: getVal('perm-fin'),
+        sales: getVal('perm-sales'),
+        costs: getVal('perm-costs'),
+        adverts: getVal('perm-adverts'),
+        attendance: getVal('perm-attendance'),
+        tasks: getVal('perm-tasks'),
+        prepare: getVal('perm-prepare'),
+        vault: getVal('perm-vault'),
+        reminders: getVal('perm-reminders'),
+        messaging: getVal('perm-messaging'),
+        activity: getVal('perm-activity'),
+        market: getVal('perm-market')
     };
 
     // Targeted write to worker permissions path
