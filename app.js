@@ -21090,7 +21090,8 @@ function startAdBroadcast() {
     const textEl = document.getElementById('ad-broadcast-text');
     const targetGroupVal = document.getElementById('ad-target-group-select')?.value || 'ALL';
     const serverUrlInput = document.getElementById('wa-server-url');
-    const baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || 'https://burgeroov-notify.onrender.com';
+    let rawBaseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || 'https://burgeroov-notify.onrender.com';
+    let baseUrl = rawBaseUrl.replace(/\/+$/, '');
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
 
     const rawMessage = textEl ? textEl.value.trim() : '';
@@ -21112,7 +21113,7 @@ function startAdBroadcast() {
     }
 
     if (!confirm(isAr 
-        ? `هل أنت أأكد من بدء إرسال الإعلان عبر الواتساب إلى [${recipientsToSend.length}] رقم هاتف مع فاصل زمني 5 ثوانٍ بين كل رقم؟` 
+        ? `هل أنت تأكد من بدء إرسال الإعلان عبر الواتساب إلى [${recipientsToSend.length}] رقم هاتف مع فاصل زمني 5 ثوانٍ بين كل رقم؟` 
         : `Are you sure you want to start broadcasting to [${recipientsToSend.length}] phone numbers with a 5-second interval between each number?`)) {
         return;
     }
@@ -21134,7 +21135,7 @@ function startAdBroadcast() {
     let currentIndex = 0;
     const total = recipientsToSend.length;
 
-    if (logBox) logBox.innerHTML = `🚀 [Broadcast Started] Target: ${total} recipients with 5-second interval...\n`;
+    if (logBox) logBox.innerHTML = `🚀 [Broadcast Started] Target: ${total} recipients with 5-second interval...\n📡 Connecting to: ${baseUrl}/wa/send\n`;
 
     function sendNext() {
         if (!isAdBroadcastRunning) {
@@ -21178,16 +21179,23 @@ function startAdBroadcast() {
                 image: selectedAdImageBase64
             })
         })
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+            }
+            return res.json();
+        })
         .then(resData => {
-            if (resData.success) {
+            if (resData && resData.success) {
                 if (logBox) logBox.innerHTML += `💬 [${recipient.tag}] Sent to ${recipient.name} (${recipient.phone})\n`;
             } else {
-                if (logBox) logBox.innerHTML += `⚠️ [${recipient.tag}] ${recipient.name}: ${resData.error || 'Failed'}\n`;
+                if (logBox) logBox.innerHTML += `⚠️ [${recipient.tag}] ${recipient.name}: ${resData?.error || 'Failed'}\n`;
             }
         })
         .catch(err => {
-            if (logBox) logBox.innerHTML += `❌ [${recipient.tag}] ${recipient.name} Error: ${err.message}\n`;
+            if (logBox) {
+                logBox.innerHTML += `❌ [${recipient.tag}] ${recipient.name} (${recipient.phone}) Error: ${err.message || 'Failed to fetch (Server waking up or offline)'}\n`;
+            }
         });
 
         currentIndex++;
