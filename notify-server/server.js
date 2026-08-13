@@ -593,8 +593,9 @@ function startNotificationListeners(companyId) {
             if (!before) return;
 
             // 1. NEW TASK
-            const beforeJobs = Array.isArray(before.jobs) ? before.jobs : [];
-            const afterJobs  = Array.isArray(after.jobs)  ? after.jobs  : [];
+            const normalizeArray = (val) => Array.isArray(val) ? val.filter(Boolean) : (val && typeof val === 'object' ? Object.values(val).filter(Boolean) : []);
+            const beforeJobs = normalizeArray(before.jobs);
+            const afterJobs  = normalizeArray(after.jobs);
 
             if (afterJobs.length > beforeJobs.length) {
                 const beforeIds = new Set(beforeJobs.map(j => j.id));
