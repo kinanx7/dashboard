@@ -20814,6 +20814,136 @@ let selectedAdGroupFilter = 'ALL';
 let selectedAdImageBase64 = null;
 let activeAdBroadcastTimer = null;
 let isAdBroadcastRunning = false;
+let adSearchQuery = '';
+
+function saveAdRecipients() {
+    if (typeof currentCompany !== 'undefined' && currentCompany) {
+        try {
+            localStorage.setItem('adRecipients_' + currentCompany, JSON.stringify(adRecipients));
+        } catch(e) {}
+        if (typeof db !== 'undefined' && db) {
+            db.ref(`companies/${currentCompany}/adRecipients`).set(adRecipients);
+        }
+    }
+}
+window.saveAdRecipients = saveAdRecipients;
+
+function loadAdRecipients() {
+    if (typeof currentCompany !== 'undefined' && currentCompany) {
+        // LocalStorage fast load
+        try {
+            const cached = localStorage.getItem('adRecipients_' + currentCompany);
+            if (cached) {
+                adRecipients = JSON.parse(cached);
+                renderAdRecipientsList();
+            }
+        } catch(e) {}
+
+        // Firebase RTDB sync
+        if (typeof db !== 'undefined' && db) {
+            db.ref(`companies/${currentCompany}/adRecipients`).once('value', snapshot => {
+                const val = snapshot.val();
+                if (Array.isArray(val)) {
+                    adRecipients = val;
+                } else if (val && typeof val === 'object') {
+                    adRecipients = Object.values(val);
+                } else if (!val) {
+                    // if empty in DB and no local cache
+                    if (!localStorage.getItem('adRecipients_' + currentCompany)) {
+                        adRecipients = [];
+                    }
+                }
+                recalculateAdRecipientGroups();
+                renderAdRecipientsList();
+            });
+        }
+    }
+}
+window.loadAdRecipients = loadAdRecipients;
+
+function onAdSearchInput(val) {
+    adSearchQuery = (val || '').trim().toLowerCase();
+    const clearBtn = document.getElementById('btn-ad-clear-search');
+    if (clearBtn) {
+        clearBtn.style.display = adSearchQuery ? 'inline-block' : 'none';
+    }
+    renderAdRecipientsList();
+}
+window.onAdSearchInput = onAdSearchInput;
+
+function clearAdSearch() {
+    const input = document.getElementById('ad-search-input');
+    const clearBtn = document.getElementById('btn-ad-clear-search');
+    if (input) input.value = '';
+    if (clearBtn) clearBtn.style.display = 'none';
+    adSearchQuery = '';
+    renderAdRecipientsList();
+}
+window.clearAdSearch = clearAdSearch;
+
+function removeDuplicateAdRecipients() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    if (!adRecipients || adRecipients.length === 0) {
+        alert(isAr ? 'القائمة خالية لا توجد أرقام.' : 'No phone numbers to check for duplicates.');
+        return;
+    }
+
+    const seenPhones = new Set();
+    const uniqueList = [];
+    let removedCount = 0;
+
+    adRecipients.forEach(r => {
+        const normPhone = (r.phone || '').replace(/[^0-9]/g, '');
+        if (seenPhones.has(normPhone)) {
+            removedCount++;
+        } else {
+            seenPhones.add(normPhone);
+            uniqueList.push(r);
+        }
+    });
+
+    if (removedCount === 0) {
+        alert(isAr ? '✅ جميع الأرقام فريدة! لا يوجد أرقام مكررة.' : '✅ All phone numbers are unique! No duplicates found.');
+        return;
+    }
+
+    adRecipients = uniqueList;
+    recalculateAdRecipientGroups();
+    saveAdRecipients();
+    renderAdRecipientsList();
+
+    alert(isAr 
+        ? `🧹 تم إزالة ${removedCount} رقم مكرر بنجاح!` 
+        : `🧹 Successfully removed ${removedCount} duplicate phone number(s)!`);
+}
+window.removeDuplicateAdRecipients = removeDuplicateAdRecipients;
+
+function clearAllAdRecipients() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    if (!adRecipients || adRecipients.length === 0) {
+        alert(isAr ? 'القائمة خالية بالفعل!' : 'Recipients list is already empty!');
+        return;
+    }
+    if (!confirm(isAr 
+        ? `هل أنت تأكد من مسح جميع الأرقام (${adRecipients.length} رقم) من القائمة والمجموعات؟` 
+        : `Are you sure you want to delete all ${adRecipients.length} recipients from the list?`)) return;
+
+    adRecipients = [];
+    saveAdRecipients();
+    recalculateAdRecipientGroups();
+    renderAdRecipientsList();
+}
+window.clearAllAdRecipients = clearAllAdRecipients;
+
+function toggleAdRecipientStatus(id) {
+    const item = adRecipients.find(r => r.id === id);
+    if (item) {
+        item.disabled = !item.disabled;
+        saveAdRecipients();
+        renderAdRecipientsList();
+    }
+}
+window.toggleAdRecipientStatus = toggleAdRecipientStatus;
 
 function toggleMessagingViewMode(mode) {
     const gatewayContainer = document.getElementById('msg-mode-gateway-container');
@@ -20837,6 +20967,7 @@ function toggleMessagingViewMode(mode) {
             btnAd.style.color = 'white';
             btnAd.style.border = 'none';
         }
+        loadAdRecipients();
         renderAdRecipientsList();
     } else {
         if (gatewayContainer) gatewayContainer.style.display = 'block';
@@ -20885,10 +21016,12 @@ function addAdRecipientFromForm() {
         name: name || `Contact #${adRecipients.length + 1}`,
         phone: cleanPhone,
         tag: `#${adRecipients.length + 1}`,
-        group: Math.floor(adRecipients.length / 50) + 1
+        group: Math.floor(adRecipients.length / 50) + 1,
+        disabled: false
     });
 
     recalculateAdRecipientGroups();
+    saveAdRecipients();
 
     if (nameEl) nameEl.value = '';
     if (phoneEl) phoneEl.value = '';
@@ -20900,6 +21033,7 @@ window.addAdRecipientFromForm = addAdRecipientFromForm;
 function deleteAdRecipient(id) {
     adRecipients = adRecipients.filter(item => item.id !== id);
     recalculateAdRecipientGroups();
+    saveAdRecipients();
     renderAdRecipientsList();
 }
 window.deleteAdRecipient = deleteAdRecipient;
@@ -20949,20 +21083,22 @@ function processBulkImportAdRecipients() {
                 name: name || `Contact #${adRecipients.length + 1}`,
                 phone: phone,
                 tag: `#${adRecipients.length + 1}`,
-                group: Math.floor(adRecipients.length / 50) + 1
+                group: Math.floor(adRecipients.length / 50) + 1,
+                disabled: false
             });
             addedCount++;
         }
     });
 
     recalculateAdRecipientGroups();
+    saveAdRecipients();
     textarea.value = '';
     closeBulkImportAdModal();
     renderAdRecipientsList();
 
     alert(isAr 
-        ? `✅ تم استيراد ${addedCount} رقم بنجاح وتصنيفها في المجموعات!` 
-        : `✅ Successfully imported ${addedCount} contacts and assigned group tags!`);
+        ? `✅ تم استيراد ${addedCount} رقم بنجاح وحفظها تلقائياً!` 
+        : `✅ Successfully imported and saved ${addedCount} contacts!`);
 }
 window.processBulkImportAdRecipients = processBulkImportAdRecipients;
 
@@ -21022,9 +21158,21 @@ function renderAdRecipientsList() {
     const tbody = document.getElementById('ad-recipients-tbody');
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
 
-    // Determine total groups
+    // Determine total groups & stats
     const totalCount = adRecipients.length;
+    const activeCount = adRecipients.filter(r => !r.disabled).length;
+    const disabledCount = totalCount - activeCount;
     const groupCount = Math.ceil(totalCount / 50) || 1;
+
+    // Update Stats Badge
+    const statsBadge = document.getElementById('ad-stats-badge');
+    if (statsBadge) {
+        if (isAr) {
+            statsBadge.textContent = `📊 الإجمالي: ${totalCount} رقم (المفعّل: ${activeCount}، المعطل: ${disabledCount})`;
+        } else {
+            statsBadge.textContent = `📊 Total: ${totalCount} Phones (Active: ${activeCount}, Off: ${disabledCount})`;
+        }
+    }
 
     // Render Pills
     if (pillsContainer) {
@@ -21060,28 +21208,53 @@ function renderAdRecipientsList() {
         selectEl.innerHTML = optsHtml;
     }
 
-    // Filter Table Rows
+    // Filter Table Rows by Group & Search Query
     const filtered = adRecipients.filter(r => {
-        if (selectedAdGroupFilter === 'ALL') return true;
-        return r.group === Number(selectedAdGroupFilter);
+        // Group Filter
+        if (selectedAdGroupFilter !== 'ALL' && r.group !== Number(selectedAdGroupFilter)) {
+            return false;
+        }
+        // Search Query Filter
+        if (adSearchQuery) {
+            const matchName = (r.name || '').toLowerCase().includes(adSearchQuery);
+            const matchPhone = (r.phone || '').toLowerCase().includes(adSearchQuery);
+            const matchTag = (r.tag || '').toLowerCase().includes(adSearchQuery);
+            return matchName || matchPhone || matchTag;
+        }
+        return true;
     });
 
     if (tbody) {
         if (filtered.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted); font-weight:700;">${isAr ? 'لا توجد أرقام مسجلة. أضف شخصاً أو استورد قائمة أعلاه.' : 'No recipients found. Add a person or import numbers above.'}</td></tr>`;
+            const msg = adSearchQuery 
+                ? (isAr ? `لا تظهر نتائج مطابقة لـ "${adSearchQuery}"` : `No contacts matching "${adSearchQuery}"`)
+                : (isAr ? 'لا توجد أرقام مسجلة. أضف شخصاً أو استورد قائمة أعلاه.' : 'No recipients found. Add a person or import numbers above.');
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted); font-weight:700;">${msg}</td></tr>`;
             return;
         }
 
-        tbody.innerHTML = filtered.map(r => `
-            <tr style="border-bottom:1px solid var(--border-color);">
-                <td style="padding:8px 12px; font-weight:900; color:#10b981; font-family:monospace;">${r.tag}</td>
-                <td style="padding:8px 12px; font-weight:700; color:var(--text-main);">${r.name}</td>
-                <td style="padding:8px 12px; font-weight:700; color:var(--text-muted); font-family:monospace;">${r.phone}</td>
-                <td style="padding:8px 12px; text-align:right;">
-                    <button type="button" onclick="deleteAdRecipient('${r.id}')" style="background:rgba(239,68,68,0.12); color:#ef4444; border:1px solid rgba(239,68,68,0.3); border-radius:6px; padding:3px 8px; font-size:0.75rem; font-weight:800; cursor:pointer;">✕ Delete</button>
-                </td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = filtered.map(r => {
+            const isDisabled = !!r.disabled;
+            const rowStyle = isDisabled 
+                ? 'border-bottom:1px solid var(--border-color); opacity:0.55; background:rgba(239,68,68,0.03);'
+                : 'border-bottom:1px solid var(--border-color);';
+
+            return `
+                <tr style="${rowStyle}">
+                    <td style="padding:8px 12px; font-weight:900; color:#10b981; font-family:monospace;">${r.tag}</td>
+                    <td style="padding:8px 12px; font-weight:700; color:var(--text-main);">${r.name}</td>
+                    <td style="padding:8px 12px; font-weight:700; color:var(--text-muted); font-family:monospace;">${r.phone}</td>
+                    <td style="padding:8px 12px; text-align:center;">
+                        <button type="button" onclick="toggleAdRecipientStatus('${r.id}')" title="${isDisabled ? (isAr ? 'انقر لتفعيل هذا الرقم لإرسال الرسائل' : 'Click to enable messaging for this number') : (isAr ? 'انقر لإيقاف هذا الرقم من الإرسال' : 'Click to disable messaging for this number')}" style="padding:3px 10px; border-radius:12px; font-size:0.75rem; font-weight:800; border:none; cursor:pointer; background:${isDisabled ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)'}; color:${isDisabled ? '#ef4444' : '#10b981'};">
+                            ${isDisabled ? (isAr ? '⛔ معطل' : '⛔ Off') : (isAr ? '🟢 مفعّل' : '🟢 Active')}
+                        </button>
+                    </td>
+                    <td style="padding:8px 12px; text-align:right;">
+                        <button type="button" onclick="deleteAdRecipient('${r.id}')" style="background:rgba(239,68,68,0.12); color:#ef4444; border:1px solid rgba(239,68,68,0.3); border-radius:6px; padding:3px 8px; font-size:0.75rem; font-weight:800; cursor:pointer;">✕ ${isAr ? 'حذف' : 'Delete'}</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
     }
 }
 window.renderAdRecipientsList = renderAdRecipientsList;
@@ -21101,8 +21274,9 @@ function startAdBroadcast() {
         return;
     }
 
-    // Filter recipients
+    // Filter recipients (Skip disabled recipients)
     let recipientsToSend = adRecipients.filter(r => {
+        if (r.disabled) return false;
         if (targetGroupVal === 'ALL') return true;
         return r.group === Number(targetGroupVal);
     });

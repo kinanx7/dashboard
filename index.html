@@ -4261,6 +4261,7 @@
                                 <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
                                     <h3 style="font-size: 1.05rem; font-weight: 900; color: var(--text-main); margin: 0; display: flex; align-items: center; gap: 8px;">
                                         <span data-i18n="title-ad-recipients-box">👥 Recipients & Phone Numbers Matrix</span>
+                                        <span id="ad-stats-badge" style="font-size: 0.76rem; font-weight: 800; color: #10b981; background: rgba(16,185,129,0.12); padding: 3px 8px; border-radius: 8px; border: 1px solid rgba(16,185,129,0.3); font-family: monospace;">📊 Total: 0 Phones</span>
                                     </h3>
                                     <button type="button" onclick="openBulkImportAdModal()" class="btn-neutral" style="padding: 6px 12px; border-radius: 8px; font-weight: 800; font-size: 0.78rem; background: rgba(99,102,241,0.12); color: #6366f1; border: 1px solid rgba(99,102,241,0.3); cursor: pointer;" data-i18n="btn-bulk-import-ad-recipients">
                                         📋 Bulk Import List
@@ -4285,7 +4286,20 @@
                                     </button>
                                 </div>
 
-                                <!-- AUTO-GROUPING TABS (e.g. Group 1 #1-#50, Group 2 #51-#100) -->
+                                <!-- AUTO-GROUPING TABS & SEARCH BAR -->
+                                <div style="display: flex; gap: 8px; margin-bottom: 10px; align-items: center; flex-wrap: wrap;">
+                                    <div style="position: relative; flex: 1; min-width: 150px;">
+                                        <input type="text" id="ad-search-input" oninput="onAdSearchInput(this.value)" placeholder="🔍 Search numbers or names..." data-i18n="[placeholder]placeholder-ad-search" style="width: 100%; padding: 8px 30px 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-size: 0.82rem; font-weight: 600; box-sizing: border-box;">
+                                        <button type="button" id="btn-ad-clear-search" onclick="clearAdSearch()" style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: var(--text-muted); font-size: 0.85rem; font-weight: 800; cursor: pointer; display: none; padding: 2px 6px;">✕</button>
+                                    </div>
+                                    <button type="button" onclick="removeDuplicateAdRecipients()" class="btn-neutral" style="padding: 8px 12px; border-radius: 8px; font-size: 0.78rem; font-weight: 800; background: rgba(245,158,11,0.12); color: #d97706; border: 1px solid rgba(245,158,11,0.3); cursor: pointer;" data-i18n="btn-remove-duplicates-ad">
+                                        🧹 Remove Duplicates
+                                    </button>
+                                    <button type="button" onclick="clearAllAdRecipients()" class="btn-danger" style="padding: 8px 12px; border-radius: 8px; font-size: 0.78rem; font-weight: 800; background: rgba(239,68,68,0.12); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); cursor: pointer;" data-i18n="btn-clear-all-ad-recipients">
+                                        🗑️ Clear All
+                                    </button>
+                                </div>
+
                                 <div id="ad-group-filter-pills" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px;">
                                     <!-- Rendered dynamically by renderAdRecipientsList() -->
                                 </div>
@@ -4299,6 +4313,7 @@
                                             <th style="padding: 8px 12px;">Tag #</th>
                                             <th style="padding: 8px 12px;">Name</th>
                                             <th style="padding: 8px 12px;">Phone</th>
+                                            <th style="padding: 8px 12px; text-align: center;" data-i18n="th-ad-status">Status</th>
                                             <th style="padding: 8px 12px; text-align: right;">Action</th>
                                         </tr>
                                     </thead>
