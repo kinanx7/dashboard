@@ -6820,21 +6820,39 @@ function applyDetailedViolation() {
 }
 
 function saveViolationRecord(workerId, stats, record) {
-    stats.violationsList.unshift(record);
-    document.getElementById('v-amount').value = ''; document.getElementById('v-reason').value = '';
-    document.getElementById('v-rule-select').value = ''; document.getElementById('v-image').value = '';
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const workers = companyData.workers || [];
+    const workerIndex = workers.findIndex(w => String(w.id) === String(workerId));
 
-    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
-    if (workerIndex !== -1) {
-        const worker = getCompanyData().workers[workerIndex];
-        db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/violationsList`).set(stats.violationsList)
-            .then(() => {
-                if (typeof logActivity === 'function') {
-                    logActivity('violation', worker.id, worker.name, `Added violation to ${worker.name}: "${record.reason}" (SAR ${record.amount})`);
-                }
-            })
-            .catch(err => console.error("Error saving violation record:", err));
+    if (workerIndex === -1) {
+        console.error("Worker not found for violation:", workerId);
+        return;
     }
+
+    const worker = workers[workerIndex];
+    const monthKey = (typeof currentGlobalMonth !== 'undefined' && currentGlobalMonth) ? currentGlobalMonth : new Date().toISOString().slice(0, 7);
+
+    if (!stats || typeof stats !== 'object') {
+        stats = typeof getMonthlyStats === 'function' ? getMonthlyStats(worker, monthKey) : { violationsList: [] };
+    }
+    if (!stats.violationsList || !Array.isArray(stats.violationsList)) {
+        stats.violationsList = [];
+    }
+
+    stats.violationsList.unshift(record);
+
+    const vAmt = document.getElementById('v-amount'); if (vAmt) vAmt.value = '';
+    const vReason = document.getElementById('v-reason'); if (vReason) vReason.value = '';
+    const vRule = document.getElementById('v-rule-select'); if (vRule) vRule.value = '';
+    const vImg = document.getElementById('v-image'); if (vImg) vImg.value = '';
+
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${monthKey}/violationsList`).set(stats.violationsList)
+        .then(() => {
+            if (typeof logActivity === 'function') {
+                logActivity('violation', worker.id, worker.name, `Added violation to ${worker.name}: "${record.reason || record.type}" (SAR ${record.amount})`);
+            }
+        })
+        .catch(err => console.error("Error saving violation record:", err));
 }
 
 function deleteDetailedViolation(workerId, violationId) {
@@ -7244,6 +7262,10 @@ function seeTask(workerId, taskId) {
     const worker = getCompanyData().workers[workerIndex];
     const t = worker.jobs.find(j => j.id === taskId);
     if (t) {
+        if (t.isTracked || t.trackedTaskId) {
+            if (typeof seeTrackedTask === 'function') seeTrackedTask(t.trackedTaskId || t.id);
+            return;
+        }
         t.status = 'seen';
         t.seenAt = Date.now();
 
@@ -7259,6 +7281,10 @@ function completeTask(workerId, taskId) {
     const worker = getCompanyData().workers[workerIndex];
     const t = worker.jobs.find(j => j.id === taskId);
     if (t) {
+        if (t.isTracked || t.trackedTaskId) {
+            if (typeof finishTrackedTask === 'function') finishTrackedTask(t.trackedTaskId || t.id);
+            return;
+        }
         t.status = 'completed';
         t.done = true;
         t.completedAt = Date.now();
@@ -7336,11 +7362,26 @@ function toggleTasksCustomRange() {
 window.toggleTasksCustomRange = toggleTasksCustomRange;
 
 function getJobTimestamp(j) {
-    if (j.timestamp) return j.timestamp;
-    if (j.createdAt) return j.createdAt;
+    if (!j) return 0;
+    if (typeof j.timestamp === 'number' && j.timestamp > 0) return j.timestamp;
+    if (typeof j.createdAt === 'number' && j.createdAt > 0) return j.createdAt;
+    if (typeof j.id === 'string' && j.id.startsWith('tt-')) {
+        const ts = parseInt(j.id.replace('tt-', ''));
+        if (!isNaN(ts) && ts > 1000000000000) return ts;
+    }
     const parsedId = parseInt(j.id);
     if (!isNaN(parsedId) && parsedId > 1000000000000) return parsedId;
     if (j.date) {
+        if (typeof j.date === 'string' && j.date.includes('/')) {
+            const parts = j.date.split('/');
+            if (parts.length === 3) {
+                const day = parseInt(parts[0]);
+                const month = parseInt(parts[1]) - 1;
+                const year = parseInt(parts[2]);
+                const d = new Date(year, month, day);
+                if (!isNaN(d.getTime())) return d.getTime();
+            }
+        }
         const parsedDate = Date.parse(j.date);
         if (!isNaN(parsedDate)) return parsedDate;
     }
@@ -7604,6 +7645,128 @@ function renderTasks() {
             return false;
         });
 
+        // Render Pending Spy Inspections for Active Worker
+        const rawTracked = data.trackedTasks || {};
+        const allTracked = Object.values(rawTracked);
+
+        const spyPendingTasks = allTracked.filter(tt => {
+            if (!tt || tt.status !== 'pending_spy_verification') return false;
+            if (activeWorker) {
+                return String(tt.spyWorkerId) === String(activeWorker.id);
+            }
+            return false;
+        });
+
+        if (spyPendingTasks.length > 0) {
+            const spyCard = document.createElement('div');
+            spyCard.className = "card";
+            spyCard.style.padding = "20px";
+            spyCard.style.marginBottom = "16px";
+            spyCard.style.border = "2px dashed #f59e0b";
+            spyCard.style.background = "rgba(245, 158, 11, 0.08)";
+
+            let spyHtml = `<h3 style="margin-top:0; color:#f59e0b; display:flex; align-items:center; gap:8px; font-size:1.15rem;">🕵️ ${isAr ? 'مهام تطلب التحقق والرقابة الميدانية منك (سباي)' : 'Spy Verifications & Inspections Required'}</h3>`;
+
+            spyPendingTasks.forEach(tt => {
+                const finishedTime = tt.finishedAt ? new Date(tt.finishedAt).toLocaleTimeString(isAr ? 'ar-SA' : 'en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+                const rejCount = tt.rejectionCount || 0;
+                const rejBadge = rejCount > 0 ? `<span class="badge" style="background:#ef4444; color:white; font-weight:800; font-size:0.8rem; margin-left:6px;">${'❌'.repeat(rejCount)} (${isAr ? 'تم رفضها سابقاً' : 'Rejected'} ${rejCount}x)</span>` : '';
+
+                let actionButtons = '';
+                if (rejCount < 2) {
+                    actionButtons = `
+                        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+                            <button type="button" onclick="spyConfirmTask('${tt.id}')" class="btn-success" style="padding:10px 18px; border-radius:8px; font-weight:800; font-size:0.85rem; background:linear-gradient(135deg, #10b981, #059669); color:white; border:none; cursor:pointer; flex:1; min-width:140px;">
+                                ✅ ${isAr ? 'تأكيد الإنجاز الصحيح (Confirm Done)' : '✅ Confirm Task Done'}
+                            </button>
+                            <button type="button" onclick="spyRejectTask('${tt.id}')" class="btn-danger" style="padding:10px 18px; border-radius:8px; font-weight:800; font-size:0.85rem; background:linear-gradient(135deg, #ef4444, #dc2626); color:white; border:none; cursor:pointer; flex:1; min-width:140px;">
+                                ❌ ${isAr ? 'رفض المهمة وإعادتها (Worker Lying)' : '❌ Reject Task (Worker Lying)'}
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    actionButtons = `
+                        <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; border-radius: 10px; padding: 12px; margin-top: 12px;">
+                            <div style="font-weight: 800; color: #ef4444; font-size: 0.88rem; margin-bottom: 8px;">🚨 ${isAr ? 'تحذير: الموظف كرر الرفض مرتين! اختر الإجراء النهائي:' : 'Warning: Task rejected twice! Choose final escalation action:'}</div>
+                            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                                <button type="button" onclick="spyReportWorkerToManager('${tt.id}')" class="btn-warning" style="padding:10px 16px; border-radius:8px; font-weight:800; font-size:0.85rem; background:linear-gradient(135deg, #f59e0b, #d97706); color:white; border:none; cursor:pointer; flex:1; min-width:160px;">
+                                    📢 ${isAr ? 'إبلاغ الإدارة عن الموظف (Report Worker)' : '📢 Report Worker to Manager'}
+                                </button>
+                                <button type="button" onclick="spyApplyViolation('${tt.id}')" class="btn-danger" style="padding:10px 16px; border-radius:8px; font-weight:800; font-size:0.85rem; background:linear-gradient(135deg, #dc2626, #991b1b); color:white; border:none; cursor:pointer; flex:1; min-width:160px;">
+                                    ⚖️ ${isAr ? 'تطبيق مخالفة على الموظف (Take Action)' : '⚖️ Take Action (Apply Violation)'}
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                const finishedTimeMs = tt.finishedAt || Date.now();
+                const spyDeadlineMs = finishedTimeMs + ((tt.spyWindowMins || 20) * 60000);
+
+                spyHtml += `
+                    <div style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:16px; margin-bottom:12px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
+                            <span style="font-size:0.8rem; color:var(--text-muted);">🕒 Completed by worker at ${finishedTime}</span>
+                            ${rejBadge}
+                        </div>
+                        <div style="font-size:1.05rem; font-weight:800; color:var(--text-main); margin-bottom:6px;">🕵️ ${tt.title}</div>
+                        <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;">👤 ${isAr ? 'الموظف المنفذ:' : 'Target Worker:'} <strong style="color:var(--text-main);">${tt.workerName}</strong></div>
+                        <div style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.3); padding: 8px 12px; border-radius: 8px; margin-bottom: 10px; font-weight: 800; font-size: 0.85rem; color: #d97706; display: flex; align-items: center; justify-content: space-between;">
+                            <span>⏳ ${isAr ? 'الوقت المتبقي للمراقب لاتخاذ إجراء:' : 'Time remaining for spy to act:'}</span>
+                            <span class="task-timer-display" data-deadline="${spyDeadlineMs}" style="font-weight: 900; color: #ef4444;"></span>
+                        </div>
+                        ${actionButtons}
+                    </div>
+                `;
+            });
+
+            spyCard.innerHTML = spyHtml;
+            board.appendChild(spyCard);
+        }
+
+        // Render Spy Inaction Alerts & Escalation Reports for Admins / Managers
+        if (canEditTask) {
+            const inactionTasks = allTracked.filter(tt => tt && !tt.alertDismissed && (tt.spyInactionAlertSent || tt.status === 'reported' || tt.status === 'violated'));
+            if (inactionTasks.length > 0) {
+                const alertCard = document.createElement('div');
+                alertCard.className = "card";
+                alertCard.style.padding = "20px";
+                alertCard.style.marginBottom = "16px";
+                alertCard.style.border = "2px solid #ef4444";
+                alertCard.style.background = "rgba(239, 68, 68, 0.08)";
+
+                let alertHtml = `<h3 style="margin-top:0; color:#ef4444; display:flex; align-items:center; gap:8px; font-size:1.15rem;">🚨 ${isAr ? 'تنبيهات وتصعيدات المهام المتتبعة' : 'Tracked Tasks Inaction & Escalation Alerts'}</h3>`;
+
+                inactionTasks.forEach(tt => {
+                    let alertType = '';
+                    let customReportMsg = '';
+                    const vAmt = tt.violationAmount || 50;
+                    if (tt.status === 'reported') {
+                        alertType = `<span class="badge" style="background:#f59e0b; color:white;">📢 ${isAr ? 'بلاغ مراقب عن عدم التزام موظف' : 'Worker Reported by Spy'}</span>`;
+                    } else if (tt.status === 'violated') {
+                        alertType = `<span class="badge" style="background:#dc2626; color:white;">⚖️ ${isAr ? `مخالفة ${vAmt} SAR` : `${vAmt} SAR Violation Applied`}</span>`;
+                    } else if (tt.spyInactionAlertSent) {
+                        alertType = `<span class="badge" style="background:#ef4444; color:white;">🚨 ${isAr ? 'بلاغ تقاعس المراقب' : 'Spy Inaction Report'}</span>`;
+                        customReportMsg = `<div style="font-weight:800; color:#ef4444; font-size:0.9rem; margin-top:4px;">🚨 ${isAr ? `المراقب ${tt.spyWorkerName} لم يتخذ أي إجراء على مهمة "${tt.title}" للموظف ${tt.workerName}` : `Spy ${tt.spyWorkerName} didn't take any action on task "${tt.title}" assigned to worker ${tt.workerName}`}</div>`;
+                    }
+
+                    alertHtml += `
+                        <div style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:14px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                            <div style="flex:1;">
+                                <div style="margin-bottom:4px;">${alertType} <strong style="font-size:0.95rem; color:var(--text-main); margin-left:6px;">${tt.title}</strong></div>
+                                <div style="font-size:0.8rem; color:var(--text-muted);">👤 ${isAr ? 'المنفذ:' : 'Worker:'} <strong>${tt.workerName}</strong> | 🕵️ ${isAr ? 'المراقب:' : 'Spy:'} <strong>${tt.spyWorkerName}</strong></div>
+                                ${customReportMsg}
+                            </div>
+                            <button type="button" onclick="dismissTrackedTaskAlert('${tt.id}')" style="background:rgba(239, 68, 68, 0.15); border:1px solid rgba(239, 68, 68, 0.4); color:#ef4444; cursor:pointer; font-size:1.1rem; padding:6px 12px; border-radius:8px; font-weight:800;" title="${isAr ? 'حذف / إخفاء التنبيه' : 'Dismiss Alert'}">✖</button>
+                        </div>
+                    `;
+                });
+
+                alertCard.innerHTML = alertHtml;
+                board.appendChild(alertCard);
+            }
+        }
+
         if (workerPendingInquiries.length > 0) {
             const inqCard = document.createElement('div');
             inqCard.className = "card";
@@ -7706,6 +7869,10 @@ function renderTasks() {
         constantTasks = constantTasks.filter(ct => ct && (ct.id || ct.title));
 
         let jobs = worker.jobs ? [...worker.jobs] : [];
+
+        // For Manager/Admin view: Tracked tasks in progress show as Pending without revealing worker completion until spy confirms
+        // Tracked tasks stay visible in Manager view as ⏳ Pending until completed.
+
         if (jobs.length === 0 && constantTasks.length === 0) return;
 
         // Apply Status Filter
@@ -7763,10 +7930,22 @@ function renderTasks() {
                 if (j.completedAt) {
                     timeInfoHtml = `<div style="font-size:0.75rem; color:var(--success); margin-top:4px;">${t('label-finished')} ${new Date(j.completedAt).toLocaleTimeString()}</div>`;
                 }
+            } else if (status === 'pending_spy_verification') {
+                if (isAdmin) {
+                    statusBadge = `<span class="badge" style="background:var(--warning); color:#000;">⏳ ${isAr ? 'قيد التنفيذ' : 'Pending'}</span>`;
+                    actionHtml = `<span style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">${isAr ? 'المهمة قيد التنفيذ والمتابعة...' : 'Task in progress...'}</span>`;
+                } else {
+                    statusBadge = `<span class="badge" style="background:#f59e0b; color:white;">🕵️ ${isAr ? 'قيد التحقق الميداني' : 'Pending Spy Verification'}</span>`;
+                    actionHtml = `<span style="font-size:0.8rem; color:#f59e0b; font-weight:700;">🕵️ ${isAr ? 'تم الإرسال للمراقب' : 'Sent to Spy Worker'} (${j.spyWorkerName || ''})</span>`;
+                }
             } else if (status === 'seen') {
                 statusBadge = `<span class="badge" style="background:var(--warning); color:#000;">👀 ${t('status-pending-sm').replace('⏳ ', '')}</span>`;
                 if (isAssignedToMe) {
-                    actionHtml = `<button onclick="completeTask('${worker.id}', '${j.id}')" class="btn-success" style="font-size:0.8rem; padding:6px 12px; width:100%;">${t('btn-mark-completed')}</button>`;
+                    if (j.isTracked || j.trackedTaskId) {
+                        actionHtml = `<button onclick="finishTrackedTask('${j.trackedTaskId || j.id}')" class="btn-success" style="font-size:0.8rem; padding:6px 12px; width:100%; font-weight:800;">✅ ${isAr ? 'تم إنجاز المهمة (Done)' : 'Done'}</button>`;
+                    } else {
+                        actionHtml = `<button onclick="completeTask('${worker.id}', '${j.id}')" class="btn-success" style="font-size:0.8rem; padding:6px 12px; width:100%;">${t('btn-mark-completed')}</button>`;
+                    }
                 }
 
                 if (j.deadlineMins > 0 && j.seenAt) {
@@ -7778,7 +7957,11 @@ function renderTasks() {
             } else {
                 statusBadge = `<span class="badge" style="background:var(--text-muted);">🆕</span>`;
                 if (isAssignedToMe) {
-                    actionHtml = `<button onclick="seeTask('${worker.id}', '${j.id}')" class="btn-warning" style="font-size:0.8rem; padding:6px 12px; width:100%;">${t('btn-i-saw-this')}</button>`;
+                    if (j.isTracked || j.trackedTaskId) {
+                        actionHtml = `<button onclick="seeTrackedTask('${j.trackedTaskId || j.id}')" class="btn-warning" style="font-size:0.8rem; padding:6px 12px; width:100%; font-weight:800;">👀 ${isAr ? 'رأيت هذه المهمة (I Saw This)' : 'I Saw This Task'}</button>`;
+                    } else {
+                        actionHtml = `<button onclick="seeTask('${worker.id}', '${j.id}')" class="btn-warning" style="font-size:0.8rem; padding:6px 12px; width:100%;">${t('btn-i-saw-this')}</button>`;
+                    }
                 } else if (isAdmin) {
                     actionHtml = `<span style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">Worker has not seen this yet.</span>`;
                 }
@@ -7802,6 +7985,7 @@ function renderTasks() {
                                     <div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px;">
                                         ${taskNumBadge}
                                         ${isGeneralBadge}
+                                        ${j.rejectionCount > 0 ? `<span class="badge" style="background:#ef4444; color:white; font-weight:800; padding:2px 6px; border-radius:6px; margin-right:4px;" title="Rejected ${j.rejectionCount}x">${'❌'.repeat(j.rejectionCount)}</span>` : ''}
                                         <span class="mission-text" style="text-decoration: ${doneText}; margin-right:4px;">${j.title}</span>
                                         ${urgencyBadge}
                                     </div>
@@ -8496,6 +8680,445 @@ function renderConstantTasks() {
     }
 }
 window.renderConstantTasks = renderConstantTasks;
+
+
+
+
+// =====================================================================
+// TRACKED TASK & SPY WORKER VERIFICATION SYSTEM
+// =====================================================================
+
+function addTrackedTask() {
+    const isAr = currentAppLang === 'ar';
+    const workerSelect = document.getElementById('tracked-task-worker-select');
+    const spySelect = document.getElementById('tracked-task-spy-select');
+
+    const workerId = workerSelect ? workerSelect.value : '';
+    const spyId = spySelect ? spySelect.value : '';
+    const title = document.getElementById('tracked-task-title') ? document.getElementById('tracked-task-title').value.trim() : '';
+    const acceptMins = document.getElementById('tracked-task-accept-mins') ? parseInt(document.getElementById('tracked-task-accept-mins').value) : 15;
+    const finishMins = document.getElementById('tracked-task-finish-mins') ? parseInt(document.getElementById('tracked-task-finish-mins').value) : 30;
+    const spyMins = document.getElementById('tracked-task-spy-mins') ? parseInt(document.getElementById('tracked-task-spy-mins').value) : 20;
+
+    if (!workerId || !spyId || !title) {
+        alert(isAr ? 'الرجاء اختيار الموظف المنفذ والموظف المراقب وتحديد عنوان المهمة المتتبعة.' : 'Please select target worker, spy worker, and enter task title.');
+        return;
+    }
+
+    if (String(workerId) === String(spyId)) {
+        alert(isAr ? 'لا يمكن اختيار نفس الموظف كمنفذ ومراقب (سباي) لنفس المهمة.' : 'Target worker and spy worker cannot be the same person.');
+        return;
+    }
+
+    const companyData = getCompanyData();
+    const workers = companyData.workers || [];
+    const workerIndex = workers.findIndex(w => String(w.id) === String(workerId));
+    const spyWorker = workers.find(w => String(w.id) === String(spyId));
+
+    if (workerIndex === -1 || !spyWorker) {
+        alert(isAr ? 'عذراً، لم يتم العثور على بيانات الموظفين.' : 'Error: Selected worker profile not found.');
+        return;
+    }
+
+    const worker = workers[workerIndex];
+    if (!worker.jobs || !Array.isArray(worker.jobs)) {
+        worker.jobs = Object.values(worker.jobs || {});
+    }
+
+    const vAmtInput = document.getElementById('tracked-task-violation-amount');
+    const violationAmount = vAmtInput ? (parseFloat(vAmtInput.value) || 50) : 50;
+
+    const taskId = 'tt-' + Date.now().toString();
+    const trackedTask = {
+        violationAmount: violationAmount,
+        id: taskId,
+        title: title,
+        workerId: workerId,
+        workerName: worker.name,
+        spyWorkerId: spyId,
+        spyWorkerName: spyWorker.name,
+        acceptWindowMins: acceptMins || 15,
+        finishWindowMins: finishMins || 30,
+        spyWindowMins: spyMins || 20,
+        createdAt: Date.now(),
+        createdBy: currentUser ? currentUser.email : 'Admin',
+        status: 'assigned', // 'assigned' | 'seen' | 'pending_spy_verification' | 'completed' | 'reported' | 'violated'
+        seenAt: null,
+        finishedAt: null,
+        rejectionCount: 0,
+        rejectionHistory: [],
+        spyInactionAlertSent: false,
+        finalAction: null
+    };
+
+    // Create job entry inside target worker's job list
+    const newJob = {
+        id: taskId,
+        title: `[Tracked] ${title}`,
+        status: 'assigned',
+        date: new Date().toLocaleDateString('en-GB'),
+        createdAt: Date.now(),
+        deadlineMins: finishMins,
+        acceptDeadlineMins: acceptMins,
+        isTracked: true,
+        trackedTaskId: taskId,
+        spyWorkerId: spyId,
+        spyWorkerName: spyWorker.name,
+        rejectionCount: 0
+    };
+
+    worker.jobs.push(newJob);
+
+    const updates = {};
+    updates[`companies/${currentCompany}/trackedTasks/${taskId}`] = trackedTask;
+    updates[`companies/${currentCompany}/workers/${workerIndex}/jobs`] = worker.jobs;
+
+    db.ref().update(updates)
+        .then(() => {
+            if (typeof logActivity === 'function') {
+                logActivity('task_tracked', worker.id, worker.name, `Assigned tracked task "${title}" to ${worker.name} (Spy: ${spyWorker.name})`);
+            }
+            alert(isAr ? `تم إسناد المهمة المتتبعة "${title}" لـ ${worker.name} وتعيين ${spyWorker.name} كمراقب بنجاح!` : `Tracked task "${title}" assigned to ${worker.name} (Spy: ${spyWorker.name}) successfully!`);
+            const form = document.getElementById('tracked-task-form');
+            if (form) form.reset();
+            if (typeof populateTrackedWorkerDropdowns === 'function') populateTrackedWorkerDropdowns();
+            renderTasks();
+        })
+        .catch(err => console.error("Error creating tracked task:", err));
+}
+window.addTrackedTask = addTrackedTask;
+
+function seeTrackedTask(taskId) {
+    const isAr = currentAppLang === 'ar';
+    const companyData = getCompanyData();
+    const trackedTasks = companyData.trackedTasks || {};
+    const task = trackedTasks[taskId];
+    if (!task) return;
+
+    task.seenAt = Date.now();
+    task.status = 'seen';
+
+    // Update job in worker jobs
+    const workers = companyData.workers || [];
+    const workerIndex = workers.findIndex(w => String(w.id) === String(task.workerId));
+    if (workerIndex !== -1 && workers[workerIndex].jobs) {
+        let jobs = workers[workerIndex].jobs;
+        if (!Array.isArray(jobs)) jobs = Object.values(jobs);
+        const job = jobs.find(j => String(j.id) === String(taskId) || String(j.trackedTaskId) === String(taskId));
+        if (job) {
+            job.status = 'seen';
+            job.seenAt = Date.now();
+        }
+    }
+
+    const updates = {};
+    updates[`companies/${currentCompany}/trackedTasks/${taskId}`] = task;
+    if (workerIndex !== -1) {
+        updates[`companies/${currentCompany}/workers/${workerIndex}/jobs`] = workers[workerIndex].jobs;
+    }
+
+    db.ref().update(updates)
+        .then(() => {
+            renderTasks();
+        })
+        .catch(err => console.error("Error seeing tracked task:", err));
+}
+window.seeTrackedTask = seeTrackedTask;
+
+function finishTrackedTask(taskId) {
+    const isAr = currentAppLang === 'ar';
+    const companyData = getCompanyData();
+    const trackedTasks = companyData.trackedTasks || {};
+    const task = trackedTasks[taskId];
+    if (!task) return;
+
+    task.finishedAt = Date.now();
+    task.status = 'pending_spy_verification';
+
+    // Update job in worker jobs
+    const workers = companyData.workers || [];
+    const workerIndex = workers.findIndex(w => String(w.id) === String(task.workerId));
+    if (workerIndex !== -1 && workers[workerIndex].jobs) {
+        let jobs = workers[workerIndex].jobs;
+        if (!Array.isArray(jobs)) jobs = Object.values(jobs);
+        const job = jobs.find(j => String(j.id) === String(taskId) || String(j.trackedTaskId) === String(taskId));
+        if (job) {
+            job.status = 'pending_spy_verification';
+            job.finishedAt = Date.now();
+        }
+    }
+
+    const updates = {};
+    updates[`companies/${currentCompany}/trackedTasks/${taskId}`] = task;
+    if (workerIndex !== -1) {
+        updates[`companies/${currentCompany}/workers/${workerIndex}/jobs`] = workers[workerIndex].jobs;
+    }
+
+    db.ref().update(updates)
+        .then(() => {
+            if (typeof logActivity === 'function') {
+                logActivity('task_tracked_finish', task.workerId, task.workerName, `Worker ${task.workerName} marked tracked task "${task.title}" as Done. Waiting for spy verification (${task.spyWorkerName}).`);
+            }
+            alert(isAr ? 'تم إرسال تقرير الإنجاز للموظف المراقب (السباي) للتحقق الميداني.' : 'Done report submitted! Sent to Spy Worker for verification.');
+            renderTasks();
+        })
+        .catch(err => console.error("Error finishing tracked task:", err));
+}
+window.finishTrackedTask = finishTrackedTask;
+
+function spyConfirmTask(taskId) {
+    const isAr = currentAppLang === 'ar';
+    const companyData = getCompanyData();
+    const trackedTasks = companyData.trackedTasks || {};
+    const task = trackedTasks[taskId];
+    if (!task) return;
+
+    task.status = 'completed';
+    task.confirmedAt = Date.now();
+
+    // Update job in worker jobs
+    const workers = companyData.workers || [];
+    const workerIndex = workers.findIndex(w => String(w.id) === String(task.workerId));
+    if (workerIndex !== -1 && workers[workerIndex].jobs) {
+        let jobs = workers[workerIndex].jobs;
+        if (!Array.isArray(jobs)) jobs = Object.values(jobs);
+        const job = jobs.find(j => String(j.id) === String(taskId) || String(j.trackedTaskId) === String(taskId));
+        if (job) {
+            job.status = 'completed';
+            job.done = true;
+            job.completedAt = Date.now();
+        }
+    }
+
+    const updates = {};
+    updates[`companies/${currentCompany}/trackedTasks/${taskId}`] = task;
+    if (workerIndex !== -1) {
+        updates[`companies/${currentCompany}/workers/${workerIndex}/jobs`] = workers[workerIndex].jobs;
+    }
+
+    db.ref().update(updates)
+        .then(() => {
+            if (typeof logActivity === 'function') {
+                logActivity('task_spy_confirm', task.spyWorkerId, task.spyWorkerName, `Spy ${task.spyWorkerName} CONFIRMED completion of tracked task "${task.title}" for ${task.workerName}.`);
+            }
+            alert(isAr ? `تم تأكيد إنجاز المهمة "${task.title}" بنجاح ونقل التقرير للإدارة.` : `Tracked task "${task.title}" confirmed successfully!`);
+            renderTasks();
+        })
+        .catch(err => console.error("Error confirming tracked task:", err));
+}
+window.spyConfirmTask = spyConfirmTask;
+
+function spyRejectTask(taskId) {
+    const isAr = currentAppLang === 'ar';
+    const companyData = getCompanyData();
+    const trackedTasks = companyData.trackedTasks || {};
+    const task = trackedTasks[taskId];
+    if (!task) return;
+
+    if (!confirm(isAr ? 'هل أنت تأكد من رفض إنجاز المهمة وإعادتها للموظف؟' : 'Are you sure you want to reject this task submission?')) return;
+
+    task.rejectionCount = (task.rejectionCount || 0) + 1;
+    if (!task.rejectionHistory) task.rejectionHistory = [];
+    task.rejectionHistory.push({
+        rejectedAt: Date.now(),
+        spyWorkerId: task.spyWorkerId,
+        spyWorkerName: task.spyWorkerName,
+        count: task.rejectionCount
+    });
+
+    // Reset task timer for target worker
+    task.status = 'seen';
+    task.seenAt = Date.now();
+    task.finishedAt = null;
+
+    // Update job in worker jobs
+    const workers = companyData.workers || [];
+    const workerIndex = workers.findIndex(w => String(w.id) === String(task.workerId));
+    if (workerIndex !== -1 && workers[workerIndex].jobs) {
+        let jobs = workers[workerIndex].jobs;
+        if (!Array.isArray(jobs)) jobs = Object.values(jobs);
+        const job = jobs.find(j => String(j.id) === String(taskId) || String(j.trackedTaskId) === String(taskId));
+        if (job) {
+            job.status = 'seen';
+            job.seenAt = Date.now();
+            job.finishedAt = null;
+            job.rejectionCount = task.rejectionCount;
+        }
+    }
+
+    const updates = {};
+    updates[`companies/${currentCompany}/trackedTasks/${taskId}`] = task;
+    if (workerIndex !== -1) {
+        updates[`companies/${currentCompany}/workers/${workerIndex}/jobs`] = workers[workerIndex].jobs;
+    }
+
+    db.ref().update(updates)
+        .then(() => {
+            if (typeof logActivity === 'function') {
+                logActivity('task_spy_reject', task.spyWorkerId, task.spyWorkerName, `Spy ${task.spyWorkerName} REJECTED tracked task "${task.title}" (Rejection #${task.rejectionCount}). Sent back to ${task.workerName}.`);
+            }
+            alert(isAr ? `تم رفض المهمة وإعادتها للموظف ${task.workerName} مع تمديد العداد ورسم شارة الرفض (${'❌'.repeat(task.rejectionCount)}).` : `Task rejected and sent back to ${task.workerName} with timer restarted (${'❌'.repeat(task.rejectionCount)}).`);
+            renderTasks();
+        })
+        .catch(err => console.error("Error rejecting tracked task:", err));
+}
+window.spyRejectTask = spyRejectTask;
+
+function spyReportWorkerToManager(taskId) {
+    const isAr = currentAppLang === 'ar';
+    const companyData = getCompanyData();
+    const trackedTasks = companyData.trackedTasks || {};
+    const task = trackedTasks[taskId];
+    if (!task) return;
+
+    task.status = 'reported';
+    task.finalAction = 'reported';
+    task.reportedAt = Date.now();
+
+    const updates = {};
+    updates[`companies/${currentCompany}/trackedTasks/${taskId}`] = task;
+
+    db.ref().update(updates)
+        .then(() => {
+            if (typeof logActivity === 'function') {
+                logActivity('task_spy_report_admin', task.spyWorkerId, task.spyWorkerName, `CRITICAL REPORT: Spy ${task.spyWorkerName} reported worker ${task.workerName} to Manager for failing task "${task.title}" after ${task.rejectionCount} rejections.`);
+            }
+            alert(isAr ? `تم إرسال بلاغ عاجل للإدارة بأن الموظف ${task.workerName} لم يقم بإنجاز المهمة رغم التنبيهات المتكررة.` : `Escalation report sent to Manager regarding worker ${task.workerName}.`);
+            renderTasks();
+        })
+        .catch(err => console.error("Error reporting worker to manager:", err));
+}
+window.spyReportWorkerToManager = spyReportWorkerToManager;
+
+function spyApplyViolation(taskId) {
+    const isAr = currentAppLang === 'ar';
+    const companyData = getCompanyData();
+    const trackedTasks = companyData.trackedTasks || {};
+    const task = trackedTasks[taskId];
+    if (!task) return;
+
+    const penaltyAmount = task.violationAmount || 50;
+
+    task.status = 'violated';
+    task.finalAction = 'violation';
+    task.violatedAt = Date.now();
+
+    const workers = companyData.workers || [];
+    const workerIndex = workers.findIndex(w => String(w.id) === String(task.workerId));
+    if (workerIndex !== -1) {
+        const worker = workers[workerIndex];
+        const stats = typeof getMonthlyStats === 'function' ? getMonthlyStats(worker, currentGlobalMonth) : { violationsList: [] };
+        if (!stats.violationsList) stats.violationsList = [];
+
+        const violationRecord = {
+            id: 'v-' + Date.now().toString(),
+            date: typeof formatTimestamp === 'function' ? formatTimestamp() : new Date().toLocaleDateString('en-GB'),
+            timestamp: Date.now(),
+            amount: penaltyAmount,
+            currency: 'SAR',
+            reason: isAr ? `مخالفة عدم تنفيذ المهمة المتتبعة: "${task.title}" (${penaltyAmount} SAR)` : `Tracked Task Non-Compliance: "${task.title}" (${penaltyAmount} SAR)`,
+            graceDays: 0,
+            status: 'active',
+            image: null
+        };
+
+        saveViolationRecord(task.workerId, stats, violationRecord);
+    }
+
+    const updates = {};
+    updates[`companies/${currentCompany}/trackedTasks/${taskId}`] = task;
+
+    db.ref().update(updates)
+        .then(() => {
+            if (typeof logActivity === 'function') {
+                logActivity('task_spy_violation', task.spyWorkerId, task.spyWorkerName, `Spy ${task.spyWorkerName} applied automatic ${penaltyAmount} SAR violation on ${task.workerName} for task "${task.title}"`);
+            }
+            alert(isAr ? `تم تطبيق الخصم والمخالفة تلقائياً (${penaltyAmount} SAR) وإضافتها لإحصائيات الموظف ${task.workerName} بنجاح!` : `Automatic ${penaltyAmount} SAR violation applied & recorded to worker ${task.workerName} stats successfully!`);
+            renderTasks();
+        })
+        .catch(err => console.error("Error applying violation to worker:", err));
+}
+window.spyApplyViolation = spyApplyViolation;
+
+function dismissTrackedTaskAlert(taskId) {
+    if (!currentCompany || !taskId) return;
+    db.ref(`companies/${currentCompany}/trackedTasks/${taskId}/alertDismissed`).set(true)
+        .then(() => {
+            const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+            if (companyData.trackedTasks && companyData.trackedTasks[taskId]) {
+                companyData.trackedTasks[taskId].alertDismissed = true;
+            }
+            renderTasks();
+        })
+        .catch(err => console.error("Error dismissing tracked task alert:", err));
+}
+window.dismissTrackedTaskAlert = dismissTrackedTaskAlert;
+
+function updateTaskTimers() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    document.querySelectorAll('.task-timer-display').forEach(el => {
+        const deadline = parseInt(el.getAttribute('data-deadline'));
+        if (!deadline || isNaN(deadline)) return;
+
+        const diff = deadline - Date.now();
+        if (diff <= 0) {
+            el.innerHTML = `<span style="color:var(--danger); font-weight:900;">🚨 ${isAr ? 'انتهى الوقت المحدد!' : 'Time Expired!'}</span>`;
+            return;
+        }
+
+        const mins = Math.floor(diff / 60000);
+        const secs = Math.floor((diff % 60000) / 1000);
+        el.innerHTML = `⏱️ ${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    });
+}
+window.updateTaskTimers = updateTaskTimers;
+
+function checkTrackedTaskInaction() {
+    const companyData = getCompanyData();
+    const trackedTasks = companyData.trackedTasks || {};
+    const now = Date.now();
+    let updated = false;
+    const updates = {};
+
+    Object.values(trackedTasks).forEach(task => {
+        if (task && task.status === 'pending_spy_verification' && task.finishedAt && !task.spyInactionAlertSent) {
+            const spyWindowMs = (task.spyWindowMins || 20) * 60000;
+            if (now - task.finishedAt > spyWindowMs) {
+                task.spyInactionAlertSent = true;
+                task.inactionAlertAt = now;
+                updates[`companies/${currentCompany}/trackedTasks/${task.id}/spyInactionAlertSent`] = true;
+                updates[`companies/${currentCompany}/trackedTasks/${task.id}/inactionAlertAt`] = now;
+                updated = true;
+
+                if (typeof logActivity === 'function') {
+                    logActivity('task_spy_inaction', task.spyWorkerId, task.spyWorkerName, `WARNING: Spy worker ${task.spyWorkerName} did NOT take action on task "${task.title}" (Worker: ${task.workerName}) within ${task.spyWindowMins} mins!`);
+                }
+            }
+        }
+    });
+
+    if (updated) {
+        db.ref().update(updates).then(() => {
+            if (typeof renderTasks === 'function') renderTasks();
+        }).catch(err => console.error("Error logging spy inaction alert:", err));
+    }
+}
+window.checkTrackedTaskInaction = checkTrackedTaskInaction;
+
+// Periodic check for spy inaction (runs every 15 seconds)
+if (!window.trackedTaskInactionTimer) {
+    window.trackedTaskInactionTimer = setInterval(checkTrackedTaskInaction, 15000);
+}
+
+// --- AUTOMATIC IN-SCOPE WINDOW EXPORTS FOR TRACKED TASKS ---
+if (typeof addTrackedTask === 'function') window.addTrackedTask = addTrackedTask;
+if (typeof seeTrackedTask === 'function') window.seeTrackedTask = seeTrackedTask;
+if (typeof finishTrackedTask === 'function') window.finishTrackedTask = finishTrackedTask;
+if (typeof spyConfirmTask === 'function') window.spyConfirmTask = spyConfirmTask;
+if (typeof spyRejectTask === 'function') window.spyRejectTask = spyRejectTask;
+if (typeof spyReportWorkerToManager === 'function') window.spyReportWorkerToManager = spyReportWorkerToManager;
+if (typeof spyApplyViolation === 'function') window.spyApplyViolation = spyApplyViolation;
+if (typeof checkTrackedTaskInaction === 'function') window.checkTrackedTaskInaction = checkTrackedTaskInaction;
 
 
 // --- AUTOMATIC IN-SCOPE WINDOW EXPORTS ---
@@ -22676,22 +23299,19 @@ function setupSearchInputClearButtons() {
         if (!input) return;
 
         let wrapper = input.parentElement;
-        if (!wrapper || (!wrapper.classList.contains('search-input-wrapper') && wrapper.tagName !== 'DIV')) {
+        if (!wrapper || !wrapper.classList.contains('search-input-wrapper')) {
             const newWrapper = document.createElement('div');
             newWrapper.className = 'search-input-wrapper';
-            if (input.style.width) newWrapper.style.width = input.style.width;
-            if (input.style.flex) newWrapper.style.flex = input.style.flex;
-            if (input.style.minWidth) newWrapper.style.minWidth = input.style.minWidth;
-            if (input.style.maxWidth) newWrapper.style.maxWidth = input.style.maxWidth;
+            newWrapper.style.position = 'relative';
+            newWrapper.style.display = 'inline-block';
+            newWrapper.style.width = '100%';
 
             input.parentNode.insertBefore(newWrapper, input);
             newWrapper.appendChild(input);
             wrapper = newWrapper;
-        } else {
-            wrapper.classList.add('search-input-wrapper');
         }
 
-        input.style.paddingLeft = '34px';
+        input.style.paddingRight = '32px';
 
         let clearBtn = wrapper.querySelector('.search-clear-btn');
         if (!clearBtn) {
@@ -22699,8 +23319,24 @@ function setupSearchInputClearButtons() {
             clearBtn.type = 'button';
             clearBtn.className = 'search-clear-btn';
             clearBtn.innerHTML = '✖';
+            clearBtn.style.position = 'absolute';
+            clearBtn.style.right = '8px';
+            clearBtn.style.top = '50%';
+            clearBtn.style.transform = 'translateY(-50%)';
+            clearBtn.style.zIndex = '5';
+            clearBtn.style.background = 'rgba(239, 68, 68, 0.2)';
+            clearBtn.style.color = '#ef4444';
+            clearBtn.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+            clearBtn.style.borderRadius = '50%';
+            clearBtn.style.width = '20px';
+            clearBtn.style.height = '20px';
+            clearBtn.style.display = 'none';
+            clearBtn.style.alignItems = 'center';
+            clearBtn.style.justifyContent = 'center';
+            clearBtn.style.fontSize = '0.7rem';
+            clearBtn.style.cursor = 'pointer';
             clearBtn.title = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar') ? 'مسح البحث' : 'Clear search';
-            wrapper.insertBefore(clearBtn, input);
+            wrapper.appendChild(clearBtn);
         }
 
         const updateVisibility = () => {
@@ -22765,21 +23401,31 @@ function setTaskFormMode(mode) {
     const hudBtn = document.getElementById('task-mode-hud-btn');
     const cycleBtn = document.getElementById('task-mode-cycle-btn');
     const constantBtn = document.getElementById('task-mode-constant-btn');
+    const trackedBtn = document.getElementById('task-mode-tracked-btn');
 
     const assignForm = document.getElementById('task-assign-form');
     const inquiryForm = document.getElementById('task-inquiry-form');
     const constantContainer = document.getElementById('constant-tasks-container');
+    const trackedContainer = document.getElementById('tracked-task-container');
+
+    const resetBtnStyles = () => {
+        if (assignBtn) { assignBtn.className = 'btn-outline'; assignBtn.style.background = 'var(--input-bg)'; assignBtn.style.color = 'var(--text-main)'; }
+        if (inquiryBtn) { inquiryBtn.className = 'btn-outline'; inquiryBtn.style.background = 'var(--input-bg)'; inquiryBtn.style.color = 'var(--text-main)'; }
+        if (hudBtn) { hudBtn.className = 'btn-outline'; hudBtn.style.background = 'var(--input-bg)'; hudBtn.style.color = 'var(--text-main)'; }
+        if (cycleBtn) { cycleBtn.className = 'btn-outline'; cycleBtn.style.background = 'var(--input-bg)'; cycleBtn.style.color = 'var(--text-main)'; }
+        if (constantBtn) { constantBtn.className = 'btn-outline'; constantBtn.style.background = 'var(--input-bg)'; constantBtn.style.color = 'var(--text-main)'; }
+        if (trackedBtn) { trackedBtn.className = 'btn-outline'; trackedBtn.style.background = 'var(--input-bg)'; trackedBtn.style.color = 'var(--text-main)'; }
+    };
+
+    resetBtnStyles();
 
     if (mode === 'inquiry') {
         if (assignForm) assignForm.style.display = 'none';
         if (inquiryForm) inquiryForm.style.display = 'block';
         if (constantContainer) constantContainer.style.display = 'none';
+        if (trackedContainer) trackedContainer.style.display = 'none';
 
-        if (assignBtn) { assignBtn.className = 'btn-outline'; assignBtn.style.background = 'var(--input-bg)'; assignBtn.style.color = 'var(--text-main)'; }
         if (inquiryBtn) { inquiryBtn.className = 'btn-primary'; inquiryBtn.style.background = 'linear-gradient(135deg, #8b5cf6, #6d28d9)'; inquiryBtn.style.color = 'white'; }
-        if (hudBtn) { hudBtn.className = 'btn-outline'; hudBtn.style.background = 'var(--input-bg)'; hudBtn.style.color = 'var(--text-main)'; }
-        if (cycleBtn) { cycleBtn.className = 'btn-outline'; cycleBtn.style.background = 'var(--input-bg)'; cycleBtn.style.color = 'var(--text-main)'; }
-        if (constantBtn) { constantBtn.className = 'btn-outline'; constantBtn.style.background = 'var(--input-bg)'; constantBtn.style.color = 'var(--text-main)'; }
 
         populateInquiryWorkerDropdown();
     } else if (mode === 'hud') {
@@ -22790,26 +23436,76 @@ function setTaskFormMode(mode) {
         if (assignForm) assignForm.style.display = 'none';
         if (inquiryForm) inquiryForm.style.display = 'none';
         if (constantContainer) constantContainer.style.display = 'block';
+        if (trackedContainer) trackedContainer.style.display = 'none';
 
-        if (assignBtn) { assignBtn.className = 'btn-outline'; assignBtn.style.background = 'var(--input-bg)'; assignBtn.style.color = 'var(--text-main)'; }
-        if (inquiryBtn) { inquiryBtn.className = 'btn-outline'; inquiryBtn.style.background = 'var(--input-bg)'; inquiryBtn.style.color = 'var(--text-main)'; }
-        if (hudBtn) { hudBtn.className = 'btn-outline'; hudBtn.style.background = 'var(--input-bg)'; hudBtn.style.color = 'var(--text-main)'; }
-        if (cycleBtn) { cycleBtn.className = 'btn-outline'; cycleBtn.style.background = 'var(--input-bg)'; cycleBtn.style.color = 'var(--text-main)'; }
         if (constantBtn) { constantBtn.className = 'btn-primary'; constantBtn.style.background = 'linear-gradient(135deg, #6366f1, #4f46e5)'; constantBtn.style.color = 'white'; }
 
         if (typeof renderConstantTasks === 'function') renderConstantTasks();
+    } else if (mode === 'tracked') {
+        if (assignForm) assignForm.style.display = 'none';
+        if (inquiryForm) inquiryForm.style.display = 'none';
+        if (constantContainer) constantContainer.style.display = 'none';
+        if (trackedContainer) trackedContainer.style.display = 'block';
+
+        if (trackedBtn) { trackedBtn.className = 'btn-warning'; trackedBtn.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)'; trackedBtn.style.color = 'white'; }
+
+        populateTrackedWorkerDropdowns();
     } else {
         if (assignForm) assignForm.style.display = 'block';
         if (inquiryForm) inquiryForm.style.display = 'none';
         if (constantContainer) constantContainer.style.display = 'none';
+        if (trackedContainer) trackedContainer.style.display = 'none';
 
         if (assignBtn) { assignBtn.className = 'btn-primary'; assignBtn.style.background = 'linear-gradient(135deg, #4f46e5, #3730a3)'; assignBtn.style.color = 'white'; }
-        if (inquiryBtn) { inquiryBtn.className = 'btn-outline'; inquiryBtn.style.background = 'var(--input-bg)'; inquiryBtn.style.color = 'var(--text-main)'; }
-        if (hudBtn) { hudBtn.className = 'btn-outline'; hudBtn.style.background = 'var(--input-bg)'; hudBtn.style.color = 'var(--text-main)'; }
-        if (cycleBtn) { cycleBtn.className = 'btn-outline'; cycleBtn.style.background = 'var(--input-bg)'; cycleBtn.style.color = 'var(--text-main)'; }
-        if (constantBtn) { constantBtn.className = 'btn-outline'; constantBtn.style.background = 'var(--input-bg)'; constantBtn.style.color = 'var(--text-main)'; }
     }
 }
+
+function populateTrackedWorkerDropdowns() {
+    const isAr = currentAppLang === 'ar';
+    const companyData = getCompanyData();
+    const workers = companyData.workers || [];
+    const permanentSpyId = companyData.permanentSpyWorkerId || '';
+
+    const workerSelect = document.getElementById('tracked-task-worker-select');
+    const spySelect = document.getElementById('tracked-task-spy-select');
+
+    let workerHtml = `<option value="">-- ${isAr ? 'اختر الموظف المنفذ' : 'Choose Target Worker'} --</option>`;
+    let spyHtml = `<option value="">-- ${isAr ? 'اختر الموظف المراقب (السباي)' : 'Choose Spy Worker'} --</option>`;
+
+    workers.forEach(w => {
+        workerHtml += `<option value="${w.id}">👤 ${w.name}</option>`;
+        const isPerm = String(w.id) === String(permanentSpyId);
+        spyHtml += `<option value="${w.id}" ${isPerm ? 'selected' : ''}>🕵️ ${w.name}${isPerm ? ' ⭐ (Permanent Spy)' : ''}</option>`;
+    });
+
+    if (workerSelect) workerSelect.innerHTML = workerHtml;
+    if (spySelect) spySelect.innerHTML = spyHtml;
+}
+window.populateTrackedWorkerDropdowns = populateTrackedWorkerDropdowns;
+
+function setPermanentSpyWorker() {
+    const isAr = currentAppLang === 'ar';
+    const spySelect = document.getElementById('tracked-task-spy-select');
+    const spyId = spySelect ? spySelect.value : '';
+
+    if (!spyId) {
+        alert(isAr ? 'الرجاء اختيار الموظف المراقب (السباي) أولاً من القائمة ثم النقر على زر التعيين كدائم.' : 'Please select a Spy Worker from the dropdown first.');
+        return;
+    }
+
+    const companyData = getCompanyData();
+    const workers = companyData.workers || [];
+    const spyWorker = workers.find(w => String(w.id) === String(spyId));
+    if (!spyWorker) return;
+
+    db.ref(`companies/${currentCompany}/permanentSpyWorkerId`).set(spyId)
+        .then(() => {
+            alert(isAr ? `تم حفظ الموظف "${spyWorker.name}" كـ مراقب دائم (Permanent Spy) بنجاح!` : `Worker "${spyWorker.name}" set as Permanent Spy Worker successfully!`);
+            populateTrackedWorkerDropdowns();
+        })
+        .catch(err => console.error("Error setting permanent spy worker:", err));
+}
+window.setPermanentSpyWorker = setPermanentSpyWorker;
 window.setTaskFormMode = setTaskFormMode;
 
 function populateInquiryWorkerDropdown() {

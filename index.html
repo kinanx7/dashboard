@@ -1528,6 +1528,10 @@
                                 style="padding: 10px 18px; border-radius: 12px; font-weight: 800; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 6px; background: var(--input-bg);">
                                 <span data-i18n="btn-mode-constant-tasks">📌 Constant Tasks / Responsibilities</span>
                             </button>
+                            <button type="button" id="task-mode-tracked-btn" onclick="setTaskFormMode('tracked')" class="btn-outline"
+                                style="padding: 10px 18px; border-radius: 12px; font-weight: 800; font-size: 0.88rem; cursor: pointer; display: flex; align-items: center; gap: 6px; background: var(--input-bg);">
+                                <span data-i18n="btn-mode-tracked-task">🕵️ Assign Tracked Task</span>
+                            </button>
                         </div>
 
                         <!-- Constant Tasks & Worker Responsibilities Container (Admin / Task Manager) -->
@@ -1642,6 +1646,61 @@
                             </div>
                             <button type="submit" class="btn-success" style="width: 100%; padding: 12px; font-weight: 900; background: linear-gradient(135deg, #8b5cf6, #6d28d9); border: none; color: white; border-radius: 10px; cursor: pointer;" data-i18n="btn-send-inquiry">❓ Send Inquiry to Worker</button>
                         </form>
+
+                        <!-- Tracked Task Assignment Container -->
+                        <div id="tracked-task-container" class="card task-assign-access-only" style="display: none; margin-bottom: 20px; border-top: 4px solid #f59e0b;">
+                            <div class="flex-between" style="align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+                                <h2 class="card-title" style="margin:0; border:none; padding:0; display:flex; align-items:center; gap:8px;">
+                                    <span>🕵️</span> <span>Assign Tracked Task with Spy Verification</span>
+                                </h2>
+                                <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700;">Assign timed task verified physically by a designated Spy Worker.</span>
+                            </div>
+
+                            <form id="tracked-task-form" onsubmit="event.preventDefault(); addTrackedTask();">
+                                <div class="grid-2-col" style="margin-bottom: 14px;">
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label>Target Worker *</label>
+                                        <select id="tracked-task-worker-select" required style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-weight:700;">
+                                            <!-- Populated dynamically -->
+                                        </select>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label>Task Detail / Description *</label>
+                                        <input type="text" id="tracked-task-title" required placeholder="e.g. Clean & Inspect Kitchen Fryers" style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-weight:700;">
+                                    </div>
+                                </div>
+
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 14px;">
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label>Time to Accept Task (Mins) *</label>
+                                        <input type="number" id="tracked-task-accept-mins" value="15" min="1" required style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-weight:700;">
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label>Time to Finish Task (Mins) *</label>
+                                        <input type="number" id="tracked-task-finish-mins" value="30" min="1" required style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-weight:700;">
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <div class="flex-between" style="align-items:center; margin-bottom:4px;">
+                                            <label style="margin:0;">Designated Spy Worker *</label>
+                                            <button type="button" onclick="setPermanentSpyWorker()" style="background:none; border:none; color:#f59e0b; font-size:0.75rem; font-weight:800; cursor:pointer; text-decoration:underline;" title="Set currently selected spy as permanent default">⭐ Set Permanent</button>
+                                        </div>
+                                        <select id="tracked-task-spy-select" required style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-weight:700;">
+                                            <!-- Populated dynamically -->
+                                        </select>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label>Time for Spy to Act (Mins) *</label>
+                                        <input type="number" id="tracked-task-spy-mins" value="20" min="1" required style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-weight:700;">
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label>Violation Penalty Amount (SAR) *</label>
+                                        <input type="number" id="tracked-task-violation-amount" value="50" min="1" required style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-weight:700;">
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="btn-warning" style="width: 100%; padding: 12px; font-weight: 900; background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: white; border-radius: 10px; cursor: pointer;">🕵️ Assign Tracked Task</button>
+                            </form>
+                        </div>
 
                         <!-- Worker Constant Tasks & Responsibilities HUD Card -->
                         <div id="worker-constant-tasks-card" class="card" style="display: none; background: linear-gradient(135deg, var(--card-bg), var(--input-bg)); border-top: 4px solid #6366f1; margin-bottom: 20px;">

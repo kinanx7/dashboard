@@ -3712,22 +3712,19 @@ function setupSearchInputClearButtons() {
         if (!input) return;
 
         let wrapper = input.parentElement;
-        if (!wrapper || (!wrapper.classList.contains('search-input-wrapper') && wrapper.tagName !== 'DIV')) {
+        if (!wrapper || !wrapper.classList.contains('search-input-wrapper')) {
             const newWrapper = document.createElement('div');
             newWrapper.className = 'search-input-wrapper';
-            if (input.style.width) newWrapper.style.width = input.style.width;
-            if (input.style.flex) newWrapper.style.flex = input.style.flex;
-            if (input.style.minWidth) newWrapper.style.minWidth = input.style.minWidth;
-            if (input.style.maxWidth) newWrapper.style.maxWidth = input.style.maxWidth;
+            newWrapper.style.position = 'relative';
+            newWrapper.style.display = 'inline-block';
+            newWrapper.style.width = '100%';
 
             input.parentNode.insertBefore(newWrapper, input);
             newWrapper.appendChild(input);
             wrapper = newWrapper;
-        } else {
-            wrapper.classList.add('search-input-wrapper');
         }
 
-        input.style.paddingLeft = '34px';
+        input.style.paddingRight = '32px';
 
         let clearBtn = wrapper.querySelector('.search-clear-btn');
         if (!clearBtn) {
@@ -3735,8 +3732,24 @@ function setupSearchInputClearButtons() {
             clearBtn.type = 'button';
             clearBtn.className = 'search-clear-btn';
             clearBtn.innerHTML = '✖';
+            clearBtn.style.position = 'absolute';
+            clearBtn.style.right = '8px';
+            clearBtn.style.top = '50%';
+            clearBtn.style.transform = 'translateY(-50%)';
+            clearBtn.style.zIndex = '5';
+            clearBtn.style.background = 'rgba(239, 68, 68, 0.2)';
+            clearBtn.style.color = '#ef4444';
+            clearBtn.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+            clearBtn.style.borderRadius = '50%';
+            clearBtn.style.width = '20px';
+            clearBtn.style.height = '20px';
+            clearBtn.style.display = 'none';
+            clearBtn.style.alignItems = 'center';
+            clearBtn.style.justifyContent = 'center';
+            clearBtn.style.fontSize = '0.7rem';
+            clearBtn.style.cursor = 'pointer';
             clearBtn.title = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar') ? 'مسح البحث' : 'Clear search';
-            wrapper.insertBefore(clearBtn, input);
+            wrapper.appendChild(clearBtn);
         }
 
         const updateVisibility = () => {
@@ -3801,21 +3814,31 @@ function setTaskFormMode(mode) {
     const hudBtn = document.getElementById('task-mode-hud-btn');
     const cycleBtn = document.getElementById('task-mode-cycle-btn');
     const constantBtn = document.getElementById('task-mode-constant-btn');
+    const trackedBtn = document.getElementById('task-mode-tracked-btn');
 
     const assignForm = document.getElementById('task-assign-form');
     const inquiryForm = document.getElementById('task-inquiry-form');
     const constantContainer = document.getElementById('constant-tasks-container');
+    const trackedContainer = document.getElementById('tracked-task-container');
+
+    const resetBtnStyles = () => {
+        if (assignBtn) { assignBtn.className = 'btn-outline'; assignBtn.style.background = 'var(--input-bg)'; assignBtn.style.color = 'var(--text-main)'; }
+        if (inquiryBtn) { inquiryBtn.className = 'btn-outline'; inquiryBtn.style.background = 'var(--input-bg)'; inquiryBtn.style.color = 'var(--text-main)'; }
+        if (hudBtn) { hudBtn.className = 'btn-outline'; hudBtn.style.background = 'var(--input-bg)'; hudBtn.style.color = 'var(--text-main)'; }
+        if (cycleBtn) { cycleBtn.className = 'btn-outline'; cycleBtn.style.background = 'var(--input-bg)'; cycleBtn.style.color = 'var(--text-main)'; }
+        if (constantBtn) { constantBtn.className = 'btn-outline'; constantBtn.style.background = 'var(--input-bg)'; constantBtn.style.color = 'var(--text-main)'; }
+        if (trackedBtn) { trackedBtn.className = 'btn-outline'; trackedBtn.style.background = 'var(--input-bg)'; trackedBtn.style.color = 'var(--text-main)'; }
+    };
+
+    resetBtnStyles();
 
     if (mode === 'inquiry') {
         if (assignForm) assignForm.style.display = 'none';
         if (inquiryForm) inquiryForm.style.display = 'block';
         if (constantContainer) constantContainer.style.display = 'none';
+        if (trackedContainer) trackedContainer.style.display = 'none';
 
-        if (assignBtn) { assignBtn.className = 'btn-outline'; assignBtn.style.background = 'var(--input-bg)'; assignBtn.style.color = 'var(--text-main)'; }
         if (inquiryBtn) { inquiryBtn.className = 'btn-primary'; inquiryBtn.style.background = 'linear-gradient(135deg, #8b5cf6, #6d28d9)'; inquiryBtn.style.color = 'white'; }
-        if (hudBtn) { hudBtn.className = 'btn-outline'; hudBtn.style.background = 'var(--input-bg)'; hudBtn.style.color = 'var(--text-main)'; }
-        if (cycleBtn) { cycleBtn.className = 'btn-outline'; cycleBtn.style.background = 'var(--input-bg)'; cycleBtn.style.color = 'var(--text-main)'; }
-        if (constantBtn) { constantBtn.className = 'btn-outline'; constantBtn.style.background = 'var(--input-bg)'; constantBtn.style.color = 'var(--text-main)'; }
 
         populateInquiryWorkerDropdown();
     } else if (mode === 'hud') {
@@ -3826,26 +3849,76 @@ function setTaskFormMode(mode) {
         if (assignForm) assignForm.style.display = 'none';
         if (inquiryForm) inquiryForm.style.display = 'none';
         if (constantContainer) constantContainer.style.display = 'block';
+        if (trackedContainer) trackedContainer.style.display = 'none';
 
-        if (assignBtn) { assignBtn.className = 'btn-outline'; assignBtn.style.background = 'var(--input-bg)'; assignBtn.style.color = 'var(--text-main)'; }
-        if (inquiryBtn) { inquiryBtn.className = 'btn-outline'; inquiryBtn.style.background = 'var(--input-bg)'; inquiryBtn.style.color = 'var(--text-main)'; }
-        if (hudBtn) { hudBtn.className = 'btn-outline'; hudBtn.style.background = 'var(--input-bg)'; hudBtn.style.color = 'var(--text-main)'; }
-        if (cycleBtn) { cycleBtn.className = 'btn-outline'; cycleBtn.style.background = 'var(--input-bg)'; cycleBtn.style.color = 'var(--text-main)'; }
         if (constantBtn) { constantBtn.className = 'btn-primary'; constantBtn.style.background = 'linear-gradient(135deg, #6366f1, #4f46e5)'; constantBtn.style.color = 'white'; }
 
         if (typeof renderConstantTasks === 'function') renderConstantTasks();
+    } else if (mode === 'tracked') {
+        if (assignForm) assignForm.style.display = 'none';
+        if (inquiryForm) inquiryForm.style.display = 'none';
+        if (constantContainer) constantContainer.style.display = 'none';
+        if (trackedContainer) trackedContainer.style.display = 'block';
+
+        if (trackedBtn) { trackedBtn.className = 'btn-warning'; trackedBtn.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)'; trackedBtn.style.color = 'white'; }
+
+        populateTrackedWorkerDropdowns();
     } else {
         if (assignForm) assignForm.style.display = 'block';
         if (inquiryForm) inquiryForm.style.display = 'none';
         if (constantContainer) constantContainer.style.display = 'none';
+        if (trackedContainer) trackedContainer.style.display = 'none';
 
         if (assignBtn) { assignBtn.className = 'btn-primary'; assignBtn.style.background = 'linear-gradient(135deg, #4f46e5, #3730a3)'; assignBtn.style.color = 'white'; }
-        if (inquiryBtn) { inquiryBtn.className = 'btn-outline'; inquiryBtn.style.background = 'var(--input-bg)'; inquiryBtn.style.color = 'var(--text-main)'; }
-        if (hudBtn) { hudBtn.className = 'btn-outline'; hudBtn.style.background = 'var(--input-bg)'; hudBtn.style.color = 'var(--text-main)'; }
-        if (cycleBtn) { cycleBtn.className = 'btn-outline'; cycleBtn.style.background = 'var(--input-bg)'; cycleBtn.style.color = 'var(--text-main)'; }
-        if (constantBtn) { constantBtn.className = 'btn-outline'; constantBtn.style.background = 'var(--input-bg)'; constantBtn.style.color = 'var(--text-main)'; }
     }
 }
+
+function populateTrackedWorkerDropdowns() {
+    const isAr = currentAppLang === 'ar';
+    const companyData = getCompanyData();
+    const workers = companyData.workers || [];
+    const permanentSpyId = companyData.permanentSpyWorkerId || '';
+
+    const workerSelect = document.getElementById('tracked-task-worker-select');
+    const spySelect = document.getElementById('tracked-task-spy-select');
+
+    let workerHtml = `<option value="">-- ${isAr ? 'اختر الموظف المنفذ' : 'Choose Target Worker'} --</option>`;
+    let spyHtml = `<option value="">-- ${isAr ? 'اختر الموظف المراقب (السباي)' : 'Choose Spy Worker'} --</option>`;
+
+    workers.forEach(w => {
+        workerHtml += `<option value="${w.id}">👤 ${w.name}</option>`;
+        const isPerm = String(w.id) === String(permanentSpyId);
+        spyHtml += `<option value="${w.id}" ${isPerm ? 'selected' : ''}>🕵️ ${w.name}${isPerm ? ' ⭐ (Permanent Spy)' : ''}</option>`;
+    });
+
+    if (workerSelect) workerSelect.innerHTML = workerHtml;
+    if (spySelect) spySelect.innerHTML = spyHtml;
+}
+window.populateTrackedWorkerDropdowns = populateTrackedWorkerDropdowns;
+
+function setPermanentSpyWorker() {
+    const isAr = currentAppLang === 'ar';
+    const spySelect = document.getElementById('tracked-task-spy-select');
+    const spyId = spySelect ? spySelect.value : '';
+
+    if (!spyId) {
+        alert(isAr ? 'الرجاء اختيار الموظف المراقب (السباي) أولاً من القائمة ثم النقر على زر التعيين كدائم.' : 'Please select a Spy Worker from the dropdown first.');
+        return;
+    }
+
+    const companyData = getCompanyData();
+    const workers = companyData.workers || [];
+    const spyWorker = workers.find(w => String(w.id) === String(spyId));
+    if (!spyWorker) return;
+
+    db.ref(`companies/${currentCompany}/permanentSpyWorkerId`).set(spyId)
+        .then(() => {
+            alert(isAr ? `تم حفظ الموظف "${spyWorker.name}" كـ مراقب دائم (Permanent Spy) بنجاح!` : `Worker "${spyWorker.name}" set as Permanent Spy Worker successfully!`);
+            populateTrackedWorkerDropdowns();
+        })
+        .catch(err => console.error("Error setting permanent spy worker:", err));
+}
+window.setPermanentSpyWorker = setPermanentSpyWorker;
 window.setTaskFormMode = setTaskFormMode;
 
 function populateInquiryWorkerDropdown() {
