@@ -636,6 +636,11 @@ const uiTranslations = {
         "title-vault-main": "📁 Admin Information & Document Vault",
         "desc-vault-main": "Store, organize & search confidential documents, car licenses, contracts, passwords, photos, and notes.",
         "btn-add-vault-note": "➕ Add New Information Note",
+        "btn-add-vault-folder": "📁 + Create Folder",
+        "title-create-vault-folder": "📁 Create New Vault Folder",
+        "label-vault-folder-name": "Folder Name *",
+        "label-vault-folder-icon": "Folder Icon",
+        "btn-save-vault-folder": "🔒 Save Folder",
         "title-upload-vault-note": "📝 Upload New Information / Document",
         "label-vault-title": "Title / Document Name *",
         "placeholder-vault-title": "e.g. Car License - Hilux, Commercial CR, Wifi Password",
@@ -905,6 +910,11 @@ const uiTranslations = {
         "tab-market": "🏪 السوق",
         "tab-ai-assistant": "🤖 المساعد الذكي",
         "tab-vault": "📁 المعلومات",
+        "btn-add-vault-folder": "📁 + إنشاء مجلد جديد",
+        "title-create-vault-folder": "📁 إنشاء مجلد جديد في الخزنة",
+        "label-vault-folder-name": "اسم المجلد أو القسم *",
+        "label-vault-folder-icon": "أيقونة المجلد",
+        "btn-save-vault-folder": "🔒 حفظ المجلد الجديد",
 
         // الحضور والغياب
         "perm-attendance-label": "مسؤول الحضور",
