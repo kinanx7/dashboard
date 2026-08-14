@@ -8431,6 +8431,172 @@ function fillConstantTaskPreset(title, amount, category) {
 }
 window.fillConstantTaskPreset = fillConstantTaskPreset;
 
+// =============================================
+// CONSTANT TASKS PRESET SHORTCUTS SYSTEM
+// =============================================
+let editingPresetId = null;
+
+function toggleConstantTaskPresetForm(optPresetId) {
+    const container = document.getElementById('constant-preset-form-container');
+    if (!container) return;
+
+    if (optPresetId) {
+        editingPresetId = optPresetId;
+        const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+        const presetsObj = data.constantTaskPresets || {};
+        let pObj = presetsObj[optPresetId];
+
+        if (!pObj) {
+            const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+            const defaultPresets = [
+                { id: 'preset_clean', title: isAr ? '🧹 تنظيف ومسح الطاولات' : '🧹 Cleaning Tables', amount: 'daily', icon: '🧹' },
+                { id: 'preset_upload', title: isAr ? '📦 تحميل وتنزيل العمالة/البضائع' : '📦 Uploading & Unloading Staff/Stock', amount: 'daily', icon: '📦' },
+                { id: 'preset_cashier', title: isAr ? '💵 عمليات الكاشير والنظام' : '💵 Cashier & POS Operations', amount: 'shift', icon: '💵' },
+                { id: 'preset_kitchen', title: isAr ? '👨‍🍳 تحضير وتعقيم المطبخ' : '👨‍🍳 Kitchen Prep & Sanitization', amount: 'daily', icon: '👨‍🍳' },
+                { id: 'preset_waste', title: isAr ? '🗑️ تفريغ وتدبير النفايات' : '🗑️ Waste & Trash Management', amount: '2 times/shift', icon: '🗑️' },
+                { id: 'preset_inv', title: isAr ? '📝 الجرد اليومي للمخزون' : '📝 Daily Inventory Check', amount: 'end of shift', icon: '📝' }
+            ];
+            pObj = defaultPresets.find(p => p.id === optPresetId);
+        }
+
+        if (pObj) {
+            const tEl = document.getElementById('constant-preset-title-input');
+            const aEl = document.getElementById('constant-preset-amount-input');
+            const iEl = document.getElementById('constant-preset-icon-select');
+            if (tEl) tEl.value = pObj.title || '';
+            if (aEl) aEl.value = pObj.amount || '';
+            if (iEl) iEl.value = pObj.icon || '📌';
+        }
+    } else {
+        editingPresetId = null;
+        const titleEl = document.getElementById('constant-preset-title-input');
+        const amtEl = document.getElementById('constant-preset-amount-input');
+        if (titleEl) titleEl.value = '';
+        if (amtEl) amtEl.value = '';
+    }
+
+    if (container.style.display === 'none' || !container.style.display) {
+        container.style.display = 'block';
+        const titleEl = document.getElementById('constant-preset-title-input');
+        if (titleEl) titleEl.focus();
+    } else {
+        container.style.display = 'none';
+    }
+}
+window.toggleConstantTaskPresetForm = toggleConstantTaskPresetForm;
+
+function saveConstantTaskPreset() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const titleInput = document.getElementById('constant-preset-title-input');
+    const amtInput = document.getElementById('constant-preset-amount-input');
+    const iconInput = document.getElementById('constant-preset-icon-select');
+
+    const title = titleInput ? titleInput.value.trim() : '';
+    const amount = amtInput ? amtInput.value.trim() : 'daily';
+    const icon = iconInput ? iconInput.value : '📌';
+
+    if (!title) {
+        const msg = isAr ? '⚠️ يرجى كتابة عنوان الاختصار.' : '⚠️ Please enter a shortcut title.';
+        if (typeof showInAppNotification === 'function') showInAppNotification(msg);
+        else alert(msg);
+        return;
+    }
+
+    const presetId = editingPresetId || ('preset_' + Date.now());
+    const presetObj = {
+        id: presetId,
+        title: title,
+        amount: amount || 'daily',
+        icon: icon,
+        createdAt: Date.now()
+    };
+
+    db.ref('companies/' + currentCompany + '/constantTaskPresets/' + presetId).set(presetObj)
+        .then(() => {
+            const successMsg = isAr ? '✅ تم حفظ الاختصار بنجاح!' : '✅ Preset shortcut saved!';
+            if (typeof showInAppNotification === 'function') showInAppNotification(successMsg);
+
+            toggleConstantTaskPresetForm();
+            renderConstantTaskPresets();
+        })
+        .catch(err => {
+            console.error("Failed to save preset:", err);
+        });
+}
+window.saveConstantTaskPreset = saveConstantTaskPreset;
+
+function deleteConstantTaskPreset(presetId, titleStr) {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    if (!confirm(isAr ? `هل أنت تأكد من حذف الاختصار "${titleStr}"؟` : `Are you sure you want to delete preset "${titleStr}"?`)) return;
+
+    db.ref('companies/' + currentCompany + '/constantTaskPresets/' + presetId).set({
+        id: presetId,
+        deleted: true,
+        deletedAt: Date.now()
+    })
+        .then(() => {
+            if (typeof showInAppNotification === 'function') showInAppNotification(isAr ? '🗑️ تم حذف الاختصار.' : '🗑️ Preset deleted.');
+            renderConstantTaskPresets();
+        })
+        .catch(err => {
+            console.error("Failed to delete preset:", err);
+        });
+}
+window.deleteConstantTaskPreset = deleteConstantTaskPreset;
+
+function renderConstantTaskPresets() {
+    const container = document.getElementById('constant-task-presets-container');
+    if (!container) return;
+
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const presetsObj = data.constantTaskPresets || {};
+    const storedPresets = Object.values(presetsObj).filter(p => p && p.id);
+
+    const defaultPresets = [
+        { id: 'preset_clean', title: isAr ? '🧹 تنظيف ومسح الطاولات' : '🧹 Cleaning Tables', amount: 'daily', icon: '🧹' },
+        { id: 'preset_upload', title: isAr ? '📦 تحميل وتنزيل العمالة/البضائع' : '📦 Uploading & Unloading Staff/Stock', amount: 'daily', icon: '📦' },
+        { id: 'preset_cashier', title: isAr ? '💵 عمليات الكاشير والنظام' : '💵 Cashier & POS Operations', amount: 'shift', icon: '💵' },
+        { id: 'preset_kitchen', title: isAr ? '👨‍🍳 تحضير وتعقيم المطبخ' : '👨‍🍳 Kitchen Prep & Sanitization', amount: 'daily', icon: '👨‍🍳' },
+        { id: 'preset_waste', title: isAr ? '🗑️ تفريغ وتدبير النفايات' : '🗑️ Waste & Trash Management', amount: '2 times/shift', icon: '🗑️' },
+        { id: 'preset_inv', title: isAr ? '📝 الجرد اليومي للمخزون' : '📝 Daily Inventory Check', amount: 'end of shift', icon: '📝' }
+    ];
+
+    const presetMap = {};
+    defaultPresets.forEach(p => { presetMap[p.id] = p; });
+    storedPresets.forEach(p => {
+        if (p.deleted) {
+            delete presetMap[p.id];
+        } else {
+            presetMap[p.id] = { ...presetMap[p.id], ...p };
+        }
+    });
+
+    const allPresets = Object.values(presetMap);
+
+    if (allPresets.length === 0) {
+        container.innerHTML = `<span style="font-size: 0.8rem; color: var(--text-muted); font-style: italic;">${isAr ? 'لا توجد اختصارات حالياً. اضغط على "+ إضافة اختصار" لإضافة اختصاراتك الخاصة.' : 'No shortcuts currently. Click "+ Add Preset" to create shortcuts.'}</span>`;
+        return;
+    }
+
+    container.innerHTML = allPresets.map(p => {
+        const safeTitle = typeof escapeHtml === 'function' ? escapeHtml(p.title) : p.title;
+        const displayTitle = safeTitle.replace(/'/g, "\\'");
+        const amtStr = (p.amount || 'daily').replace(/'/g, "\\'");
+
+        return `
+            <div style="display: inline-flex; align-items: center; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 2px 4px 2px 8px; gap: 4px; box-shadow: var(--shadow-sm);">
+                <button type="button" onclick="fillConstantTaskPreset('${displayTitle}', '${amtStr}')" style="background: none; border: none; font-size: 0.8rem; font-weight: 800; color: var(--text-main); cursor: pointer; padding: 4px 2px;" title="${isAr ? 'اضغط لتعبئة هذه المهمة' : 'Click to use shortcut'}">
+                    ${safeTitle}
+                </button>
+                <button type="button" onclick="toggleConstantTaskPresetForm('${p.id}')" style="background: none; border: none; color: #6366f1; cursor: pointer; font-size: 0.78rem; padding: 2px 4px;" title="${isAr ? 'تعديل الاختصار' : 'Edit shortcut'}">✏️</button>
+                <button type="button" onclick="deleteConstantTaskPreset('${p.id}', '${displayTitle}')" style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.78rem; padding: 2px 4px;" title="${isAr ? 'حذف الاختصار' : 'Delete shortcut'}">✖</button>
+            </div>
+        `;
+    }).join('');
+}
+window.renderConstantTaskPresets = renderConstantTaskPresets;
+
 function addConstantTask() {
     const isAr = currentAppLang === 'ar';
     const workerSelect = document.getElementById('constant-task-worker-select');
@@ -8604,6 +8770,9 @@ function renderConstantTasks() {
     const isAr = currentAppLang === 'ar';
     const companyData = getCompanyData();
     const workers = companyData.workers || [];
+
+    // Automatically render preset shortcuts
+    renderConstantTaskPresets();
 
     // 1. Populate Manager Worker Select dropdown
     const select = document.getElementById('constant-task-worker-select');
@@ -9428,7 +9597,6 @@ if (typeof openEditTaskModal === 'function') window.openEditTaskModal = openEdit
 if (typeof closeEditTaskModal === 'function') window.closeEditTaskModal = closeEditTaskModal;
 if (typeof saveEditedTask === 'function') window.saveEditedTask = saveEditedTask;
 if (typeof renderConstantTasks === 'function') window.renderConstantTasks = renderConstantTasks;
-
 
 /**
  * Driver dispatch board, active status, delivery provisions & pool orders
@@ -17583,7 +17751,7 @@ function addToMarketCart(productId, evt) {
     if (!prod) return;
 
     const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
-    const isAdmin = !isCustomer && (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.isAdmin));
+    const isAdmin = isMarketAdmin();
     if (isProductHidden(prod) && !isAdmin) {
         const isAr = currentAppLang === 'ar';
         alert(isAr ? 'عذراً، هذا المنتج غير متوفر حالياً (تم إخفاؤه من قبل الأدمن).' : 'Sorry, this product is currently unavailable (hidden by admin).');
@@ -18609,7 +18777,7 @@ function closeCustomerManagementModal() {
 }
 function renderMarketProductCard(p) {
     const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
-    const isAdmin = !isCustomer && (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.isAdmin));
+    const isAdmin = isMarketAdmin();
     const isAr = currentAppLang === 'ar';
     const catKey = getNormalizedProductCategory(p);
     const weightText = p.weightTag || '';
@@ -18816,7 +18984,7 @@ function renderMarket() {
     const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
     const prods = getAllMarketProducts();
     const search = (document.getElementById('market-search-input')?.value || '').trim().toLowerCase();
-    const isAdmin = !isCustomer && (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.isAdmin));
+    const isAdmin = isMarketAdmin();
     const isAr = currentAppLang === 'ar';
 
     renderMarketCategoryTabs(prods);
@@ -18885,7 +19053,7 @@ function renderMarket() {
 
     function renderMarketProductCard(p) {
         const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
-        const isAdmin = !isCustomer && (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.isAdmin));
+        const isAdmin = isMarketAdmin();
         const isAr = currentAppLang === 'ar';
         const catKey = getNormalizedProductCategory(p);
         const weightText = p.weightTag || '';
@@ -19860,6 +20028,22 @@ if (typeof getUserCoins === 'function') window.getUserCoins = getUserCoins;
 if (typeof renderMarketCartItems === 'function') window.renderMarketCartItems = renderMarketCartItems;
 if (typeof closeCustomerManagementModal === 'function') window.closeCustomerManagementModal = closeCustomerManagementModal;
 if (typeof processCustomerLogin === 'function') window.processCustomerLogin = processCustomerLogin;
+
+
+function isMarketAdmin() {
+    if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession) return false;
+    if (typeof currentUser === 'undefined' || !currentUser) {
+        if (typeof document !== 'undefined' && document.body && document.body.classList.contains('role-admin')) return true;
+        return false;
+    }
+    const role = (currentUser.role || '').toLowerCase();
+    const isRoleAdmin = role === 'admin' || role === 'manager' || role === 'superadmin' || currentUser.isAdmin === true || currentUser.isManager === true;
+    const hasBodyClass = document.body && (document.body.classList.contains('role-admin') || document.body.classList.contains('perm-market') || document.body.classList.contains('admin-only'));
+    const hasPerm = currentUser.perms && (currentUser.perms.market === true || currentUser.perms.market === 'true' || currentUser.perms.admin === true);
+    return isRoleAdmin || hasBodyClass || hasPerm;
+}
+window.isMarketAdmin = isMarketAdmin;
+
 
 
 /**
@@ -22588,20 +22772,21 @@ function renderVaultNotes() {
                         </div>
                     ` : ''}
 
-                    <!-- Title & Category Header -->
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; gap: 8px;">
-                        <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
-                            <span style="${badgeStyle} display: inline-block; width: fit-content; padding: 3px 8px; border-radius: 14px; font-weight: 800; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px;">
-                                ${badgeLabel}
-                            </span>
-                            <strong style="font-size: 1.05rem; color: var(--text-main); word-break: break-word; line-height: 1.3;">${safeTitle}</strong>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0; flex-wrap: wrap;">
-                            ${moveSelectHtml}
+                    <!-- Row 1: Category Badge & Action Buttons -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 8px; width: 100%;">
+                        <span style="${badgeStyle} display: inline-block; padding: 4px 10px; border-radius: 14px; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                            ${badgeLabel}
+                        </span>
+                        <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
                             <button type="button" onclick="copyVaultText('${n.id}')" title="${isAr ? 'نسخ النص' : 'Copy Text'}" style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: var(--text-main);">${isAr ? '📋 نسخ' : '📋 Copy'}</button>
                             <button type="button" onclick="editVaultNote('${n.id}')" title="${isAr ? 'تعديل الملاحظة' : 'Edit Note'}" style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: #6366f1;">${isAr ? '✏️ تعديل' : '✏️ Edit'}</button>
                             <button type="button" onclick="deleteVaultNote('${n.id}')" title="${isAr ? 'حذف الملاحظة' : 'Delete Note'}" style="background: rgba(220, 38, 38, 0.1); border: 1px solid rgba(220, 38, 38, 0.25); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: var(--danger);">🗑️</button>
                         </div>
+                    </div>
+
+                    <!-- Row 2: Full-Width Title (Natural Flexible Arabic Text Flow) -->
+                    <div style="margin-bottom: 10px; width: 100%;">
+                        <strong style="font-size: 1.08rem; font-weight: 900; color: var(--text-main); word-break: break-word; line-height: 1.4; display: block; width: 100%;">${safeTitle}</strong>
                     </div>
 
                     <!-- Text Details directly UNDER Image & Title -->

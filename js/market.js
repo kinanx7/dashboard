@@ -740,7 +740,7 @@ function addToMarketCart(productId, evt) {
     if (!prod) return;
 
     const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
-    const isAdmin = !isCustomer && (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.isAdmin));
+    const isAdmin = isMarketAdmin();
     if (isProductHidden(prod) && !isAdmin) {
         const isAr = currentAppLang === 'ar';
         alert(isAr ? 'عذراً، هذا المنتج غير متوفر حالياً (تم إخفاؤه من قبل الأدمن).' : 'Sorry, this product is currently unavailable (hidden by admin).');
@@ -1766,7 +1766,7 @@ function closeCustomerManagementModal() {
 }
 function renderMarketProductCard(p) {
     const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
-    const isAdmin = !isCustomer && (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.isAdmin));
+    const isAdmin = isMarketAdmin();
     const isAr = currentAppLang === 'ar';
     const catKey = getNormalizedProductCategory(p);
     const weightText = p.weightTag || '';
@@ -1973,7 +1973,7 @@ function renderMarket() {
     const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
     const prods = getAllMarketProducts();
     const search = (document.getElementById('market-search-input')?.value || '').trim().toLowerCase();
-    const isAdmin = !isCustomer && (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.isAdmin));
+    const isAdmin = isMarketAdmin();
     const isAr = currentAppLang === 'ar';
 
     renderMarketCategoryTabs(prods);
@@ -2042,7 +2042,7 @@ function renderMarket() {
 
     function renderMarketProductCard(p) {
         const isCustomer = !!(typeof currentCustomerSession !== 'undefined' && currentCustomerSession);
-        const isAdmin = !isCustomer && (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.isAdmin));
+        const isAdmin = isMarketAdmin();
         const isAr = currentAppLang === 'ar';
         const catKey = getNormalizedProductCategory(p);
         const weightText = p.weightTag || '';
@@ -3017,3 +3017,19 @@ if (typeof getUserCoins === 'function') window.getUserCoins = getUserCoins;
 if (typeof renderMarketCartItems === 'function') window.renderMarketCartItems = renderMarketCartItems;
 if (typeof closeCustomerManagementModal === 'function') window.closeCustomerManagementModal = closeCustomerManagementModal;
 if (typeof processCustomerLogin === 'function') window.processCustomerLogin = processCustomerLogin;
+
+
+function isMarketAdmin() {
+    if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession) return false;
+    if (typeof currentUser === 'undefined' || !currentUser) {
+        if (typeof document !== 'undefined' && document.body && document.body.classList.contains('role-admin')) return true;
+        return false;
+    }
+    const role = (currentUser.role || '').toLowerCase();
+    const isRoleAdmin = role === 'admin' || role === 'manager' || role === 'superadmin' || currentUser.isAdmin === true || currentUser.isManager === true;
+    const hasBodyClass = document.body && (document.body.classList.contains('role-admin') || document.body.classList.contains('perm-market') || document.body.classList.contains('admin-only'));
+    const hasPerm = currentUser.perms && (currentUser.perms.market === true || currentUser.perms.market === 'true' || currentUser.perms.admin === true);
+    return isRoleAdmin || hasBodyClass || hasPerm;
+}
+window.isMarketAdmin = isMarketAdmin;
+

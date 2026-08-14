@@ -1545,14 +1545,36 @@
 
                             <!-- Pre-defined preset shortcuts -->
                             <div style="background: var(--input-bg); border-radius: 12px; padding: 12px; border: 1px solid var(--border-color); margin-bottom: 16px;">
-                                <label style="font-size: 0.8rem; font-weight: 800; color: var(--text-muted); display: block; margin-bottom: 8px;" data-i18n="label-preset-shortcuts">💡 Fast Preset Responsibilities Shortcuts:</label>
-                                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                                    <button type="button" onclick="fillConstantTaskPreset(typeof currentAppLang !== 'undefined' && currentAppLang==='ar'?'🧹 تنظيف ومسح الطاولات':'🧹 Cleaning Tables', 'daily', 'cleaning')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);" data-i18n="preset-clean-tables">🧹 Cleaning Tables</button>
-                                    <button type="button" onclick="fillConstantTaskPreset(typeof currentAppLang !== 'undefined' && currentAppLang==='ar'?'📦 تحميل وتنزيل العمالة/البضائع':'📦 Uploading & Unloading Staff/Stock', 'daily', 'staff')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);" data-i18n="preset-upload-staff">📦 Uploading Staff/Stock</button>
-                                    <button type="button" onclick="fillConstantTaskPreset(typeof currentAppLang !== 'undefined' && currentAppLang==='ar'?'💵 عمليات الكاشير والنظام':'💵 Cashier & POS Operations', 'shift', 'cashier')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);" data-i18n="preset-cashier-pos">💵 Cashier & POS</button>
-                                    <button type="button" onclick="fillConstantTaskPreset(typeof currentAppLang !== 'undefined' && currentAppLang==='ar'?'👨‍🍳 تحضير وتعقيم المطبخ':'👨‍🍳 Kitchen Prep & Sanitization', 'daily', 'kitchen')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);" data-i18n="preset-kitchen-prep">👨‍🍳 Kitchen Prep</button>
-                                    <button type="button" onclick="fillConstantTaskPreset(typeof currentAppLang !== 'undefined' && currentAppLang==='ar'?'🗑️ تفريغ وتدبير النفايات':'🗑️ Waste & Trash Management', '2 times/shift', 'cleaning')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);" data-i18n="preset-waste-disposal">🗑️ Waste Disposal</button>
-                                    <button type="button" onclick="fillConstantTaskPreset(typeof currentAppLang !== 'undefined' && currentAppLang==='ar'?'📝 الجرد اليومي للمخزون':'📝 Daily Inventory Check', 'end of shift', 'inventory')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);" data-i18n="preset-daily-inventory">📝 Daily Inventory</button>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <label style="font-size: 0.8rem; font-weight: 800; color: var(--text-muted); margin: 0;" data-i18n="label-preset-shortcuts">💡 Fast Preset Responsibilities Shortcuts:</label>
+                                    <button type="button" onclick="toggleConstantTaskPresetForm()" class="btn-outline" style="padding: 4px 10px; font-size: 0.78rem; font-weight: 800; border-radius: 8px; color: #6366f1; border-color: #6366f1; cursor: pointer; background: rgba(99,102,241,0.1);">
+                                        ➕ <span data-i18n="btn-add-preset-shortcut">+ Add Preset</span>
+                                    </button>
+                                </div>
+                                <div id="constant-preset-form-container" style="display: none; background: var(--card-bg); border: 1.5px dashed #6366f1; border-radius: 10px; padding: 12px; margin-bottom: 12px;">
+                                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                                        <input type="text" id="constant-preset-title-input" placeholder="Shortcut title e.g. Clean Fryers..." style="padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.85rem;">
+                                        <input type="text" id="constant-preset-amount-input" placeholder="e.g. daily, 3 times..." style="padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.85rem;">
+                                        <select id="constant-preset-icon-select" style="padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.85rem;">
+                                            <option value="📌">📌 Pin</option>
+                                            <option value="🧹">🧹 Clean</option>
+                                            <option value="📦">📦 Stock</option>
+                                            <option value="💵">💵 Cashier</option>
+                                            <option value="👨‍🍳">👨‍🍳 Kitchen</option>
+                                            <option value="🗑️">🗑️ Waste</option>
+                                            <option value="📝">📝 Inventory</option>
+                                            <option value="🧼">🧼 Sanitization</option>
+                                            <option value="🍳">🍳 Cooking</option>
+                                            <option value="🚗">🚗 Delivery</option>
+                                        </select>
+                                    </div>
+                                    <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                                        <button type="button" onclick="toggleConstantTaskPresetForm()" class="btn-neutral" style="padding: 6px 12px; font-size: 0.8rem; border-radius: 6px;">Cancel</button>
+                                        <button type="button" onclick="saveConstantTaskPreset()" class="btn-primary" style="padding: 6px 16px; font-size: 0.8rem; border-radius: 6px; background: #6366f1; border: none; color: white; cursor: pointer; font-weight: 800;">🔒 Save Preset</button>
+                                    </div>
+                                </div>
+                                <div id="constant-task-presets-container" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                    <!-- Rendered dynamically by renderConstantTaskPresets() -->
                                 </div>
                             </div>
 

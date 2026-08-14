@@ -2724,20 +2724,21 @@ function renderVaultNotes() {
                         </div>
                     ` : ''}
 
-                    <!-- Title & Category Header -->
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; gap: 8px;">
-                        <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
-                            <span style="${badgeStyle} display: inline-block; width: fit-content; padding: 3px 8px; border-radius: 14px; font-weight: 800; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px;">
-                                ${badgeLabel}
-                            </span>
-                            <strong style="font-size: 1.05rem; color: var(--text-main); word-break: break-word; line-height: 1.3;">${safeTitle}</strong>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0; flex-wrap: wrap;">
-                            ${moveSelectHtml}
+                    <!-- Row 1: Category Badge & Action Buttons -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 8px; width: 100%;">
+                        <span style="${badgeStyle} display: inline-block; padding: 4px 10px; border-radius: 14px; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                            ${badgeLabel}
+                        </span>
+                        <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
                             <button type="button" onclick="copyVaultText('${n.id}')" title="${isAr ? 'نسخ النص' : 'Copy Text'}" style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: var(--text-main);">${isAr ? '📋 نسخ' : '📋 Copy'}</button>
                             <button type="button" onclick="editVaultNote('${n.id}')" title="${isAr ? 'تعديل الملاحظة' : 'Edit Note'}" style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: #6366f1;">${isAr ? '✏️ تعديل' : '✏️ Edit'}</button>
                             <button type="button" onclick="deleteVaultNote('${n.id}')" title="${isAr ? 'حذف الملاحظة' : 'Delete Note'}" style="background: rgba(220, 38, 38, 0.1); border: 1px solid rgba(220, 38, 38, 0.25); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: var(--danger);">🗑️</button>
                         </div>
+                    </div>
+
+                    <!-- Row 2: Full-Width Title (Natural Flexible Arabic Text Flow) -->
+                    <div style="margin-bottom: 10px; width: 100%;">
+                        <strong style="font-size: 1.08rem; font-weight: 900; color: var(--text-main); word-break: break-word; line-height: 1.4; display: block; width: 100%;">${safeTitle}</strong>
                     </div>
 
                     <!-- Text Details directly UNDER Image & Title -->

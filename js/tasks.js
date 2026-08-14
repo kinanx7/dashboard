@@ -2052,6 +2052,172 @@ function fillConstantTaskPreset(title, amount, category) {
 }
 window.fillConstantTaskPreset = fillConstantTaskPreset;
 
+// =============================================
+// CONSTANT TASKS PRESET SHORTCUTS SYSTEM
+// =============================================
+let editingPresetId = null;
+
+function toggleConstantTaskPresetForm(optPresetId) {
+    const container = document.getElementById('constant-preset-form-container');
+    if (!container) return;
+
+    if (optPresetId) {
+        editingPresetId = optPresetId;
+        const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+        const presetsObj = data.constantTaskPresets || {};
+        let pObj = presetsObj[optPresetId];
+
+        if (!pObj) {
+            const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+            const defaultPresets = [
+                { id: 'preset_clean', title: isAr ? '🧹 تنظيف ومسح الطاولات' : '🧹 Cleaning Tables', amount: 'daily', icon: '🧹' },
+                { id: 'preset_upload', title: isAr ? '📦 تحميل وتنزيل العمالة/البضائع' : '📦 Uploading & Unloading Staff/Stock', amount: 'daily', icon: '📦' },
+                { id: 'preset_cashier', title: isAr ? '💵 عمليات الكاشير والنظام' : '💵 Cashier & POS Operations', amount: 'shift', icon: '💵' },
+                { id: 'preset_kitchen', title: isAr ? '👨‍🍳 تحضير وتعقيم المطبخ' : '👨‍🍳 Kitchen Prep & Sanitization', amount: 'daily', icon: '👨‍🍳' },
+                { id: 'preset_waste', title: isAr ? '🗑️ تفريغ وتدبير النفايات' : '🗑️ Waste & Trash Management', amount: '2 times/shift', icon: '🗑️' },
+                { id: 'preset_inv', title: isAr ? '📝 الجرد اليومي للمخزون' : '📝 Daily Inventory Check', amount: 'end of shift', icon: '📝' }
+            ];
+            pObj = defaultPresets.find(p => p.id === optPresetId);
+        }
+
+        if (pObj) {
+            const tEl = document.getElementById('constant-preset-title-input');
+            const aEl = document.getElementById('constant-preset-amount-input');
+            const iEl = document.getElementById('constant-preset-icon-select');
+            if (tEl) tEl.value = pObj.title || '';
+            if (aEl) aEl.value = pObj.amount || '';
+            if (iEl) iEl.value = pObj.icon || '📌';
+        }
+    } else {
+        editingPresetId = null;
+        const titleEl = document.getElementById('constant-preset-title-input');
+        const amtEl = document.getElementById('constant-preset-amount-input');
+        if (titleEl) titleEl.value = '';
+        if (amtEl) amtEl.value = '';
+    }
+
+    if (container.style.display === 'none' || !container.style.display) {
+        container.style.display = 'block';
+        const titleEl = document.getElementById('constant-preset-title-input');
+        if (titleEl) titleEl.focus();
+    } else {
+        container.style.display = 'none';
+    }
+}
+window.toggleConstantTaskPresetForm = toggleConstantTaskPresetForm;
+
+function saveConstantTaskPreset() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const titleInput = document.getElementById('constant-preset-title-input');
+    const amtInput = document.getElementById('constant-preset-amount-input');
+    const iconInput = document.getElementById('constant-preset-icon-select');
+
+    const title = titleInput ? titleInput.value.trim() : '';
+    const amount = amtInput ? amtInput.value.trim() : 'daily';
+    const icon = iconInput ? iconInput.value : '📌';
+
+    if (!title) {
+        const msg = isAr ? '⚠️ يرجى كتابة عنوان الاختصار.' : '⚠️ Please enter a shortcut title.';
+        if (typeof showInAppNotification === 'function') showInAppNotification(msg);
+        else alert(msg);
+        return;
+    }
+
+    const presetId = editingPresetId || ('preset_' + Date.now());
+    const presetObj = {
+        id: presetId,
+        title: title,
+        amount: amount || 'daily',
+        icon: icon,
+        createdAt: Date.now()
+    };
+
+    db.ref('companies/' + currentCompany + '/constantTaskPresets/' + presetId).set(presetObj)
+        .then(() => {
+            const successMsg = isAr ? '✅ تم حفظ الاختصار بنجاح!' : '✅ Preset shortcut saved!';
+            if (typeof showInAppNotification === 'function') showInAppNotification(successMsg);
+
+            toggleConstantTaskPresetForm();
+            renderConstantTaskPresets();
+        })
+        .catch(err => {
+            console.error("Failed to save preset:", err);
+        });
+}
+window.saveConstantTaskPreset = saveConstantTaskPreset;
+
+function deleteConstantTaskPreset(presetId, titleStr) {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    if (!confirm(isAr ? `هل أنت تأكد من حذف الاختصار "${titleStr}"؟` : `Are you sure you want to delete preset "${titleStr}"?`)) return;
+
+    db.ref('companies/' + currentCompany + '/constantTaskPresets/' + presetId).set({
+        id: presetId,
+        deleted: true,
+        deletedAt: Date.now()
+    })
+        .then(() => {
+            if (typeof showInAppNotification === 'function') showInAppNotification(isAr ? '🗑️ تم حذف الاختصار.' : '🗑️ Preset deleted.');
+            renderConstantTaskPresets();
+        })
+        .catch(err => {
+            console.error("Failed to delete preset:", err);
+        });
+}
+window.deleteConstantTaskPreset = deleteConstantTaskPreset;
+
+function renderConstantTaskPresets() {
+    const container = document.getElementById('constant-task-presets-container');
+    if (!container) return;
+
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const presetsObj = data.constantTaskPresets || {};
+    const storedPresets = Object.values(presetsObj).filter(p => p && p.id);
+
+    const defaultPresets = [
+        { id: 'preset_clean', title: isAr ? '🧹 تنظيف ومسح الطاولات' : '🧹 Cleaning Tables', amount: 'daily', icon: '🧹' },
+        { id: 'preset_upload', title: isAr ? '📦 تحميل وتنزيل العمالة/البضائع' : '📦 Uploading & Unloading Staff/Stock', amount: 'daily', icon: '📦' },
+        { id: 'preset_cashier', title: isAr ? '💵 عمليات الكاشير والنظام' : '💵 Cashier & POS Operations', amount: 'shift', icon: '💵' },
+        { id: 'preset_kitchen', title: isAr ? '👨‍🍳 تحضير وتعقيم المطبخ' : '👨‍🍳 Kitchen Prep & Sanitization', amount: 'daily', icon: '👨‍🍳' },
+        { id: 'preset_waste', title: isAr ? '🗑️ تفريغ وتدبير النفايات' : '🗑️ Waste & Trash Management', amount: '2 times/shift', icon: '🗑️' },
+        { id: 'preset_inv', title: isAr ? '📝 الجرد اليومي للمخزون' : '📝 Daily Inventory Check', amount: 'end of shift', icon: '📝' }
+    ];
+
+    const presetMap = {};
+    defaultPresets.forEach(p => { presetMap[p.id] = p; });
+    storedPresets.forEach(p => {
+        if (p.deleted) {
+            delete presetMap[p.id];
+        } else {
+            presetMap[p.id] = { ...presetMap[p.id], ...p };
+        }
+    });
+
+    const allPresets = Object.values(presetMap);
+
+    if (allPresets.length === 0) {
+        container.innerHTML = `<span style="font-size: 0.8rem; color: var(--text-muted); font-style: italic;">${isAr ? 'لا توجد اختصارات حالياً. اضغط على "+ إضافة اختصار" لإضافة اختصاراتك الخاصة.' : 'No shortcuts currently. Click "+ Add Preset" to create shortcuts.'}</span>`;
+        return;
+    }
+
+    container.innerHTML = allPresets.map(p => {
+        const safeTitle = typeof escapeHtml === 'function' ? escapeHtml(p.title) : p.title;
+        const displayTitle = safeTitle.replace(/'/g, "\\'");
+        const amtStr = (p.amount || 'daily').replace(/'/g, "\\'");
+
+        return `
+            <div style="display: inline-flex; align-items: center; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 2px 4px 2px 8px; gap: 4px; box-shadow: var(--shadow-sm);">
+                <button type="button" onclick="fillConstantTaskPreset('${displayTitle}', '${amtStr}')" style="background: none; border: none; font-size: 0.8rem; font-weight: 800; color: var(--text-main); cursor: pointer; padding: 4px 2px;" title="${isAr ? 'اضغط لتعبئة هذه المهمة' : 'Click to use shortcut'}">
+                    ${safeTitle}
+                </button>
+                <button type="button" onclick="toggleConstantTaskPresetForm('${p.id}')" style="background: none; border: none; color: #6366f1; cursor: pointer; font-size: 0.78rem; padding: 2px 4px;" title="${isAr ? 'تعديل الاختصار' : 'Edit shortcut'}">✏️</button>
+                <button type="button" onclick="deleteConstantTaskPreset('${p.id}', '${displayTitle}')" style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.78rem; padding: 2px 4px;" title="${isAr ? 'حذف الاختصار' : 'Delete shortcut'}">✖</button>
+            </div>
+        `;
+    }).join('');
+}
+window.renderConstantTaskPresets = renderConstantTaskPresets;
+
 function addConstantTask() {
     const isAr = currentAppLang === 'ar';
     const workerSelect = document.getElementById('constant-task-worker-select');
@@ -2225,6 +2391,9 @@ function renderConstantTasks() {
     const isAr = currentAppLang === 'ar';
     const companyData = getCompanyData();
     const workers = companyData.workers || [];
+
+    // Automatically render preset shortcuts
+    renderConstantTaskPresets();
 
     // 1. Populate Manager Worker Select dropdown
     const select = document.getElementById('constant-task-worker-select');
