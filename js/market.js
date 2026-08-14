@@ -1725,30 +1725,18 @@ function toggleMarketProductVisibility(productId) {
 
     renderMarket();
 
-    const updates = {};
-    updates[`marketProducts/${productId}/id`] = productId;
-    updates[`marketProducts/${productId}/isHidden`] = newHiddenState;
-    updates[`marketProducts/${productId}/hidden`] = newHiddenState;
-    updates[`marketProducts/${productId}/updatedAt`] = now;
-    ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
-        updates[`companies/${c}/marketProducts/${productId}/id`] = productId;
-        updates[`companies/${c}/marketProducts/${productId}/isHidden`] = newHiddenState;
-        updates[`companies/${c}/marketProducts/${productId}/hidden`] = newHiddenState;
-        updates[`companies/${c}/marketProducts/${productId}/updatedAt`] = now;
-    });
-
-    if (typeof db !== 'undefined') {
-        db.ref().update(updates).then(() => {
+    saveMarketProductToFirebase(productId, window.globalMarketProductsCache[productId] || prod)
+        .then(() => {
             renderMarket();
             showInAppNotification(newHiddenState
                 ? (isAr ? 'تم إخفاء المنتج من المتجر (غير ظاهر للزبائن)' : 'Product hidden from market')
                 : (isAr ? 'تم إظهار المنتج للزبائن' : 'Product is now visible to customers')
             );
-        }).catch(err => {
+        })
+        .catch(err => {
             console.error("Error toggling product visibility:", err);
             renderMarket();
         });
-    }
 }
 window.toggleMarketProductVisibility = toggleMarketProductVisibility;
 
@@ -2240,27 +2228,24 @@ function addMarketProduct() {
         createdBy: (typeof currentUser !== 'undefined' && currentUser && currentUser.email) ? currentUser.email : 'Admin'
     };
 
-    const updates = {};
-    updates[`marketProducts/${productId}`] = productObj;
-    ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
-        updates[`companies/${c}/marketProducts/${productId}`] = productObj;
-    });
-
-    db.ref().update(updates).then(() => {
-        nameEl.value = '';
-        priceEl.value = '';
-        if (weightEl) weightEl.value = '';
-        if (imageEl) imageEl.value = '';
-        const previewContainer = document.getElementById('market-img-preview-add');
-        if (previewContainer) previewContainer.style.display = 'none';
-        window.globalMarketProductsCache[productId] = productObj;
-        renderMarket();
-        closeAddMarketProductModal();
-        showInAppNotification(isAr ? 'تم نشر المنتج بنجاح!' : 'Market product published successfully!');
-    }).catch(err => {
-        console.error("Error adding market product:", err);
-        alert(isAr ? 'حدث خطأ أثناء إضافة المنتج.' : 'Error adding market product.');
-    });
+    saveMarketProductToFirebase(productId, productObj)
+        .then(() => {
+            nameEl.value = '';
+            priceEl.value = '';
+            if (weightEl) weightEl.value = '';
+            if (imageEl) imageEl.value = '';
+            const previewContainer = document.getElementById('market-img-preview-add');
+            if (previewContainer) previewContainer.style.display = 'none';
+            if (!window.globalMarketProductsCache) window.globalMarketProductsCache = {};
+            window.globalMarketProductsCache[productId] = productObj;
+            renderMarket();
+            closeAddMarketProductModal();
+            showInAppNotification(isAr ? 'تم نشر المنتج بنجاح!' : 'Market product published successfully!');
+        })
+        .catch(err => {
+            console.error("Error adding market product:", err);
+            alert(isAr ? 'حدث خطأ أثناء إضافة المنتج.' : 'Error adding market product.');
+        });
 }
 window.addMarketProduct = addMarketProduct;
 
@@ -2395,21 +2380,15 @@ function saveEditedMarketProduct() {
     renderMarket();
     closeEditMarketProductModal();
 
-    const updates = {};
-    updates[`marketProducts/${id}`] = updateObj;
-    ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
-        updates[`companies/${c}/marketProducts/${id}`] = updateObj;
-    });
-
-    if (typeof db !== 'undefined') {
-        db.ref().update(updates).then(() => {
+    saveMarketProductToFirebase(id, updateObj)
+        .then(() => {
             renderMarket();
             showInAppNotification(isAr ? 'تم تحديث المنتج بنجاح!' : 'Product updated successfully!');
-        }).catch(err => {
+        })
+        .catch(err => {
             console.error("Error saving edited product:", err);
             alert(isAr ? 'حدث خطأ أثناء حفظ التعديلات.' : 'Error saving product updates.');
         });
-    }
 }
 window.saveEditedMarketProduct = saveEditedMarketProduct;
 
@@ -2439,17 +2418,17 @@ function deleteMarketProduct(productId) {
         window.currentMarketFilteredProducts = window.currentMarketFilteredProducts.filter(p => p && p.id !== productId);
     }
 
-    db.ref().update(updates).then(() => {
-        if (typeof showInAppNotification === 'function') {
-            showInAppNotification(isAr ? 'تم حذف المنتج بنجاح!' : 'Product deleted successfully!');
-        }
-        if (typeof renderMarket === 'function') {
-            renderMarket();
-        }
-    }).catch(err => {
-        console.error("Error deleting market product:", err);
-        alert(isAr ? 'حدث خطأ أثناء الحذف.' : 'Error deleting product.');
-    });
+    saveMarketProductToFirebase(productId, null)
+        .then(() => {
+            if (typeof renderMarket === 'function') renderMarket();
+            if (typeof showInAppNotification === 'function') {
+                showInAppNotification(isAr ? 'تم حذف المنتج بنجاح!' : 'Product deleted successfully!');
+            }
+        })
+        .catch(err => {
+            console.error("Error deleting market product:", err);
+            alert(isAr ? 'حدث خطأ أثناء الحذف.' : 'Error deleting product.');
+        });
 }
 window.deleteMarketProduct = deleteMarketProduct;
 
@@ -3072,4 +3051,41 @@ function isMarketAdmin() {
     return isRoleAdmin || hasBodyClass || hasPerm;
 }
 window.isMarketAdmin = isMarketAdmin;
+
+
+
+// =====================================================================
+// RESILIENT FIREBASE MARKET PERSISTENCE HELPER (PRIMARY + BACKGROUND SYNC)
+// =====================================================================
+function saveMarketProductToFirebase(productId, dataObjOrNull) {
+    if (typeof db === 'undefined' || !productId) return Promise.resolve();
+
+    const isDelete = (dataObjOrNull === null);
+    const primaryComp = currentCompany || 'mvc';
+    const targetPath = `companies/${primaryComp}/marketProducts/${productId}`;
+
+    const primaryPromise = isDelete
+        ? db.ref(targetPath).remove()
+        : db.ref(targetPath).set(dataObjOrNull);
+
+    return primaryPromise.then(() => {
+        const secondaryUpdates = {};
+        if (isDelete) {
+            secondaryUpdates[`marketProducts/${productId}`] = null;
+            ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
+                if (c !== primaryComp) secondaryUpdates[`companies/${c}/marketProducts/${productId}`] = null;
+            });
+        } else {
+            secondaryUpdates[`marketProducts/${productId}`] = dataObjOrNull;
+            ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
+                if (c !== primaryComp) secondaryUpdates[`companies/${c}/marketProducts/${productId}`] = dataObjOrNull;
+            });
+        }
+
+        db.ref().update(secondaryUpdates).catch(err => {
+            console.log("Secondary market sync notice (handled gracefully):", err.message);
+        });
+    });
+}
+window.saveMarketProductToFirebase = saveMarketProductToFirebase;
 
