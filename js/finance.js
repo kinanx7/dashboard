@@ -3046,6 +3046,15 @@ function getSystemViolationLogsForMonth(worker, monthStr) {
 
 function checkWorkerSystemViolationAlerts(worker) {
     if (!worker) return;
+
+    // ONLY show the alert overlay if current user is linked to this target worker profile
+    const currentUserEmail = (typeof currentUser !== 'undefined' && currentUser && currentUser.email) ? currentUser.email.toLowerCase() : '';
+    const workerEmail = worker.email ? worker.email.toLowerCase() : '';
+    if (currentUserEmail !== workerEmail) {
+        // Manager or admin applied the violation - DO NOT display popup on manager screen!
+        return;
+    }
+
     const count = (worker.systemViolations || []).length;
     const ack = worker.alertsAcknowledged || {};
 

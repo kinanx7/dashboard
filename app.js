@@ -7726,7 +7726,7 @@ function renderTasks() {
 
         // Render Spy Inaction Alerts & Escalation Reports for Admins / Managers
         if (canEditTask) {
-            const inactionTasks = allTracked.filter(tt => tt && !tt.alertDismissed && (tt.spyInactionAlertSent || tt.status === 'reported' || tt.status === 'violated'));
+            const inactionTasks = allTracked.filter(tt => tt && !tt.alertDismissed && (tt.spyInactionAlertSent || tt.status === 'reported' || tt.status === 'violated' || tt.status === 'violated_system'));
             if (inactionTasks.length > 0) {
                 const alertCard = document.createElement('div');
                 alertCard.className = "card";
@@ -7741,23 +7741,53 @@ function renderTasks() {
                     let alertType = '';
                     let customReportMsg = '';
                     const vAmt = tt.violationAmount || 50;
+
+                    const reportTs = tt.reportedAt || tt.inactionAlertAt || tt.violatedAt || tt.createdAt;
+                    const reportDateStr = reportTs ? new Date(reportTs).toLocaleString(isAr ? 'ar-EG' : 'en-US', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+
                     if (tt.status === 'reported') {
                         alertType = `<span class="badge" style="background:#f59e0b; color:white;">📢 ${isAr ? 'بلاغ مراقب عن عدم التزام موظف' : 'Worker Reported by Spy'}</span>`;
                     } else if (tt.status === 'violated') {
-                        alertType = `<span class="badge" style="background:#dc2626; color:white;">⚖️ ${isAr ? `مخالفة ${vAmt} SAR` : `${vAmt} SAR Violation Applied`}</span>`;
+                        alertType = `<span class="badge" style="background:#dc2626; color:white;">⚖️ ${isAr ? `مخالفة عادية (${vAmt} SAR)` : `${vAmt} SAR Violation Applied`}</span>`;
+                    } else if (tt.status === 'violated_system') {
+                        alertType = `<span class="badge" style="background:#7c3aed; color:white;">🚨 ${isAr ? 'مخالفة نظامية' : 'System Violation Applied'}</span>`;
                     } else if (tt.spyInactionAlertSent) {
                         alertType = `<span class="badge" style="background:#ef4444; color:white;">🚨 ${isAr ? 'بلاغ تقاعس المراقب' : 'Spy Inaction Report'}</span>`;
                         customReportMsg = `<div style="font-weight:800; color:#ef4444; font-size:0.9rem; margin-top:4px;">🚨 ${isAr ? `المراقب ${tt.spyWorkerName} لم يتخذ أي إجراء على مهمة "${tt.title}" للموظف ${tt.workerName}` : `Spy ${tt.spyWorkerName} didn't take any action on task "${tt.title}" assigned to worker ${tt.workerName}`}</div>`;
                     }
 
-                    alertHtml += `
-                        <div style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:14px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                            <div style="flex:1;">
-                                <div style="margin-bottom:4px;">${alertType} <strong style="font-size:0.95rem; color:var(--text-main); margin-left:6px;">${tt.title}</strong></div>
-                                <div style="font-size:0.8rem; color:var(--text-muted);">👤 ${isAr ? 'المنفذ:' : 'Worker:'} <strong>${tt.workerName}</strong> | 🕵️ ${isAr ? 'المراقب:' : 'Spy:'} <strong>${tt.spyWorkerName}</strong></div>
-                                ${customReportMsg}
+                    let managerActionButtons = '';
+                    if (tt.status === 'reported' || (tt.spyInactionAlertSent && tt.status !== 'violated' && tt.status !== 'violated_system')) {
+                        managerActionButtons = `
+                            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border-color);" onclick="event.stopPropagation()">
+                                <button type="button" onclick="managerApplyTrackedViolation('${tt.id}')" class="btn-danger" style="padding:8px 16px; border-radius:8px; font-weight:800; font-size:0.82rem; background:linear-gradient(135deg, #dc2626, #991b1b); color:white; border:none; cursor:pointer; flex:1; min-width:140px;">
+                                    ⚖️ ${isAr ? `تطبيق المخالفة العادية (${vAmt} SAR)` : `Apply Violation (${vAmt} SAR)`}
+                                </button>
+                                <button type="button" onclick="managerApplyTrackedSystemViolation('${tt.id}')" class="btn-danger" style="padding:8px 16px; border-radius:8px; font-weight:800; font-size:0.82rem; background:linear-gradient(135deg, #7c3aed, #4c1d95); color:white; border:none; cursor:pointer; flex:1; min-width:160px;">
+                                    🚨 ${isAr ? 'تطبيق مخالفة نظامية' : 'Apply System Violation'}
+                                </button>
                             </div>
-                            <button type="button" onclick="dismissTrackedTaskAlert('${tt.id}')" style="background:rgba(239, 68, 68, 0.15); border:1px solid rgba(239, 68, 68, 0.4); color:#ef4444; cursor:pointer; font-size:1.1rem; padding:6px 12px; border-radius:8px; font-weight:800;" title="${isAr ? 'حذف / إخفاء التنبيه' : 'Dismiss Alert'}">✖</button>
+                        `;
+                    }
+
+                    alertHtml += `
+                        <div style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; padding:14px; margin-bottom:10px; cursor:pointer;" onclick="openTrackedTaskAuditModal('${tt.id}')" title="${isAr ? 'انقر لفتح التقرير الزمني والتفصيلي الشامل' : 'Click to open detailed audit HUD timeline'}">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                                <div style="flex:1;">
+                                    <div style="margin-bottom:4px; display:flex; align-items:center; flex-wrap:wrap; gap:6px;">
+                                        ${alertType}
+                                        <strong style="font-size:0.95rem; color:var(--text-main);">${tt.title}</strong>
+                                        <span style="font-size:0.78rem; color:var(--text-muted); font-weight:700; background:var(--input-bg); padding:2px 8px; border-radius:6px; border:1px solid var(--border-color);">🕒 ${reportDateStr}</span>
+                                    </div>
+                                    <div style="font-size:0.8rem; color:var(--text-muted);">👤 ${isAr ? 'المنفذ:' : 'Worker:'} <strong style="color:var(--text-main);">${tt.workerName}</strong> | 🕵️ ${isAr ? 'المراقب:' : 'Spy:'} <strong style="color:var(--text-main);">${tt.spyWorkerName}</strong></div>
+                                    ${customReportMsg}
+                                </div>
+                                <div style="display:flex; align-items:center; gap:8px;" onclick="event.stopPropagation()">
+                                    <button type="button" onclick="openTrackedTaskAuditModal('${tt.id}')" class="btn-outline" style="padding:6px 12px; border-radius:8px; font-weight:800; font-size:0.8rem; cursor:pointer; border:1px solid #3b82f6; color:#3b82f6; background:rgba(59,130,246,0.1);">📊 ${isAr ? 'الجدول الزمني' : 'Audit Timeline'}</button>
+                                    <button type="button" onclick="dismissTrackedTaskAlert('${tt.id}')" style="background:rgba(239, 68, 68, 0.15); border:1px solid rgba(239, 68, 68, 0.4); color:#ef4444; cursor:pointer; font-size:1.1rem; padding:6px 12px; border-radius:8px; font-weight:800;" title="${isAr ? 'حذف / إخفاء التنبيه' : 'Dismiss Alert'}">✖</button>
+                                </div>
+                            </div>
+                            ${managerActionButtons}
                         </div>
                     `;
                 });
@@ -7924,22 +7954,41 @@ function renderTasks() {
             let urgencyBadge = j.urgency === 'urgent' ? `<span class="badge" style="background:var(--danger); margin-left:8px;">🔴 ${t('opt-urgency-high').replace('🔴 ', '')}</span>` : '';
             let timeInfoHtml = '';
 
-            if (status === 'completed' || j.done) {
+            const tt = (data.trackedTasks && (j.trackedTaskId || j.id)) ? data.trackedTasks[j.trackedTaskId || j.id] : null;
+            const effectiveStatus = tt ? tt.status : (j.status || (j.done ? 'completed' : 'assigned'));
+
+            let rejBadgesHtml = '';
+            if (tt && tt.rejectionCount > 0) {
+                rejBadgesHtml = `<span class="badge" style="background:#ef4444; color:white; margin-left:6px;" title="${isAr ? `مرفوضة ${tt.rejectionCount} مرة من المراقب` : `Rejected ${tt.rejectionCount} time(s) by spy`}">${'❌'.repeat(tt.rejectionCount)}</span>`;
+            }
+
+            if (effectiveStatus === 'completed' || j.done) {
                 statusBadge = `<span class="badge badge-good">${t('btn-mark-completed').replace('✅ ', '')} ✅</span>`;
                 actionHtml = isAdmin ? `<button onclick="toggleTaskDone('${worker.id}', '${j.id}')" class="btn-outline" style="font-size:0.75rem; padding:4px 8px;">${t('btn-undo-action')}</button>` : '';
-                if (j.completedAt) {
-                    timeInfoHtml = `<div style="font-size:0.75rem; color:var(--success); margin-top:4px;">${t('label-finished')} ${new Date(j.completedAt).toLocaleTimeString()}</div>`;
+                if (j.completedAt || (tt && tt.confirmedAt)) {
+                    timeInfoHtml = `<div style="font-size:0.75rem; color:var(--success); margin-top:4px;">${t('label-finished')} ${new Date(j.completedAt || tt.confirmedAt).toLocaleTimeString()}</div>`;
                 }
-            } else if (status === 'pending_spy_verification') {
+            } else if (effectiveStatus === 'reported') {
+                statusBadge = `<span class="badge" style="background:#f59e0b; color:white;">📢 ${isAr ? 'تم الإبلاغ للإدارة' : 'Reported to Manager'}</span>`;
+                actionHtml = `<span style="font-size:0.8rem; color:#f59e0b; font-weight:700;">📢 ${isAr ? 'تم تصعيد البلاغ للإدارة من قبل المراقب' : 'Reported to manager by spy worker'}</span>`;
+            } else if (effectiveStatus === 'violated' || effectiveStatus === 'violated_system') {
+                const isSys = effectiveStatus === 'violated_system';
+                statusBadge = `<span class="badge" style="background:${isSys ? '#7c3aed' : '#dc2626'}; color:white;">${isSys ? '🚨' : '⚖️'} ${isAr ? (isSys ? 'مخالفة نظامية' : 'تم تطبيق المخالفة') : (isSys ? 'System Violation' : 'Violation Applied')}</span>`;
+                actionHtml = `<span style="font-size:0.8rem; color:${isSys ? '#7c3aed' : '#dc2626'}; font-weight:700;">${isSys ? '🚨' : '⚖️'} ${isAr ? (isSys ? 'تم تطبيق مخالفة نظامية على الموظف' : 'تم خصم المخالفة من إحصائيات الموظف') : 'Violation recorded for non-compliance'}</span>`;
+            } else if (effectiveStatus === 'pending_spy_verification') {
                 if (isAdmin) {
-                    statusBadge = `<span class="badge" style="background:var(--warning); color:#000;">⏳ ${isAr ? 'قيد التنفيذ' : 'Pending'}</span>`;
-                    actionHtml = `<span style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">${isAr ? 'المهمة قيد التنفيذ والمتابعة...' : 'Task in progress...'}</span>`;
+                    statusBadge = `<span class="badge" style="background:#f59e0b; color:white;">🕵️ ${isAr ? 'تم التسليم (بانتظار تأكيد السباي)' : 'Submitted (Awaiting Spy)'}</span>`;
+                    actionHtml = `<span style="font-size:0.8rem; color:#f59e0b; font-weight:700;">🕵️ ${isAr ? 'بانتظار تحقق المراقب الميداني' : 'Awaiting spy verification'} (${tt ? tt.spyWorkerName : (j.spyWorkerName || '')})</span>`;
                 } else {
                     statusBadge = `<span class="badge" style="background:#f59e0b; color:white;">🕵️ ${isAr ? 'قيد التحقق الميداني' : 'Pending Spy Verification'}</span>`;
                     actionHtml = `<span style="font-size:0.8rem; color:#f59e0b; font-weight:700;">🕵️ ${isAr ? 'تم الإرسال للمراقب' : 'Sent to Spy Worker'} (${j.spyWorkerName || ''})</span>`;
                 }
-            } else if (status === 'seen') {
-                statusBadge = `<span class="badge" style="background:var(--warning); color:#000;">👀 ${t('status-pending-sm').replace('⏳ ', '')}</span>`;
+            } else if (effectiveStatus === 'seen') {
+                if (tt && tt.rejectionCount > 0) {
+                    statusBadge = `<span class="badge" style="background:#ef4444; color:white;">❌ ${isAr ? 'مرفوضة من المراقب' : 'Rejected by Spy'}</span>`;
+                } else {
+                    statusBadge = `<span class="badge" style="background:var(--warning); color:#000;">👀 ${t('status-pending-sm').replace('⏳ ', '')}</span>`;
+                }
                 if (isAssignedToMe) {
                     if (j.isTracked || j.trackedTaskId) {
                         actionHtml = `<button onclick="finishTrackedTask('${j.trackedTaskId || j.id}')" class="btn-success" style="font-size:0.8rem; padding:6px 12px; width:100%; font-weight:800;">✅ ${isAr ? 'تم إنجاز المهمة (Done)' : 'Done'}</button>`;
@@ -7948,8 +7997,9 @@ function renderTasks() {
                     }
                 }
 
-                if (j.deadlineMins > 0 && j.seenAt) {
-                    const deadlineMs = j.seenAt + (j.deadlineMins * 60000);
+                if (j.deadlineMins > 0 && (j.seenAt || (tt && tt.seenAt))) {
+                    const seenTime = j.seenAt || (tt ? tt.seenAt : Date.now());
+                    const deadlineMs = seenTime + (j.deadlineMins * 60000);
                     timeInfoHtml = `<div class="task-timer-display" data-deadline="${deadlineMs}" style="font-size:0.85rem; font-weight:600; margin-top:4px;"></div>`;
                 } else if (j.seenAt) {
                     timeInfoHtml = `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">${t('label-started')} ${new Date(j.seenAt).toLocaleTimeString()}</div>`;
@@ -9054,6 +9104,221 @@ function dismissTrackedTaskAlert(taskId) {
 }
 window.dismissTrackedTaskAlert = dismissTrackedTaskAlert;
 
+function managerApplyTrackedViolation(taskId) {
+    if (typeof spyApplyViolation === 'function') {
+        spyApplyViolation(taskId);
+    }
+}
+window.managerApplyTrackedViolation = managerApplyTrackedViolation;
+
+function managerApplyTrackedSystemViolation(taskId) {
+    const isAr = currentAppLang === 'ar';
+    const companyData = getCompanyData();
+    const trackedTasks = companyData.trackedTasks || {};
+    const task = trackedTasks[taskId];
+    if (!task) return;
+
+    if (!confirm(isAr ? `هل أنت متأكد من تطبيق مخالفة نظامية على الموظف ${task.workerName} بسبب عدم الالتزام بالمهمة المتتبعة؟` : `Are you sure you want to apply a System Violation to worker ${task.workerName}?`)) return;
+
+    const workers = companyData.workers || [];
+    const workerIndex = workers.findIndex(w => String(w.id) === String(task.workerId));
+    if (workerIndex === -1) {
+        alert(isAr ? 'عذراً، لم يتم العثور على ملف الموظف' : 'Error: Worker profile not found');
+        return;
+    }
+
+    const worker = workers[workerIndex];
+    let sysViolList = worker.systemViolations || [];
+    if (!Array.isArray(sysViolList)) sysViolList = Object.values(sysViolList);
+
+    const newSysViol = {
+        id: 'sv-' + Date.now().toString(),
+        reason: isAr ? `مخالفة نظامية - تقاعس/عدم تنفيذ المهمة المتتبعة: "${task.title}"` : `System Violation - Tracked Task Non-Compliance: "${task.title}"`,
+        timestamp: Date.now()
+    };
+
+    sysViolList.push(newSysViol);
+    const newCount = sysViolList.length;
+
+    let alertsAck = worker.alertsAcknowledged || {};
+    if (newCount === 1) alertsAck.warning1 = false;
+    if (newCount === 2) alertsAck.warning2 = false;
+
+    task.status = 'violated_system';
+    task.finalAction = 'system_violation';
+    task.violatedAt = Date.now();
+
+    const updates = {};
+    updates[`companies/${currentCompany}/trackedTasks/${taskId}`] = task;
+    updates[`companies/${currentCompany}/workers/${workerIndex}/systemViolations`] = sysViolList;
+    updates[`companies/${currentCompany}/workers/${workerIndex}/alertsAcknowledged`] = alertsAck;
+    if (newCount >= 6) {
+        updates[`companies/${currentCompany}/workers/${workerIndex}/unlockedClose`] = false;
+    }
+
+    db.ref().update(updates)
+        .then(() => {
+            if (typeof logActivity === 'function') {
+                logActivity('violation', worker.id, worker.name, `Manager applied SYSTEM VIOLATION (${newCount}/6) to ${worker.name} for tracked task "${task.title}"`);
+            }
+            if (typeof checkWorkerSystemViolationAlerts === 'function') {
+                worker.systemViolations = sysViolList;
+                checkWorkerSystemViolationAlerts(worker);
+            }
+            alert(isAr ? `تم تطبيق مخالفة نظامية (${newCount}/6) على الموظف ${worker.name} بنجاح!` : `System Violation (${newCount}/6) applied to worker ${worker.name} successfully!`);
+            renderTasks();
+        })
+        .catch(err => console.error("Error applying system violation:", err));
+}
+window.managerApplyTrackedSystemViolation = managerApplyTrackedSystemViolation;
+
+function openTrackedTaskAuditModal(taskId) {
+    const isAr = currentAppLang === 'ar';
+    const companyData = getCompanyData();
+    const trackedTasks = companyData.trackedTasks || {};
+    const task = trackedTasks[taskId];
+    if (!task) {
+        alert(isAr ? 'لم يتم العثور على سجل المهمة المتتبعة' : 'Tracked task log not found');
+        return;
+    }
+
+    let existingModal = document.getElementById('tracked-task-audit-modal');
+    if (existingModal) existingModal.remove();
+
+    const formatFullDateTime = (ts) => {
+        if (!ts) return null;
+        return new Date(ts).toLocaleString(isAr ? 'ar-SA' : 'en-US', {
+            weekday: 'short',
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    };
+
+    const createdTimeStr = formatFullDateTime(task.createdAt) || 'N/A';
+    const seenTimeStr = formatFullDateTime(task.seenAt) || (isAr ? '⏳ لم يطلع عليها الموظف بعد' : '⏳ Worker has not viewed task yet');
+    const finishedTimeStr = formatFullDateTime(task.finishedAt) || (isAr ? '⏳ لم يكملها الموظف بعد' : '⏳ Worker has not completed task yet');
+    const reportedTimeStr = formatFullDateTime(task.reportedAt || task.inactionAlertAt) || (isAr ? 'لم يتم رفعه للإدارة' : 'Not reported to manager');
+    const actionTimeStr = formatFullDateTime(task.violatedAt || task.confirmedAt) || (isAr ? 'بانتظار إجراء الإدارة' : 'Pending manager action');
+
+    // Build rejection history HTML
+    let rejHtml = '';
+    if (task.rejectionHistory && task.rejectionHistory.length > 0) {
+        rejHtml = task.rejectionHistory.map((rej, idx) => `
+            <div style="background:rgba(239, 68, 68, 0.08); border:1px solid rgba(239, 68, 68, 0.3); border-radius:8px; padding:8px 12px; margin-bottom:6px; font-size:0.85rem;">
+                <div style="font-weight:800; color:#ef4444;">❌ ${isAr ? `الرفض رقم #${rej.count || (idx + 1)} من المراقب:` : `Rejection #${rej.count || (idx + 1)} by Spy:`} ${rej.spyWorkerName || task.spyWorkerName}</div>
+                <div style="font-size:0.78rem; color:var(--text-muted); margin-top:2px;">🕒 ${formatFullDateTime(rej.rejectedAt)}</div>
+            </div>
+        `).join('');
+    } else {
+        rejHtml = `<div style="font-size:0.85rem; color:var(--text-muted); font-style:italic;">${isAr ? 'لا توجد مرفوضات سابقة من المراقب.' : 'No rejections by spy worker.'}</div>`;
+    }
+
+    let finalActionBadge = '';
+    if (task.status === 'completed') {
+        finalActionBadge = `<span class="badge" style="background:#10b981; color:white;">✅ ${isAr ? 'تم تأكيد الإنجاز من المراقب' : 'Confirmed Done by Spy'}</span>`;
+    } else if (task.status === 'violated') {
+        finalActionBadge = `<span class="badge" style="background:#dc2626; color:white;">⚖️ ${isAr ? `تطبيق مخالفة عادية (${task.violationAmount || 50} SAR)` : `Monetary Violation (${task.violationAmount || 50} SAR)`}</span>`;
+    } else if (task.status === 'violated_system') {
+        finalActionBadge = `<span class="badge" style="background:#7c3aed; color:white;">🚨 ${isAr ? 'تطبيق مخالفة نظامية' : 'System Violation'}</span>`;
+    } else {
+        finalActionBadge = `<span class="badge" style="background:#f59e0b; color:white;">⏳ ${isAr ? 'بانتظار الإجراء' : 'Pending Action'}</span>`;
+    }
+
+    const modal = document.createElement('div');
+    modal.id = 'tracked-task-audit-modal';
+    modal.style = `
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center;
+        z-index: 99999; padding: 20px; backdrop-filter: blur(6px);
+    `;
+
+    modal.innerHTML = `
+        <div class="card" style="max-width: 650px; width: 100%; max-height: 90vh; overflow-y: auto; background: var(--card-bg); border: 2px solid #f59e0b; border-radius: 16px; padding: 24px; box-shadow: var(--shadow-lg);">
+            <div class="flex-between" style="align-items: center; margin-bottom: 16px; border-bottom: 1px dashed var(--border-color); padding-bottom: 12px;">
+                <h3 style="margin: 0; color: #f59e0b; font-size: 1.2rem; display: flex; align-items: center; gap: 8px;">
+                    📊 ${isAr ? 'تقرير تتبع المهمة الميدانية والجدول الزمني' : 'Tracked Task Audit Log & Timeline HUD'}
+                </h3>
+                <button type="button" onclick="document.getElementById('tracked-task-audit-modal').remove()" style="background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; font-weight: 800;">✕</button>
+            </div>
+
+            <!-- Task Meta -->
+            <div style="background: var(--input-bg); border-radius: 10px; padding: 14px; margin-bottom: 16px; border: 1px solid var(--border-color);">
+                <div style="font-size: 1.08rem; font-weight: 800; color: var(--text-main); margin-bottom: 6px;">📌 ${task.title}</div>
+                <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px;">
+                    <span>👤 ${isAr ? 'المنفذ:' : 'Target Worker:'} <strong style="color:var(--text-main);">${task.workerName}</strong></span>
+                    <span>🕵️ ${isAr ? 'المراقب:' : 'Spy Worker:'} <strong style="color:var(--text-main);">${task.spyWorkerName}</strong></span>
+                    <span>⚖️ ${isAr ? 'المبلغ المحدد:' : 'Penalty Rate:'} <strong style="color:#ef4444;">${task.violationAmount || 50} SAR</strong></span>
+                </div>
+                <div>${finalActionBadge}</div>
+            </div>
+
+            <!-- Timeline Stepper -->
+            <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                    <div style="background: #3b82f6; color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; flex-shrink: 0; font-size: 0.85rem;">1</div>
+                    <div style="flex: 1; background: var(--input-bg); padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color);">
+                        <div style="font-weight: 800; color: #3b82f6; font-size: 0.88rem;">📤 ${isAr ? 'وقت إرسال وإسناد المهمة' : 'Task Sent & Assigned'}</div>
+                        <div style="font-size: 0.82rem; color: var(--text-main); margin-top: 2px;">🕒 ${createdTimeStr}</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                    <div style="background: #06b6d4; color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; flex-shrink: 0; font-size: 0.85rem;">2</div>
+                    <div style="flex: 1; background: var(--input-bg); padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color);">
+                        <div style="font-weight: 800; color: #06b6d4; font-size: 0.88rem;">👁️ ${isAr ? 'وقت الاطلاع والقبول من الموظف' : 'Task Viewed / Accepted by Worker'}</div>
+                        <div style="font-size: 0.82rem; color: var(--text-main); margin-top: 2px;">🕒 ${seenTimeStr}</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                    <div style="background: #10b981; color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; flex-shrink: 0; font-size: 0.85rem;">3</div>
+                    <div style="flex: 1; background: var(--input-bg); padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color);">
+                        <div style="font-weight: 800; color: #10b981; font-size: 0.88rem;">🏁 ${isAr ? 'وقت إكمال المهمة ورفعها للمراقب' : 'Task Finished & Submitted to Spy'}</div>
+                        <div style="font-size: 0.82rem; color: var(--text-main); margin-top: 2px;">🕒 ${finishedTimeStr}</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                    <div style="background: #f59e0b; color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; flex-shrink: 0; font-size: 0.85rem;">4</div>
+                    <div style="flex: 1; background: var(--input-bg); padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color);">
+                        <div style="font-weight: 800; color: #f59e0b; font-size: 0.88rem; margin-bottom: 6px;">🕵️ ${isAr ? 'سجل الرفض والتحقق الميداني من المراقب (Spy)' : 'Spy Rejection & Verification History'}</div>
+                        ${rejHtml}
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                    <div style="background: #ef4444; color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; flex-shrink: 0; font-size: 0.85rem;">5</div>
+                    <div style="flex: 1; background: var(--input-bg); padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color);">
+                        <div style="font-weight: 800; color: #ef4444; font-size: 0.88rem;">📢 ${isAr ? 'وقت رفع البلاغ/التصعيد للإدارة' : 'Report / Escalation Sent to Manager'}</div>
+                        <div style="font-size: 0.82rem; color: var(--text-main); margin-top: 2px;">🕒 ${reportedTimeStr}</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
+                    <div style="background: #7c3aed; color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; flex-shrink: 0; font-size: 0.85rem;">6</div>
+                    <div style="flex: 1; background: var(--input-bg); padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color);">
+                        <div style="font-weight: 800; color: #7c3aed; font-size: 0.88rem;">⚖️ ${isAr ? 'وقت وإجراء القرار النهائي من الإدارة' : 'Final Manager Action & Status'}</div>
+                        <div style="font-size: 0.82rem; color: var(--text-main); margin-top: 2px;">🕒 ${actionTimeStr}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="text-align: right;">
+                <button type="button" onclick="document.getElementById('tracked-task-audit-modal').remove()" class="btn-outline" style="padding: 8px 22px; font-weight: 800; border-radius: 8px; cursor: pointer; background: var(--input-bg);">
+                    ${isAr ? 'إغلاق النافذة' : 'Close'}
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+}
+window.openTrackedTaskAuditModal = openTrackedTaskAuditModal;
+
 function updateTaskTimers() {
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     document.querySelectorAll('.task-timer-display').forEach(el => {
@@ -9118,6 +9383,9 @@ if (typeof spyConfirmTask === 'function') window.spyConfirmTask = spyConfirmTask
 if (typeof spyRejectTask === 'function') window.spyRejectTask = spyRejectTask;
 if (typeof spyReportWorkerToManager === 'function') window.spyReportWorkerToManager = spyReportWorkerToManager;
 if (typeof spyApplyViolation === 'function') window.spyApplyViolation = spyApplyViolation;
+if (typeof managerApplyTrackedViolation === 'function') window.managerApplyTrackedViolation = managerApplyTrackedViolation;
+if (typeof managerApplyTrackedSystemViolation === 'function') window.managerApplyTrackedSystemViolation = managerApplyTrackedSystemViolation;
+if (typeof openTrackedTaskAuditModal === 'function') window.openTrackedTaskAuditModal = openTrackedTaskAuditModal;
 if (typeof checkTrackedTaskInaction === 'function') window.checkTrackedTaskInaction = checkTrackedTaskInaction;
 
 
@@ -14025,6 +14293,15 @@ function getSystemViolationLogsForMonth(worker, monthStr) {
 
 function checkWorkerSystemViolationAlerts(worker) {
     if (!worker) return;
+
+    // ONLY show the alert overlay if current user is linked to this target worker profile
+    const currentUserEmail = (typeof currentUser !== 'undefined' && currentUser && currentUser.email) ? currentUser.email.toLowerCase() : '';
+    const workerEmail = worker.email ? worker.email.toLowerCase() : '';
+    if (currentUserEmail !== workerEmail) {
+        // Manager or admin applied the violation - DO NOT display popup on manager screen!
+        return;
+    }
+
     const count = (worker.systemViolations || []).length;
     const ack = worker.alertsAcknowledged || {};
 
