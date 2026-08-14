@@ -582,17 +582,18 @@ function getAllMarketProducts() {
         p.id = pId;
 
         const h = isProductHidden(p);
+
         if (!map[pId]) {
             map[pId] = { ...p, id: pId, isHidden: h, hidden: h };
         } else {
-            const isHiddenState = isProductHidden(map[pId]) || h;
-            map[pId] = {
-                ...map[pId],
-                ...p,
-                id: pId,
-                isHidden: isHiddenState,
-                hidden: isHiddenState
-            };
+            const existingTs = map[pId].updatedAt || 0;
+            const newTs = p.updatedAt || 0;
+
+            if (newTs >= existingTs) {
+                map[pId] = { ...map[pId], ...p, id: pId, isHidden: h, hidden: h };
+            } else {
+                map[pId].id = pId;
+            }
         }
     };
 
@@ -1688,37 +1689,53 @@ function toggleMarketProductVisibility(productId) {
 
     const isCurrentlyHidden = isProductHidden(prod);
     const newHiddenState = !isCurrentlyHidden;
+    const now = Date.now();
 
     prod.isHidden = newHiddenState;
     prod.hidden = newHiddenState;
+    prod.updatedAt = now;
 
-    if (window.globalMarketProductsCache && window.globalMarketProductsCache[productId]) {
-        window.globalMarketProductsCache[productId].isHidden = newHiddenState;
-        window.globalMarketProductsCache[productId].hidden = newHiddenState;
-        window.globalMarketProductsCache[productId].id = productId;
-        try {
-            localStorage.setItem('mvc_cached_market_products', JSON.stringify(window.globalMarketProductsCache));
-        } catch (e) { }
+    if (!window.globalMarketProductsCache) window.globalMarketProductsCache = {};
+    window.globalMarketProductsCache[productId] = {
+        ...(window.globalMarketProductsCache[productId] || prod),
+        id: productId,
+        isHidden: newHiddenState,
+        hidden: newHiddenState,
+        updatedAt: now
+    };
+
+    if (typeof appData !== 'undefined') {
+        ['mvc', 'mvcfresh', 'burgeroov'].forEach(cKey => {
+            if (appData[cKey]) {
+                if (!appData[cKey].marketProducts) appData[cKey].marketProducts = {};
+                appData[cKey].marketProducts[productId] = {
+                    ...(appData[cKey].marketProducts[productId] || prod),
+                    id: productId,
+                    isHidden: newHiddenState,
+                    hidden: newHiddenState,
+                    updatedAt: now
+                };
+            }
+        });
     }
+
+    try {
+        localStorage.setItem('mvc_cached_market_products', JSON.stringify(window.globalMarketProductsCache));
+    } catch (e) { }
+
+    renderMarket();
 
     const updates = {};
     updates[`marketProducts/${productId}/id`] = productId;
     updates[`marketProducts/${productId}/isHidden`] = newHiddenState;
     updates[`marketProducts/${productId}/hidden`] = newHiddenState;
+    updates[`marketProducts/${productId}/updatedAt`] = now;
     ['mvc', 'mvcfresh', 'burgeroov'].forEach(c => {
         updates[`companies/${c}/marketProducts/${productId}/id`] = productId;
         updates[`companies/${c}/marketProducts/${productId}/isHidden`] = newHiddenState;
         updates[`companies/${c}/marketProducts/${productId}/hidden`] = newHiddenState;
-        if (appData[c] && appData[c].marketProducts) {
-            if (appData[c].marketProducts[productId]) {
-                appData[c].marketProducts[productId].id = productId;
-                appData[c].marketProducts[productId].isHidden = newHiddenState;
-                appData[c].marketProducts[productId].hidden = newHiddenState;
-            }
-        }
+        updates[`companies/${c}/marketProducts/${productId}/updatedAt`] = now;
     });
-
-    renderMarket();
 
     if (typeof db !== 'undefined') {
         db.ref().update(updates).then(() => {
@@ -2344,6 +2361,7 @@ function saveEditedMarketProduct() {
         return;
     }
 
+    const now = Date.now();
     const updateObj = {
         id: id,
         name: name,
@@ -2352,8 +2370,30 @@ function saveEditedMarketProduct() {
         weightTag: weightTag,
         imageUrl: imageUrl,
         isHidden: isHidden,
-        updatedAt: Date.now()
+        hidden: isHidden,
+        updatedAt: now
     };
+
+    // 1. Mutate cache immediately
+    if (!window.globalMarketProductsCache) window.globalMarketProductsCache = {};
+    window.globalMarketProductsCache[id] = { ...updateObj };
+
+    // 2. Mutate appData across all companies immediately
+    if (typeof appData !== 'undefined') {
+        ['mvc', 'mvcfresh', 'burgeroov'].forEach(cKey => {
+            if (appData[cKey]) {
+                if (!appData[cKey].marketProducts) appData[cKey].marketProducts = {};
+                appData[cKey].marketProducts[id] = { ...updateObj };
+            }
+        });
+    }
+
+    try {
+        localStorage.setItem('mvc_cached_market_products', JSON.stringify(window.globalMarketProductsCache));
+    } catch (e) { }
+
+    renderMarket();
+    closeEditMarketProductModal();
 
     const updates = {};
     updates[`marketProducts/${id}`] = updateObj;
@@ -2361,15 +2401,15 @@ function saveEditedMarketProduct() {
         updates[`companies/${c}/marketProducts/${id}`] = updateObj;
     });
 
-    db.ref().update(updates).then(() => {
-        if (window.globalMarketProductsCache) window.globalMarketProductsCache[id] = updateObj;
-        renderMarket();
-        closeEditMarketProductModal();
-        showInAppNotification(isAr ? 'تم تحديث المنتج بنجاح!' : 'Product updated successfully!');
-    }).catch(err => {
-        console.error("Error saving edited product:", err);
-        alert(isAr ? 'حدث خطأ أثناء حفظ التعديلات.' : 'Error saving product updates.');
-    });
+    if (typeof db !== 'undefined') {
+        db.ref().update(updates).then(() => {
+            renderMarket();
+            showInAppNotification(isAr ? 'تم تحديث المنتج بنجاح!' : 'Product updated successfully!');
+        }).catch(err => {
+            console.error("Error saving edited product:", err);
+            alert(isAr ? 'حدث خطأ أثناء حفظ التعديلات.' : 'Error saving product updates.');
+        });
+    }
 }
 window.saveEditedMarketProduct = saveEditedMarketProduct;
 
