@@ -1547,12 +1547,12 @@
                             <div style="background: var(--input-bg); border-radius: 12px; padding: 12px; border: 1px solid var(--border-color); margin-bottom: 16px;">
                                 <label style="font-size: 0.8rem; font-weight: 800; color: var(--text-muted); display: block; margin-bottom: 8px;" data-i18n="label-preset-shortcuts">💡 Fast Preset Responsibilities Shortcuts:</label>
                                 <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                                    <button type="button" onclick="fillConstantTaskPreset('🧹 Cleaning Tables', 'daily', 'cleaning')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);">🧹 Cleaning Tables</button>
-                                    <button type="button" onclick="fillConstantTaskPreset('📦 Uploading & Unloading Staff/Stock', 'daily', 'staff')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);">📦 Uploading Staff/Stock</button>
-                                    <button type="button" onclick="fillConstantTaskPreset('💵 Cashier & POS Operations', 'shift', 'cashier')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);">💵 Cashier & POS</button>
-                                    <button type="button" onclick="fillConstantTaskPreset('👨‍🍳 Kitchen Prep & Sanitization', 'daily', 'kitchen')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);">👨‍🍳 Kitchen Prep</button>
-                                    <button type="button" onclick="fillConstantTaskPreset('🗑️ Waste & Trash Management', '2 times/shift', 'cleaning')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);">🗑️ Waste Disposal</button>
-                                    <button type="button" onclick="fillConstantTaskPreset('📝 Daily Inventory Check', 'end of shift', 'inventory')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);">📝 Daily Inventory</button>
+                                    <button type="button" onclick="fillConstantTaskPreset(typeof currentAppLang !== 'undefined' && currentAppLang==='ar'?'🧹 تنظيف ومسح الطاولات':'🧹 Cleaning Tables', 'daily', 'cleaning')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);" data-i18n="preset-clean-tables">🧹 Cleaning Tables</button>
+                                    <button type="button" onclick="fillConstantTaskPreset(typeof currentAppLang !== 'undefined' && currentAppLang==='ar'?'📦 تحميل وتنزيل العمالة/البضائع':'📦 Uploading & Unloading Staff/Stock', 'daily', 'staff')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);" data-i18n="preset-upload-staff">📦 Uploading Staff/Stock</button>
+                                    <button type="button" onclick="fillConstantTaskPreset(typeof currentAppLang !== 'undefined' && currentAppLang==='ar'?'💵 عمليات الكاشير والنظام':'💵 Cashier & POS Operations', 'shift', 'cashier')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);" data-i18n="preset-cashier-pos">💵 Cashier & POS</button>
+                                    <button type="button" onclick="fillConstantTaskPreset(typeof currentAppLang !== 'undefined' && currentAppLang==='ar'?'👨‍🍳 تحضير وتعقيم المطبخ':'👨‍🍳 Kitchen Prep & Sanitization', 'daily', 'kitchen')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);" data-i18n="preset-kitchen-prep">👨‍🍳 Kitchen Prep</button>
+                                    <button type="button" onclick="fillConstantTaskPreset(typeof currentAppLang !== 'undefined' && currentAppLang==='ar'?'🗑️ تفريغ وتدبير النفايات':'🗑️ Waste & Trash Management', '2 times/shift', 'cleaning')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);" data-i18n="preset-waste-disposal">🗑️ Waste Disposal</button>
+                                    <button type="button" onclick="fillConstantTaskPreset(typeof currentAppLang !== 'undefined' && currentAppLang==='ar'?'📝 الجرد اليومي للمخزون':'📝 Daily Inventory Check', 'end of shift', 'inventory')" style="padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; background: var(--card-bg); border: 1px solid var(--border-color); cursor: pointer; color: var(--text-main);" data-i18n="preset-daily-inventory">📝 Daily Inventory</button>
                                 </div>
                             </div>
 
@@ -1567,11 +1567,11 @@
                                     </div>
                                     <div class="form-group" style="margin-bottom:0;">
                                         <label data-i18n="label-responsibility-title">Responsibility / Task Title</label>
-                                        <input type="text" id="constant-task-title" placeholder="e.g. Clean Dining Tables" required>
+                                        <input type="text" id="constant-task-title" placeholder="e.g. Clean Dining Tables" data-i18n="[placeholder]placeholder-responsibility-title" required>
                                     </div>
                                     <div class="form-group" style="margin-bottom:0;">
                                         <label data-i18n="label-responsibility-amount">Amount / Frequency / Target</label>
-                                        <input type="text" id="constant-task-amount" placeholder="e.g. 3 times per shift, or 50 items">
+                                        <input type="text" id="constant-task-amount" placeholder="e.g. 3 times per shift, or 50 items" data-i18n="[placeholder]placeholder-responsibility-amount">
                                     </div>
                                 </div>
                                 <div style="text-align: right;">
@@ -1651,54 +1651,54 @@
                         <div id="tracked-task-container" class="card task-assign-access-only" style="display: none; margin-bottom: 20px; border-top: 4px solid #f59e0b;">
                             <div class="flex-between" style="align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
                                 <h2 class="card-title" style="margin:0; border:none; padding:0; display:flex; align-items:center; gap:8px;">
-                                    <span>🕵️</span> <span>Assign Tracked Task with Spy Verification</span>
+                                    <span>🕵️</span> <span data-i18n="title-assign-tracked-task">Assign Tracked Task with Spy Verification</span>
                                 </h2>
-                                <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700;">Assign timed task verified physically by a designated Spy Worker.</span>
+                                <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700;" data-i18n="desc-assign-tracked-task">Assign timed task verified physically by a designated Spy Worker.</span>
                             </div>
 
                             <form id="tracked-task-form" onsubmit="event.preventDefault(); addTrackedTask();">
                                 <div class="grid-2-col" style="margin-bottom: 14px;">
                                     <div class="form-group" style="margin-bottom: 0;">
-                                        <label>Target Worker *</label>
+                                        <label data-i18n="label-target-worker">Target Worker *</label>
                                         <select id="tracked-task-worker-select" required style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-weight:700;">
                                             <!-- Populated dynamically -->
                                         </select>
                                     </div>
                                     <div class="form-group" style="margin-bottom: 0;">
-                                        <label>Task Detail / Description *</label>
-                                        <input type="text" id="tracked-task-title" required placeholder="e.g. Clean & Inspect Kitchen Fryers" style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-weight:700;">
+                                        <label data-i18n="label-tracked-task-title">Task Detail / Description *</label>
+                                        <input type="text" id="tracked-task-title" required placeholder="e.g. Clean & Inspect Kitchen Fryers" data-i18n="[placeholder]placeholder-tracked-task-title" style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-weight:700;">
                                     </div>
                                 </div>
 
                                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 14px;">
                                     <div class="form-group" style="margin-bottom: 0;">
-                                        <label>Time to Accept Task (Mins) *</label>
+                                        <label data-i18n="label-time-accept-mins">Time to Accept Task (Mins) *</label>
                                         <input type="number" id="tracked-task-accept-mins" value="15" min="1" required style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-weight:700;">
                                     </div>
                                     <div class="form-group" style="margin-bottom: 0;">
-                                        <label>Time to Finish Task (Mins) *</label>
+                                        <label data-i18n="label-time-finish-mins">Time to Finish Task (Mins) *</label>
                                         <input type="number" id="tracked-task-finish-mins" value="30" min="1" required style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-weight:700;">
                                     </div>
                                     <div class="form-group" style="margin-bottom: 0;">
                                         <div class="flex-between" style="align-items:center; margin-bottom:4px;">
-                                            <label style="margin:0;">Designated Spy Worker *</label>
-                                            <button type="button" onclick="setPermanentSpyWorker()" style="background:none; border:none; color:#f59e0b; font-size:0.75rem; font-weight:800; cursor:pointer; text-decoration:underline;" title="Set currently selected spy as permanent default">⭐ Set Permanent</button>
+                                            <label style="margin:0;" data-i18n="label-designated-spy">Designated Spy Worker *</label>
+                                            <button type="button" onclick="setPermanentSpyWorker()" style="background:none; border:none; color:#f59e0b; font-size:0.75rem; font-weight:800; cursor:pointer; text-decoration:underline;" title="Set currently selected spy as permanent default" data-i18n="btn-set-permanent-spy">⭐ Set Permanent</button>
                                         </div>
                                         <select id="tracked-task-spy-select" required style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-weight:700;">
                                             <!-- Populated dynamically -->
                                         </select>
                                     </div>
                                     <div class="form-group" style="margin-bottom: 0;">
-                                        <label>Time for Spy to Act (Mins) *</label>
+                                        <label data-i18n="label-time-spy-act-mins">Time for Spy to Act (Mins) *</label>
                                         <input type="number" id="tracked-task-spy-mins" value="20" min="1" required style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-weight:700;">
                                     </div>
                                     <div class="form-group" style="margin-bottom: 0;">
-                                        <label>Violation Penalty Amount (SAR) *</label>
+                                        <label data-i18n="label-tracked-violation-amount">Violation Penalty Amount (SAR) *</label>
                                         <input type="number" id="tracked-task-violation-amount" value="50" min="1" required style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-weight:700;">
                                     </div>
                                 </div>
 
-                                <button type="submit" class="btn-warning" style="width: 100%; padding: 12px; font-weight: 900; background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: white; border-radius: 10px; cursor: pointer;">🕵️ Assign Tracked Task</button>
+                                <button type="submit" class="btn-warning" style="width: 100%; padding: 12px; font-weight: 900; background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: white; border-radius: 10px; cursor: pointer;" data-i18n="btn-assign-tracked-task-submit">🕵️ Assign Tracked Task</button>
                             </form>
                         </div>
 
