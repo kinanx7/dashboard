@@ -16574,13 +16574,68 @@ function isReminderAlerting(r, now) {
     return false;
 }
 
-function getReminderColorTheme(daysLeft, isDue, isAr) {
-    if (daysLeft <= 2) {
-        // Red: 0 - 2 days left
+function getReminderOverdueText(deadlineMs, now, isAr) {
+    if (!deadlineMs) return '';
+    const dMs = typeof deadlineMs === 'number' ? deadlineMs : new Date(deadlineMs).getTime();
+    if (isNaN(dMs) || dMs > now) return '';
+
+    const overdueMs = now - dMs;
+    const days = Math.floor(overdueMs / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((overdueMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const mins = Math.floor((overdueMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (days >= 1) {
+        if (hours > 0) {
+            return isAr 
+                ? `متأخر ${days} ${days === 1 ? 'يوم' : (days === 2 ? 'يومين' : 'أيام')} و ${hours} ساعة` 
+                : `${days} day${days > 1 ? 's' : ''} and ${hours} hr${hours > 1 ? 's' : ''} late`;
+        }
+        return isAr 
+            ? `متأخر ${days} ${days === 1 ? 'يوم' : (days === 2 ? 'يومين' : 'أيام')}` 
+            : `${days} day${days > 1 ? 's' : ''} late`;
+    } else if (hours >= 1) {
+        return isAr 
+            ? `متأخر ${hours} ساعة` 
+            : `${hours} hour${hours > 1 ? 's' : ''} late`;
+    } else {
+        const m = Math.max(1, mins);
+        return isAr 
+            ? `متأخر ${m} دقيقة` 
+            : `${m} min${m > 1 ? 's' : ''} late`;
+    }
+}
+window.getReminderOverdueText = getReminderOverdueText;
+
+function toggleRemindersAlerts() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const currentState = localStorage.getItem('mvc_reminders_alerts_enabled') !== 'false';
+    const newState = !currentState;
+    localStorage.setItem('mvc_reminders_alerts_enabled', newState ? 'true' : 'false');
+
+    const msg = newState 
+        ? (isAr ? "🔔 تم تشغيل تنبيهات المواعيد بنجاح!" : "🔔 Reminder alerts turned ON!")
+        : (isAr ? "🔕 تم إيقاف تنبيهات المواعيد." : "🔕 Reminder alerts turned OFF!");
+
+    if (typeof showInAppNotification === 'function') showInAppNotification(msg);
+    if (typeof renderReminders === 'function') renderReminders();
+}
+window.toggleRemindersAlerts = toggleRemindersAlerts;
+
+function getReminderColorTheme(daysLeft, isDue, isAr, r, now) {
+    if (isDue) {
+        const dMs = r ? (r.deadlineMs || (r.deadlineISO ? new Date(r.deadlineISO).getTime() : null)) : null;
+        const overdueText = getReminderOverdueText(dMs, now || Date.now(), isAr);
+        const badgeLabel = overdueText ? `🚨 ${overdueText}` : `🔴 ${isAr ? 'مستحق الآن!' : 'DUE NOW!'}`;
         return {
             border: '2px solid #dc2626',
             bg: 'rgba(220, 38, 38, 0.12)',
-            badge: `<span class="badge" style="background:#dc2626; color:white; font-weight:800; animation:notif-bell 1s infinite alternate;">🔴 ${isDue ? (isAr ? 'مستحق الآن!' : 'DUE NOW!') : (isAr ? '0-2 يوم متبقي' : '0-2 Days Left')}</span>`
+            badge: `<span class="badge" style="background:#dc2626; color:white; font-weight:800; animation:notif-bell 1s infinite alternate;">${badgeLabel}</span>`
+        };
+    } else if (daysLeft <= 2) {
+        return {
+            border: '2px solid #dc2626',
+            bg: 'rgba(220, 38, 38, 0.12)',
+            badge: `<span class="badge" style="background:#dc2626; color:white; font-weight:800;">🔴 ${isAr ? '0-2 يوم متبقي' : '0-2 Days Left'}</span>`
         };
     } else if (daysLeft > 2 && daysLeft <= 5) {
         // Yellow: 3 - 5 days left
@@ -16669,14 +16724,43 @@ function renderReminders() {
         countBadge.textContent = `${remindersList.length} ${isAr ? 'تذكير نشط' : 'Active'}`;
     }
 
-    // Check Due Reminders for Alert Banner
-    const dueReminders = remindersList.filter(r => r.deadlineMs && isReminderAlerting(r, now));
+    // Check Due Reminders for Alert Banner & ON/OFF preference
+    const alertsEnabled = localStorage.getItem('mvc_reminders_alerts_enabled') !== 'false';
+    const dueReminders = remindersList.filter(r => {
+        const dMs = r.deadlineMs || (r.deadlineISO ? new Date(r.deadlineISO).getTime() : 0);
+        return dMs > 0 && isReminderAlerting(r, now);
+    });
+
     const banner = document.getElementById('reminders-due-banner');
     const bannerText = document.getElementById('reminders-due-text');
+    const toggleBtnBanner = document.getElementById('btn-toggle-reminders-alerts');
+    const toggleBtnTop = document.getElementById('btn-toggle-reminders-alerts-top');
 
-    if (dueReminders.length > 0 && banner && bannerText) {
+    const toggleLabel = alertsEnabled
+        ? (isAr ? "🔔 التنبيهات: مُشغّلة (ON)" : "🔔 Alerts: ON")
+        : (isAr ? "🔕 التنبيهات: مُطفأة (OFF)" : "🔕 Alerts: OFF");
+
+    if (toggleBtnBanner) {
+        toggleBtnBanner.innerHTML = toggleLabel;
+        toggleBtnBanner.style.background = alertsEnabled ? 'linear-gradient(135deg, #dc2626, #b91c1c)' : 'var(--card-bg)';
+        toggleBtnBanner.style.color = alertsEnabled ? 'white' : 'var(--text-muted)';
+        toggleBtnBanner.style.border = alertsEnabled ? 'none' : '1px solid var(--border-color)';
+    }
+
+    if (toggleBtnTop) {
+        toggleBtnTop.innerHTML = toggleLabel;
+        toggleBtnTop.style.background = alertsEnabled ? 'rgba(220,38,38,0.15)' : 'var(--input-bg)';
+        toggleBtnTop.style.color = alertsEnabled ? '#dc2626' : 'var(--text-muted)';
+        toggleBtnTop.style.border = alertsEnabled ? '1px solid rgba(220,38,38,0.3)' : '1px solid var(--border-color)';
+    }
+
+    if (dueReminders.length > 0 && alertsEnabled && banner && bannerText) {
         banner.style.display = 'block';
-        const dueTitles = dueReminders.map(r => `• ${r.title}`).join(', ');
+        const dueTitles = dueReminders.map(r => {
+            const dMs = r.deadlineMs || (r.deadlineISO ? new Date(r.deadlineISO).getTime() : 0);
+            const ov = (dMs > 0 && dMs <= now) ? getReminderOverdueText(dMs, now, isAr) : '';
+            return `• ${r.title}${ov ? ` (${ov})` : ''}`;
+        }).join(', ');
         bannerText.textContent = isAr
             ? `لديك (${dueReminders.length}) تذكيرات حان موعد التنبيه عليها: ${dueTitles}`
             : `You have (${dueReminders.length}) reminders with active lead alerts: ${dueTitles}`;
@@ -16696,7 +16780,7 @@ function renderReminders() {
         const isDue = r.deadlineMs <= now;
         const diffMs = (r.deadlineMs || 0) - now;
         const daysLeft = diffMs / (1000 * 60 * 60 * 24);
-        const theme = getReminderColorTheme(daysLeft, isDue, isAr);
+        const theme = getReminderColorTheme(daysLeft, isDue, isAr, r, now);
         const deadlineStr = formatReminderDate(r.deadlineMs, r.deadlineISO);
 
         const leadTimes = r.leadTimes || ['1_2d', '5d', '10d', '15d', '1m'];
@@ -16734,9 +16818,17 @@ function renderReminders() {
                     ${r.note ? `📝 <em>${r.note}</em>` : `<span style="color:var(--text-muted); font-size:0.8rem;">${isAr ? 'بدون وصف إضافي' : 'No extra description'}</span>`}
                 </div>
 
-                <!-- Col 3: Deadline & Alerts -->
+                <!-- Col 3: Deadline & Overdue Lateness Status -->
                 <div style="min-width:0; font-size:0.82rem; color:var(--text-muted);">
                     <div>🕒 <strong>${deadlineStr}</strong></div>
+                    ${(() => {
+                        const dMs = r.deadlineMs || (r.deadlineISO ? new Date(r.deadlineISO).getTime() : 0);
+                        if (dMs > 0 && dMs <= now) {
+                            const ov = getReminderOverdueText(dMs, now, isAr);
+                            return ov ? `<div style="font-size:0.8rem; color:#ef4444; font-weight:900; margin-top:3px; background:rgba(239,68,68,0.15); padding:2px 8px; border-radius:6px; display:inline-block; border:1px solid rgba(239,68,68,0.3);">🚨 ${ov}</div>` : '';
+                        }
+                        return '';
+                    })()}
                     ${r.targetPhone ? `<div style="font-size:0.78rem; margin-top:2px; color:#10b981; font-weight:800;">📱 ${r.targetPhone}</div>` : ''}
                     <div style="font-size:0.75rem; margin-top:2px;">🔔 ${isAr ? 'تنبيه:' : 'Alert:'} <strong>${activeLeadStr || 'None'}</strong></div>
                 </div>
@@ -17032,6 +17124,13 @@ const MARKET_CATEGORY_DEFS = {
         icon: '🌟',
         gradient: 'linear-gradient(135deg, #10b981, #059669)'
     },
+    'hidden': {
+        key: 'hidden',
+        labelEn: '🙈 Hidden Products',
+        labelAr: '🙈 المنتجات المخفية',
+        icon: '🙈',
+        gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #b45309 100%)'
+    },
     'meat': {
         key: 'meat',
         labelEn: '🥩 Meat Products',
@@ -17110,7 +17209,12 @@ function renderMarketCategoryTabs(allProducts) {
     if (!container) return;
 
     const isAr = currentAppLang === 'ar';
+    const isAdmin = typeof isMarketAdmin === 'function' ? isMarketAdmin() : false;
     const categoriesFound = new Set(['all', 'meat', 'veg_fruit', 'fish']);
+
+    if (isAdmin) {
+        categoriesFound.add('hidden');
+    }
 
     (allProducts || []).forEach(p => {
         const cat = getNormalizedProductCategory(p);
@@ -17126,6 +17230,8 @@ function renderMarketCategoryTabs(allProducts) {
         let count = 0;
         if (catKey === 'all') {
             count = (allProducts || []).length;
+        } else if (catKey === 'hidden') {
+            count = (allProducts || []).filter(p => isProductHidden(p)).length;
         } else {
             count = (allProducts || []).filter(p => getNormalizedProductCategory(p) === catKey).length;
         }
@@ -17568,6 +17674,7 @@ function initGlobalMarketProductsListener() {
             } catch (e) { }
 
             if (typeof renderMarket === 'function') {
+                if (window._isTogglingVisibility) return;
                 renderMarket();
             }
         });
@@ -18694,9 +18801,11 @@ window.deleteMarketOrder = deleteMarketOrder;
 function toggleMarketProductVisibility(productId) {
     const isAr = currentAppLang === 'ar';
     const prods = getAllMarketProducts();
-    const prod = prods.find(p => p.id === productId);
+    const prod = prods.find(p => p && p.id === productId);
 
     if (!prod) return;
+
+    window._isTogglingVisibility = true;
 
     const isCurrentlyHidden = isProductHidden(prod);
     const newHiddenState = !isCurrentlyHidden;
@@ -18734,19 +18843,24 @@ function toggleMarketProductVisibility(productId) {
         localStorage.setItem('mvc_cached_market_products', JSON.stringify(window.globalMarketProductsCache));
     } catch (e) { }
 
+    const scrollY = window.scrollY || document.documentElement.scrollTop;
     renderMarket();
+    window.scrollTo({ top: scrollY, behavior: 'instant' });
+
+    if (typeof showInAppNotification === 'function') {
+        showInAppNotification(newHiddenState
+            ? (isAr ? '🙈 تم إخفاء المنتج من المتجر (تم نقله للأسفل)' : '🙈 Product hidden from market (moved to bottom)')
+            : (isAr ? '👁️ تم إظهار المنتج للزبائن' : '👁️ Product is now visible to customers')
+        );
+    }
 
     saveMarketProductToFirebase(productId, window.globalMarketProductsCache[productId] || prod)
         .then(() => {
-            renderMarket();
-            showInAppNotification(newHiddenState
-                ? (isAr ? 'تم إخفاء المنتج من المتجر (غير ظاهر للزبائن)' : 'Product hidden from market')
-                : (isAr ? 'تم إظهار المنتج للزبائن' : 'Product is now visible to customers')
-            );
+            setTimeout(() => { window._isTogglingVisibility = false; }, 1500);
         })
         .catch(err => {
             console.error("Error toggling product visibility:", err);
-            renderMarket();
+            window._isTogglingVisibility = false;
         });
 }
 window.toggleMarketProductVisibility = toggleMarketProductVisibility;
@@ -19029,15 +19143,31 @@ function renderMarket() {
     let filtered = prods.filter(p => {
         if (!p) return false;
         const hidden = isProductHidden(p);
+
+        if (currentMarketCategoryFilter === 'hidden') {
+            if (!isAdmin) return false;
+            return hidden;
+        }
+
         if (!isAdmin && hidden) return false;
         if (window.adminMarketCustomerPreview && hidden) return false;
+
         const pCat = getNormalizedProductCategory(p);
         if (currentMarketCategoryFilter !== 'all' && pCat !== currentMarketCategoryFilter) return false;
         if (search && !(p.name || '').toLowerCase().includes(search)) return false;
         return true;
     });
 
-    filtered.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    // SORTING: Push hidden products (hidden = 1) to the VERY BOTTOM!
+    filtered.sort((a, b) => {
+        const aHidden = isProductHidden(a) ? 1 : 0;
+        const bHidden = isProductHidden(b) ? 1 : 0;
+
+        if (aHidden !== bHidden) {
+            return aHidden - bHidden; // Non-hidden (0) first, Hidden (1) last!
+        }
+        return (b.createdAt || 0) - (a.createdAt || 0);
+    });
 
     const totalCount = filtered.length;
     const badge = document.getElementById('market-count-badge');
@@ -22417,14 +22547,80 @@ function toggleVaultAddForm() {
 }
 window.toggleVaultAddForm = toggleVaultAddForm;
 
+let currentVaultImagesData = [];
+
+function renderVaultFormImagePreviews() {
+    if (typeof currentVaultImageData !== 'undefined') {
+        currentVaultImageData = currentVaultImagesData[0] || null;
+    }
+    const previewContainer = document.getElementById('vault-img-preview-container');
+    const clearBtn = document.getElementById('vault-clear-img-btn');
+    const fileInput = document.getElementById('vault-note-image-file');
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    if (!previewContainer) return;
+
+    if (currentVaultImagesData.length === 0) {
+        previewContainer.style.display = 'none';
+        previewContainer.innerHTML = '';
+        if (clearBtn) clearBtn.style.display = 'none';
+        if (fileInput) fileInput.value = '';
+        return;
+    }
+
+    if (clearBtn) {
+        clearBtn.style.display = 'inline-block';
+        clearBtn.textContent = isAr ? '✕ حذف جميع الصور' : '✕ Remove All Photos';
+    }
+
+    previewContainer.style.display = 'flex';
+    previewContainer.style.flexWrap = 'wrap';
+    previewContainer.style.gap = '10px';
+    previewContainer.style.marginTop = '12px';
+
+    previewContainer.innerHTML = currentVaultImagesData.map((imgUrl, idx) => `
+        <div style="position: relative; display: inline-block;">
+            <img src="${imgUrl}" style="max-height: 120px; border-radius: 10px; border: 2px solid #6366f1; box-shadow: var(--shadow-sm); object-fit: cover;">
+            <button type="button" onclick="removeVaultFormImage(${idx})" style="
+                position: absolute;
+                top: -6px;
+                right: -6px;
+                background: #dc2626;
+                color: white;
+                border: none;
+                border-radius: 50%;
+                width: 22px;
+                height: 22px;
+                font-size: 0.75rem;
+                font-weight: 900;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            " title="${isAr ? 'حذف هذه الصورة' : 'Delete this photo'}">✖</button>
+        </div>
+    `).join('');
+}
+
+function removeVaultFormImage(index) {
+    if (index >= 0 && index < currentVaultImagesData.length) {
+        currentVaultImagesData.splice(index, 1);
+        renderVaultFormImagePreviews();
+    }
+}
+window.removeVaultFormImage = removeVaultFormImage;
+
 function clearVaultForm() {
     currentEditingVaultId = null;
+    currentVaultImagesData = [];
+    if (typeof currentVaultImageData !== 'undefined') currentVaultImageData = null;
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     const headerTitle = document.getElementById('vault-form-header-title');
     const submitBtn = document.getElementById('vault-submit-btn');
 
     if (headerTitle) {
-        headerTitle.textContent = isAr ? '📝 رفع معلومات أو وثيقة جديدة' : '📝 Upload New Information / Document';
+        headerTitle.textContent = isAr ? '📝 رفع معلومات أو وثائق جديدة' : '📝 Upload New Information / Documents';
         headerTitle.setAttribute('data-i18n', 'title-upload-vault-note');
     }
     if (submitBtn) {
@@ -22440,67 +22636,60 @@ function clearVaultForm() {
     if (cat) cat.value = 'General';
     if (text) text.value = '';
     if (file) file.value = '';
-    clearVaultImagePreview();
+    renderVaultFormImagePreviews();
 }
 window.clearVaultForm = clearVaultForm;
 
 function handleVaultImagePreview(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
 
-    const reader = new FileReader();
-    reader.onload = function (e) {
-        const img = new Image();
-        img.onload = function () {
-            const canvas = document.createElement('canvas');
-            const maxDim = 1200;
-            let width = img.width;
-            let height = img.height;
+    let processedCount = 0;
+    files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const img = new Image();
+            img.onload = function () {
+                const canvas = document.createElement('canvas');
+                const maxDim = 1200;
+                let width = img.width;
+                let height = img.height;
 
-            if (width > height) {
-                if (width > maxDim) {
-                    height = Math.round((height * maxDim) / width);
-                    width = maxDim;
+                if (width > height) {
+                    if (width > maxDim) {
+                        height = Math.round((height * maxDim) / width);
+                        width = maxDim;
+                    }
+                } else {
+                    if (height > maxDim) {
+                        width = Math.round((width * maxDim) / height);
+                        height = maxDim;
+                    }
                 }
-            } else {
-                if (height > maxDim) {
-                    width = Math.round((width * maxDim) / height);
-                    height = maxDim;
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                const base64Data = canvas.toDataURL('image/jpeg', 0.82);
+                currentVaultImagesData.push(base64Data);
+
+                processedCount++;
+                if (processedCount === files.length) {
+                    renderVaultFormImagePreviews();
                 }
-            }
-
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-
-            currentVaultImageData = canvas.toDataURL('image/jpeg', 0.82);
-
-            const previewImg = document.getElementById('vault-img-preview');
-            const previewContainer = document.getElementById('vault-img-preview-container');
-            const clearBtn = document.getElementById('vault-clear-img-btn');
-
-            if (previewImg) previewImg.src = currentVaultImageData;
-            if (previewContainer) previewContainer.style.display = 'block';
-            if (clearBtn) clearBtn.style.display = 'inline-block';
+            };
+            img.src = e.target.result;
         };
-        img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
+        reader.readAsDataURL(file);
+    });
 }
 window.handleVaultImagePreview = handleVaultImagePreview;
 
 function clearVaultImagePreview() {
-    currentVaultImageData = null;
-    const previewImg = document.getElementById('vault-img-preview');
-    const previewContainer = document.getElementById('vault-img-preview-container');
-    const clearBtn = document.getElementById('vault-clear-img-btn');
-    const fileInput = document.getElementById('vault-note-image-file');
-
-    if (previewImg) previewImg.src = '';
-    if (previewContainer) previewContainer.style.display = 'none';
-    if (clearBtn) clearBtn.style.display = 'none';
-    if (fileInput) fileInput.value = '';
+    currentVaultImagesData = [];
+    renderVaultFormImagePreviews();
 }
 window.clearVaultImagePreview = clearVaultImagePreview;
 
@@ -22532,22 +22721,16 @@ function editVaultNote(noteId) {
         submitBtn.setAttribute('data-i18n', 'btn-update-vault-note');
     }
 
-    currentVaultImageData = noteObj.imageUrl || null;
-    const previewImg = document.getElementById('vault-img-preview');
-    const previewContainer = document.getElementById('vault-img-preview-container');
-    const clearBtn = document.getElementById('vault-clear-img-btn');
+    if (noteObj.imageUrls && Array.isArray(noteObj.imageUrls) && noteObj.imageUrls.length > 0) {
+        currentVaultImagesData = [...noteObj.imageUrls];
+    } else if (noteObj.imageUrl) {
+        currentVaultImagesData = [noteObj.imageUrl];
+    } else {
+        currentVaultImagesData = [];
+    }
     const fileInput = document.getElementById('vault-note-image-file');
     if (fileInput) fileInput.value = '';
-
-    if (currentVaultImageData) {
-        if (previewImg) previewImg.src = currentVaultImageData;
-        if (previewContainer) previewContainer.style.display = 'block';
-        if (clearBtn) clearBtn.style.display = 'inline-block';
-    } else {
-        if (previewImg) previewImg.src = '';
-        if (previewContainer) previewContainer.style.display = 'none';
-        if (clearBtn) clearBtn.style.display = 'none';
-    }
+    renderVaultFormImagePreviews();
 
     const container = document.getElementById('vault-add-form-container');
     if (container) {
@@ -22567,7 +22750,7 @@ function postVaultNote() {
     const text = textEl ? textEl.value.trim() : '';
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
 
-    if (!title && !text && !currentVaultImageData) {
+    if (!title && !text && currentVaultImagesData.length === 0) {
         const msg = isAr ? "⚠️ يرجى كتابة عنوان أو تفاصيل أو رفع صورة." : "⚠️ Please enter a title, details, or upload an image.";
         if (typeof showInAppNotification === 'function') showInAppNotification(msg);
         else alert(msg);
@@ -22584,7 +22767,8 @@ function postVaultNote() {
         title: title || (isAr ? 'ملاحظة معلومات' : 'Information Note'),
         category: category,
         text: text || '',
-        imageUrl: currentVaultImageData || '',
+        imageUrl: currentVaultImagesData[0] || '',
+        imageUrls: currentVaultImagesData || [],
         createdAt: existingNote.createdAt || Date.now(),
         createdBy: existingNote.createdBy || ((currentUser && currentUser.email) ? currentUser.email : 'Admin'),
         updatedAt: Date.now()
@@ -22628,6 +22812,14 @@ function renderVaultNotes() {
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
     const notesObj = data.vaultNotes || {};
+
+    // Auto-clean stored notes in memory
+    Object.values(notesObj).forEach(n => {
+        if (n) {
+            if (n.title) n.title = deepCleanNoteText(n.title);
+            if (n.text) n.text = deepCleanNoteText(n.text);
+        }
+    });
     let notes = Object.values(notesObj);
 
     const statTotal = document.getElementById('vault-stat-total');
@@ -22801,32 +22993,70 @@ function renderVaultNotes() {
             " title="${isAr ? 'انقر مرتين لتعديل الملاحظة' : 'Double-click to edit note'}">
                 <div>
                     <!-- Image Card (If Uploaded) -->
-                    ${n.imageUrl ? `
-                        <div style="
-                            position: relative;
-                            cursor: pointer;
-                            overflow: hidden;
-                            border-radius: 10px;
-                            border: 1px solid var(--border-color);
-                            margin-bottom: 12px;
-                            height: 160px;
-                            background: var(--input-bg);
-                        " onclick="openImageModal('${n.imageUrl}')">
-                            <img src="${n.imageUrl}" alt="${safeTitle}" style="width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 10px; transition: transform 0.2s ease;" onmouseenter="this.style.transform='scale(1.03)'" onmouseleave="this.style.transform='none'">
-                            <div style="
-                                position: absolute;
-                                bottom: 8px;
-                                right: 8px;
-                                background: rgba(0, 0, 0, 0.75);
-                                color: white;
-                                padding: 3px 8px;
-                                border-radius: 8px;
-                                font-size: 0.72rem;
-                                font-weight: 800;
-                                backdrop-filter: blur(4px);
-                            ">${isAr ? '🔍 تكبير' : '🔍 Zoom'}</div>
-                        </div>
-                    ` : ''}
+                    <!-- Images Gallery (Single or Multi-Image Grid) -->
+                    ${(() => {
+                        const imgs = (n.imageUrls && Array.isArray(n.imageUrls) && n.imageUrls.length > 0) ? n.imageUrls : (n.imageUrl ? [n.imageUrl] : []);
+                        if (imgs.length === 0) return '';
+
+                        if (imgs.length === 1) {
+                            return `
+                                <div style="
+                                    position: relative;
+                                    cursor: pointer;
+                                    overflow: hidden;
+                                    border-radius: 10px;
+                                    border: 1px solid var(--border-color);
+                                    margin-bottom: 12px;
+                                    height: 160px;
+                                    background: var(--input-bg);
+                                " onclick="openImageModal('${imgs[0]}')">
+                                    <img src="${imgs[0]}" alt="${safeTitle}" style="width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 10px; transition: transform 0.2s ease;" onmouseenter="this.style.transform='scale(1.03)'" onmouseleave="this.style.transform='none'">
+                                    <div style="
+                                        position: absolute;
+                                        bottom: 8px;
+                                        right: 8px;
+                                        background: rgba(0, 0, 0, 0.75);
+                                        color: white;
+                                        padding: 3px 8px;
+                                        border-radius: 8px;
+                                        font-size: 0.72rem;
+                                        font-weight: 800;
+                                        backdrop-filter: blur(4px);
+                                    ">${isAr ? '🔍 تكبير' : '🔍 Zoom'}</div>
+                                </div>
+                            `;
+                        } else {
+                            const gridCols = imgs.length === 2 ? '1fr 1fr' : 'repeat(auto-fit, minmax(70px, 1fr))';
+                            return `
+                                <div style="position: relative; margin-bottom: 12px;">
+                                    <div style="
+                                        display: grid;
+                                        grid-template-columns: ${gridCols};
+                                        gap: 6px;
+                                        max-height: 180px;
+                                        overflow-y: auto;
+                                        padding: 4px;
+                                        background: var(--input-bg);
+                                        border-radius: 10px;
+                                        border: 1px solid var(--border-color);
+                                    ">
+                                        ${imgs.map(imgUrl => `
+                                            <div style="position: relative; height: 80px; cursor: pointer; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color);" onclick="openImageModal('${imgUrl}')">
+                                                <img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.2s ease;" onmouseenter="this.style.transform='scale(1.05)'" onmouseleave="this.style.transform='none'">
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                    <span style="
+                                        display: inline-block;
+                                        margin-top: 4px;
+                                        font-size: 0.72rem;
+                                        color: var(--text-muted);
+                                        font-weight: 800;
+                                    ">📷 ${imgs.length} ${isAr ? 'صور مرفقة (انقر للتكبير)' : 'Photos attached (Click to view)'}</span>
+                                </div>
+                            `;
+                        }
+                    })()}
 
                     <!-- Row 1: Category Badge & Action Buttons -->
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 8px; width: 100%;">
@@ -22834,6 +23064,7 @@ function renderVaultNotes() {
                             ${badgeLabel}
                         </span>
                         <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                            <button type="button" onclick="shareVaultNote('${n.id}')" title="${isAr ? 'مشاركة الملاحظة والصور في أي تطبيق' : 'Share note & photos to any app'}" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: #10b981;">${isAr ? '📲 مشاركة' : '📲 Share'}</button>
                             <button type="button" onclick="copyVaultText('${n.id}')" title="${isAr ? 'نسخ النص' : 'Copy Text'}" style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: var(--text-main);">${isAr ? '📋 نسخ' : '📋 Copy'}</button>
                             <button type="button" onclick="editVaultNote('${n.id}')" title="${isAr ? 'تعديل الملاحظة' : 'Edit Note'}" style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: #6366f1;">${isAr ? '✏️ تعديل' : '✏️ Edit'}</button>
                             <button type="button" onclick="deleteVaultNote('${n.id}')" title="${isAr ? 'حذف الملاحظة' : 'Delete Note'}" style="background: rgba(220, 38, 38, 0.1); border: 1px solid rgba(220, 38, 38, 0.25); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: var(--danger);">🗑️</button>
@@ -22902,6 +23133,147 @@ function toggleVaultNoteExpand(noteId) {
     }
 }
 window.toggleVaultNoteExpand = toggleVaultNoteExpand;
+
+
+
+
+function deepCleanNoteText(str) {
+    if (!str) return '';
+    let text = String(str);
+
+    try {
+        if (text.includes('%')) {
+            text = decodeURIComponent(text);
+        }
+    } catch(e) {}
+
+    // 1. Decode or clean URL-encoded linebreaks, spaces & percent noise
+    text = text.replace(/%20/gi, ' ');
+    text = text.replace(/A%0A0%/gi, '\n');
+    text = text.replace(/A%0A/gi, '\n');
+    text = text.replace(/%0A/gi, '\n');
+    text = text.replace(/%0D/gi, '\n');
+    text = text.replace(/%A0/gi, ' ');
+    text = text.replace(/A0%/gi, ' ');
+    text = text.replace(/0%/g, ' ');
+
+    // 2. Remove HTML tags & entities
+    text = text.replace(/<[^>]*>/g, '');
+    text = text.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&nbsp;/g, ' ');
+
+    // 3. Remove isolated capital 'A' used as separator between Arabic characters or digits
+    text = text.replace(/([\u0600-\u06FF0-9])A([\u0600-\u06FF0-9])/g, '$1 $2');
+    text = text.replace(/([\u0600-\u06FF0-9])A(?=\s|$|[^\u0600-\u06FF0-9])/g, '$1 ');
+
+    // 4. Remove any remaining raw markdown symbols (*, `, #) and emojis
+    text = text.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}]/gu, '');
+    text = text.replace(/[\*`#_~]/g, '');
+
+    // 5. Clean up multiple spaces & excessive linebreaks
+    text = text.replace(/[ \t]+/g, ' ');
+    text = text.replace(/\n\s*\n\s*\n+/g, '\n\n');
+
+    return text.trim();
+}
+window.deepCleanNoteText = deepCleanNoteText;
+
+function dataURLtoFile(dataurl, filename) {
+    if (!dataurl || typeof dataurl !== 'string') return null;
+    if (!dataurl.startsWith('data:')) return null;
+    try {
+        const arr = dataurl.split(',');
+        const mimeMatch = arr[0].match(/:(.*?);/);
+        const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+        }
+        return new File([u8arr], filename, { type: mime });
+    } catch (e) {
+        console.warn("dataURLtoFile error:", e);
+        return null;
+    }
+}
+window.dataURLtoFile = dataURLtoFile;
+
+async function shareVaultNote(noteId) {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const notesObj = data.vaultNotes || {};
+    const note = notesObj[noteId];
+
+    if (!note) return;
+
+    const rawTitle = note.title || '';
+    const rawText = note.text || '';
+    const images = (note.imageUrls && Array.isArray(note.imageUrls) && note.imageUrls.length > 0)
+        ? note.imageUrls
+        : (note.imageUrl ? [note.imageUrl] : []);
+
+    const cleanTitle = deepCleanNoteText(rawTitle);
+    const cleanContent = deepCleanNoteText(rawText);
+
+    const parts = [];
+    if (cleanTitle) parts.push(cleanTitle);
+    if (cleanContent && cleanContent !== cleanTitle) parts.push(cleanContent);
+
+    const shareText = parts.join('\n\n');
+
+    let filesArray = [];
+    if (images.length > 0) {
+        for (let i = 0; i < images.length; i++) {
+            const imgUrl = images[i];
+            try {
+                if (imgUrl.startsWith('data:')) {
+                    const file = dataURLtoFile(imgUrl, `info_photo_${i + 1}.jpg`);
+                    if (file) filesArray.push(file);
+                } else {
+                    const res = await fetch(imgUrl);
+                    const blob = await res.blob();
+                    const fileExt = blob.type.includes('png') ? 'png' : 'jpg';
+                    const file = new File([blob], `info_photo_${i + 1}.${fileExt}`, { type: blob.type || 'image/jpeg' });
+                    filesArray.push(file);
+                }
+            } catch (e) {
+                console.warn("Failed to convert image to File for sharing:", e);
+            }
+        }
+    }
+
+    if (navigator.share) {
+        try {
+            const shareData = {
+                title: cleanTitle || 'Information Note',
+                text: shareText
+            };
+
+            if (filesArray.length > 0 && navigator.canShare && navigator.canShare({ files: filesArray })) {
+                shareData.files = filesArray;
+            }
+
+            await navigator.share(shareData);
+
+            return;
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                // User intentionally closed the share dialog
+                return;
+            }
+            console.warn("Web Share API error, opening fallback options:", err);
+        }
+    }
+
+    // Fallback: If Web Share API is not supported or failed
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+    window.open(waUrl, '_blank');
+
+    if (typeof showInAppNotification === 'function') {
+        showInAppNotification(isAr ? '💬 تم فتح واتساب لمشاركة النص!' : '💬 Opening WhatsApp to share!');
+    }
+}
+window.shareVaultNote = shareVaultNote;
 
 function copyVaultText(noteId) {
     const data = typeof getCompanyData === 'function' ? getCompanyData() : {};

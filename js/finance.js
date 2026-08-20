@@ -5159,13 +5159,68 @@ function isReminderAlerting(r, now) {
     return false;
 }
 
-function getReminderColorTheme(daysLeft, isDue, isAr) {
-    if (daysLeft <= 2) {
-        // Red: 0 - 2 days left
+function getReminderOverdueText(deadlineMs, now, isAr) {
+    if (!deadlineMs) return '';
+    const dMs = typeof deadlineMs === 'number' ? deadlineMs : new Date(deadlineMs).getTime();
+    if (isNaN(dMs) || dMs > now) return '';
+
+    const overdueMs = now - dMs;
+    const days = Math.floor(overdueMs / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((overdueMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const mins = Math.floor((overdueMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (days >= 1) {
+        if (hours > 0) {
+            return isAr 
+                ? `متأخر ${days} ${days === 1 ? 'يوم' : (days === 2 ? 'يومين' : 'أيام')} و ${hours} ساعة` 
+                : `${days} day${days > 1 ? 's' : ''} and ${hours} hr${hours > 1 ? 's' : ''} late`;
+        }
+        return isAr 
+            ? `متأخر ${days} ${days === 1 ? 'يوم' : (days === 2 ? 'يومين' : 'أيام')}` 
+            : `${days} day${days > 1 ? 's' : ''} late`;
+    } else if (hours >= 1) {
+        return isAr 
+            ? `متأخر ${hours} ساعة` 
+            : `${hours} hour${hours > 1 ? 's' : ''} late`;
+    } else {
+        const m = Math.max(1, mins);
+        return isAr 
+            ? `متأخر ${m} دقيقة` 
+            : `${m} min${m > 1 ? 's' : ''} late`;
+    }
+}
+window.getReminderOverdueText = getReminderOverdueText;
+
+function toggleRemindersAlerts() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const currentState = localStorage.getItem('mvc_reminders_alerts_enabled') !== 'false';
+    const newState = !currentState;
+    localStorage.setItem('mvc_reminders_alerts_enabled', newState ? 'true' : 'false');
+
+    const msg = newState 
+        ? (isAr ? "🔔 تم تشغيل تنبيهات المواعيد بنجاح!" : "🔔 Reminder alerts turned ON!")
+        : (isAr ? "🔕 تم إيقاف تنبيهات المواعيد." : "🔕 Reminder alerts turned OFF!");
+
+    if (typeof showInAppNotification === 'function') showInAppNotification(msg);
+    if (typeof renderReminders === 'function') renderReminders();
+}
+window.toggleRemindersAlerts = toggleRemindersAlerts;
+
+function getReminderColorTheme(daysLeft, isDue, isAr, r, now) {
+    if (isDue) {
+        const dMs = r ? (r.deadlineMs || (r.deadlineISO ? new Date(r.deadlineISO).getTime() : null)) : null;
+        const overdueText = getReminderOverdueText(dMs, now || Date.now(), isAr);
+        const badgeLabel = overdueText ? `🚨 ${overdueText}` : `🔴 ${isAr ? 'مستحق الآن!' : 'DUE NOW!'}`;
         return {
             border: '2px solid #dc2626',
             bg: 'rgba(220, 38, 38, 0.12)',
-            badge: `<span class="badge" style="background:#dc2626; color:white; font-weight:800; animation:notif-bell 1s infinite alternate;">🔴 ${isDue ? (isAr ? 'مستحق الآن!' : 'DUE NOW!') : (isAr ? '0-2 يوم متبقي' : '0-2 Days Left')}</span>`
+            badge: `<span class="badge" style="background:#dc2626; color:white; font-weight:800; animation:notif-bell 1s infinite alternate;">${badgeLabel}</span>`
+        };
+    } else if (daysLeft <= 2) {
+        return {
+            border: '2px solid #dc2626',
+            bg: 'rgba(220, 38, 38, 0.12)',
+            badge: `<span class="badge" style="background:#dc2626; color:white; font-weight:800;">🔴 ${isAr ? '0-2 يوم متبقي' : '0-2 Days Left'}</span>`
         };
     } else if (daysLeft > 2 && daysLeft <= 5) {
         // Yellow: 3 - 5 days left
@@ -5254,14 +5309,43 @@ function renderReminders() {
         countBadge.textContent = `${remindersList.length} ${isAr ? 'تذكير نشط' : 'Active'}`;
     }
 
-    // Check Due Reminders for Alert Banner
-    const dueReminders = remindersList.filter(r => r.deadlineMs && isReminderAlerting(r, now));
+    // Check Due Reminders for Alert Banner & ON/OFF preference
+    const alertsEnabled = localStorage.getItem('mvc_reminders_alerts_enabled') !== 'false';
+    const dueReminders = remindersList.filter(r => {
+        const dMs = r.deadlineMs || (r.deadlineISO ? new Date(r.deadlineISO).getTime() : 0);
+        return dMs > 0 && isReminderAlerting(r, now);
+    });
+
     const banner = document.getElementById('reminders-due-banner');
     const bannerText = document.getElementById('reminders-due-text');
+    const toggleBtnBanner = document.getElementById('btn-toggle-reminders-alerts');
+    const toggleBtnTop = document.getElementById('btn-toggle-reminders-alerts-top');
 
-    if (dueReminders.length > 0 && banner && bannerText) {
+    const toggleLabel = alertsEnabled
+        ? (isAr ? "🔔 التنبيهات: مُشغّلة (ON)" : "🔔 Alerts: ON")
+        : (isAr ? "🔕 التنبيهات: مُطفأة (OFF)" : "🔕 Alerts: OFF");
+
+    if (toggleBtnBanner) {
+        toggleBtnBanner.innerHTML = toggleLabel;
+        toggleBtnBanner.style.background = alertsEnabled ? 'linear-gradient(135deg, #dc2626, #b91c1c)' : 'var(--card-bg)';
+        toggleBtnBanner.style.color = alertsEnabled ? 'white' : 'var(--text-muted)';
+        toggleBtnBanner.style.border = alertsEnabled ? 'none' : '1px solid var(--border-color)';
+    }
+
+    if (toggleBtnTop) {
+        toggleBtnTop.innerHTML = toggleLabel;
+        toggleBtnTop.style.background = alertsEnabled ? 'rgba(220,38,38,0.15)' : 'var(--input-bg)';
+        toggleBtnTop.style.color = alertsEnabled ? '#dc2626' : 'var(--text-muted)';
+        toggleBtnTop.style.border = alertsEnabled ? '1px solid rgba(220,38,38,0.3)' : '1px solid var(--border-color)';
+    }
+
+    if (dueReminders.length > 0 && alertsEnabled && banner && bannerText) {
         banner.style.display = 'block';
-        const dueTitles = dueReminders.map(r => `• ${r.title}`).join(', ');
+        const dueTitles = dueReminders.map(r => {
+            const dMs = r.deadlineMs || (r.deadlineISO ? new Date(r.deadlineISO).getTime() : 0);
+            const ov = (dMs > 0 && dMs <= now) ? getReminderOverdueText(dMs, now, isAr) : '';
+            return `• ${r.title}${ov ? ` (${ov})` : ''}`;
+        }).join(', ');
         bannerText.textContent = isAr
             ? `لديك (${dueReminders.length}) تذكيرات حان موعد التنبيه عليها: ${dueTitles}`
             : `You have (${dueReminders.length}) reminders with active lead alerts: ${dueTitles}`;
@@ -5281,7 +5365,7 @@ function renderReminders() {
         const isDue = r.deadlineMs <= now;
         const diffMs = (r.deadlineMs || 0) - now;
         const daysLeft = diffMs / (1000 * 60 * 60 * 24);
-        const theme = getReminderColorTheme(daysLeft, isDue, isAr);
+        const theme = getReminderColorTheme(daysLeft, isDue, isAr, r, now);
         const deadlineStr = formatReminderDate(r.deadlineMs, r.deadlineISO);
 
         const leadTimes = r.leadTimes || ['1_2d', '5d', '10d', '15d', '1m'];
@@ -5319,9 +5403,17 @@ function renderReminders() {
                     ${r.note ? `📝 <em>${r.note}</em>` : `<span style="color:var(--text-muted); font-size:0.8rem;">${isAr ? 'بدون وصف إضافي' : 'No extra description'}</span>`}
                 </div>
 
-                <!-- Col 3: Deadline & Alerts -->
+                <!-- Col 3: Deadline & Overdue Lateness Status -->
                 <div style="min-width:0; font-size:0.82rem; color:var(--text-muted);">
                     <div>🕒 <strong>${deadlineStr}</strong></div>
+                    ${(() => {
+                        const dMs = r.deadlineMs || (r.deadlineISO ? new Date(r.deadlineISO).getTime() : 0);
+                        if (dMs > 0 && dMs <= now) {
+                            const ov = getReminderOverdueText(dMs, now, isAr);
+                            return ov ? `<div style="font-size:0.8rem; color:#ef4444; font-weight:900; margin-top:3px; background:rgba(239,68,68,0.15); padding:2px 8px; border-radius:6px; display:inline-block; border:1px solid rgba(239,68,68,0.3);">🚨 ${ov}</div>` : '';
+                        }
+                        return '';
+                    })()}
                     ${r.targetPhone ? `<div style="font-size:0.78rem; margin-top:2px; color:#10b981; font-weight:800;">📱 ${r.targetPhone}</div>` : ''}
                     <div style="font-size:0.75rem; margin-top:2px;">🔔 ${isAr ? 'تنبيه:' : 'Alert:'} <strong>${activeLeadStr || 'None'}</strong></div>
                 </div>

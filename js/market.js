@@ -21,6 +21,13 @@ const MARKET_CATEGORY_DEFS = {
         icon: '🌟',
         gradient: 'linear-gradient(135deg, #10b981, #059669)'
     },
+    'hidden': {
+        key: 'hidden',
+        labelEn: '🙈 Hidden Products',
+        labelAr: '🙈 المنتجات المخفية',
+        icon: '🙈',
+        gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #b45309 100%)'
+    },
     'meat': {
         key: 'meat',
         labelEn: '🥩 Meat Products',
@@ -99,7 +106,12 @@ function renderMarketCategoryTabs(allProducts) {
     if (!container) return;
 
     const isAr = currentAppLang === 'ar';
+    const isAdmin = typeof isMarketAdmin === 'function' ? isMarketAdmin() : false;
     const categoriesFound = new Set(['all', 'meat', 'veg_fruit', 'fish']);
+
+    if (isAdmin) {
+        categoriesFound.add('hidden');
+    }
 
     (allProducts || []).forEach(p => {
         const cat = getNormalizedProductCategory(p);
@@ -115,6 +127,8 @@ function renderMarketCategoryTabs(allProducts) {
         let count = 0;
         if (catKey === 'all') {
             count = (allProducts || []).length;
+        } else if (catKey === 'hidden') {
+            count = (allProducts || []).filter(p => isProductHidden(p)).length;
         } else {
             count = (allProducts || []).filter(p => getNormalizedProductCategory(p) === catKey).length;
         }
@@ -557,6 +571,7 @@ function initGlobalMarketProductsListener() {
             } catch (e) { }
 
             if (typeof renderMarket === 'function') {
+                if (window._isTogglingVisibility) return;
                 renderMarket();
             }
         });
@@ -1683,9 +1698,11 @@ window.deleteMarketOrder = deleteMarketOrder;
 function toggleMarketProductVisibility(productId) {
     const isAr = currentAppLang === 'ar';
     const prods = getAllMarketProducts();
-    const prod = prods.find(p => p.id === productId);
+    const prod = prods.find(p => p && p.id === productId);
 
     if (!prod) return;
+
+    window._isTogglingVisibility = true;
 
     const isCurrentlyHidden = isProductHidden(prod);
     const newHiddenState = !isCurrentlyHidden;
@@ -1723,19 +1740,24 @@ function toggleMarketProductVisibility(productId) {
         localStorage.setItem('mvc_cached_market_products', JSON.stringify(window.globalMarketProductsCache));
     } catch (e) { }
 
+    const scrollY = window.scrollY || document.documentElement.scrollTop;
     renderMarket();
+    window.scrollTo({ top: scrollY, behavior: 'instant' });
+
+    if (typeof showInAppNotification === 'function') {
+        showInAppNotification(newHiddenState
+            ? (isAr ? '🙈 تم إخفاء المنتج من المتجر (تم نقله للأسفل)' : '🙈 Product hidden from market (moved to bottom)')
+            : (isAr ? '👁️ تم إظهار المنتج للزبائن' : '👁️ Product is now visible to customers')
+        );
+    }
 
     saveMarketProductToFirebase(productId, window.globalMarketProductsCache[productId] || prod)
         .then(() => {
-            renderMarket();
-            showInAppNotification(newHiddenState
-                ? (isAr ? 'تم إخفاء المنتج من المتجر (غير ظاهر للزبائن)' : 'Product hidden from market')
-                : (isAr ? 'تم إظهار المنتج للزبائن' : 'Product is now visible to customers')
-            );
+            setTimeout(() => { window._isTogglingVisibility = false; }, 1500);
         })
         .catch(err => {
             console.error("Error toggling product visibility:", err);
-            renderMarket();
+            window._isTogglingVisibility = false;
         });
 }
 window.toggleMarketProductVisibility = toggleMarketProductVisibility;
@@ -2018,15 +2040,31 @@ function renderMarket() {
     let filtered = prods.filter(p => {
         if (!p) return false;
         const hidden = isProductHidden(p);
+
+        if (currentMarketCategoryFilter === 'hidden') {
+            if (!isAdmin) return false;
+            return hidden;
+        }
+
         if (!isAdmin && hidden) return false;
         if (window.adminMarketCustomerPreview && hidden) return false;
+
         const pCat = getNormalizedProductCategory(p);
         if (currentMarketCategoryFilter !== 'all' && pCat !== currentMarketCategoryFilter) return false;
         if (search && !(p.name || '').toLowerCase().includes(search)) return false;
         return true;
     });
 
-    filtered.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    // SORTING: Push hidden products (hidden = 1) to the VERY BOTTOM!
+    filtered.sort((a, b) => {
+        const aHidden = isProductHidden(a) ? 1 : 0;
+        const bHidden = isProductHidden(b) ? 1 : 0;
+
+        if (aHidden !== bHidden) {
+            return aHidden - bHidden; // Non-hidden (0) first, Hidden (1) last!
+        }
+        return (b.createdAt || 0) - (a.createdAt || 0);
+    });
 
     const totalCount = filtered.length;
     const badge = document.getElementById('market-count-badge');
