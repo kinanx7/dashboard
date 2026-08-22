@@ -73,6 +73,7 @@ Navigation is controlled by `switchTab(tabName)` which activates the correspondi
 17. **💬 Messaging (`view-messaging`)**: WhatsApp Business connection gateway (QR Code / 8-Digit Pairing Code).
 18. **📁 Informations (`view-vault`)**: Document & license storage vault with custom folder organization.
 19. **🤖 AI Assistant (`view-ai-assistant`)**: Integrated Gemini AI assistant for natural language system queries.
+20. **🎓 Learning Program (`view-learning`)**: Interactive video training portal with YouTube embeds for onboarding new workers across all departments.
 
 ---
 

@@ -2055,7 +2055,7 @@ window.fillConstantTaskPreset = fillConstantTaskPreset;
 // =============================================
 // CONSTANT TASKS PRESET SHORTCUTS SYSTEM
 // =============================================
-let editingPresetId = null;
+var editingPresetId = null;
 
 function toggleConstantTaskPresetForm(optPresetId) {
     const container = document.getElementById('constant-preset-form-container');

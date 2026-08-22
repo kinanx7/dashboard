@@ -1166,14 +1166,14 @@ function deleteLog(workerId, logDate) {
 }
 
 // --- ADVERTISEMENT MAP SYSTEM ---
-let promoMap = null;
-let mapLayerGroup = null;
+var promoMap = null;
+var mapLayerGroup = null;
 
 // Drawing & UI State
-let activeAdvertTool = 'pin';
-let drawPoints = [];
-let tempDrawLayer = null;
-let pendingMapItem = null; // Temporarily holds the location data until the modal is saved
+var activeAdvertTool = 'pin';
+var drawPoints = [];
+var tempDrawLayer = null;
+var pendingMapItem = null; // Temporarily holds the location data until the modal is saved
 
 function setAdvertTool(tool) {
     activeAdvertTool = tool;

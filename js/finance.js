@@ -4570,7 +4570,7 @@ window.editCustodyRequestAmount = editCustodyRequestAmount;
 // =========================================================================
 // CUSTOM DEPARTMENT TAB BUTTON DRAG & DROP REORDERING ENGINE
 // =========================================================================
-let draggedTabElement = null;
+var draggedTabElement = null;
 
 function toggleTabReorderMode() {
     const isAr = currentAppLang === 'ar';
@@ -4950,8 +4950,8 @@ function addReminder() {
 }
 window.addReminder = addReminder;
 
-let currentRemindersLimit = 20;
-let isRemindersInfiniteScrollAttached = false;
+var currentRemindersLimit = 20;
+var isRemindersInfiniteScrollAttached = false;
 
 function setupRemindersInfiniteScroll() {
     if (isRemindersInfiniteScrollAttached) return;
@@ -5659,7 +5659,7 @@ window.saveEditReminder = saveEditReminder;
 
 // ==========================================
 // Market Cart & Coin System State
-let marketCart = [];
+var marketCart = [];
 try {
     const savedCart = localStorage.getItem('mvc_market_cart');
     if (savedCart) marketCart = JSON.parse(savedCart);

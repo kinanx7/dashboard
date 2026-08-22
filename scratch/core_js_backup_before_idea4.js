@@ -174,12 +174,10 @@ window.alert = function (msg) {
     return originalAlert(translateDynamicTerm(msg));
 };
 
-if (!window.originalConfirm) {
-    window.originalConfirm = window.confirm;
-    window.confirm = function (msg) {
-        return window.originalConfirm(typeof translateDynamicTerm === 'function' ? translateDynamicTerm(msg) : msg);
-    };
-}
+var originalConfirm = window.confirm;
+window.confirm = function (msg) {
+    return originalConfirm(translateDynamicTerm(msg));
+};
 
 // FEATURE 1: IN-APP NOTIFICATION SYSTEM
 var notifTimeout = null;

@@ -3,9 +3,9 @@
  */
 
 // --- SALES & POS SYSTEM ---
-let currentSalesTimeframe = 'day';
-let currentSalesChartType = 'bar'; // 'bar' | 'line' | 'doughnut'
-let _salesChartInstance = null;  // Chart.js instance handle
+var currentSalesTimeframe = 'day';
+var currentSalesChartType = 'bar'; // 'bar' | 'line' | 'doughnut'
+var _salesChartInstance = null;  // Chart.js instance handle
 
 function setSalesTimeframe(tf) {
     currentSalesTimeframe = tf;
@@ -1245,7 +1245,7 @@ function renderSpendOrders() {
 
 // --- COSTS DEPARTMENT SYSTEM ---
 
-let currentCostsTimeframe = 'day';
+var currentCostsTimeframe = 'day';
 
 function setCostsTimeframe(tf) {
     currentCostsTimeframe = tf;

@@ -413,13 +413,13 @@ function saveMonthlySales() {
 
 
 // --- COMMUNICATION & NOTES SYSTEM ---
-let noteAttachmentType = null; // 'image' or 'voice'
-let noteAttachmentData = null; // base64 Data URL
-let noteMediaRecorder = null;
-let noteAudioChunks = [];
-let noteRecordingTimer = null;
-let noteRecordingDuration = 0;
-let noteRecorderShouldSave = false;
+var noteAttachmentType = null; // 'image' or 'voice'
+var noteAttachmentData = null; // base64 Data URL
+var noteMediaRecorder = null;
+var noteAudioChunks = [];
+var noteRecordingTimer = null;
+var noteRecordingDuration = 0;
+var noteRecorderShouldSave = false;
 
 function triggerNoteImageUpload(source) {
     if (noteMediaRecorder && noteMediaRecorder.state === 'recording') {
@@ -592,13 +592,13 @@ function clearNoteAttachment() {
 }
 
 // Reply Attachments state
-let replyAttachmentTypes = {}; // noteId -> 'image' | 'voice'
-let replyAttachmentDatas = {}; // noteId -> base64
-let replyMediaRecorders = {}; // noteId -> MediaRecorder
-let replyAudioChunks = {}; // noteId -> array
-let replyRecordingTimers = {}; // noteId -> intervalId
-let replyRecordingDurations = {}; // noteId -> int
-let replyRecordersShouldSave = {}; // noteId -> bool
+var replyAttachmentTypes = {}; // noteId -> 'image' | 'voice'
+var replyAttachmentDatas = {}; // noteId -> base64
+var replyMediaRecorders = {}; // noteId -> MediaRecorder
+var replyAudioChunks = {}; // noteId -> array
+var replyRecordingTimers = {}; // noteId -> intervalId
+var replyRecordingDurations = {}; // noteId -> int
+var replyRecordersShouldSave = {}; // noteId -> bool
 
 function triggerReplyImageUpload(noteId, source) {
     if (replyMediaRecorders[noteId] && replyMediaRecorders[noteId].state === 'recording') {

@@ -2,10 +2,10 @@
  * Market product grid, shopping cart, checkout, coin transactions & admin product editor
  */
 
-let currentMarketCategoryFilter = 'all';
-let currentMarketPage = 1;
-let marketPageSize = 12;
-let marketWishlist = new Set();
+var currentMarketCategoryFilter = 'all';
+var currentMarketPage = 1;
+var marketPageSize = 12;
+var marketWishlist = new Set();
 try {
     const savedWishlist = localStorage.getItem('mvc_market_wishlist');
     if (savedWishlist) marketWishlist = new Set(JSON.parse(savedWishlist));
@@ -13,7 +13,21 @@ try {
     marketWishlist = new Set();
 }
 
-const MARKET_CATEGORY_DEFS = {
+var MARKET_CATEGORY_DEFS = {
+    'prepared': {
+        key: 'prepared',
+        labelEn: '🍱 Prepared Products',
+        labelAr: '🍱 قسم المنتجات الجاهزة',
+        icon: '🍱',
+        gradient: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 50%, #c084fc 100%)'
+    },
+    'prepare': {
+        key: 'prepare',
+        labelEn: '🍱 Prepared Products',
+        labelAr: '🍱 قسم المنتجات الجاهزة',
+        icon: '🍱',
+        gradient: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 50%, #c084fc 100%)'
+    },
     'all': {
         key: 'all',
         labelEn: '🌟 All Products',
@@ -72,14 +86,47 @@ function getNormalizedProductCategory(p) {
 window.getNormalizedProductCategory = getNormalizedProductCategory;
 
 function getMarketCategoryMeta(catKey) {
-    if (MARKET_CATEGORY_DEFS[catKey]) {
-        return MARKET_CATEGORY_DEFS[catKey];
+    if (!catKey) catKey = 'meat';
+    const normKey = catKey.toString().trim().toLowerCase();
+    
+    if (MARKET_CATEGORY_DEFS[normKey]) {
+        return MARKET_CATEGORY_DEFS[normKey];
     }
+
+    const mapAr = {
+        'prepared': 'قسم المنتجات الجاهزة',
+        'prepare': 'قسم المنتجات الجاهزة',
+        'prep': 'قسم المنتجات الجاهزة',
+        'bakery': 'قسم المخبوزات',
+        'dairy': 'قسم الألبان والأجبان',
+        'beverages': 'قسم المشروبات والعصائر',
+        'drinks': 'قسم المشروبات والعصائر',
+        'spices': 'قسم البهارات والتوابل',
+        'oils': 'قسم الزيوت والصلصات',
+        'snacks': 'قسم الحلويات والمكسرات'
+    };
+
+    const mapEn = {
+        'prepared': 'Prepared Products',
+        'prepare': 'Prepared Products',
+        'prep': 'Prepared Products',
+        'bakery': 'Bakery',
+        'dairy': 'Dairy & Cheese',
+        'beverages': 'Beverages & Juices',
+        'drinks': 'Beverages & Juices',
+        'spices': 'Spices & Seasoning',
+        'oils': 'Oils & Sauces',
+        'snacks': 'Snacks & Nuts'
+    };
+
     const cleanTitle = catKey.charAt(0).toUpperCase() + catKey.slice(1).replace(/_/g, ' ');
+    const enName = mapEn[normKey] || cleanTitle;
+    const arName = mapAr[normKey] || `قسم ${cleanTitle}`;
+
     return {
         key: catKey,
-        labelEn: `📦 ${cleanTitle}`,
-        labelAr: `📦 قسم ${cleanTitle}`,
+        labelEn: `📦 ${enName}`,
+        labelAr: `📦 ${arName}`,
         icon: '📦',
         gradient: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #9333ea 100%)'
     };
@@ -1892,7 +1939,7 @@ function renderMarketProductCard(p) {
 }
 window.renderMarketProductCard = renderMarketProductCard;
 
-let isMarketLoadingMore = false;
+var isMarketLoadingMore = false;
 
 function loadMoreMarketProducts() {
     if (isMarketLoadingMore) return;
@@ -1989,6 +2036,7 @@ function expandCategorySection(catKey) {
 window.expandCategorySection = expandCategorySection;
 
 function renderMarket() {
+    if (typeof applyTranslations === 'function') setTimeout(applyTranslations, 0);
     window.currentMarketRenderLimit = 24;
     const grid = document.getElementById('market-products-grid');
     if (!grid) return;

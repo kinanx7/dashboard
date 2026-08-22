@@ -1382,9 +1382,9 @@ ${liveContext}`;
 window.fetchGeneralKnowledge = fetchGeneralKnowledge;
 
 // --- AI CHATBOT VOICE SPEECH RECOGNITION (ARABIC & ENGLISH) ---
-let aiChatSpeechRecognition = null;
-let isAIChatListening = false;
-let aiChatVoiceLang = 'auto'; // 'auto', 'ar-SA', 'en-US'
+var aiChatSpeechRecognition = aiChatSpeechRecognition || null;
+var isAIChatListening = isAIChatListening || false;
+var aiChatVoiceLang = aiChatVoiceLang || 'auto'; // 'auto', 'ar-SA', 'en-US'
 
 function toggleAIChatVoiceInput() {
     const input = document.getElementById('ai-chat-input');
@@ -2077,9 +2077,9 @@ window.handleAIChatSubmit = handleAIChatSubmit;
 // =============================================
 // ADMIN INFORMATION & DOCUMENT VAULT MODULE
 // =============================================
-let vaultActiveCategoryFilter = 'ALL';
-let currentVaultImageData = null;
-let currentEditingVaultId = null;
+var vaultActiveCategoryFilter = 'ALL';
+var currentVaultImageData = null;
+var currentEditingVaultId = null;
 
 // Toggle New Folder Form / Modal
 function toggleVaultFolderForm() {
@@ -2313,7 +2313,7 @@ function toggleVaultAddForm() {
 }
 window.toggleVaultAddForm = toggleVaultAddForm;
 
-let currentVaultImagesData = [];
+var currentVaultImagesData = [];
 
 function renderVaultFormImagePreviews() {
     if (typeof currentVaultImageData !== 'undefined') {
@@ -2965,78 +2965,85 @@ function dataURLtoFile(dataurl, filename) {
 window.dataURLtoFile = dataURLtoFile;
 
 async function shareVaultNote(noteId) {
-    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
     const notesObj = data.vaultNotes || {};
     const note = notesObj[noteId];
 
     if (!note) return;
 
-    const rawTitle = note.title || '';
-    const rawText = note.text || '';
-    const images = (note.imageUrls && Array.isArray(note.imageUrls) && note.imageUrls.length > 0)
-        ? note.imageUrls
-        : (note.imageUrl ? [note.imageUrl] : []);
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
 
-    const cleanTitle = deepCleanNoteText(rawTitle);
-    const cleanContent = deepCleanNoteText(rawText);
+    let cleanTitle = note.title ? deepCleanNoteText(note.title) : '';
+    let cleanDesc = note.description ? deepCleanNoteText(note.description) : '';
 
-    const parts = [];
-    if (cleanTitle) parts.push(cleanTitle);
-    if (cleanContent && cleanContent !== cleanTitle) parts.push(cleanContent);
-
-    const shareText = parts.join('\n\n');
-
-    let filesArray = [];
-    if (images.length > 0) {
-        for (let i = 0; i < images.length; i++) {
-            const imgUrl = images[i];
-            try {
-                if (imgUrl.startsWith('data:')) {
-                    const file = dataURLtoFile(imgUrl, `info_photo_${i + 1}.jpg`);
-                    if (file) filesArray.push(file);
-                } else {
-                    const res = await fetch(imgUrl);
-                    const blob = await res.blob();
-                    const fileExt = blob.type.includes('png') ? 'png' : 'jpg';
-                    const file = new File([blob], `info_photo_${i + 1}.${fileExt}`, { type: blob.type || 'image/jpeg' });
-                    filesArray.push(file);
-                }
-            } catch (e) {
-                console.warn("Failed to convert image to File for sharing:", e);
-            }
-        }
+    let shareText = '';
+    if (cleanTitle && cleanDesc) {
+        shareText = `${cleanTitle}\n\n${cleanDesc}`;
+    } else {
+        shareText = cleanTitle || cleanDesc || '';
     }
 
-    if (navigator.share) {
+    if (!shareText) {
+        if (typeof showInAppNotification === 'function') {
+            showInAppNotification(isAr ? '⚠️ لا يوجد نص للمشاركة في هذه الملاحظة.' : '⚠️ No text to share in this note.');
+        }
+        return;
+    }
+
+    const shareData = {
+        title: cleanTitle || 'Information Note',
+        text: shareText
+    };
+
+    // Helper to copy text to clipboard as robust backup
+    const copyToClipboard = (text) => {
         try {
-            const shareData = {
-                title: cleanTitle || 'Information Note',
-                text: shareText
-            };
-
-            if (filesArray.length > 0 && navigator.canShare && navigator.canShare({ files: filesArray })) {
-                shareData.files = filesArray;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text);
+            } else {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
             }
-
-            await navigator.share(shareData);
-
-            return;
-        } catch (err) {
-            if (err.name === 'AbortError') {
-                // User intentionally closed the share dialog
-                return;
-            }
-            console.warn("Web Share API error, opening fallback options:", err);
+        } catch (e) {
+            console.warn("Clipboard copy fallback error:", e);
         }
+    };
+
+    // MULTI-TIER BULLETPROOF APP & WEBVIEW SHARE STRATEGY
+    // Tier 1: Try Native navigator.share (Text Only first for WebView compatibility)
+    if (navigator.share) {
+        navigator.share(shareData).then(() => {
+            console.log("Successfully shared via navigator.share");
+        }).catch(err => {
+            if (err.name === 'AbortError') return; // User closed share sheet intentionally
+            console.warn("navigator.share failed, executing Tier 2 App fallback:", err);
+
+            // Tier 2: Copy to clipboard + WhatsApp direct URL
+            copyToClipboard(shareText);
+            const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+            window.open(waUrl, '_blank');
+
+            if (typeof showInAppNotification === 'function') {
+                showInAppNotification(isAr ? '📋 تم نسخ النص وإعادة التوجيه للمشاركة!' : '📋 Text copied & sharing opened!');
+            }
+        });
+        return;
     }
 
-    // Fallback: If Web Share API is not supported or failed
+    // Tier 3: Direct Web/App Fallback if navigator.share is completely missing
+    copyToClipboard(shareText);
     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
     window.open(waUrl, '_blank');
 
     if (typeof showInAppNotification === 'function') {
-        showInAppNotification(isAr ? '💬 تم فتح واتساب لمشاركة النص!' : '💬 Opening WhatsApp to share!');
+        showInAppNotification(isAr ? '📋 تم نسخ النص كحفظ احتياطي وفتح المشاركة!' : '📋 Text copied to clipboard!');
     }
 }
 window.shareVaultNote = shareVaultNote;
@@ -3076,7 +3083,7 @@ function deleteVaultNote(noteId) {
 window.deleteVaultNote = deleteVaultNote;
 
 // --- MESSAGING & WHATSAPP GATEWAY SYSTEM ---
-let activeTemplateInputId = 'msg-tpl-task';
+var activeTemplateInputId = 'msg-tpl-task';
 
 function setActiveTemplateInput(id) {
     activeTemplateInputId = id;
@@ -3387,7 +3394,7 @@ function renderMessagingSection() {
 }
 window.renderMessagingSection = renderMessagingSection;
 
-let messagingTemplateSaveDebounce = null;
+var messagingTemplateSaveDebounce = null;
 function autoSaveMessagingTemplate(tplKey) {
     if (!tplKey || typeof db === 'undefined' || typeof currentCompany === 'undefined') return;
     const el = document.getElementById(`msg-tpl-${tplKey}`);
@@ -3617,12 +3624,12 @@ function sendTestMessagingAlert() {
 }
 
 // ─── General Advertisement Broadcast Engine ────────────────────────────────
-let adRecipients = [];
-let selectedAdGroupFilter = 'ALL';
-let selectedAdImageBase64 = null;
-let activeAdBroadcastTimer = null;
-let isAdBroadcastRunning = false;
-let adSearchQuery = '';
+var adRecipients = [];
+var selectedAdGroupFilter = 'ALL';
+var selectedAdImageBase64 = null;
+var activeAdBroadcastTimer = null;
+var isAdBroadcastRunning = false;
+var adSearchQuery = '';
 
 function saveAdRecipients() {
     if (typeof currentCompany !== 'undefined' && currentCompany) {
@@ -4308,7 +4315,7 @@ window.setupSearchInputClearButtons = setupSearchInputClearButtons;
 // =============================================
 // TASK INQUIRY SYSTEM & DEPARTMENT
 // =============================================
-let currentTaskFormMode = 'assign'; // 'assign' | 'inquiry'
+var currentTaskFormMode = 'assign'; // 'assign' | 'inquiry'
 
 function setTaskFormMode(mode) {
     currentTaskFormMode = mode;
@@ -4648,7 +4655,7 @@ window.renderInquiries = renderInquiries;
 // =============================================
 // INQUIRIES POPUP MODAL HUD FUNCTIONS
 // =============================================
-let currentInquiryModalFilter = 'all';
+var currentInquiryModalFilter = 'all';
 
 function openInquiriesHUDModal() {
     const modal = document.getElementById('modal-inquiries-hud');
@@ -4790,8 +4797,8 @@ window.renderInquiriesModal = renderInquiriesModal;
 // =============================================
 // TASK CYCLE SYSTEM (SCHEDULED TASKS PER WORKER & DAYS)
 // =============================================
-let currentCycleItemsDraft = [];
-let currentEditingCycleItemId = null;
+var currentCycleItemsDraft = [];
+var currentEditingCycleItemId = null;
 
 function toggleCycleDaysPillsVisibility() {
     const sel = document.getElementById('cycle-recurrence-select');
