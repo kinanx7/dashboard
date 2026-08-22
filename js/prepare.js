@@ -2145,6 +2145,8 @@ window.saveCustomVaultFolder = saveCustomVaultFolder;
 // Delete Custom Vault Folder
 function deleteCustomVaultFolder(folderId, folderName) {
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    if (folderId === 'ALL') return;
+
     const confirmMsg = isAr 
         ? `هل أنت متأكد من حذف المجلد "${folderName}"؟ سيتم إرجاع جميع العناصر الموجودة بداخل هذا المجلد إلى قسم "عامة".`
         : `Are you sure you want to delete folder "${folderName}"? All notes inside will be moved to General.`;
@@ -2152,31 +2154,46 @@ function deleteCustomVaultFolder(folderId, folderName) {
     if (!confirm(confirmMsg)) return;
 
     const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    if (!data.hiddenVaultFolders) data.hiddenVaultFolders = {};
+    data.hiddenVaultFolders[folderId] = true;
+
+    if (data.vaultFolders && data.vaultFolders[folderId]) delete data.vaultFolders[folderId];
+
+    if (typeof appData !== 'undefined' && currentCompany && appData[currentCompany]) {
+        if (!appData[currentCompany].hiddenVaultFolders) appData[currentCompany].hiddenVaultFolders = {};
+        appData[currentCompany].hiddenVaultFolders[folderId] = true;
+        if (appData[currentCompany].vaultFolders) delete appData[currentCompany].vaultFolders[folderId];
+    }
+
     const notesObj = data.vaultNotes || {};
     const updates = {};
+    updates[`companies/${currentCompany}/hiddenVaultFolders/${folderId}`] = true;
     updates[`companies/${currentCompany}/vaultFolders/${folderId}`] = null;
 
     Object.values(notesObj).forEach(n => {
         if (n && (n.category === folderId || n.category === folderName)) {
+            n.category = 'General';
             updates[`companies/${currentCompany}/vaultNotes/${n.id}/category`] = 'General';
         }
     });
 
-    db.ref().update(updates)
-        .then(() => {
-            if (typeof showInAppNotification === 'function') {
-                showInAppNotification(isAr ? `🗑️ تم حذف المجلد "${folderName}".` : `🗑️ Folder "${folderName}" deleted.`);
-            }
-            if (vaultActiveCategoryFilter === folderId || vaultActiveCategoryFilter === folderName) {
-                vaultActiveCategoryFilter = 'ALL';
-            }
-            renderVaultCategoryFilters();
-            populateVaultCategoryDropdowns();
-            renderVaultNotes();
-        })
-        .catch(err => {
-            console.error("Failed to delete folder:", err);
-        });
+    if (vaultActiveCategoryFilter === folderId || vaultActiveCategoryFilter === folderName) {
+        vaultActiveCategoryFilter = 'ALL';
+    }
+
+    renderVaultCategoryFilters();
+    populateVaultCategoryDropdowns();
+    renderVaultNotes();
+
+    if (typeof db !== 'undefined' && currentCompany) {
+        db.ref().update(updates)
+            .then(() => {
+                if (typeof showInAppNotification === 'function') {
+                    showInAppNotification(isAr ? `🗑️ تم حذف المجلد "${folderName}" بنجاح.` : `🗑️ Folder "${folderName}" deleted successfully.`);
+                }
+            })
+            .catch(err => console.error("Failed to delete folder:", err));
+    }
 }
 window.deleteCustomVaultFolder = deleteCustomVaultFolder;
 
@@ -2209,49 +2226,71 @@ function renderVaultCategoryFilters() {
     if (!container) return;
 
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const isAdmin = (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager' || currentUser.isAdmin));
     const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
     const customFoldersObj = data.vaultFolders || {};
-    const customFolders = Object.values(customFoldersObj).filter(f => f && (f.id || f.name));
 
+    const hiddenVault = data.hiddenVaultFolders || {};
     const standardFilters = [
-        { id: 'ALL', label: isAr ? 'جميع الملاحظات' : 'All Notes', icon: '🌟' },
-        { id: 'Vehicle', label: isAr ? '🚗 مركبات ورخص' : '🚗 Vehicles', icon: '🚗' },
-        { id: 'Contracts', label: isAr ? '📜 عقود ووثائق' : '📜 Contracts', icon: '📜' },
-        { id: 'Passwords', label: isAr ? '🔑 كلمات سر' : '🔑 Passwords', icon: '🔑' },
-        { id: 'Documents', label: isAr ? '🆔 ثبوتيات' : '🆔 IDs', icon: '🆔' },
-        { id: 'General', label: isAr ? '📌 عامة' : '📌 General', icon: '📌' }
-    ];
+        { id: 'ALL', labelAr: 'جميع الملاحظات', labelEn: 'All Notes', icon: '🌟' },
+        { id: 'Vehicle', labelAr: 'مركبات ورخص', labelEn: 'Vehicles', icon: '🚗' },
+        { id: 'Contracts', labelAr: 'عقود ووثائق', labelEn: 'Contracts', icon: '📜' },
+        { id: 'Passwords', labelAr: 'كلمات سر', labelEn: 'Passwords', icon: '🔑' },
+        { id: 'Documents', labelAr: 'ثبوتيات ورخص', labelEn: 'IDs', icon: '🆔' },
+        { id: 'General', labelAr: 'معلومات عامة', labelEn: 'General', icon: '📌' }
+    ].filter(f => f.id === 'ALL' || !hiddenVault[f.id]);
 
     let html = standardFilters.map(f => {
         const isMatch = vaultActiveCategoryFilter === f.id;
-        const bg = isMatch ? '#6366f1' : 'transparent';
-        const color = isMatch ? 'white' : 'var(--text-main)';
-        return `<button type="button" onclick="setVaultCategoryFilter('${f.id}')" class="btn-vault-filter ${isMatch ? 'active-vault-filter' : ''}" data-cat="${f.id}" style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:1px solid var(--border-color); background:${bg}; color:${color}; cursor:pointer;">${f.label}</button>`;
+        const customOverride = customFoldersObj[f.id];
+        const icon = customOverride ? (customOverride.icon || f.icon) : f.icon;
+        const label = customOverride ? (isAr ? (customOverride.nameAr || customOverride.name) : (customOverride.nameEn || customOverride.name)) : (isAr ? f.labelAr : f.labelEn);
+        const bg = isMatch ? '#6366f1' : 'var(--card-bg)';
+        const color = isMatch ? '#ffffff' : 'var(--text-main)';
+
+        return `
+            <div style="display:inline-flex; align-items:center; background:${bg}; border:1px solid ${isMatch ? '#6366f1' : 'var(--border-color)'}; border-radius:20px; padding:2px 4px 2px 10px; gap:2px; transition:all 0.2s ease;">
+                <button type="button" onclick="setVaultCategoryFilter('${f.id}')" class="btn-vault-filter ${isMatch ? 'active-vault-filter' : ''}" data-cat="${f.id}" style="padding:6px 6px; border-radius:20px; font-weight:800; font-size:0.8rem; border:none; background:transparent; color:${color}; cursor:pointer;">
+                    ${icon} ${label}
+                </button>
+                ${(isAdmin && f.id !== 'ALL') ? `
+                    <button type="button" onclick="editVaultCategory('${f.id}')" style="background:none; border:none; color:${isMatch ? '#ffffff' : 'var(--primary)'}; cursor:pointer; font-size:0.75rem; font-weight:800; padding:2px 3px;" title="${isAr ? 'تعديل القسم' : 'Edit category'}">✏️</button>
+                    <button type="button" onclick="deleteCustomVaultFolder('${f.id}', '${label}')" style="background:none; border:none; color:${isMatch ? '#ffffff' : 'var(--danger)'}; cursor:pointer; font-size:0.75rem; font-weight:800; padding:2px 3px;" title="${isAr ? 'حذف القسم' : 'Delete category'}">✖</button>
+                ` : ''}
+            </div>
+        `;
     }).join('');
 
     // Add Custom Folders
-    customFolders.forEach(cf => {
+    Object.values(customFoldersObj).forEach(cf => {
+        if (!cf || !cf.id || ['ALL', 'Vehicle', 'Contracts', 'Passwords', 'Documents', 'General'].includes(cf.id)) return;
+
         const isMatch = vaultActiveCategoryFilter === cf.id || vaultActiveCategoryFilter === cf.name;
-        const bg = isMatch ? '#6366f1' : 'transparent';
-        const color = isMatch ? 'white' : 'var(--text-main)';
-        const safeName = typeof escapeHtml === 'function' ? escapeHtml(cf.name) : cf.name;
+        const bg = isMatch ? '#6366f1' : 'var(--card-bg)';
+        const color = isMatch ? '#ffffff' : 'var(--text-main)';
+        const safeName = isAr ? (cf.nameAr || cf.name) : (cf.nameEn || cf.name);
 
         html += `
-            <div style="display:inline-flex; align-items:center; background:${bg}; border:1px solid var(--border-color); border-radius:20px; padding:2px 4px 2px 10px; gap:4px;">
-                <button type="button" onclick="setVaultCategoryFilter('${cf.id}')" class="btn-vault-filter ${isMatch ? 'active-vault-filter' : ''}" data-cat="${cf.id}" style="padding:6px 4px; border-radius:20px; font-weight:800; font-size:0.8rem; border:none; background:transparent; color:${color}; cursor:pointer;">
+            <div style="display:inline-flex; align-items:center; background:${bg}; border:1px solid ${isMatch ? '#6366f1' : 'var(--border-color)'}; border-radius:20px; padding:2px 4px 2px 10px; gap:2px; transition:all 0.2s ease;">
+                <button type="button" onclick="setVaultCategoryFilter('${cf.id}')" class="btn-vault-filter ${isMatch ? 'active-vault-filter' : ''}" data-cat="${cf.id}" style="padding:6px 6px; border-radius:20px; font-weight:800; font-size:0.8rem; border:none; background:transparent; color:${color}; cursor:pointer;">
                     ${cf.icon || '📁'} ${safeName}
                 </button>
-                <button type="button" onclick="deleteCustomVaultFolder('${cf.id}', '${safeName}')" style="background:none; border:none; color:${isMatch ? 'white' : 'var(--danger)'}; cursor:pointer; font-size:0.75rem; font-weight:800; padding:2px 4px;" title="${isAr ? 'حذف المجلد' : 'Delete folder'}">✖</button>
+                ${isAdmin ? `
+                    <button type="button" onclick="editVaultCategory('${cf.id}')" style="background:none; border:none; color:${isMatch ? '#ffffff' : 'var(--primary)'}; cursor:pointer; font-size:0.75rem; font-weight:800; padding:2px 3px;" title="${isAr ? 'تعديل المجلد' : 'Edit folder'}">✏️</button>
+                    <button type="button" onclick="deleteCustomVaultFolder('${cf.id}', '${safeName}')" style="background:none; border:none; color:${isMatch ? '#ffffff' : 'var(--danger)'}; cursor:pointer; font-size:0.75rem; font-weight:800; padding:2px 3px;" title="${isAr ? 'حذف المجلد' : 'Delete folder'}">✖</button>
+                ` : ''}
             </div>
         `;
     });
 
     // Add New Folder button at end of filter bar
-    html += `
-        <button type="button" onclick="toggleVaultFolderForm()" style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:2px dashed #6366f1; background:rgba(99,102,241,0.1); color:#6366f1; cursor:pointer;">
-            📁 ${isAr ? '+ إنشاء مجلد جديد' : '+ New Folder'}
-        </button>
-    `;
+    if (isAdmin) {
+        html += `
+            <button type="button" onclick="openVaultFolderModal()" style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:2px dashed #6366f1; background:rgba(99,102,241,0.12); color:#6366f1; cursor:pointer;">
+                📁 ${isAr ? '+ إنشاء مجلد جديد' : '+ New Folder'}
+            </button>
+        `;
+    }
 
     container.innerHTML = html;
 }
@@ -2667,7 +2706,8 @@ function renderVaultNotes() {
     }
 
     grid.style.display = 'grid';
-    grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(280px, 1fr))';
+    grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(310px, 1fr))';
+    grid.style.boxSizing = 'border-box';
     grid.style.gap = '16px';
     grid.style.width = '100%';
 
@@ -2746,7 +2786,7 @@ function renderVaultNotes() {
         return `
             <div class="ledger-card" ondblclick="if (!event.target.closest('button')) editVaultNote('${n.id}')" style="
                 margin: 0;
-                padding: 16px;
+                padding: 14px;
                 border-radius: 14px;
                 border: 1px solid var(--border-color);
                 background: var(--card-bg);
@@ -2756,6 +2796,10 @@ function renderVaultNotes() {
                 box-shadow: var(--shadow-sm);
                 transition: transform 0.2s ease, box-shadow 0.2s ease;
                 cursor: pointer;
+                box-sizing: border-box;
+                width: 100%;
+                max-width: 100%;
+                overflow: hidden;
             " title="${isAr ? 'انقر مرتين لتعديل الملاحظة' : 'Double-click to edit note'}">
                 <div>
                     <!-- Image Card (If Uploaded) -->
@@ -2824,16 +2868,24 @@ function renderVaultNotes() {
                         }
                     })()}
 
-                    <!-- Row 1: Category Badge & Action Buttons -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 8px; width: 100%;">
-                        <span style="${badgeStyle} display: inline-block; padding: 4px 10px; border-radius: 14px; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                    <!-- Row 1: Category Badge & Action Buttons (Compact, Zero Overflow) -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 6px; width: 100%; box-sizing: border-box; flex-wrap: wrap;">
+                        <span style="${badgeStyle} display: inline-block; padding: 3px 8px; border-radius: 10px; font-weight: 800; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.3px; max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1;" title="${badgeLabel}">
                             ${badgeLabel}
                         </span>
-                        <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
-                            <button type="button" onclick="shareVaultNote('${n.id}')" title="${isAr ? 'مشاركة الملاحظة والصور في أي تطبيق' : 'Share note & photos to any app'}" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: #10b981;">${isAr ? '📲 مشاركة' : '📲 Share'}</button>
-                            <button type="button" onclick="copyVaultText('${n.id}')" title="${isAr ? 'نسخ النص' : 'Copy Text'}" style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: var(--text-main);">${isAr ? '📋 نسخ' : '📋 Copy'}</button>
-                            <button type="button" onclick="editVaultNote('${n.id}')" title="${isAr ? 'تعديل الملاحظة' : 'Edit Note'}" style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: #6366f1;">${isAr ? '✏️ تعديل' : '✏️ Edit'}</button>
-                            <button type="button" onclick="deleteVaultNote('${n.id}')" title="${isAr ? 'حذف الملاحظة' : 'Delete Note'}" style="background: rgba(220, 38, 38, 0.1); border: 1px solid rgba(220, 38, 38, 0.25); border-radius: 6px; padding: 4px 8px; font-size: 0.78rem; font-weight: 700; cursor: pointer; color: var(--danger);">🗑️</button>
+                        <div style="display: flex; align-items: center; gap: 3px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end;">
+                            <button type="button" onclick="shareVaultNote('${n.id}')" title="${isAr ? 'مشاركة الملاحظة والصور في أي تطبيق' : 'Share note & photos to any app'}" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 3px 6px; font-size: 0.74rem; font-weight: 700; cursor: pointer; color: #10b981; display: inline-flex; align-items: center; gap: 2px;">
+                                <span>📲</span><span>${isAr ? 'مشاركة' : 'Share'}</span>
+                            </button>
+                            <button type="button" onclick="copyVaultText('${n.id}')" title="${isAr ? 'نسخ النص' : 'Copy Text'}" style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 3px 6px; font-size: 0.74rem; font-weight: 700; cursor: pointer; color: var(--text-main); display: inline-flex; align-items: center; gap: 2px;">
+                                <span>📋</span><span>${isAr ? 'نسخ' : 'Copy'}</span>
+                            </button>
+                            <button type="button" onclick="editVaultNote('${n.id}')" title="${isAr ? 'تعديل الملاحظة' : 'Edit Note'}" style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 6px; padding: 3px 6px; font-size: 0.74rem; font-weight: 700; cursor: pointer; color: #6366f1; display: inline-flex; align-items: center; gap: 2px;">
+                                <span>✏️</span><span>${isAr ? 'تعديل' : 'Edit'}</span>
+                            </button>
+                            <button type="button" onclick="deleteVaultNote('${n.id}')" title="${isAr ? 'حذف الملاحظة' : 'Delete Note'}" style="background: rgba(220, 38, 38, 0.12); border: 1px solid rgba(220, 38, 38, 0.3); border-radius: 6px; padding: 3px 6px; font-size: 0.74rem; font-weight: 700; cursor: pointer; color: var(--danger); display: inline-flex; align-items: center; justify-content: center;">
+                                <span>🗑️</span>
+                            </button>
                         </div>
                     </div>
 
@@ -5242,3 +5294,135 @@ if (typeof recalculateAdRecipientGroups === 'function') window.recalculateAdReci
 if (typeof sendNext === 'function') window.sendNext = sendNext;
 if (typeof getGMT3Time === 'function') window.getGMT3Time = getGMT3Time;
 if (typeof checkScheduledTaskCycles === 'function') window.checkScheduledTaskCycles = checkScheduledTaskCycles;
+
+
+
+// =====================================================================
+// VAULT / INFORMATIONS CATEGORY EDIT & DELETE ENGINE
+// =====================================================================
+
+function openVaultFolderModal(catId) {
+    const modal = document.getElementById('modal-edit-vault-folder');
+    const editIdEl = document.getElementById('vault-folder-editing-id');
+    const arEl = document.getElementById('vault-folder-name-ar');
+    const enEl = document.getElementById('vault-folder-name-en');
+    const iconEl = document.getElementById('vault-folder-icon');
+    const colorEl = document.getElementById('vault-folder-color');
+    const titleEl = document.getElementById('vault-folder-modal-title');
+    const submitBtn = document.getElementById('vault-folder-submit-btn');
+
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    if (editIdEl) editIdEl.value = catId || '';
+    if (arEl) arEl.value = '';
+    if (enEl) enEl.value = '';
+    if (iconEl) iconEl.value = '📁';
+    if (colorEl) colorEl.value = '#6366f1';
+
+    if (catId) {
+        const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+        const customFoldersObj = data.vaultFolders || {};
+        const custom = customFoldersObj[catId] || Object.values(customFoldersObj).find(f => f && (f.id === catId || f.name === catId));
+
+        if (custom) {
+            if (arEl) arEl.value = custom.nameAr || custom.name || '';
+            if (enEl) enEl.value = custom.nameEn || custom.name || '';
+            if (iconEl) iconEl.value = custom.icon || '📁';
+            if (colorEl) colorEl.value = custom.color || '#6366f1';
+        } else {
+            // Built-in standard filter meta
+            const stdMeta = {
+                'Vehicle': { ar: 'مركبات ورخص', en: 'Vehicles & Licenses', icon: '🚗' },
+                'Contracts': { ar: 'عقود ووثائق', en: 'Contracts & Documents', icon: '📜' },
+                'Passwords': { ar: 'كلمات سر', en: 'Passwords & Logins', icon: '🔑' },
+                'Documents': { ar: 'ثبوتيات ورخص', en: 'IDs & Papers', icon: '🆔' },
+                'General': { ar: 'معلومات عامة', en: 'General Info', icon: '📌' }
+            }[catId];
+
+            if (stdMeta) {
+                if (arEl) arEl.value = stdMeta.ar;
+                if (enEl) enEl.value = stdMeta.en;
+                if (iconEl) iconEl.value = stdMeta.icon;
+            }
+        }
+        if (titleEl) titleEl.textContent = isAr ? '✏️ تعديل قسم المعلومات' : '✏️ Edit Vault Category / Folder';
+        if (submitBtn) submitBtn.textContent = isAr ? '💾 حفظ التعديلات' : '💾 Save Changes';
+    } else {
+        if (titleEl) titleEl.textContent = isAr ? '📁 إنشاء مجلد معلومات جديد' : '📁 Create Vault Category / Folder';
+        if (submitBtn) submitBtn.textContent = isAr ? '💾 حفظ المجلد' : '💾 Save Folder';
+    }
+
+    if (modal) modal.style.display = 'flex';
+}
+window.openVaultFolderModal = openVaultFolderModal;
+
+function closeVaultFolderModal() {
+    const modal = document.getElementById('modal-edit-vault-folder');
+    if (modal) modal.style.display = 'none';
+}
+window.closeVaultFolderModal = closeVaultFolderModal;
+
+function saveVaultCategoryModal() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const editIdEl = document.getElementById('vault-folder-editing-id');
+    const arEl = document.getElementById('vault-folder-name-ar');
+    const enEl = document.getElementById('vault-folder-name-en');
+    const iconEl = document.getElementById('vault-folder-icon');
+    const colorEl = document.getElementById('vault-folder-color');
+
+    const editingId = editIdEl ? editIdEl.value.trim() : '';
+    const nameAr = arEl ? arEl.value.trim() : '';
+    const nameEn = enEl ? enEl.value.trim() : '';
+    const icon = iconEl && iconEl.value.trim() ? iconEl.value.trim() : '📁';
+    const color = colorEl ? colorEl.value : '#6366f1';
+
+    if (!nameAr || !nameEn) {
+        alert(isAr ? 'الرجاء إدخال اسم القسم بالعربي وبالإنجليزي.' : 'Please enter folder name in both Arabic and English.');
+        return;
+    }
+
+    const folderId = editingId || ('vfolder_' + Date.now());
+    const folderObj = {
+        id: folderId,
+        name: isAr ? nameAr : nameEn,
+        nameAr: nameAr,
+        nameEn: nameEn,
+        icon: icon,
+        color: color,
+        updatedAt: Date.now()
+    };
+
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    if (!data.vaultFolders) data.vaultFolders = {};
+    data.vaultFolders[folderId] = folderObj;
+
+    if (typeof appData !== 'undefined' && currentCompany && appData[currentCompany]) {
+        if (!appData[currentCompany].vaultFolders) appData[currentCompany].vaultFolders = {};
+        appData[currentCompany].vaultFolders[folderId] = folderObj;
+    }
+
+    closeVaultFolderModal();
+    vaultActiveCategoryFilter = folderId;
+    renderVaultCategoryFilters();
+    populateVaultCategoryDropdowns();
+    renderVaultNotes();
+
+    if (typeof db !== 'undefined' && currentCompany) {
+        db.ref(`companies/${currentCompany}/vaultFolders/${folderId}`).set(folderObj).then(() => {
+            if (typeof showInAppNotification === 'function') {
+                showInAppNotification(isAr ? '📁 تم حفظ قسم المعلومات بنجاح!' : '📁 Vault folder saved successfully!');
+            }
+        }).catch(err => console.error("Error saving vault folder:", err));
+    }
+}
+window.saveVaultCategoryModal = saveVaultCategoryModal;
+
+function editVaultCategory(catId) {
+    openVaultFolderModal(catId);
+}
+window.editVaultCategory = editVaultCategory;
+
+function deleteVaultCategory(catId, catName) {
+    deleteCustomVaultFolder(catId, catName);
+}
+window.deleteVaultCategory = deleteVaultCategory;

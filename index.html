@@ -81,7 +81,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=160">
+    <link rel="stylesheet" href="style.css?v=161">
 </head>
 
 <body class="theme-burgeroov">
@@ -3862,7 +3862,7 @@
         </div>
 
         <!-- Admin Informations & Document Vault Section -->
-        <div id="view-vault" class="view-section admin-only" style="grid-template-columns: 1fr;">
+        <div id="view-vault" class="view-section admin-only" style="grid-template-columns: 1fr; max-width: 1400px; width: 100%; margin: 0 auto; padding: 0 24px; box-sizing: border-box; overflow-x: hidden;">
             <div class="card" style="width: 100%; border-top: 4px solid #6366f1;">
                 <!-- Header Title & Controls -->
                 <div class="flex-between" style="margin-bottom: 20px; flex-wrap: wrap; gap: 14px; align-items: center;">
@@ -4025,7 +4025,7 @@
                             style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 1rem; color: var(--text-muted); pointer-events: none;">🔍</span>
                     </div>
 
-                    <div style="display:flex; gap:6px; flex-wrap:wrap;" id="vault-category-filters">
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; width:100%; box-sizing:border-box;" id="vault-category-filters">
                         <button type="button" onclick="setVaultCategoryFilter('ALL')"
                             class="btn-vault-filter active-vault-filter" data-cat="ALL"
                             style="padding:8px 14px; border-radius:20px; font-weight:800; font-size:0.8rem; border:1px solid var(--border-color); background:#6366f1; color:white; cursor:pointer;"
@@ -4055,7 +4055,7 @@
 
                 <!-- CARDS GRID (Reminder style cards next to each other) -->
                 <div id="vault-notes-grid"
-                    style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; width: 100%;">
+                    style="display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 16px; width: 100%; box-sizing: border-box;">
                     <!-- Dynamically rendered by renderVaultNotes() -->
                 </div>
             </div>
@@ -4067,9 +4067,9 @@
         <!-- ========================================== -->
             <!-- VIEW: LEARNING PROGRAM (ALL WORKERS)       -->
             <!-- ========================================== -->
-            <div id="view-learning" class="view-section" style="grid-template-columns: 1fr;">
+            <div id="view-learning" class="view-section" style="grid-template-columns: 1fr; max-width: 1400px; width: 100%; margin: 0 auto; padding: 0 24px; box-sizing: border-box; overflow-x: hidden;">
                 <!-- Top HUD Header Banner -->
-                <div style="background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(168,85,247,0.15)); border: 2px solid #8b5cf6; border-radius: 18px; padding: 22px; margin-bottom: 20px; box-shadow: 0 4px 14px rgba(139,92,246,0.15); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                <div style="background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(168,85,247,0.15)); border: 2px solid #8b5cf6; border-radius: 18px; padding: 18px 22px; margin-bottom: 20px; box-shadow: 0 4px 14px rgba(139,92,246,0.15); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; width: 100%; box-sizing: border-box;">
                     <div style="display: flex; align-items: center; gap: 16px;">
                         <div style="font-size: 2.8rem; background: rgba(139,92,246,0.2); width: 64px; height: 64px; border-radius: 16px; display: flex; align-items: center; justify-content: center;">🎓</div>
                         <div>
@@ -4138,7 +4138,7 @@
                         <span id="learning-count-badge" class="badge" style="background: rgba(139,92,246,0.15); color: #8b5cf6; border: 1px solid rgba(139,92,246,0.3); padding: 8px 14px; border-radius: 100px; font-weight: 800; font-size: 0.85rem;">0 Videos</span>
                     </div>
 
-                    <div id="learning-category-tabs" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px;">
+                    <div id="learning-category-tabs" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; width: 100%; box-sizing: border-box; padding-bottom: 6px;">
                         <!-- Rendered dynamically: All, Warehouse, Sales, Ops, Drivers, Prepare, Tasks, General -->
                     </div>
                 </div>
@@ -5949,11 +5949,12 @@
     <div id="modal-add-learning-category" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.7); backdrop-filter:blur(6px); justify-content:center; align-items:center; z-index:9999999;">
         <div class="modal-content" style="max-width: 480px; width: 92%; border-radius: 18px; padding: 24px; background:var(--card-bg); border: 2px solid #8b5cf6; box-shadow:0 10px 40px rgba(0,0,0,0.5);">
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--border-color); padding-bottom:12px; margin-bottom:16px;">
-                <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:#8b5cf6;" data-i18n="title-add-learning-cat-modal">📁 Add Custom Job Category</h3>
+                <h3 id="custom-cat-modal-title" style="margin:0; font-size:1.15rem; font-weight:800; color:#8b5cf6;" data-i18n="title-add-learning-cat-modal">📁 Add Custom Job Category</h3>
                 <button type="button" onclick="closeAddLearningCategoryModal()" style="background:transparent; border:none; font-size:1.2rem; cursor:pointer; color:var(--text-muted);">✖</button>
             </div>
 
             <form onsubmit="event.preventDefault(); saveCustomLearningCategory();" style="display:flex; flex-direction:column; gap:14px;">
+                <input type="hidden" id="custom-cat-editing-id" value="" />
                 <div class="form-group" style="margin:0;">
                     <label style="font-weight:700; font-size:0.85rem;" data-i18n="label-cat-name-ar">Category Name (Arabic) *</label>
                     <input type="text" id="custom-cat-name-ar" required placeholder="مثال: قسم النظافة والتعقيم..." style="width:100%; padding:10px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.9rem;" />
@@ -5977,15 +5978,56 @@
 
                 <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
                     <button type="button" onclick="closeAddLearningCategoryModal()" class="btn-neutral" style="padding:10px 18px; border-radius:10px; font-weight:700;" data-i18n="btn-cancel">Cancel</button>
-                    <button type="submit" class="btn-primary" style="padding:10px 22px; border-radius:10px; font-weight:800; background:linear-gradient(135deg, #8b5cf6, #7c3aed); border:none;" data-i18n="btn-save-category">💾 Save Category</button>
+                    <button type="submit" id="custom-cat-submit-btn" class="btn-primary" style="padding:10px 22px; border-radius:10px; font-weight:800; background:linear-gradient(135deg, #8b5cf6, #7c3aed); border:none;" data-i18n="btn-save-category">💾 Save Category</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    
+    <!-- EDIT/CREATE VAULT CATEGORY MODAL -->
+    <div id="modal-edit-vault-folder" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.75); backdrop-filter:blur(6px); justify-content:center; align-items:center; z-index:9999999;">
+        <div class="modal-content" style="max-width: 480px; width: 92%; border-radius: 20px; padding: 24px; background:var(--card-bg); border: 2px solid #6366f1; box-shadow:0 12px 40px rgba(0,0,0,0.5);">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--border-color); padding-bottom:12px; margin-bottom:16px;">
+                <h3 id="vault-folder-modal-title" style="margin:0; font-size:1.15rem; font-weight:800; color:#6366f1;" data-i18n="title-vault-folder-modal">📁 Edit Vault Category / Folder</h3>
+                <button type="button" onclick="closeVaultFolderModal()" style="background:transparent; border:none; font-size:1.2rem; cursor:pointer; color:var(--text-muted);">✖</button>
+            </div>
+
+            <form onsubmit="event.preventDefault(); saveVaultCategoryModal();" style="display:flex; flex-direction:column; gap:14px;">
+                <input type="hidden" id="vault-folder-editing-id" value="" />
+
+                <div class="form-group" style="margin:0;">
+                    <label style="font-weight:700; font-size:0.85rem;" data-i18n="label-folder-name-ar">Category / Folder Name (Arabic) *</label>
+                    <input type="text" id="vault-folder-name-ar" required placeholder="مثال: وثائق الرخص، السجلات..." style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.9rem;" />
+                </div>
+
+                <div class="form-group" style="margin:0;">
+                    <label style="font-weight:700; font-size:0.85rem;" data-i18n="label-folder-name-en">Category / Folder Name (English) *</label>
+                    <input type="text" id="vault-folder-name-en" required placeholder="e.g. License Documents..." style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.9rem;" />
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-weight:700; font-size:0.85rem;" data-i18n="label-folder-icon">Icon Emoji</label>
+                        <input type="text" id="vault-folder-icon" placeholder="e.g. 📁" value="📁" style="width:100%; padding:10px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.9rem; text-align:center;" />
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-weight:700; font-size:0.85rem;" data-i18n="label-folder-color">Theme Color</label>
+                        <input type="color" id="vault-folder-color" value="#6366f1" style="width:100%; height:42px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); cursor:pointer;" />
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
+                    <button type="button" onclick="closeVaultFolderModal()" class="btn-neutral" style="padding:10px 18px; border-radius:10px; font-weight:700;" data-i18n="btn-cancel">Cancel</button>
+                    <button type="submit" id="vault-folder-submit-btn" class="btn-primary" style="padding:10px 22px; border-radius:10px; font-weight:800; background:linear-gradient(135deg, #6366f1, #4f46e5); border:none;" data-i18n="btn-save-folder">💾 Save Folder</button>
                 </div>
             </form>
         </div>
     </div>
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=144"></script>
-    <script src="app.js?v=144"></script>
+    <script src="translations.js?v=166"></script>
+    <script src="app.js?v=166"></script>
 </body>
 
 </html>
