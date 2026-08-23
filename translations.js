@@ -912,6 +912,7 @@ var uiTranslations = {
     ar: {
  
         "tab-contracts": "📜 العقود",
+        "tab-learning": "🎓 برنامج التعليم والتدريب",
         "title-contracts-main": "📜 العقود والاتفاقيات الرسمية والتوقيع الإلكتروني",
         "desc-contracts-main": "إنشاء وإرسال وأرشفة عقود العمل والاتفاقيات الموقعة إلكترونياً.",
         "btn-create-text-contract": "➕ إنشاء عقد نصي",

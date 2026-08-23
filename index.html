@@ -490,7 +490,7 @@
                     <button id="tab-learning" class="dept-tab" onclick="switchTab('learning')"
                         data-i18n="tab-learning">🎓
                         Learning</button>
-                    <button id="tab-contracts" class="dept-tab admin-only" onclick="switchTab('contracts')"
+                    <button id="tab-contracts" class="dept-tab" onclick="switchTab('contracts')"
                         data-i18n="tab-contracts">📜
                         Contracts</button>
                 </div>
@@ -5807,6 +5807,14 @@
                 onclick="switchTab('messaging'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">💬</span><span data-i18n="tab-messaging">Messaging</span>
             </button>
+            <button class="mob-dept-item mob-sheet-tab" data-tab="learning"
+                onclick="switchTab('learning'); closeMobDeptMenu()">
+                <span class="mob-dept-icon">🎓</span><span data-i18n="tab-learning">Learning</span>
+            </button>
+            <button class="mob-dept-item mob-sheet-tab" data-tab="contracts"
+                onclick="switchTab('contracts'); closeMobDeptMenu()">
+                <span class="mob-dept-icon">📜</span><span data-i18n="tab-contracts">Contracts</span>
+            </button>
         </div>
     </div>
 
@@ -6279,8 +6287,8 @@
 
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=173"></script>
-    <script src="app.js?v=173"></script>
+    <script src="translations.js?v=178"></script>
+    <script src="app.js?v=178"></script>
 </body>
 
 </html>

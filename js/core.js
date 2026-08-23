@@ -1492,7 +1492,9 @@ function markLockedTabs() {
         prepare: isAdmin || document.body.classList.contains('perm-prepare'),
         'ai-assistant': isAdmin,
         vault: isAdmin || document.body.classList.contains('perm-vault'),
-        messaging: isAdmin || document.body.classList.contains('perm-messaging')
+        messaging: isAdmin || document.body.classList.contains('perm-messaging'),
+        learning: true,
+        contracts: isAdmin
     };
 
     Object.entries(access).forEach(([tabId, hasAccess]) => {
@@ -1547,6 +1549,27 @@ function ensureArraysExist(data) {
     data.violationRules = data.violationRules.filter(r => r);
 
     if (!data.vaultNotes) data.vaultNotes = {};
+
+    // Contracts dictionary sanitize and null-removal
+    if (data.contracts) {
+        if (Array.isArray(data.contracts)) {
+            const cleanObj = {};
+            data.contracts.forEach(c => {
+                if (c && typeof c === 'object' && c.id) {
+                    cleanObj[c.id] = c;
+                }
+            });
+            data.contracts = cleanObj;
+        } else if (typeof data.contracts === 'object') {
+            Object.keys(data.contracts).forEach(k => {
+                if (!data.contracts[k] || typeof data.contracts[k] !== 'object' || !data.contracts[k].id) {
+                    delete data.contracts[k];
+                }
+            });
+        }
+    } else {
+        data.contracts = {};
+    }
 
     if (!data.jobCatalog) data.jobCatalog = [];
     data.jobCatalog = data.jobCatalog.filter(j => j);

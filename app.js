@@ -1492,7 +1492,9 @@ function markLockedTabs() {
         prepare: isAdmin || document.body.classList.contains('perm-prepare'),
         'ai-assistant': isAdmin,
         vault: isAdmin || document.body.classList.contains('perm-vault'),
-        messaging: isAdmin || document.body.classList.contains('perm-messaging')
+        messaging: isAdmin || document.body.classList.contains('perm-messaging'),
+        learning: true,
+        contracts: isAdmin
     };
 
     Object.entries(access).forEach(([tabId, hasAccess]) => {
@@ -1547,6 +1549,27 @@ function ensureArraysExist(data) {
     data.violationRules = data.violationRules.filter(r => r);
 
     if (!data.vaultNotes) data.vaultNotes = {};
+
+    // Contracts dictionary sanitize and null-removal
+    if (data.contracts) {
+        if (Array.isArray(data.contracts)) {
+            const cleanObj = {};
+            data.contracts.forEach(c => {
+                if (c && typeof c === 'object' && c.id) {
+                    cleanObj[c.id] = c;
+                }
+            });
+            data.contracts = cleanObj;
+        } else if (typeof data.contracts === 'object') {
+            Object.keys(data.contracts).forEach(k => {
+                if (!data.contracts[k] || typeof data.contracts[k] !== 'object' || !data.contracts[k].id) {
+                    delete data.contracts[k];
+                }
+            });
+        }
+    } else {
+        data.contracts = {};
+    }
 
     if (!data.jobCatalog) data.jobCatalog = [];
     data.jobCatalog = data.jobCatalog.filter(j => j);
@@ -16193,10 +16216,26 @@ function applyUserTabOrder() {
 }
 
 function reorderTabContainer(container, tabIds) {
-    tabIds.forEach(id => {
-        const tabEl = document.getElementById(id);
-        if (tabEl && tabEl.parentNode === container) {
-            container.appendChild(tabEl);
+    if (!container) return;
+    const allTabs = Array.from(container.querySelectorAll('.dept-tab'));
+    const allIds = allTabs.map(t => t.id);
+
+    if (Array.isArray(tabIds)) {
+        tabIds.forEach(id => {
+            const tabEl = document.getElementById(id);
+            if (tabEl && tabEl.parentNode === container) {
+                container.appendChild(tabEl);
+            }
+        });
+    }
+
+    // Always preserve any newly added tabs that weren't in saved order
+    allIds.forEach(id => {
+        if (!tabIds || !tabIds.includes(id)) {
+            const tabEl = document.getElementById(id);
+            if (tabEl && tabEl.parentNode === container) {
+                container.appendChild(tabEl);
+            }
         }
     });
 }
@@ -26355,7 +26394,7 @@ function renderContractsSection() {
 
     const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
     const contractsObj = data.contracts || {};
-    let contracts = Object.values(contractsObj);
+    let contracts = Object.values(contractsObj).filter(c => c && typeof c === "object" && c.id && c.title);
 
     // Search Query Filter
     const searchInput = document.getElementById('contract-search-input');
@@ -26380,7 +26419,7 @@ function renderContractsSection() {
     contracts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
     // Update Counter Badges
-    const allContracts = Object.values(contractsObj);
+    const allContracts = Object.values(contractsObj).filter(c => c && typeof c === "object" && c.id && c.title);
     const totalCount = allContracts.length;
     const pendingCount = allContracts.filter(c => c.status === 'pending_signature').length;
     const signedCount = allContracts.filter(c => c.status === 'signed').length;
@@ -26753,24 +26792,56 @@ window.confirmSendContractToWorker = confirmSendContractToWorker;
 
 // 5. DELETE CONTRACT
 function deleteContract(contractId) {
+    if (!contractId) return;
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     if (!confirm(isAr ? 'هل أنت متأكد من حذف هذا العقد نهائياً؟' : 'Are you sure you want to delete this contract?')) {
         return;
     }
 
     const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
-    if (data.contracts && data.contracts[contractId]) delete data.contracts[contractId];
+    let targetContract = data.contracts?.[contractId];
+    if (!targetContract && data.contracts) {
+        targetContract = Object.values(data.contracts).find(c => c && (c.id === contractId || String(c.id) === String(contractId)));
+    }
+    const realId = (targetContract && targetContract.id) ? targetContract.id : contractId;
+    const workerId = targetContract ? targetContract.workerId : null;
 
+    // 1. Delete from in-memory objects immediately
+    if (data.contracts) {
+        delete data.contracts[realId];
+        delete data.contracts[contractId];
+    }
     if (typeof appData !== 'undefined' && currentCompany && appData[currentCompany]?.contracts) {
+        delete appData[currentCompany].contracts[realId];
         delete appData[currentCompany].contracts[contractId];
     }
 
-    renderContractsSection();
+    // 2. Clean up any PDF viewer if currently viewing this contract
+    if (currentViewingContractId === realId || currentViewingContractId === contractId) {
+        closeContractPDFViewer();
+    }
 
+    // 3. Re-render UI immediately
+    renderContractsSection();
+    if (typeof renderWorkerOperationsContractBanner === 'function') {
+        renderWorkerOperationsContractBanner();
+    }
+
+    // 4. Atomic Firebase RTDB delete (clean both contract node and worker pending reference)
     if (typeof db !== 'undefined' && currentCompany) {
-        db.ref(`companies/${currentCompany}/contracts/${contractId}`).remove().then(() => {
+        const updates = {};
+        updates[`companies/${currentCompany}/contracts/${realId}`] = null;
+        if (realId !== contractId) {
+            updates[`companies/${currentCompany}/contracts/${contractId}`] = null;
+        }
+        if (workerId) {
+            updates[`companies/${currentCompany}/workerPendingContracts/${workerId}/${realId}`] = null;
+        }
+
+        db.ref().update(updates).then(() => {
+            db.ref(`companies/${currentCompany}/contracts/${realId}`).remove().catch(() => {});
             if (typeof showInAppNotification === 'function') {
-                showInAppNotification(isAr ? '🗑️ تم حذف العقد.' : '🗑️ Contract deleted.');
+                showInAppNotification(isAr ? '🗑️ تم حذف العقد نهائياً من النظام.' : '🗑️ Contract deleted permanently.');
             }
         }).catch(err => console.error("Error deleting contract:", err));
     }
@@ -26791,6 +26862,7 @@ function viewContractAsPDF(contractId) {
     const c = data.contracts?.[contractId];
     if (!c) return;
 
+    const isAdmin = (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager' || currentUser.isAdmin));
     const compName = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany.toUpperCase() : 'MVC FRESH';
     const isSigned = (c.status === 'signed' || !!c.signatureDataUrl || !!c.signedAt);
     const dateStr = c.createdAt ? new Date(c.createdAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
@@ -26846,12 +26918,15 @@ function viewContractAsPDF(contractId) {
                 ⏳ ${isAr ? `حالة العقد: بانتظار توقيع الموظف (${c.workerName || 'غير مسند'})` : `Contract Status: Pending Signature (${c.workerName || 'Unassigned'})`}
             </div>
             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <button type="button" onclick="openWorkerContractSignModal('${c.id}')" class="btn-success" style="padding: 8px 16px; font-weight: 800; font-size: 0.85rem; border-radius: 8px; background: linear-gradient(135deg, #10b981, #059669); border: none; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(16,185,129,0.3);">
-                    <span>✍️</span> <span>${isAr ? 'توقيع العقد الآن' : 'Sign Contract Now'}</span>
-                </button>
-                <button type="button" onclick="openSendContractModal('${c.id}')" class="btn-primary" style="padding: 8px 16px; font-weight: 800; font-size: 0.85rem; border-radius: 8px; background: #4f46e5; border: none; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
-                    <span>📤</span> <span>${isAr ? 'إرسال لموظف آخر' : 'Send to Worker'}</span>
-                </button>
+                ${!isAdmin ? `
+                    <button type="button" onclick="openWorkerContractSignModal('${c.id}')" class="btn-success" style="padding: 8px 16px; font-weight: 800; font-size: 0.85rem; border-radius: 8px; background: linear-gradient(135deg, #10b981, #059669); border: none; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(16,185,129,0.3);">
+                        <span>✍️</span> <span>${isAr ? 'توقيع العقد الآن' : 'Sign Contract Now'}</span>
+                    </button>
+                ` : `
+                    <button type="button" onclick="openSendContractModal('${c.id}')" class="btn-primary" style="padding: 8px 16px; font-weight: 800; font-size: 0.85rem; border-radius: 8px; background: #4f46e5; border: none; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        <span>📤</span> <span>${isAr ? 'إرسال لموظف للتوقيع' : 'Send to Worker for Signature'}</span>
+                    </button>
+                `}
             </div>
         </div>
     `;
@@ -26966,16 +27041,27 @@ window.printContractPDF = printContractPDF;
 var currentSigningContractId = null;
 
 function openWorkerContractSignModal(contractId) {
-    currentSigningContractId = contractId;
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const isAdmin = (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager' || currentUser.isAdmin));
+    if (isAdmin) {
+        alert(isAr ? 'عفواً، لا يمكن للمدير التوقيع نيابة عن الموظف. هذا الإجراء مخصص للموظف المستلم فقط عبر حسابه.' : 'Notice: Administrators cannot sign on behalf of workers. This action is reserved for the recipient worker via their account.');
+        return;
+    }
+    currentSigningContractId = contractId;
     const modal = document.getElementById('modal-worker-contract-sign');
     const contractBodyContainer = document.getElementById('worker-sign-contract-body');
     const dateInput = document.getElementById('worker-signature-date');
-    if (!modal) return;
+    if (!modal) {
+        console.error("modal-worker-contract-sign not found in DOM");
+        return;
+    }
 
     const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
-    const c = data.contracts?.[contractId];
-    if (!c) return;
+    const contractsObj = data.contracts || (typeof appData !== 'undefined' && currentCompany && appData[currentCompany]?.contracts) || {};
+    let c = contractsObj[contractId];
+    if (!c) {
+        c = Object.values(contractsObj).find(item => item && (item.id === contractId || String(item.id) === String(contractId)));
+    }
 
     // Set today's date in YYYY-MM-DD
     if (dateInput) {
@@ -26984,31 +27070,42 @@ function openWorkerContractSignModal(contractId) {
     }
 
     if (contractBodyContainer) {
-        if (c.type === 'image') {
+        if (c && c.type === 'image') {
             contractBodyContainer.innerHTML = `
                 <div style="text-align:center; padding: 10px;">
                     <img src="${c.imageUrl}" style="max-width: 100%; border-radius: 8px; border: 1px solid var(--border-color);" alt="Contract" />
                 </div>
             `;
-        } else {
-            const formattedText = (c.content || '').split('\n').map(p => p.trim() ? `<p style="margin-bottom: 12px; line-height: 1.7; font-size: 0.95rem; color: var(--text-main);">${escapeHtml(p)}</p>` : '<br/>').join('');
+        } else if (c) {
+            const formattedText = (c.content || '').split('\n').map(p => p.trim() ? `<p style="margin-bottom: 12px; line-height: 1.7; font-size: 0.95rem; color: var(--text-main);">${typeof escapeHtml === 'function' ? escapeHtml(p) : p}</p>` : '<br/>').join('');
             contractBodyContainer.innerHTML = `
                 <div style="background: var(--input-bg); padding: 18px; border-radius: 12px; border: 1px solid var(--border-color); max-height: 280px; overflow-y: auto;">
-                    <h3 style="margin: 0 0 12px 0; color: var(--text-main); font-weight: 800; font-size: 1.1rem;">${escapeHtml(c.title)}</h3>
+                    <h3 style="margin: 0 0 12px 0; color: var(--text-main); font-weight: 800; font-size: 1.1rem;">${typeof escapeHtml === 'function' ? escapeHtml(c.title) : c.title}</h3>
                     ${formattedText}
+                </div>
+            `;
+        } else {
+            contractBodyContainer.innerHTML = `
+                <div style="background: var(--input-bg); padding: 18px; border-radius: 12px; border: 1px solid var(--border-color);">
+                    <h3 style="margin: 0 0 12px 0; color: var(--text-main); font-weight: 800; font-size: 1.1rem;">${isAr ? 'عقد رسمي' : 'Official Agreement'}</h3>
+                    <p style="color: var(--text-main); font-size: 0.9rem;">${isAr ? 'يرجى التوقيع في المربع أدناه لإتمام توقيع واعتماد العقد.' : 'Please sign in the box below to complete agreement verification.'}</p>
                 </div>
             `;
         }
     }
 
     modal.style.display = 'flex';
-    setTimeout(initWorkerSignaturePad, 100);
+    modal.style.position = 'fixed';
+    modal.style.zIndex = '99999999';
+    document.body.style.overflow = 'hidden';
+    setTimeout(initWorkerSignaturePad, 150);
 }
 window.openWorkerContractSignModal = openWorkerContractSignModal;
 
 function closeWorkerContractSignModal() {
     const modal = document.getElementById('modal-worker-contract-sign');
     if (modal) modal.style.display = 'none';
+    document.body.style.overflow = '';
     currentSigningContractId = null;
 }
 window.closeWorkerContractSignModal = closeWorkerContractSignModal;
@@ -27021,22 +27118,22 @@ function initWorkerSignaturePad() {
     signatureCanvasCtx = canvas.getContext('2d');
     signatureHasDrawn = false;
 
-    // Adjust canvas resolution for sharp display
+    // Adjust canvas resolution for sharp display on mobile & retina
     const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width || 450;
+    const displayWidth = rect.width > 50 ? rect.width : (canvas.parentElement ? canvas.parentElement.clientWidth : 350);
+    canvas.width = displayWidth || 350;
     canvas.height = 140;
 
     signatureCanvasCtx.strokeStyle = '#0f172a';
-    signatureCanvasCtx.lineWidth = 2.5;
+    signatureCanvasCtx.lineWidth = 3;
     signatureCanvasCtx.lineCap = 'round';
     signatureCanvasCtx.lineJoin = 'round';
-
-    // Clear canvas
-    signatureCanvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+    signatureCanvasCtx.fillStyle = '#ffffff';
+    signatureCanvasCtx.fillRect(0, 0, canvas.width, canvas.height);
 
     function getCanvasCoords(e) {
         const r = canvas.getBoundingClientRect();
-        if (e.touches && e.touches[0]) {
+        if (e.touches && e.touches.length > 0) {
             return {
                 x: e.touches[0].clientX - r.left,
                 y: e.touches[0].clientY - r.top
@@ -27049,7 +27146,7 @@ function initWorkerSignaturePad() {
     }
 
     function startDraw(e) {
-        e.preventDefault();
+        if (e.cancelable) e.preventDefault();
         signatureDrawing = true;
         const coords = getCanvasCoords(e);
         signatureCanvasCtx.beginPath();
@@ -27058,7 +27155,7 @@ function initWorkerSignaturePad() {
 
     function draw(e) {
         if (!signatureDrawing) return;
-        e.preventDefault();
+        if (e.cancelable) e.preventDefault();
         const coords = getCanvasCoords(e);
         signatureCanvasCtx.lineTo(coords.x, coords.y);
         signatureCanvasCtx.stroke();
@@ -27190,7 +27287,7 @@ function renderWorkerOperationsContractBanner() {
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
     const contractsObj = data.contracts || {};
-    const allContracts = Object.values(contractsObj);
+    const allContracts = Object.values(contractsObj).filter(c => c && typeof c === "object" && c.id && c.title);
     const workers = data.workers || [];
 
     const currentEmail = (typeof currentUser !== 'undefined' && currentUser && currentUser.email) ? currentUser.email.toLowerCase() : '';
@@ -27277,9 +27374,20 @@ function renderWorkerOperationsContractBanner() {
                                         ${c.workerName ? `<span style="margin-right: 10px; margin-left: 10px;">👤 ${c.workerName}</span>` : ''}
                                     </div>
                                 </div>
-                                <button type="button" onclick="openWorkerContractSignModal('${c.id}')" class="btn-success" style="padding: 8px 18px; border-radius: 8px; font-weight: 900; font-size: 0.85rem; background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; cursor: pointer; box-shadow: 0 4px 10px rgba(16,185,129,0.3); display: inline-flex; align-items: center; gap: 6px;">
-                                    <span>✍️</span> <span>${isAr ? 'مراجعة وتوقيع العقد الآن' : 'Review & Sign Contract'}</span>
-                                </button>
+                                ${!isAdmin ? `
+                                    <button type="button" onclick="openWorkerContractSignModal('${c.id}')" class="btn-success" style="padding: 8px 18px; border-radius: 8px; font-weight: 900; font-size: 0.85rem; background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; cursor: pointer; box-shadow: 0 4px 10px rgba(16,185,129,0.3); display: inline-flex; align-items: center; gap: 6px;">
+                                        <span>✍️</span> <span>${isAr ? 'مراجعة وتوقيع العقد الآن' : 'Review & Sign Contract'}</span>
+                                    </button>
+                                ` : `
+                                    <div style="display: flex; gap: 6px; align-items: center;">
+                                        <span class="badge" style="background: #f59e0b; color: white; font-weight: 800; padding: 6px 12px; font-size: 0.8rem;">
+                                            ⏳ ${isAr ? 'بانتظار توقيع الموظف' : 'Waiting Worker Signature'}
+                                        </span>
+                                        <button type="button" onclick="viewContractAsPDF('${c.id}')" class="btn-outline" style="padding: 6px 12px; font-size: 0.8rem; border-radius: 6px; border: 1px solid var(--primary); color: var(--primary); cursor: pointer;">
+                                            👁️ ${isAr ? 'معاينة' : 'Preview'}
+                                        </button>
+                                    </div>
+                                `}
                             </div>
                         `;
                     }).join('')}

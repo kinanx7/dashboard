@@ -4755,10 +4755,26 @@ function applyUserTabOrder() {
 }
 
 function reorderTabContainer(container, tabIds) {
-    tabIds.forEach(id => {
-        const tabEl = document.getElementById(id);
-        if (tabEl && tabEl.parentNode === container) {
-            container.appendChild(tabEl);
+    if (!container) return;
+    const allTabs = Array.from(container.querySelectorAll('.dept-tab'));
+    const allIds = allTabs.map(t => t.id);
+
+    if (Array.isArray(tabIds)) {
+        tabIds.forEach(id => {
+            const tabEl = document.getElementById(id);
+            if (tabEl && tabEl.parentNode === container) {
+                container.appendChild(tabEl);
+            }
+        });
+    }
+
+    // Always preserve any newly added tabs that weren't in saved order
+    allIds.forEach(id => {
+        if (!tabIds || !tabIds.includes(id)) {
+            const tabEl = document.getElementById(id);
+            if (tabEl && tabEl.parentNode === container) {
+                container.appendChild(tabEl);
+            }
         }
     });
 }
