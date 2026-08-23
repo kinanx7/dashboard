@@ -5302,6 +5302,12 @@ if (typeof checkScheduledTaskCycles === 'function') window.checkScheduledTaskCyc
 // =====================================================================
 
 function openVaultFolderModal(catId) {
+    const isAdmin = (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager' || currentUser.isAdmin));
+    if (!isAdmin) {
+        const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+        alert(isAr ? 'عذراً، إدارة المجلدات والأقسام متاحة للإدارة فقط.' : 'Access Denied: Only administrators can manage folders.');
+        return;
+    }
     const modal = document.getElementById('modal-edit-vault-folder');
     const editIdEl = document.getElementById('vault-folder-editing-id');
     const arEl = document.getElementById('vault-folder-name-ar');

@@ -3384,3 +3384,11 @@ body:not(.role-admin) .task-grid {
     transform: translateY(-50%) scale(1.1) !important;
     box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4) !important;
 }
+#view-contracts.active-view {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 24px;
+    box-sizing: border-box;
+}

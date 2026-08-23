@@ -188,6 +188,10 @@ function renderOpsWorkersTable() {
         tr.innerHTML = html;
         tbody.appendChild(tr);
     });
+
+    if (typeof renderWorkerOperationsContractBanner === 'function') {
+        renderWorkerOperationsContractBanner();
+    }
 }
 
 function renderOpsDetails() {

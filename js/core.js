@@ -169,10 +169,12 @@ function translateDynamicTerm(term) {
     return term;
 }
 
-var originalAlert = window.alert;
-window.alert = function (msg) {
-    return originalAlert(translateDynamicTerm(msg));
-};
+if (!window.originalAlert) {
+    window.originalAlert = (window.alert ? window.alert.bind(window) : function () {});
+    window.alert = function (msg) {
+        return window.originalAlert(typeof translateDynamicTerm === 'function' ? translateDynamicTerm(msg) : msg);
+    };
+}
 
 if (!window.originalConfirm) {
     window.originalConfirm = window.confirm;
@@ -1752,6 +1754,9 @@ function listenToCloudData() {
         }
 
         applyUserRoles();
+        if (typeof renderWorkerOperationsContractBanner === 'function') {
+            renderWorkerOperationsContractBanner();
+        }
 
         if (isInitialLoad) {
             migrateMonthlyData();
@@ -2112,7 +2117,7 @@ function switchTab(tab) {
         }
     }
 
-    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant', 'vault', 'messaging', 'learning'];
+    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant', 'vault', 'messaging', 'learning', 'contracts'];
 
     allTabs.forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
@@ -2141,6 +2146,12 @@ function switchTab(tab) {
     if (tab === 'learning' && typeof renderLearningProgram === 'function') {
         renderLearningProgram();
     }
+    if (tab === 'contracts' && typeof renderContractsSection === 'function') {
+        renderContractsSection();
+    }
+    if (tab === 'ops' && typeof renderWorkerOperationsContractBanner === 'function') {
+        renderWorkerOperationsContractBanner();
+    }
     if (tab === 'tasks' && typeof renderInquiries === 'function') {
         renderInquiries();
     }
@@ -2164,6 +2175,7 @@ function switchTab(tab) {
         vault: { icon: '📁', label: 'Informations' },
         messaging: { icon: '💬', label: 'Messaging' },
         learning: { icon: '🎓', label: 'Learning' },
+        contracts: { icon: '📜', label: 'Contracts' },
     };
     const meta = tabMeta[tab] || { icon: '⚙️', label: tab };
     const iconEl = document.getElementById('mob-active-icon');
@@ -2327,108 +2339,138 @@ function toggleVacationDays() {
 
 // --- DATA EXPORT LOGIC ---
 
-function switchTab(tab) {
-    if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession && tab !== 'market') {
-        tab = 'market';
+// --- MOBILE DEPARTMENT MENU ---
+window.openMobDeptMenu = function () {
+    const backdrop = document.getElementById('mob-dept-backdrop');
+    const sheet = document.getElementById('mob-dept-sheet');
+    if (backdrop) backdrop.classList.add('open');
+    if (sheet) sheet.classList.add('open');
+    document.body.style.overflow = 'hidden';
+};
+
+window.closeMobDeptMenu = function () {
+    const backdrop = document.getElementById('mob-dept-backdrop');
+    const sheet = document.getElementById('mob-dept-sheet');
+    if (backdrop) backdrop.classList.remove('open');
+    if (sheet) {
+        sheet.classList.remove('open');
     }
-    currentTab = tab;
+    document.body.style.overflow = '';
+};
 
-    // --- Check if this tab is locked for the current user ---
-    const tabBtn = document.getElementById(`tab-${tab}`);
-    const isLocked = tabBtn ? tabBtn.classList.contains('tab-locked') : false;
+// Close menu on Escape key
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeMobDeptMenu();
+});
 
-    // Update the locked view label with the department name
-    if (isLocked) {
-        const label = document.getElementById('locked-dept-label');
-        if (label && tabBtn) {
-            // Strip the ⛓️ emoji appended by CSS ::after (it's not in textContent)
-            label.textContent = tabBtn.textContent.trim();
+
+function getMonthlyStats(worker, monthStr) {
+    if (!worker.monthlyStats) worker.monthlyStats = {};
+    if (!worker.monthlyStats[monthStr]) {
+        worker.monthlyStats[monthStr] = {
+            custodyList: [],
+            violationsList: [],
+            rewardsList: [],
+            costs: 0,
+            paymentsList: [],
+            deliveriesList: [],
+            legacyDeliveries: 0,
+            overtimeList: []
+        };
+    } else if (!worker.monthlyStats[monthStr].overtimeList) {
+        worker.monthlyStats[monthStr].overtimeList = [];
+    }
+    return worker.monthlyStats[monthStr];
+}
+
+function getLogsForMonth(worker, monthStr) { return worker.logs.filter(l => l.date.startsWith(monthStr)); }
+
+function calculateViolationsTotal(violationsList) {
+    if (!violationsList) return 0;
+    return violationsList.reduce((sum, v) => {
+        if (v.status === 'waived') return sum;
+        if (v.status === 'active' || !v.status) return sum + parseFloat(v.amount);
+        if (v.status === 'pending') {
+            const deadline = v.timestamp + (v.graceDays * 86400000);
+            if (Date.now() >= deadline) return sum + parseFloat(v.amount);
         }
+        return sum;
+    }, 0);
+}
+
+function calculatePaymentsTotal(paymentsList) {
+    if (!paymentsList) return 0;
+    return paymentsList.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+}
+
+function calculateRewardsTotal(rewardsList) {
+    if (!rewardsList) return 0;
+    return rewardsList.reduce((sum, r) => sum + parseFloat(r.amount), 0);
+}
+
+function calculateOvertimeTotal(overtimeList) {
+    if (!overtimeList) return 0;
+    return overtimeList.reduce((sum, o) => sum + parseFloat(o.amount || 0), 0);
+}
+
+function calculateCustodyTotal(custodyList) {
+    if (!custodyList) return 0;
+    return custodyList.reduce((sum, c) => {
+        if (c.type === 'given') return sum + parseFloat(c.amount);
+        if (c.type === 'returned') return sum - parseFloat(c.amount);
+        return sum;
+    }, 0);
+}
+
+function getCumulativeBalance(worker, maxMonthStr) {
+    const allMonths = Object.keys(worker.monthlyStats || {}).sort();
+    let balance = parseFloat(worker.initialBalance || 0);
+    for (const m of allMonths) {
+        const stats = worker.monthlyStats[m];
+        const base = parseFloat(worker.income || 0);
+        const rew = calculateRewardsTotal(stats.rewardsList);
+        const viol = calculateViolationsTotal(stats.violationsList);
+
+        const sysViolDeduction = typeof getSystemViolationDeductionsForMonth === 'function' ? getSystemViolationDeductionsForMonth(worker, m) : 0;
+        const lateDeduction = typeof getLateDeductionsForMonth === 'function' ? getLateDeductionsForMonth(worker, m) : 0;
+        const volumeReward = typeof getDriverVolumeRewardsForMonth === 'function' ? getDriverVolumeRewardsForMonth(worker, m) : 0;
+        const ov = calculateOvertimeTotal(stats.overtimeList);
+        const netThisMonth = base + rew + volumeReward + ov - viol - sysViolDeduction - lateDeduction;
+        const paidThisMonth = calculatePaymentsTotal(stats.paymentsList);
+        balance += (netThisMonth - paidThisMonth);
+        if (m === maxMonthStr) break;
     }
+    return balance;
+}
 
-    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant', 'vault', 'messaging', 'learning'];
-
-    allTabs.forEach(t => {
-        const btn = document.getElementById(`tab-${t}`);
-        const view = document.getElementById(`view-${t}`);
-        const isActive = tab === t;
-        if (btn) btn.classList.toggle('active-tab', isActive);
-        // Only show the real view if NOT locked
-        if (view) view.classList.toggle('active-view', isActive && !isLocked);
-
-        // Sync quick-bar buttons (by id)
-        const qBtn = document.getElementById(`mob-tab-${t}`);
-        if (qBtn) qBtn.classList.toggle('active-tab', isActive);
-
-        // Sync dept-sheet buttons (by data-tab attribute)
-        document.querySelectorAll(`.mob-sheet-tab[data-tab="${t}"]`).forEach(el => {
-            el.classList.toggle('active-tab', isActive);
-        });
-    });
-
-    if (tab === 'vault' && typeof renderVaultNotes === 'function') {
-        renderVaultNotes();
-    }
-    if (tab === 'messaging' && typeof renderMessagingSection === 'function') {
-        renderMessagingSection();
-    }
-    if (tab === 'learning' && typeof renderLearningProgram === 'function') {
-        renderLearningProgram();
-    }
-    if (tab === 'tasks' && typeof renderInquiries === 'function') {
-        renderInquiries();
-    }
-
-    // Update the compact bar's active tab label and icon
-    const tabMeta = {
-        ops: { icon: '⚙️', label: 'Operations' },
-        ranks: { icon: '🏆', label: 'Ranks' },
-        tasks: { icon: '📋', label: 'Tasks' },
-        warehouse: { icon: '📦', label: 'Warehouse' },
-        drivers: { icon: '🚚', label: 'Drivers' },
-        finance: { icon: '💰', label: 'Finance' },
-        summary: { icon: '📊', label: 'Summary' },
-        managing: { icon: '💵', label: 'Sales' },
-        costs: { icon: '📉', label: 'Costs' },
-        adverts: { icon: '📢', label: 'Ads' },
-        notes: { icon: '📝', label: 'Notes' },
-        reminders: { icon: '⏰', label: 'Reminders' },
-        market: { icon: '🏪', label: 'Market' },
-        prepare: { icon: '👨‍🍳', label: 'Prepare' },
-        vault: { icon: '📁', label: 'Informations' },
-        messaging: { icon: '💬', label: 'Messaging' },
-        learning: { icon: '🎓', label: 'Learning' },
-    };
-    const meta = tabMeta[tab] || { icon: '⚙️', label: tab };
-    const iconEl = document.getElementById('mob-active-icon');
-    const labelEl = document.getElementById('mob-active-label');
-    if (iconEl) iconEl.textContent = meta.icon;
-    if (labelEl) labelEl.textContent = meta.label;
-
-    // Show or hide the locked overlay
-    const lockedView = document.getElementById('view-locked');
-    if (lockedView) lockedView.classList.toggle('active-view', isLocked);
-
-    if (!isLocked) {
+function handleMonthChange() {
+    const input = document.getElementById('global-month').value;
+    if (input) {
+        currentGlobalMonth = input;
+        showingAllHistory = false;
+        setDatePickerLimits();
+        runAutoLogger();
         renderAll();
-        if (tab === 'reminders' && typeof renderReminders === 'function') {
-            if (typeof currentRemindersLimit !== 'undefined') {
-                currentRemindersLimit = 20;
-            }
-            renderReminders();
-        }
-        if (tab === 'market' && typeof renderMarket === 'function') {
-            renderMarket();
-        }
-        if (tab === 'prepare' && typeof renderPrepareSection === 'function') {
-            renderPrepareSection();
-        }
-        // Fixes Leaflet map rendering bug when switching tabs
-        if (tab === 'adverts' && promoMap) {
-            setTimeout(() => { promoMap.invalidateSize(); }, 500);
-        }
+        checkStockAlerts();
     }
 }
+
+function setDatePickerLimits() {
+    const dateInput = document.getElementById('log-date');
+    const [year, month] = currentGlobalMonth.split('-');
+    const lastDay = new Date(year, month, 0).getDate();
+    dateInput.min = `${currentGlobalMonth}-01`; dateInput.max = `${currentGlobalMonth}-${lastDay}`;
+    dateInput.value = '';
+}
+
+function toggleVacationDays() {
+    const type = document.getElementById('log-type').value;
+    document.getElementById('vacation-days-group').style.display = type === 'vacation' ? 'block' : 'none';
+}
+
+// --- DATA EXPORT LOGIC ---
+
+
 
 // --- MOBILE DEPARTMENT MENU ---
 window.openMobDeptMenu = function () {
@@ -2469,6 +2511,7 @@ function renderAll() {
         if (typeof renderOpsWorkersTable === 'function') renderOpsWorkersTable();
         if (typeof renderOpsDetails === 'function') renderOpsDetails();
         if (typeof renderSelectedWorkerSysViolations === 'function') renderSelectedWorkerSysViolations();
+        if (typeof renderWorkerOperationsContractBanner === 'function') renderWorkerOperationsContractBanner();
     }
     else if (currentTab === 'ranks') { if (typeof renderRanksTable === 'function') renderRanksTable(); }
     else if (currentTab === 'attendance') { if (typeof renderAttendance === 'function') renderAttendance(); }
@@ -2499,6 +2542,7 @@ function renderAll() {
     else if (currentTab === 'market') { if (typeof renderMarket === 'function') renderMarket(); }
     else if (currentTab === 'ai-assistant') { if (typeof renderAIAssistant === 'function') renderAIAssistant(); }
     else if (currentTab === 'learning') { if (typeof renderLearningProgram === 'function') renderLearningProgram(); }
+    else if (currentTab === 'contracts') { if (typeof renderContractsSection === 'function') renderContractsSection(); }
 
     if (typeof renderPaymentRequests === 'function') renderPaymentRequests();
     if (typeof renderWorkerCustodyRequests === 'function') renderWorkerCustodyRequests();

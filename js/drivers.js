@@ -1402,43 +1402,7 @@ async function searchMapLocation() {
 
 
 // --- RENDERING ---
-function renderAll() {
-    renderBranches();
-    renderViolationRules();
-    populateWorkerDropdowns();
-    renderWarehouse();
-    renderManagersList();
-    renderWorkerViolationPanel();
-
-    if (currentTab === 'ops') {
-        renderOpsWorkersTable();
-        renderOpsDetails();
-        if (typeof renderSelectedWorkerSysViolations === 'function') {
-            renderSelectedWorkerSysViolations();
-        }
-    }
-    else if (currentTab === 'ranks') { renderRanksTable(); renderLeaderboard(); }
-    else if (currentTab === 'attendance') { renderAttendance(); }
-    else if (currentTab === 'tasks') { renderTasks(); }
-    else if (currentTab === 'finance') { renderFinanceTable(); renderFinDetails(); renderFinanceSpendArea(); }
-    else if (currentTab === 'summary') { renderSummaryTable(); }
-    else if (currentTab === 'drivers') { renderDriversList(); renderDriverPanel(); renderDriverVolumeRewards(); }
-    else if (currentTab === 'adverts') { renderAdverts(); }
-    else if (currentTab === 'notes') { renderNotes(); }
-    else if (currentTab === 'activity') { renderActivityLog(); }
-    else if (currentTab === 'managing') { renderManaging(); }
-    else if (currentTab === 'costs') { renderCosts(); }
-    else if (currentTab === 'reminders') { if (typeof renderReminders === 'function') renderReminders(); }
-    else if (currentTab === 'market') { if (typeof renderMarket === 'function') renderMarket(); }
-
-    renderPaymentRequests();
-    renderWorkerCustodyRequests();
-    renderPendingCustodyRequests();
-    renderAcceptedCustodyReleases();
-    if (typeof applyUserTabOrder === 'function') {
-        applyUserTabOrder();
-    }
-}
+// Unified renderAll() is defined and managed in js/core.js
 
 
 // --- AUTOMATIC IN-SCOPE WINDOW EXPORTS ---

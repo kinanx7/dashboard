@@ -37,6 +37,12 @@ window.populateLearningCategoryDropdown = populateLearningCategoryDropdown;
 
 
 function openAddLearningCategoryModal() {
+    const isAdmin = (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager' || currentUser.isAdmin));
+    if (!isAdmin) {
+        const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+        alert(isAr ? 'عذراً، إضافة وتعديل الأقسام متاح للإدارة فقط.' : 'Access Denied: Only administrators can add or edit categories.');
+        return;
+    }
     const modal = document.getElementById('modal-add-learning-category');
     const editIdEl = document.getElementById('custom-cat-editing-id');
     const nameArEl = document.getElementById('custom-cat-name-ar');
@@ -62,6 +68,8 @@ function openAddLearningCategoryModal() {
 window.openAddLearningCategoryModal = openAddLearningCategoryModal;
 
 function editLearningCategory(catKey) {
+    const isAdmin = (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager' || currentUser.isAdmin));
+    if (!isAdmin) return;
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     const modal = document.getElementById('modal-add-learning-category');
     const editIdEl = document.getElementById('custom-cat-editing-id');
@@ -484,11 +492,11 @@ function renderLearningProgram() {
                     ` : ''}
                 </div>
             `;
-        }).join('') + `
-            <button type="button" onclick="openAddLearningCategoryModal()" style="padding: 7px 14px; border-radius: 100px; font-weight: 800; font-size: 0.82rem; border: 2px dashed #8b5cf6; background: rgba(139,92,246,0.12); color: #8b5cf6; cursor: pointer; white-space: nowrap;">
+        }).join('') + (isAdmin ? `
+            <button type="button" onclick="openAddLearningCategoryModal()" class="admin-only" style="padding: 7px 14px; border-radius: 100px; font-weight: 800; font-size: 0.82rem; border: 2px dashed #8b5cf6; background: rgba(139,92,246,0.12); color: #8b5cf6; cursor: pointer; white-space: nowrap;">
                 ➕ ${isAr ? 'قسم جديد' : 'New Category'}
             </button>
-        `;
+        ` : '');
     }
 
     if (videos.length === 0) {
