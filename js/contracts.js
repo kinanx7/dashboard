@@ -409,22 +409,40 @@ function confirmSendContractToWorker() {
     const w = (data.workers || []).find(wk => wk.id === workerId);
     const workerName = w ? w.name : 'Worker';
 
-    c.workerId = workerId;
-    c.workerName = workerName;
-    c.status = 'pending_signature';
-    c.sentAt = Date.now();
+    // If the contract was a template (draft / unassigned), clone a dedicated contract copy for this worker
+    const isTemplate = !c.workerId || c.status === 'draft';
+    const targetContractId = isTemplate ? ('contract_' + Date.now() + '_' + workerId) : currentSendContractId;
+    
+    const workerContract = {
+        ...c,
+        id: targetContractId,
+        templateId: isTemplate ? currentSendContractId : (c.templateId || null),
+        workerId: workerId,
+        workerName: workerName,
+        status: 'pending_signature',
+        sentAt: Date.now(),
+        createdAt: isTemplate ? Date.now() : c.createdAt
+    };
+
+    if (!data.contracts) data.contracts = {};
+    data.contracts[targetContractId] = workerContract;
+
+    if (typeof appData !== 'undefined' && currentCompany && appData[currentCompany]) {
+        if (!appData[currentCompany].contracts) appData[currentCompany].contracts = {};
+        appData[currentCompany].contracts[targetContractId] = workerContract;
+    }
 
     closeSendContractModal();
     renderContractsSection();
 
     if (typeof db !== 'undefined' && currentCompany) {
         const updates = {};
-        updates[`companies/${currentCompany}/contracts/${currentSendContractId}`] = c;
-        updates[`companies/${currentCompany}/workerPendingContracts/${workerId}/${currentSendContractId}`] = true;
+        updates[`companies/${currentCompany}/contracts/${targetContractId}`] = workerContract;
+        updates[`companies/${currentCompany}/workerPendingContracts/${workerId}/${targetContractId}`] = true;
 
         db.ref().update(updates).then(() => {
             if (typeof showInAppNotification === 'function') {
-                showInAppNotification(isAr ? `📤 تم إرسال العقد للموظف (${workerName}) بانتظار توقيعه الإلكتروني!` : `📤 Contract sent to (${workerName}) for digital signature!`);
+                showInAppNotification(isAr ? `📤 تم إرسال نسخة من العقد للموظف (${workerName}) للتوقيع!` : `📤 Contract copy sent to (${workerName}) for digital signature!`);
             }
         }).catch(err => console.error("Error sending contract:", err));
     }
@@ -910,6 +928,17 @@ function submitSignedWorkerContract() {
         }
 
         db.ref().update(updates).then(() => {
+            // Explicitly remove pending pointer so no null residue remains
+            if (c.workerId) {
+                db.ref(`companies/${currentCompany}/workerPendingContracts/${c.workerId}/${savedId}`).remove().catch(() => {});
+            }
+            // If this signed contract had a templateId, ensure the original template remains safely in local memory
+            if (c.templateId && data.contracts && data.contracts[c.templateId]) {
+                const tmpl = data.contracts[c.templateId];
+                if (tmpl.status === 'draft') {
+                    db.ref(`companies/${currentCompany}/contracts/${c.templateId}`).set(tmpl).catch(() => {});
+                }
+            }
             if (typeof showInAppNotification === 'function') {
                 showInAppNotification(isAr ? '✅ تم توقيع العقد وإرساله للإدارة بنجاح!' : '✅ Contract signed and submitted to administration successfully!');
             }

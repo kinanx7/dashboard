@@ -1550,23 +1550,27 @@ function ensureArraysExist(data) {
 
     if (!data.vaultNotes) data.vaultNotes = {};
 
-    // Contracts dictionary sanitize and null-removal
+    // Contracts dictionary sanitize and absolute null-purging
     if (data.contracts) {
+        const cleanObj = {};
         if (Array.isArray(data.contracts)) {
-            const cleanObj = {};
-            data.contracts.forEach(c => {
-                if (c && typeof c === 'object' && c.id) {
-                    cleanObj[c.id] = c;
+            data.contracts.forEach((c, idx) => {
+                if (c && typeof c === 'object' && c.title) {
+                    const cId = String(c.id || ('contract_' + idx));
+                    c.id = cId;
+                    cleanObj[cId] = c;
                 }
             });
-            data.contracts = cleanObj;
         } else if (typeof data.contracts === 'object') {
-            Object.keys(data.contracts).forEach(k => {
-                if (!data.contracts[k] || typeof data.contracts[k] !== 'object' || !data.contracts[k].id) {
-                    delete data.contracts[k];
+            Object.entries(data.contracts).forEach(([key, val]) => {
+                if (val && typeof val === 'object' && val.title) {
+                    const cId = String(val.id || key);
+                    val.id = cId;
+                    cleanObj[cId] = val;
                 }
             });
         }
+        data.contracts = cleanObj;
     } else {
         data.contracts = {};
     }
@@ -1817,6 +1821,9 @@ function listenToCloudData() {
 }
 
 function saveData() {
+    if (appData[currentCompany]) {
+        ensureArraysExist(appData[currentCompany]);
+    }
     db.ref('companies/' + currentCompany).set(appData[currentCompany])
         .catch(error => {
             console.error("Error saving data:", error);
@@ -6331,9 +6338,32 @@ function renderWarehouse() {
     });
 }
 
+function closeRestockPDFViewer() {
+    const modal = document.getElementById('modal-warehouse-restock-pdf-viewer');
+    if (modal) modal.style.display = 'none';
+}
+window.closeRestockPDFViewer = closeRestockPDFViewer;
+
 function exportWarehousePDF() {
     const data = getCompanyData().warehouse;
-    if (!data || data.length === 0) return alert("Warehouse is empty.");
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    if (!data || data.length === 0) {
+        if (typeof showInAppNotification === 'function') {
+            showInAppNotification(isAr ? "⚠️ المستودع فارغ حالياً." : "⚠️ Warehouse is empty.");
+        } else {
+            alert(isAr ? "المستودع فارغ حالياً." : "Warehouse is empty.");
+        }
+        return;
+    }
+
+    const modal = document.getElementById('modal-warehouse-restock-pdf-viewer');
+    const container = document.getElementById('restock-pdf-paper-container');
+    if (!modal || !container) return;
+
+    const compName = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany.toUpperCase() : 'BURGEROOV';
+    let compLogo = 'burgeroov.png';
+    if (currentCompany === 'mvc') compLogo = 'mvc.png';
+    else if (currentCompany === 'mvcfresh') compLogo = 'mvcfresh.png';
 
     // Gather all folders dynamically
     let folders = [...(getCompanyData().whCategories || [])];
@@ -6344,31 +6374,66 @@ function exportWarehousePDF() {
 
     let rowsHtml = '';
     let criticalList = [];
+    let totalItems = data.length;
+    let totalCritical = 0;
+    let totalUnitsToOrder = 0;
 
-    // Group by folders for PDF too
+    // Group by folders for PDF
     folders.forEach(folder => {
         const itemsInFolder = data.filter(i => (i.category || 'Uncategorized') === folder);
         if (itemsInFolder.length > 0) {
-            rowsHtml += `<tr style="background-color: #f1f5f9;"><td colspan="3" style="padding:10px; font-weight:bold; color:#334155;">📂 ${folder}</td></tr>`;
+            rowsHtml += `
+                <tr style="background:#f1f5f9; border-top: 2px solid #cbd5e1; border-bottom: 2px solid #cbd5e1;">
+                    <td colspan="3" style="padding:10px 14px; font-weight:800; font-size:14px; color:#1e293b;">
+                        📁 ${folder} <span style="font-size:12px; font-weight:600; color:#64748b; margin-inline-start:8px;">(${itemsInFolder.length} ${isAr ? 'صنف' : 'items'})</span>
+                    </td>
+                </tr>
+            `;
 
             itemsInFolder.forEach(i => {
                 const isLow = i.currentStock <= i.riskAmount;
                 const toOrder = Math.max(0, i.maxStock - i.currentStock);
+                totalUnitsToOrder += toOrder;
 
                 if (isLow) {
-                    criticalList.push(`<li style="margin-bottom:6px;"><strong>${i.name}</strong> (${folder}): Need to order <strong>${toOrder}</strong></li>`);
+                    totalCritical++;
+                    criticalList.push(`
+                        <li style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed #fca5a5; padding-bottom:6px;">
+                            <span>🚨 <strong>${i.name}</strong> <span style="color:#64748b; font-size:12px;">(${folder})</span></span>
+                            <span style="background:#ef4444; color:#ffffff; font-weight:800; padding:2px 10px; border-radius:12px; font-size:12px;">
+                                ${isAr ? 'مطلوب:' : 'Need:'} ${toOrder}
+                            </span>
+                        </li>
+                    `);
                 }
 
-                const rowBg = isLow ? 'background-color:#fef2f2; color:#dc2626; font-weight:bold;' : '';
-                const nameDisplay = isLow ? `&#x1F6A8; ${i.name}` : i.name;
+                const rowBg = isLow ? 'background-color:#fff1f2;' : 'background-color:#ffffff;';
+                const nameStyle = isLow ? 'color:#b91c1c; font-weight:800;' : 'color:#0f172a; font-weight:600;';
+
+                let orderBadge = `<span style="color:#94a3b8; font-weight:600;">-</span>`;
+                if (toOrder > 0) {
+                    if (isLow) {
+                        orderBadge = `<span style="background:#dc2626; color:#ffffff; font-weight:800; padding:4px 12px; border-radius:12px; font-size:13px; display:inline-block;">${toOrder}</span>`;
+                    } else {
+                        orderBadge = `<span style="background:#2563eb; color:#ffffff; font-weight:800; padding:4px 12px; border-radius:12px; font-size:13px; display:inline-block;">${toOrder}</span>`;
+                    }
+                }
 
                 rowsHtml += `
-                            <tr style="${rowBg}">
-                                <td style="padding:8px 8px 8px 24px; border:1px solid #e2e8f0;">${nameDisplay}</td>
-                                <td style="padding:8px; border:1px solid #e2e8f0; text-align:center;">${i.currentStock} / ${i.maxStock}</td>
-                                <td style="padding:8px; border:1px solid #e2e8f0; text-align:center;">${toOrder}</td>
-                            </tr>
-                        `;
+                    <tr style="${rowBg} border-bottom: 1px solid #e2e8f0;">
+                        <td style="padding:10px 14px; font-size:13px; ${nameStyle}">
+                            ${isLow ? '🚨 ' : ''}${i.name}
+                        </td>
+                        <td style="padding:10px 14px; text-align:center; font-size:13px;">
+                            <span style="display:inline-block; padding:3px 10px; border-radius:8px; background:${isLow ? '#fee2e2' : '#f1f5f9'}; color:${isLow ? '#991b1b' : '#334155'}; font-weight:700; font-size:12px;">
+                                ${i.currentStock} / ${i.maxStock}
+                            </span>
+                        </td>
+                        <td style="padding:10px 14px; text-align:center; font-size:13px;">
+                            ${orderBadge}
+                        </td>
+                    </tr>
+                `;
             });
         }
     });
@@ -6376,49 +6441,243 @@ function exportWarehousePDF() {
     let criticalHtml = '';
     if (criticalList.length > 0) {
         criticalHtml = `
-                    <div style="margin-top:30px; border:2px solid #dc2626; padding:15px; border-radius:8px; background-color:#fef2f2;">
-                        <h3 style="color:#dc2626; margin-top:0; font-size:16px;">&#x1F6A8; CRITICAL RESTOCK ORDERS</h3>
-                        <ul style="color:#dc2626; margin-bottom:0; font-size:14px; list-style-type:square;">
-                            ${criticalList.join('')}
-                        </ul>
-                    </div>
-                `;
+            <div style="margin-top:24px; border:2px solid #ef4444; border-radius:12px; background-color:#fef2f2; padding:18px; box-shadow:0 2px 8px rgba(239,68,68,0.1);">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px; color:#b91c1c; font-weight:900; font-size:15px;">
+                    <span style="font-size:20px;">🚨</span>
+                    <span>${isAr ? 'قائمة النواقص والأصناف الحرجة العاجلة للطلب فوراً' : 'CRITICAL RESTOCK ORDERS - IMMEDIATE ACTION REQUIRED'}</span>
+                </div>
+                <ul style="margin:0; padding:0; list-style:none; color:#7f1d1d; font-size:13px; line-height:1.6;">
+                    ${criticalList.join('')}
+                </ul>
+            </div>
+        `;
     }
 
-    const printHTML = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
-                <title>Burgeroov Restock Report</title>
-                <style>
-                    @page { size: portrait; margin: 0mm !important; }
-                    body { font-family: Arial, sans-serif; color: #1e293b; padding: 15mm; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    h2 { color: #452b1b; border-bottom: 2px solid #452b1b; padding-bottom: 10px; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
-                    th { background-color: #452b1b; color: #fff; padding: 10px; border: 1px solid #cbd5e1; text-align: left; }
-                    td { border: 1px solid #e2e8f0; }
-                </style></head><body>
-                <h2>Burgeroov Restock Report</h2>
-                <p style="color:#64748b; font-size:13px;">Generated: ${new Date().toLocaleString()}</p>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Product Name</th>
-                            <th style="text-align:center;">Currently Left</th>
-                            <th style="text-align:center;">Amount to Order</th>
-                        </tr>
-                    </thead>
-                    <tbody>${rowsHtml}</tbody>
-                </table>
-                ${criticalHtml}
-                </body></html>`;
+    const reportDate = new Date().toLocaleString(isAr ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-    const blob = new Blob([printHTML], { type: 'text/html' });
-    const blobUrl = URL.createObjectURL(blob);
-    const iframe = document.createElement('iframe');
-    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
-    document.body.appendChild(iframe);
-    iframe.onload = function () { setTimeout(function () { iframe.contentWindow.print(); }, 300); };
-    iframe.src = blobUrl;
-    setTimeout(() => { URL.revokeObjectURL(blobUrl); document.body.removeChild(iframe); }, 10000);
+    container.innerHTML = `
+        <div id="restock-pdf-paper-content" class="a4-restock-page" style="background:#ffffff; color:#0f172a; max-width:820px; margin:0 auto; padding:32px 28px; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.1); box-sizing:border-box; font-family:'Segoe UI', 'Cairo', Tahoma, Arial, sans-serif; direction:${isAr ? 'rtl' : 'ltr'}; text-align:${isAr ? 'right' : 'left'};">
+            
+            <!-- Document Header -->
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #c5832b; padding-bottom:18px; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+                <div style="display:flex; align-items:center; gap:14px;">
+                    <img src="${compLogo}" alt="Logo" style="height:52px; max-width:130px; object-fit:contain;" onerror="this.style.display='none';" />
+                    <div>
+                        <h1 style="margin:0; font-size:22px; font-weight:900; color:#0f172a;">${compName}</h1>
+                        <span style="font-size:13px; font-weight:700; color:#64748b;">${isAr ? 'إدارة العمليات والمستودع المركزي' : 'Operations & Central Warehouse'}</span>
+                    </div>
+                </div>
+                <div style="text-align:${isAr ? 'left' : 'right'}; font-size:13px; color:#475569;">
+                    <div style="font-weight:900; color:#0f172a; font-size:16px;">${isAr ? '📋 تقرير طلب نواقص وبضاعة' : '📋 Warehouse Restock Order'}</div>
+                    <div style="margin-top:4px; font-size:12px; color:#64748b;">📅 ${reportDate}</div>
+                </div>
+            </div>
+
+            <!-- Summary HUD KPI Cards -->
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:20px;">
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; text-align:center;">
+                    <div style="font-size:11px; font-weight:700; color:#64748b;">${isAr ? 'إجمالي الأصناف' : 'Total Items'}</div>
+                    <div style="font-size:20px; font-weight:900; color:#0f172a; margin-top:2px;">${totalItems}</div>
+                </div>
+                <div style="background:${totalCritical > 0 ? '#fef2f2' : '#f8fafc'}; border:1px solid ${totalCritical > 0 ? '#fecaca' : '#e2e8f0'}; border-radius:10px; padding:12px 14px; text-align:center;">
+                    <div style="font-size:11px; font-weight:700; color:${totalCritical > 0 ? '#dc2626' : '#64748b'};">${isAr ? 'أصناف حرجة للطلب' : 'Critical Items'}</div>
+                    <div style="font-size:20px; font-weight:900; color:${totalCritical > 0 ? '#dc2626' : '#0f172a'}; margin-top:2px;">${totalCritical}</div>
+                </div>
+                <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:10px; padding:12px 14px; text-align:center;">
+                    <div style="font-size:11px; font-weight:700; color:#0369a1;">${isAr ? 'إجمالي الكميات المطلوبة' : 'Total Units to Order'}</div>
+                    <div style="font-size:20px; font-weight:900; color:#0284c7; margin-top:2px;">${totalUnitsToOrder}</div>
+                </div>
+            </div>
+
+            <!-- Table of Items -->
+            <table style="width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden;">
+                <thead>
+                    <tr style="background:#1e293b; color:#ffffff;">
+                        <th style="padding:12px 14px; text-align:${isAr ? 'right' : 'left'}; font-size:13px; font-weight:800;">${isAr ? 'اسم الصنف / المنتج' : 'Product Name'}</th>
+                        <th style="padding:12px 14px; text-align:center; font-size:13px; font-weight:800; width:160px;">${isAr ? 'المتوفر / الأقصى' : 'Current / Max'}</th>
+                        <th style="padding:12px 14px; text-align:center; font-size:13px; font-weight:800; width:140px;">${isAr ? 'الكمية للطلب' : 'Order Qty'}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHtml}
+                </tbody>
+            </table>
+
+            <!-- Critical List Alert Callout -->
+            ${criticalHtml}
+
+            <!-- Document Footer -->
+            <div style="margin-top:35px; padding-top:14px; border-top:1px dashed #cbd5e1; display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#64748b; flex-wrap:wrap; gap:8px;">
+                <div>🏢 ${compName} Operations Management System</div>
+                <div>✅ Automated Restock Document</div>
+            </div>
+        </div>
+    `;
+
+    modal.style.display = 'flex';
 }
+
+function printRestockPDF() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const container = document.getElementById('restock-pdf-paper-content');
+    if (!container) return;
+
+    // Check Native Android Print Bridge
+    const androidBridge = window.AndroidInterface || window.Android || window.AndroidShare;
+    if (androidBridge && typeof androidBridge.printDocument === 'function') {
+        try {
+            androidBridge.printDocument();
+            return;
+        } catch (e) {
+            console.warn("androidBridge.printDocument error:", e);
+        }
+    }
+
+    // High quality native browser / mobile vector print (Crisp Arabic with NO canvas corruptions)
+    const printHTML = `
+        <!DOCTYPE html>
+        <html dir="${isAr ? 'rtl' : 'ltr'}" lang="${isAr ? 'ar' : 'en'}">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>${isAr ? 'تقرير_طلب_بضاعة' : 'Restock_Order_Report'}</title>
+            <style>
+                @page {
+                    size: A4 portrait;
+                    margin: 10mm;
+                }
+                @media print {
+                    html, body {
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        background: #ffffff !important;
+                    }
+                    .a4-restock-page {
+                        box-shadow: none !important;
+                        border: none !important;
+                        padding: 0 !important;
+                        max-width: 100% !important;
+                    }
+                }
+                body {
+                    font-family: 'Segoe UI', 'Cairo', Tahoma, Arial, sans-serif;
+                    background: #ffffff;
+                    color: #0f172a;
+                    margin: 0;
+                    padding: 10mm;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+                table { page-break-inside: auto; }
+                tr { page-break-inside: avoid; page-break-after: auto; }
+            </style>
+        </head>
+        <body>
+            ${container.outerHTML}
+        </body>
+        </html>
+    `;
+
+    const blob = new Blob([printHTML], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.src = url;
+    document.body.appendChild(iframe);
+
+    iframe.onload = function() {
+        setTimeout(function() {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } catch (e) {
+                console.warn("Iframe print error:", e);
+                window.print();
+            }
+            setTimeout(() => {
+                try {
+                    document.body.removeChild(iframe);
+                    URL.revokeObjectURL(url);
+                } catch (e) {}
+            }, 3000);
+        }, 300);
+    };
+}
+window.printRestockPDF = printRestockPDF;
+
+function shareRestockTextReport() {
+    const data = getCompanyData().warehouse;
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    if (!data || data.length === 0) return;
+
+    const compName = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany.toUpperCase() : 'BURGEROOV';
+    const reportDate = new Date().toLocaleString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    let criticalLines = [];
+    let regularLines = [];
+    let totalUnits = 0;
+
+    data.forEach(i => {
+        const isLow = i.currentStock <= i.riskAmount;
+        const toOrder = Math.max(0, i.maxStock - i.currentStock);
+        if (toOrder > 0) {
+            totalUnits += toOrder;
+            const line = `• ${i.name} [${i.category || 'عام'}]: مطلوب (${toOrder}) - متوفر حالياً (${i.currentStock}/${i.maxStock})`;
+            if (isLow) {
+                criticalLines.push(`🚨 ` + line);
+            } else {
+                regularLines.push(`▫️ ` + line);
+            }
+        }
+    });
+
+    let msg = `📦 *${isAr ? 'طلب بضاعة ونواقص المستودع' : 'Warehouse Restock Order'} - ${compName}*\n`;
+    msg += `📅 ${reportDate}\n\n`;
+
+    if (criticalLines.length > 0) {
+        msg += `🔥 *${isAr ? 'النواقص الحرجة العاجلة:' : 'CRITICAL DEFICITS:'}*\n`;
+        msg += criticalLines.join('\n') + '\n\n';
+    }
+
+    if (regularLines.length > 0) {
+        msg += `📋 *${isAr ? 'باقي النواقص للطلب:' : 'Other Restock Items:'}*\n`;
+        msg += regularLines.join('\n') + '\n\n';
+    }
+
+    if (criticalLines.length === 0 && regularLines.length === 0) {
+        msg += isAr ? `✅ المستودع مكتمل ولا توجد نواقص حالياً.` : `✅ All items are in stock.`;
+    } else {
+        msg += `🛒 *${isAr ? 'إجمالي الكميات المطلوبة:' : 'Total Units to Order:'}* ${totalUnits}\n`;
+    }
+
+    // Share via Web Share or WhatsApp
+    if (navigator.share) {
+        navigator.share({
+            title: isAr ? 'طلب نواقص المستودع' : 'Warehouse Restock Order',
+            text: msg
+        }).catch(() => {
+            openWhatsAppFallback(msg);
+        });
+    } else {
+        openWhatsAppFallback(msg);
+    }
+
+    function openWhatsAppFallback(text) {
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text);
+            }
+        } catch (e) {}
+        const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+        window.open(waUrl, '_blank');
+    }
+}
+window.shareRestockTextReport = shareRestockTextReport;
 
 // --- UTILITIES ---
 
@@ -6450,6 +6709,8 @@ function processRestoreFile(event) {
 // --- AUTOMATIC IN-SCOPE WINDOW EXPORTS ---
 if (typeof renderWarehouse === 'function') window.renderWarehouse = renderWarehouse;
 if (typeof exportWarehousePDF === 'function') window.exportWarehousePDF = exportWarehousePDF;
+if (typeof printRestockPDF === 'function') window.printRestockPDF = printRestockPDF;
+if (typeof closeRestockPDFViewer === 'function') window.closeRestockPDFViewer = closeRestockPDFViewer;
 if (typeof downloadBackup === 'function') window.downloadBackup = downloadBackup;
 if (typeof triggerRestore === 'function') window.triggerRestore = triggerRestore;
 if (typeof processRestoreFile === 'function') window.processRestoreFile = processRestoreFile;
@@ -23151,6 +23412,7 @@ function renderVaultNotes() {
                     ${(() => {
                         const imgs = (n.imageUrls && Array.isArray(n.imageUrls) && n.imageUrls.length > 0) ? n.imageUrls : (n.imageUrl ? [n.imageUrl] : []);
                         if (imgs.length === 0) return '';
+                        if (typeof preloadVaultNoteFile === 'function') preloadVaultNoteFile(n.id, imgs[0]);
 
                         if (imgs.length === 1) {
                             return `
@@ -23344,6 +23606,7 @@ function dataURLtoFile(dataurl, filename) {
     if (!dataurl.startsWith('data:')) return null;
     try {
         const arr = dataurl.split(',');
+        if (arr.length < 2) return null;
         const mimeMatch = arr[0].match(/:(.*?);/);
         const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
         const bstr = atob(arr[1]);
@@ -23352,7 +23615,8 @@ function dataURLtoFile(dataurl, filename) {
         while (n--) {
             u8arr[n] = bstr.charCodeAt(n);
         }
-        return new File([u8arr], filename, { type: mime });
+        const ext = mime.includes('png') ? 'png' : 'jpg';
+        return new File([u8arr], filename || `note_attachment.${ext}`, { type: mime });
     } catch (e) {
         console.warn("dataURLtoFile error:", e);
         return null;
@@ -23360,86 +23624,162 @@ function dataURLtoFile(dataurl, filename) {
 }
 window.dataURLtoFile = dataURLtoFile;
 
-async function shareVaultNote(noteId) {
-    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
-    const notesObj = data.vaultNotes || {};
-    const note = notesObj[noteId];
+window._vaultNoteFiles = window._vaultNoteFiles || {};
 
-    if (!note) return;
-
-    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
-
-    let cleanTitle = note.title ? deepCleanNoteText(note.title) : '';
-    let cleanDesc = note.description ? deepCleanNoteText(note.description) : '';
-
-    let shareText = '';
-    if (cleanTitle && cleanDesc) {
-        shareText = `${cleanTitle}\n\n${cleanDesc}`;
-    } else {
-        shareText = cleanTitle || cleanDesc || '';
+function preloadVaultNoteFile(noteId, imgSrc) {
+    if (!noteId || !imgSrc || typeof imgSrc !== 'string') return;
+    if (imgSrc.startsWith('data:')) {
+        window._vaultNoteFiles[noteId] = dataURLtoFile(imgSrc, 'note_attachment.jpg');
+        return;
     }
+    if (imgSrc.startsWith('http') || imgSrc.startsWith('blob:')) {
+        fetch(imgSrc).then(r => r.blob()).then(blob => {
+            const mime = blob.type || 'image/jpeg';
+            const ext = mime.includes('png') ? 'png' : (mime.includes('webp') ? 'webp' : 'jpg');
+            window._vaultNoteFiles[noteId] = new File([blob], `note_attachment.${ext}`, { type: mime, lastModified: Date.now() });
+        }).catch(() => {});
+    }
+}
+window.preloadVaultNoteFile = preloadVaultNoteFile;
 
-    if (!shareText) {
+function getFileFromImageSync(imgSrc, noteId) {
+    if (noteId && window._vaultNoteFiles && window._vaultNoteFiles[noteId]) {
+        return window._vaultNoteFiles[noteId];
+    }
+    if (!imgSrc || typeof imgSrc !== 'string') return null;
+    if (imgSrc.startsWith('data:')) {
+        const f = typeof dataURLtoFile === 'function' ? dataURLtoFile(imgSrc, 'note_attachment.jpg') : null;
+        if (noteId && f) window._vaultNoteFiles[noteId] = f;
+        return f;
+    }
+    // Synchronously extract from rendered DOM <img> element if available on the page
+    try {
+        const cardEl = document.getElementById(`vault-text-${noteId}`)?.closest('.vault-note-card') || document.querySelector(`[data-note-id="${noteId}"]`);
+        const imgEl = (cardEl && cardEl.querySelector('img')) || document.querySelector(`img[src="${imgSrc}"]`);
+        if (imgEl && imgEl.naturalWidth > 0 && imgEl.complete) {
+            const cvs = document.createElement('canvas');
+            cvs.width = imgEl.naturalWidth;
+            cvs.height = imgEl.naturalHeight;
+            const ctx = cvs.getContext('2d');
+            ctx.drawImage(imgEl, 0, 0);
+            const durl = cvs.toDataURL('image/jpeg', 0.92);
+            const f = typeof dataURLtoFile === 'function' ? dataURLtoFile(durl, 'note_attachment.jpg') : null;
+            if (noteId && f) window._vaultNoteFiles[noteId] = f;
+            return f;
+        }
+    } catch (e) {
+        console.warn("getFileFromImageSync error:", e);
+    }
+    return null;
+}
+window.getFileFromImageSync = getFileFromImageSync;
+
+function shareVaultNote(noteId) {
+    try {
+        const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+        let note = null;
+        const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+        if (data && data.vaultNotes && data.vaultNotes[noteId]) {
+            note = data.vaultNotes[noteId];
+        }
+        if (!note && typeof appData !== 'undefined' && typeof currentCompany !== 'undefined' && appData[currentCompany] && appData[currentCompany].vaultNotes) {
+            note = appData[currentCompany].vaultNotes[noteId];
+        }
+
+        let cleanTitle = note && note.title ? deepCleanNoteText(note.title) : '';
+        let cleanDesc = note && (note.text || note.description) ? deepCleanNoteText(note.text || note.description) : '';
+
+        if (!cleanDesc) {
+            const textEl = document.getElementById(`vault-text-${noteId}`);
+            if (textEl) cleanDesc = (textEl.textContent || textEl.innerText || '').trim();
+        }
+
+        let shareText = '';
+        if (cleanTitle && cleanDesc) {
+            shareText = `📌 *${cleanTitle}*\n\n${cleanDesc}`;
+        } else {
+            shareText = cleanTitle || cleanDesc || '';
+        }
+
+        const noteImage = (note && (note.imageUrl || (note.imageUrls && note.imageUrls[0]) || note.image || note.attachmentData)) || '';
+
+        // 1. Android APK Native Bridge (Invokes Native Android System Chooser in APK with Image)
+        const androidBridge = window.AndroidShare || window.AndroidInterface || window.Android;
+        if (androidBridge) {
+            if (typeof androidBridge.shareWithImage === 'function') {
+                try {
+                    androidBridge.shareWithImage(cleanTitle || 'Note', shareText, noteImage || '');
+                    return;
+                } catch (e) {
+                    console.warn("Android native shareWithImage error:", e);
+                }
+            }
+            if (typeof androidBridge.share === 'function') {
+                try {
+                    androidBridge.share(cleanTitle || 'Note', shareText, noteImage || '');
+                    return;
+                } catch (e) {
+                    console.warn("Android native share error:", e);
+                }
+            }
+            if (typeof androidBridge.shareText === 'function') {
+                try {
+                    androidBridge.shareText(shareText);
+                    return;
+                } catch (e) {
+                    console.warn("Android native shareText error:", e);
+                }
+            }
+        }
+
+        // 2. Prepare file object synchronously (preserving the browser's User Gesture activation)
+        const fileObj = getFileFromImageSync(noteImage, noteId);
+
+        // 3. Direct Native OS System Share (Triggers Windows 10/11 Share UI on PC / Web Share on Mobile)
+        if (navigator.share) {
+            const shareData = {
+                title: cleanTitle || 'Information Note',
+                text: shareText
+            };
+
+            if (fileObj && navigator.canShare) {
+                try {
+                    if (navigator.canShare({ files: [fileObj], title: cleanTitle || 'Information Note', text: shareText })) {
+                        shareData.files = [fileObj];
+                    } else if (navigator.canShare({ files: [fileObj] })) {
+                        shareData.files = [fileObj];
+                    }
+                } catch (canShareErr) {
+                    console.warn("navigator.canShare error:", canShareErr);
+                }
+            }
+
+            navigator.share(shareData).catch(err => {
+                if (err.name === 'AbortError') return; // User closed OS share picker intentionally
+                console.warn("System share with files failed, retrying text-only:", err);
+                
+                // Retry text-only native OS share
+                navigator.share({
+                    title: cleanTitle || 'Information Note',
+                    text: shareText
+                }).catch(retryErr => {
+                    if (retryErr.name === 'AbortError') return;
+                    console.warn("System share text retry failed:", retryErr);
+                });
+            });
+            return;
+        }
+
+        // 4. Fallback (Copy text to clipboard ONLY if Web Share is not supported by browser)
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(shareText);
+        }
         if (typeof showInAppNotification === 'function') {
-            showInAppNotification(isAr ? '⚠️ لا يوجد نص للمشاركة في هذه الملاحظة.' : '⚠️ No text to share in this note.');
+            showInAppNotification(isAr ? '📋 تم نسخ نص الملاحظة إلى الحافظة.' : '📋 Note text copied to clipboard.');
         }
-        return;
-    }
-
-    const shareData = {
-        title: cleanTitle || 'Information Note',
-        text: shareText
-    };
-
-    // Helper to copy text to clipboard as robust backup
-    const copyToClipboard = (text) => {
-        try {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text);
-            } else {
-                const textArea = document.createElement("textarea");
-                textArea.value = text;
-                textArea.style.position = "fixed";
-                textArea.style.left = "-9999px";
-                document.body.appendChild(textArea);
-                textArea.focus();
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-            }
-        } catch (e) {
-            console.warn("Clipboard copy fallback error:", e);
-        }
-    };
-
-    // MULTI-TIER BULLETPROOF APP & WEBVIEW SHARE STRATEGY
-    // Tier 1: Try Native navigator.share (Text Only first for WebView compatibility)
-    if (navigator.share) {
-        navigator.share(shareData).then(() => {
-            console.log("Successfully shared via navigator.share");
-        }).catch(err => {
-            if (err.name === 'AbortError') return; // User closed share sheet intentionally
-            console.warn("navigator.share failed, executing Tier 2 App fallback:", err);
-
-            // Tier 2: Copy to clipboard + WhatsApp direct URL
-            copyToClipboard(shareText);
-            const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
-            window.open(waUrl, '_blank');
-
-            if (typeof showInAppNotification === 'function') {
-                showInAppNotification(isAr ? '📋 تم نسخ النص وإعادة التوجيه للمشاركة!' : '📋 Text copied & sharing opened!');
-            }
-        });
-        return;
-    }
-
-    // Tier 3: Direct Web/App Fallback if navigator.share is completely missing
-    copyToClipboard(shareText);
-    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
-    window.open(waUrl, '_blank');
-
-    if (typeof showInAppNotification === 'function') {
-        showInAppNotification(isAr ? '📋 تم نسخ النص كحفظ احتياطي وفتح المشاركة!' : '📋 Text copied to clipboard!');
+    } catch (outerErr) {
+        console.error("shareVaultNote error:", outerErr);
     }
 }
 window.shareVaultNote = shareVaultNote;
@@ -26298,7 +26638,7 @@ function renderLearningProgram() {
         if (embedUrl) {
             videoPlayerHTML = `
                 <div style="width: 100%; aspect-ratio: 16 / 9; background: #000000; position: relative; overflow: hidden; border-radius: 12px 12px 0 0;">
-                    <iframe src="${embedUrl}" title="${v.title}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
+                    <iframe src="${embedUrl}" title="${v.title}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen" allowfullscreen="true" webkitallowfullscreen mozallowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
                 </div>
             `;
         } else {
@@ -26768,22 +27108,40 @@ function confirmSendContractToWorker() {
     const w = (data.workers || []).find(wk => wk.id === workerId);
     const workerName = w ? w.name : 'Worker';
 
-    c.workerId = workerId;
-    c.workerName = workerName;
-    c.status = 'pending_signature';
-    c.sentAt = Date.now();
+    // If the contract was a template (draft / unassigned), clone a dedicated contract copy for this worker
+    const isTemplate = !c.workerId || c.status === 'draft';
+    const targetContractId = isTemplate ? ('contract_' + Date.now() + '_' + workerId) : currentSendContractId;
+    
+    const workerContract = {
+        ...c,
+        id: targetContractId,
+        templateId: isTemplate ? currentSendContractId : (c.templateId || null),
+        workerId: workerId,
+        workerName: workerName,
+        status: 'pending_signature',
+        sentAt: Date.now(),
+        createdAt: isTemplate ? Date.now() : c.createdAt
+    };
+
+    if (!data.contracts) data.contracts = {};
+    data.contracts[targetContractId] = workerContract;
+
+    if (typeof appData !== 'undefined' && currentCompany && appData[currentCompany]) {
+        if (!appData[currentCompany].contracts) appData[currentCompany].contracts = {};
+        appData[currentCompany].contracts[targetContractId] = workerContract;
+    }
 
     closeSendContractModal();
     renderContractsSection();
 
     if (typeof db !== 'undefined' && currentCompany) {
         const updates = {};
-        updates[`companies/${currentCompany}/contracts/${currentSendContractId}`] = c;
-        updates[`companies/${currentCompany}/workerPendingContracts/${workerId}/${currentSendContractId}`] = true;
+        updates[`companies/${currentCompany}/contracts/${targetContractId}`] = workerContract;
+        updates[`companies/${currentCompany}/workerPendingContracts/${workerId}/${targetContractId}`] = true;
 
         db.ref().update(updates).then(() => {
             if (typeof showInAppNotification === 'function') {
-                showInAppNotification(isAr ? `📤 تم إرسال العقد للموظف (${workerName}) بانتظار توقيعه الإلكتروني!` : `📤 Contract sent to (${workerName}) for digital signature!`);
+                showInAppNotification(isAr ? `📤 تم إرسال نسخة من العقد للموظف (${workerName}) للتوقيع!` : `📤 Contract copy sent to (${workerName}) for digital signature!`);
             }
         }).catch(err => console.error("Error sending contract:", err));
     }
@@ -27269,6 +27627,17 @@ function submitSignedWorkerContract() {
         }
 
         db.ref().update(updates).then(() => {
+            // Explicitly remove pending pointer so no null residue remains
+            if (c.workerId) {
+                db.ref(`companies/${currentCompany}/workerPendingContracts/${c.workerId}/${savedId}`).remove().catch(() => {});
+            }
+            // If this signed contract had a templateId, ensure the original template remains safely in local memory
+            if (c.templateId && data.contracts && data.contracts[c.templateId]) {
+                const tmpl = data.contracts[c.templateId];
+                if (tmpl.status === 'draft') {
+                    db.ref(`companies/${currentCompany}/contracts/${c.templateId}`).set(tmpl).catch(() => {});
+                }
+            }
             if (typeof showInAppNotification === 'function') {
                 showInAppNotification(isAr ? '✅ تم توقيع العقد وإرساله للإدارة بنجاح!' : '✅ Contract signed and submitted to administration successfully!');
             }

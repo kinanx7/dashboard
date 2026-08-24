@@ -1550,23 +1550,27 @@ function ensureArraysExist(data) {
 
     if (!data.vaultNotes) data.vaultNotes = {};
 
-    // Contracts dictionary sanitize and null-removal
+    // Contracts dictionary sanitize and absolute null-purging
     if (data.contracts) {
+        const cleanObj = {};
         if (Array.isArray(data.contracts)) {
-            const cleanObj = {};
-            data.contracts.forEach(c => {
-                if (c && typeof c === 'object' && c.id) {
-                    cleanObj[c.id] = c;
+            data.contracts.forEach((c, idx) => {
+                if (c && typeof c === 'object' && c.title) {
+                    const cId = String(c.id || ('contract_' + idx));
+                    c.id = cId;
+                    cleanObj[cId] = c;
                 }
             });
-            data.contracts = cleanObj;
         } else if (typeof data.contracts === 'object') {
-            Object.keys(data.contracts).forEach(k => {
-                if (!data.contracts[k] || typeof data.contracts[k] !== 'object' || !data.contracts[k].id) {
-                    delete data.contracts[k];
+            Object.entries(data.contracts).forEach(([key, val]) => {
+                if (val && typeof val === 'object' && val.title) {
+                    const cId = String(val.id || key);
+                    val.id = cId;
+                    cleanObj[cId] = val;
                 }
             });
         }
+        data.contracts = cleanObj;
     } else {
         data.contracts = {};
     }
@@ -1817,6 +1821,9 @@ function listenToCloudData() {
 }
 
 function saveData() {
+    if (appData[currentCompany]) {
+        ensureArraysExist(appData[currentCompany]);
+    }
     db.ref('companies/' + currentCompany).set(appData[currentCompany])
         .catch(error => {
             console.error("Error saving data:", error);

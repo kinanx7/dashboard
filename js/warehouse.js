@@ -165,9 +165,32 @@ function renderWarehouse() {
     });
 }
 
+function closeRestockPDFViewer() {
+    const modal = document.getElementById('modal-warehouse-restock-pdf-viewer');
+    if (modal) modal.style.display = 'none';
+}
+window.closeRestockPDFViewer = closeRestockPDFViewer;
+
 function exportWarehousePDF() {
     const data = getCompanyData().warehouse;
-    if (!data || data.length === 0) return alert("Warehouse is empty.");
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    if (!data || data.length === 0) {
+        if (typeof showInAppNotification === 'function') {
+            showInAppNotification(isAr ? "⚠️ المستودع فارغ حالياً." : "⚠️ Warehouse is empty.");
+        } else {
+            alert(isAr ? "المستودع فارغ حالياً." : "Warehouse is empty.");
+        }
+        return;
+    }
+
+    const modal = document.getElementById('modal-warehouse-restock-pdf-viewer');
+    const container = document.getElementById('restock-pdf-paper-container');
+    if (!modal || !container) return;
+
+    const compName = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany.toUpperCase() : 'BURGEROOV';
+    let compLogo = 'burgeroov.png';
+    if (currentCompany === 'mvc') compLogo = 'mvc.png';
+    else if (currentCompany === 'mvcfresh') compLogo = 'mvcfresh.png';
 
     // Gather all folders dynamically
     let folders = [...(getCompanyData().whCategories || [])];
@@ -178,31 +201,66 @@ function exportWarehousePDF() {
 
     let rowsHtml = '';
     let criticalList = [];
+    let totalItems = data.length;
+    let totalCritical = 0;
+    let totalUnitsToOrder = 0;
 
-    // Group by folders for PDF too
+    // Group by folders for PDF
     folders.forEach(folder => {
         const itemsInFolder = data.filter(i => (i.category || 'Uncategorized') === folder);
         if (itemsInFolder.length > 0) {
-            rowsHtml += `<tr style="background-color: #f1f5f9;"><td colspan="3" style="padding:10px; font-weight:bold; color:#334155;">📂 ${folder}</td></tr>`;
+            rowsHtml += `
+                <tr style="background:#f1f5f9; border-top: 2px solid #cbd5e1; border-bottom: 2px solid #cbd5e1;">
+                    <td colspan="3" style="padding:10px 14px; font-weight:800; font-size:14px; color:#1e293b;">
+                        📁 ${folder} <span style="font-size:12px; font-weight:600; color:#64748b; margin-inline-start:8px;">(${itemsInFolder.length} ${isAr ? 'صنف' : 'items'})</span>
+                    </td>
+                </tr>
+            `;
 
             itemsInFolder.forEach(i => {
                 const isLow = i.currentStock <= i.riskAmount;
                 const toOrder = Math.max(0, i.maxStock - i.currentStock);
+                totalUnitsToOrder += toOrder;
 
                 if (isLow) {
-                    criticalList.push(`<li style="margin-bottom:6px;"><strong>${i.name}</strong> (${folder}): Need to order <strong>${toOrder}</strong></li>`);
+                    totalCritical++;
+                    criticalList.push(`
+                        <li style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed #fca5a5; padding-bottom:6px;">
+                            <span>🚨 <strong>${i.name}</strong> <span style="color:#64748b; font-size:12px;">(${folder})</span></span>
+                            <span style="background:#ef4444; color:#ffffff; font-weight:800; padding:2px 10px; border-radius:12px; font-size:12px;">
+                                ${isAr ? 'مطلوب:' : 'Need:'} ${toOrder}
+                            </span>
+                        </li>
+                    `);
                 }
 
-                const rowBg = isLow ? 'background-color:#fef2f2; color:#dc2626; font-weight:bold;' : '';
-                const nameDisplay = isLow ? `&#x1F6A8; ${i.name}` : i.name;
+                const rowBg = isLow ? 'background-color:#fff1f2;' : 'background-color:#ffffff;';
+                const nameStyle = isLow ? 'color:#b91c1c; font-weight:800;' : 'color:#0f172a; font-weight:600;';
+
+                let orderBadge = `<span style="color:#94a3b8; font-weight:600;">-</span>`;
+                if (toOrder > 0) {
+                    if (isLow) {
+                        orderBadge = `<span style="background:#dc2626; color:#ffffff; font-weight:800; padding:4px 12px; border-radius:12px; font-size:13px; display:inline-block;">${toOrder}</span>`;
+                    } else {
+                        orderBadge = `<span style="background:#2563eb; color:#ffffff; font-weight:800; padding:4px 12px; border-radius:12px; font-size:13px; display:inline-block;">${toOrder}</span>`;
+                    }
+                }
 
                 rowsHtml += `
-                            <tr style="${rowBg}">
-                                <td style="padding:8px 8px 8px 24px; border:1px solid #e2e8f0;">${nameDisplay}</td>
-                                <td style="padding:8px; border:1px solid #e2e8f0; text-align:center;">${i.currentStock} / ${i.maxStock}</td>
-                                <td style="padding:8px; border:1px solid #e2e8f0; text-align:center;">${toOrder}</td>
-                            </tr>
-                        `;
+                    <tr style="${rowBg} border-bottom: 1px solid #e2e8f0;">
+                        <td style="padding:10px 14px; font-size:13px; ${nameStyle}">
+                            ${isLow ? '🚨 ' : ''}${i.name}
+                        </td>
+                        <td style="padding:10px 14px; text-align:center; font-size:13px;">
+                            <span style="display:inline-block; padding:3px 10px; border-radius:8px; background:${isLow ? '#fee2e2' : '#f1f5f9'}; color:${isLow ? '#991b1b' : '#334155'}; font-weight:700; font-size:12px;">
+                                ${i.currentStock} / ${i.maxStock}
+                            </span>
+                        </td>
+                        <td style="padding:10px 14px; text-align:center; font-size:13px;">
+                            ${orderBadge}
+                        </td>
+                    </tr>
+                `;
             });
         }
     });
@@ -210,49 +268,243 @@ function exportWarehousePDF() {
     let criticalHtml = '';
     if (criticalList.length > 0) {
         criticalHtml = `
-                    <div style="margin-top:30px; border:2px solid #dc2626; padding:15px; border-radius:8px; background-color:#fef2f2;">
-                        <h3 style="color:#dc2626; margin-top:0; font-size:16px;">&#x1F6A8; CRITICAL RESTOCK ORDERS</h3>
-                        <ul style="color:#dc2626; margin-bottom:0; font-size:14px; list-style-type:square;">
-                            ${criticalList.join('')}
-                        </ul>
-                    </div>
-                `;
+            <div style="margin-top:24px; border:2px solid #ef4444; border-radius:12px; background-color:#fef2f2; padding:18px; box-shadow:0 2px 8px rgba(239,68,68,0.1);">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px; color:#b91c1c; font-weight:900; font-size:15px;">
+                    <span style="font-size:20px;">🚨</span>
+                    <span>${isAr ? 'قائمة النواقص والأصناف الحرجة العاجلة للطلب فوراً' : 'CRITICAL RESTOCK ORDERS - IMMEDIATE ACTION REQUIRED'}</span>
+                </div>
+                <ul style="margin:0; padding:0; list-style:none; color:#7f1d1d; font-size:13px; line-height:1.6;">
+                    ${criticalList.join('')}
+                </ul>
+            </div>
+        `;
     }
 
-    const printHTML = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
-                <title>Burgeroov Restock Report</title>
-                <style>
-                    @page { size: portrait; margin: 0mm !important; }
-                    body { font-family: Arial, sans-serif; color: #1e293b; padding: 15mm; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    h2 { color: #452b1b; border-bottom: 2px solid #452b1b; padding-bottom: 10px; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
-                    th { background-color: #452b1b; color: #fff; padding: 10px; border: 1px solid #cbd5e1; text-align: left; }
-                    td { border: 1px solid #e2e8f0; }
-                </style></head><body>
-                <h2>Burgeroov Restock Report</h2>
-                <p style="color:#64748b; font-size:13px;">Generated: ${new Date().toLocaleString()}</p>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Product Name</th>
-                            <th style="text-align:center;">Currently Left</th>
-                            <th style="text-align:center;">Amount to Order</th>
-                        </tr>
-                    </thead>
-                    <tbody>${rowsHtml}</tbody>
-                </table>
-                ${criticalHtml}
-                </body></html>`;
+    const reportDate = new Date().toLocaleString(isAr ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-    const blob = new Blob([printHTML], { type: 'text/html' });
-    const blobUrl = URL.createObjectURL(blob);
-    const iframe = document.createElement('iframe');
-    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
-    document.body.appendChild(iframe);
-    iframe.onload = function () { setTimeout(function () { iframe.contentWindow.print(); }, 300); };
-    iframe.src = blobUrl;
-    setTimeout(() => { URL.revokeObjectURL(blobUrl); document.body.removeChild(iframe); }, 10000);
+    container.innerHTML = `
+        <div id="restock-pdf-paper-content" class="a4-restock-page" style="background:#ffffff; color:#0f172a; max-width:820px; margin:0 auto; padding:32px 28px; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.1); box-sizing:border-box; font-family:'Segoe UI', 'Cairo', Tahoma, Arial, sans-serif; direction:${isAr ? 'rtl' : 'ltr'}; text-align:${isAr ? 'right' : 'left'};">
+            
+            <!-- Document Header -->
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #c5832b; padding-bottom:18px; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+                <div style="display:flex; align-items:center; gap:14px;">
+                    <img src="${compLogo}" alt="Logo" style="height:52px; max-width:130px; object-fit:contain;" onerror="this.style.display='none';" />
+                    <div>
+                        <h1 style="margin:0; font-size:22px; font-weight:900; color:#0f172a;">${compName}</h1>
+                        <span style="font-size:13px; font-weight:700; color:#64748b;">${isAr ? 'إدارة العمليات والمستودع المركزي' : 'Operations & Central Warehouse'}</span>
+                    </div>
+                </div>
+                <div style="text-align:${isAr ? 'left' : 'right'}; font-size:13px; color:#475569;">
+                    <div style="font-weight:900; color:#0f172a; font-size:16px;">${isAr ? '📋 تقرير طلب نواقص وبضاعة' : '📋 Warehouse Restock Order'}</div>
+                    <div style="margin-top:4px; font-size:12px; color:#64748b;">📅 ${reportDate}</div>
+                </div>
+            </div>
+
+            <!-- Summary HUD KPI Cards -->
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:20px;">
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; text-align:center;">
+                    <div style="font-size:11px; font-weight:700; color:#64748b;">${isAr ? 'إجمالي الأصناف' : 'Total Items'}</div>
+                    <div style="font-size:20px; font-weight:900; color:#0f172a; margin-top:2px;">${totalItems}</div>
+                </div>
+                <div style="background:${totalCritical > 0 ? '#fef2f2' : '#f8fafc'}; border:1px solid ${totalCritical > 0 ? '#fecaca' : '#e2e8f0'}; border-radius:10px; padding:12px 14px; text-align:center;">
+                    <div style="font-size:11px; font-weight:700; color:${totalCritical > 0 ? '#dc2626' : '#64748b'};">${isAr ? 'أصناف حرجة للطلب' : 'Critical Items'}</div>
+                    <div style="font-size:20px; font-weight:900; color:${totalCritical > 0 ? '#dc2626' : '#0f172a'}; margin-top:2px;">${totalCritical}</div>
+                </div>
+                <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:10px; padding:12px 14px; text-align:center;">
+                    <div style="font-size:11px; font-weight:700; color:#0369a1;">${isAr ? 'إجمالي الكميات المطلوبة' : 'Total Units to Order'}</div>
+                    <div style="font-size:20px; font-weight:900; color:#0284c7; margin-top:2px;">${totalUnitsToOrder}</div>
+                </div>
+            </div>
+
+            <!-- Table of Items -->
+            <table style="width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden;">
+                <thead>
+                    <tr style="background:#1e293b; color:#ffffff;">
+                        <th style="padding:12px 14px; text-align:${isAr ? 'right' : 'left'}; font-size:13px; font-weight:800;">${isAr ? 'اسم الصنف / المنتج' : 'Product Name'}</th>
+                        <th style="padding:12px 14px; text-align:center; font-size:13px; font-weight:800; width:160px;">${isAr ? 'المتوفر / الأقصى' : 'Current / Max'}</th>
+                        <th style="padding:12px 14px; text-align:center; font-size:13px; font-weight:800; width:140px;">${isAr ? 'الكمية للطلب' : 'Order Qty'}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHtml}
+                </tbody>
+            </table>
+
+            <!-- Critical List Alert Callout -->
+            ${criticalHtml}
+
+            <!-- Document Footer -->
+            <div style="margin-top:35px; padding-top:14px; border-top:1px dashed #cbd5e1; display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#64748b; flex-wrap:wrap; gap:8px;">
+                <div>🏢 ${compName} Operations Management System</div>
+                <div>✅ Automated Restock Document</div>
+            </div>
+        </div>
+    `;
+
+    modal.style.display = 'flex';
 }
+
+function printRestockPDF() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const container = document.getElementById('restock-pdf-paper-content');
+    if (!container) return;
+
+    // Check Native Android Print Bridge
+    const androidBridge = window.AndroidInterface || window.Android || window.AndroidShare;
+    if (androidBridge && typeof androidBridge.printDocument === 'function') {
+        try {
+            androidBridge.printDocument();
+            return;
+        } catch (e) {
+            console.warn("androidBridge.printDocument error:", e);
+        }
+    }
+
+    // High quality native browser / mobile vector print (Crisp Arabic with NO canvas corruptions)
+    const printHTML = `
+        <!DOCTYPE html>
+        <html dir="${isAr ? 'rtl' : 'ltr'}" lang="${isAr ? 'ar' : 'en'}">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>${isAr ? 'تقرير_طلب_بضاعة' : 'Restock_Order_Report'}</title>
+            <style>
+                @page {
+                    size: A4 portrait;
+                    margin: 10mm;
+                }
+                @media print {
+                    html, body {
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        background: #ffffff !important;
+                    }
+                    .a4-restock-page {
+                        box-shadow: none !important;
+                        border: none !important;
+                        padding: 0 !important;
+                        max-width: 100% !important;
+                    }
+                }
+                body {
+                    font-family: 'Segoe UI', 'Cairo', Tahoma, Arial, sans-serif;
+                    background: #ffffff;
+                    color: #0f172a;
+                    margin: 0;
+                    padding: 10mm;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+                table { page-break-inside: auto; }
+                tr { page-break-inside: avoid; page-break-after: auto; }
+            </style>
+        </head>
+        <body>
+            ${container.outerHTML}
+        </body>
+        </html>
+    `;
+
+    const blob = new Blob([printHTML], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.src = url;
+    document.body.appendChild(iframe);
+
+    iframe.onload = function() {
+        setTimeout(function() {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } catch (e) {
+                console.warn("Iframe print error:", e);
+                window.print();
+            }
+            setTimeout(() => {
+                try {
+                    document.body.removeChild(iframe);
+                    URL.revokeObjectURL(url);
+                } catch (e) {}
+            }, 3000);
+        }, 300);
+    };
+}
+window.printRestockPDF = printRestockPDF;
+
+function shareRestockTextReport() {
+    const data = getCompanyData().warehouse;
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    if (!data || data.length === 0) return;
+
+    const compName = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany.toUpperCase() : 'BURGEROOV';
+    const reportDate = new Date().toLocaleString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    let criticalLines = [];
+    let regularLines = [];
+    let totalUnits = 0;
+
+    data.forEach(i => {
+        const isLow = i.currentStock <= i.riskAmount;
+        const toOrder = Math.max(0, i.maxStock - i.currentStock);
+        if (toOrder > 0) {
+            totalUnits += toOrder;
+            const line = `• ${i.name} [${i.category || 'عام'}]: مطلوب (${toOrder}) - متوفر حالياً (${i.currentStock}/${i.maxStock})`;
+            if (isLow) {
+                criticalLines.push(`🚨 ` + line);
+            } else {
+                regularLines.push(`▫️ ` + line);
+            }
+        }
+    });
+
+    let msg = `📦 *${isAr ? 'طلب بضاعة ونواقص المستودع' : 'Warehouse Restock Order'} - ${compName}*\n`;
+    msg += `📅 ${reportDate}\n\n`;
+
+    if (criticalLines.length > 0) {
+        msg += `🔥 *${isAr ? 'النواقص الحرجة العاجلة:' : 'CRITICAL DEFICITS:'}*\n`;
+        msg += criticalLines.join('\n') + '\n\n';
+    }
+
+    if (regularLines.length > 0) {
+        msg += `📋 *${isAr ? 'باقي النواقص للطلب:' : 'Other Restock Items:'}*\n`;
+        msg += regularLines.join('\n') + '\n\n';
+    }
+
+    if (criticalLines.length === 0 && regularLines.length === 0) {
+        msg += isAr ? `✅ المستودع مكتمل ولا توجد نواقص حالياً.` : `✅ All items are in stock.`;
+    } else {
+        msg += `🛒 *${isAr ? 'إجمالي الكميات المطلوبة:' : 'Total Units to Order:'}* ${totalUnits}\n`;
+    }
+
+    // Share via Web Share or WhatsApp
+    if (navigator.share) {
+        navigator.share({
+            title: isAr ? 'طلب نواقص المستودع' : 'Warehouse Restock Order',
+            text: msg
+        }).catch(() => {
+            openWhatsAppFallback(msg);
+        });
+    } else {
+        openWhatsAppFallback(msg);
+    }
+
+    function openWhatsAppFallback(text) {
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text);
+            }
+        } catch (e) {}
+        const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+        window.open(waUrl, '_blank');
+    }
+}
+window.shareRestockTextReport = shareRestockTextReport;
 
 // --- UTILITIES ---
 
@@ -284,6 +536,8 @@ function processRestoreFile(event) {
 // --- AUTOMATIC IN-SCOPE WINDOW EXPORTS ---
 if (typeof renderWarehouse === 'function') window.renderWarehouse = renderWarehouse;
 if (typeof exportWarehousePDF === 'function') window.exportWarehousePDF = exportWarehousePDF;
+if (typeof printRestockPDF === 'function') window.printRestockPDF = printRestockPDF;
+if (typeof closeRestockPDFViewer === 'function') window.closeRestockPDFViewer = closeRestockPDFViewer;
 if (typeof downloadBackup === 'function') window.downloadBackup = downloadBackup;
 if (typeof triggerRestore === 'function') window.triggerRestore = triggerRestore;
 if (typeof processRestoreFile === 'function') window.processRestoreFile = processRestoreFile;

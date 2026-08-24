@@ -2807,6 +2807,7 @@ function renderVaultNotes() {
                     ${(() => {
                         const imgs = (n.imageUrls && Array.isArray(n.imageUrls) && n.imageUrls.length > 0) ? n.imageUrls : (n.imageUrl ? [n.imageUrl] : []);
                         if (imgs.length === 0) return '';
+                        if (typeof preloadVaultNoteFile === 'function') preloadVaultNoteFile(n.id, imgs[0]);
 
                         if (imgs.length === 1) {
                             return `
@@ -3000,6 +3001,7 @@ function dataURLtoFile(dataurl, filename) {
     if (!dataurl.startsWith('data:')) return null;
     try {
         const arr = dataurl.split(',');
+        if (arr.length < 2) return null;
         const mimeMatch = arr[0].match(/:(.*?);/);
         const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
         const bstr = atob(arr[1]);
@@ -3008,7 +3010,8 @@ function dataURLtoFile(dataurl, filename) {
         while (n--) {
             u8arr[n] = bstr.charCodeAt(n);
         }
-        return new File([u8arr], filename, { type: mime });
+        const ext = mime.includes('png') ? 'png' : 'jpg';
+        return new File([u8arr], filename || `note_attachment.${ext}`, { type: mime });
     } catch (e) {
         console.warn("dataURLtoFile error:", e);
         return null;
@@ -3016,86 +3019,162 @@ function dataURLtoFile(dataurl, filename) {
 }
 window.dataURLtoFile = dataURLtoFile;
 
-async function shareVaultNote(noteId) {
-    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
-    const notesObj = data.vaultNotes || {};
-    const note = notesObj[noteId];
+window._vaultNoteFiles = window._vaultNoteFiles || {};
 
-    if (!note) return;
-
-    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
-
-    let cleanTitle = note.title ? deepCleanNoteText(note.title) : '';
-    let cleanDesc = note.description ? deepCleanNoteText(note.description) : '';
-
-    let shareText = '';
-    if (cleanTitle && cleanDesc) {
-        shareText = `${cleanTitle}\n\n${cleanDesc}`;
-    } else {
-        shareText = cleanTitle || cleanDesc || '';
+function preloadVaultNoteFile(noteId, imgSrc) {
+    if (!noteId || !imgSrc || typeof imgSrc !== 'string') return;
+    if (imgSrc.startsWith('data:')) {
+        window._vaultNoteFiles[noteId] = dataURLtoFile(imgSrc, 'note_attachment.jpg');
+        return;
     }
+    if (imgSrc.startsWith('http') || imgSrc.startsWith('blob:')) {
+        fetch(imgSrc).then(r => r.blob()).then(blob => {
+            const mime = blob.type || 'image/jpeg';
+            const ext = mime.includes('png') ? 'png' : (mime.includes('webp') ? 'webp' : 'jpg');
+            window._vaultNoteFiles[noteId] = new File([blob], `note_attachment.${ext}`, { type: mime, lastModified: Date.now() });
+        }).catch(() => {});
+    }
+}
+window.preloadVaultNoteFile = preloadVaultNoteFile;
 
-    if (!shareText) {
+function getFileFromImageSync(imgSrc, noteId) {
+    if (noteId && window._vaultNoteFiles && window._vaultNoteFiles[noteId]) {
+        return window._vaultNoteFiles[noteId];
+    }
+    if (!imgSrc || typeof imgSrc !== 'string') return null;
+    if (imgSrc.startsWith('data:')) {
+        const f = typeof dataURLtoFile === 'function' ? dataURLtoFile(imgSrc, 'note_attachment.jpg') : null;
+        if (noteId && f) window._vaultNoteFiles[noteId] = f;
+        return f;
+    }
+    // Synchronously extract from rendered DOM <img> element if available on the page
+    try {
+        const cardEl = document.getElementById(`vault-text-${noteId}`)?.closest('.vault-note-card') || document.querySelector(`[data-note-id="${noteId}"]`);
+        const imgEl = (cardEl && cardEl.querySelector('img')) || document.querySelector(`img[src="${imgSrc}"]`);
+        if (imgEl && imgEl.naturalWidth > 0 && imgEl.complete) {
+            const cvs = document.createElement('canvas');
+            cvs.width = imgEl.naturalWidth;
+            cvs.height = imgEl.naturalHeight;
+            const ctx = cvs.getContext('2d');
+            ctx.drawImage(imgEl, 0, 0);
+            const durl = cvs.toDataURL('image/jpeg', 0.92);
+            const f = typeof dataURLtoFile === 'function' ? dataURLtoFile(durl, 'note_attachment.jpg') : null;
+            if (noteId && f) window._vaultNoteFiles[noteId] = f;
+            return f;
+        }
+    } catch (e) {
+        console.warn("getFileFromImageSync error:", e);
+    }
+    return null;
+}
+window.getFileFromImageSync = getFileFromImageSync;
+
+function shareVaultNote(noteId) {
+    try {
+        const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+        let note = null;
+        const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+        if (data && data.vaultNotes && data.vaultNotes[noteId]) {
+            note = data.vaultNotes[noteId];
+        }
+        if (!note && typeof appData !== 'undefined' && typeof currentCompany !== 'undefined' && appData[currentCompany] && appData[currentCompany].vaultNotes) {
+            note = appData[currentCompany].vaultNotes[noteId];
+        }
+
+        let cleanTitle = note && note.title ? deepCleanNoteText(note.title) : '';
+        let cleanDesc = note && (note.text || note.description) ? deepCleanNoteText(note.text || note.description) : '';
+
+        if (!cleanDesc) {
+            const textEl = document.getElementById(`vault-text-${noteId}`);
+            if (textEl) cleanDesc = (textEl.textContent || textEl.innerText || '').trim();
+        }
+
+        let shareText = '';
+        if (cleanTitle && cleanDesc) {
+            shareText = `📌 *${cleanTitle}*\n\n${cleanDesc}`;
+        } else {
+            shareText = cleanTitle || cleanDesc || '';
+        }
+
+        const noteImage = (note && (note.imageUrl || (note.imageUrls && note.imageUrls[0]) || note.image || note.attachmentData)) || '';
+
+        // 1. Android APK Native Bridge (Invokes Native Android System Chooser in APK with Image)
+        const androidBridge = window.AndroidShare || window.AndroidInterface || window.Android;
+        if (androidBridge) {
+            if (typeof androidBridge.shareWithImage === 'function') {
+                try {
+                    androidBridge.shareWithImage(cleanTitle || 'Note', shareText, noteImage || '');
+                    return;
+                } catch (e) {
+                    console.warn("Android native shareWithImage error:", e);
+                }
+            }
+            if (typeof androidBridge.share === 'function') {
+                try {
+                    androidBridge.share(cleanTitle || 'Note', shareText, noteImage || '');
+                    return;
+                } catch (e) {
+                    console.warn("Android native share error:", e);
+                }
+            }
+            if (typeof androidBridge.shareText === 'function') {
+                try {
+                    androidBridge.shareText(shareText);
+                    return;
+                } catch (e) {
+                    console.warn("Android native shareText error:", e);
+                }
+            }
+        }
+
+        // 2. Prepare file object synchronously (preserving the browser's User Gesture activation)
+        const fileObj = getFileFromImageSync(noteImage, noteId);
+
+        // 3. Direct Native OS System Share (Triggers Windows 10/11 Share UI on PC / Web Share on Mobile)
+        if (navigator.share) {
+            const shareData = {
+                title: cleanTitle || 'Information Note',
+                text: shareText
+            };
+
+            if (fileObj && navigator.canShare) {
+                try {
+                    if (navigator.canShare({ files: [fileObj], title: cleanTitle || 'Information Note', text: shareText })) {
+                        shareData.files = [fileObj];
+                    } else if (navigator.canShare({ files: [fileObj] })) {
+                        shareData.files = [fileObj];
+                    }
+                } catch (canShareErr) {
+                    console.warn("navigator.canShare error:", canShareErr);
+                }
+            }
+
+            navigator.share(shareData).catch(err => {
+                if (err.name === 'AbortError') return; // User closed OS share picker intentionally
+                console.warn("System share with files failed, retrying text-only:", err);
+                
+                // Retry text-only native OS share
+                navigator.share({
+                    title: cleanTitle || 'Information Note',
+                    text: shareText
+                }).catch(retryErr => {
+                    if (retryErr.name === 'AbortError') return;
+                    console.warn("System share text retry failed:", retryErr);
+                });
+            });
+            return;
+        }
+
+        // 4. Fallback (Copy text to clipboard ONLY if Web Share is not supported by browser)
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(shareText);
+        }
         if (typeof showInAppNotification === 'function') {
-            showInAppNotification(isAr ? '⚠️ لا يوجد نص للمشاركة في هذه الملاحظة.' : '⚠️ No text to share in this note.');
+            showInAppNotification(isAr ? '📋 تم نسخ نص الملاحظة إلى الحافظة.' : '📋 Note text copied to clipboard.');
         }
-        return;
-    }
-
-    const shareData = {
-        title: cleanTitle || 'Information Note',
-        text: shareText
-    };
-
-    // Helper to copy text to clipboard as robust backup
-    const copyToClipboard = (text) => {
-        try {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text);
-            } else {
-                const textArea = document.createElement("textarea");
-                textArea.value = text;
-                textArea.style.position = "fixed";
-                textArea.style.left = "-9999px";
-                document.body.appendChild(textArea);
-                textArea.focus();
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-            }
-        } catch (e) {
-            console.warn("Clipboard copy fallback error:", e);
-        }
-    };
-
-    // MULTI-TIER BULLETPROOF APP & WEBVIEW SHARE STRATEGY
-    // Tier 1: Try Native navigator.share (Text Only first for WebView compatibility)
-    if (navigator.share) {
-        navigator.share(shareData).then(() => {
-            console.log("Successfully shared via navigator.share");
-        }).catch(err => {
-            if (err.name === 'AbortError') return; // User closed share sheet intentionally
-            console.warn("navigator.share failed, executing Tier 2 App fallback:", err);
-
-            // Tier 2: Copy to clipboard + WhatsApp direct URL
-            copyToClipboard(shareText);
-            const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
-            window.open(waUrl, '_blank');
-
-            if (typeof showInAppNotification === 'function') {
-                showInAppNotification(isAr ? '📋 تم نسخ النص وإعادة التوجيه للمشاركة!' : '📋 Text copied & sharing opened!');
-            }
-        });
-        return;
-    }
-
-    // Tier 3: Direct Web/App Fallback if navigator.share is completely missing
-    copyToClipboard(shareText);
-    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
-    window.open(waUrl, '_blank');
-
-    if (typeof showInAppNotification === 'function') {
-        showInAppNotification(isAr ? '📋 تم نسخ النص كحفظ احتياطي وفتح المشاركة!' : '📋 Text copied to clipboard!');
+    } catch (outerErr) {
+        console.error("shareVaultNote error:", outerErr);
     }
 }
 window.shareVaultNote = shareVaultNote;

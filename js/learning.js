@@ -518,7 +518,7 @@ function renderLearningProgram() {
         if (embedUrl) {
             videoPlayerHTML = `
                 <div style="width: 100%; aspect-ratio: 16 / 9; background: #000000; position: relative; overflow: hidden; border-radius: 12px 12px 0 0;">
-                    <iframe src="${embedUrl}" title="${v.title}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
+                    <iframe src="${embedUrl}" title="${v.title}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen" allowfullscreen="true" webkitallowfullscreen mozallowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
                 </div>
             `;
         } else {
