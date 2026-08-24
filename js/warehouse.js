@@ -349,14 +349,24 @@ function printRestockPDF() {
     const container = document.getElementById('restock-pdf-paper-content');
     if (!container) return;
 
-    // Check Native Android Print Bridge
+    // Check if Android bridge supports printing custom HTML
     const androidBridge = window.AndroidInterface || window.Android || window.AndroidShare;
-    if (androidBridge && typeof androidBridge.printDocument === 'function') {
-        try {
-            androidBridge.printDocument();
-            return;
-        } catch (e) {
-            console.warn("androidBridge.printDocument error:", e);
+    if (androidBridge) {
+        if (typeof androidBridge.printWarehousePDF === 'function') {
+            try {
+                androidBridge.printWarehousePDF();
+                return;
+            } catch (e) {
+                console.warn("androidBridge.printWarehousePDF error:", e);
+            }
+        }
+        if (typeof androidBridge.printHtml === 'function') {
+            try {
+                androidBridge.printHtml(container.outerHTML);
+                return;
+            } catch (e) {
+                console.warn("androidBridge.printHtml error:", e);
+            }
         }
     }
 
@@ -367,7 +377,7 @@ function printRestockPDF() {
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>${isAr ? 'تقرير_طلب_بضاعة' : 'Restock_Order_Report'}</title>
+            <title>${isAr ? 'تقرير_طلب_بضاعة_ونواقص_المستودع' : 'Warehouse_Restock_Order_Report'}</title>
             <style>
                 @page {
                     size: A4 portrait;
