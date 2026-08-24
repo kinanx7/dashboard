@@ -578,6 +578,126 @@ var auth = firebase.auth();
 var db = firebase.database();
 initPublicCustomerSync();
 
+// =============================================
+// AUTOMATIC APK VERSION CHECKER & FORCED UPDATE
+// =============================================
+window.CURRENT_APK_VERSION = 'v1.0.0'; // Base version tag for older APKs
+window.LATEST_RELEASE_APK_VERSION = 'v1.0.1'; // The newly uploaded APK version
+
+function initAppVersionChecker() {
+    if (typeof firebase === 'undefined' || !firebase.database) return;
+    const isMobileOrAndroid = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || 
+                              window.AndroidInterface || window.Android || window.AndroidShare;
+    
+    const updateRef = firebase.database().ref('system_config/app_update');
+    updateRef.on('value', (snap) => {
+        const data = snap.val();
+        const targetNotesBilingual = [
+            { ar: 'إصلاح الأخطاء البرمجية', en: 'Fix bugs & stability' },
+            { ar: 'تحسين وتطوير طباعة PDF وفواتير الطلبات', en: 'Improve the PDF printing and receipt printing' },
+            { ar: 'إضافة أقسام وميزات جديدة والمزيد', en: 'Add new sections and more' }
+        ];
+        const targetNotesAr = '• إصلاح الأخطاء البرمجية (Fix bugs & stability)\n• تحسين وتطوير طباعة PDF وفواتير الطلبات (Improve PDF & receipt printing)\n• إضافة أقسام وميزات جديدة والمزيد (Add new sections and more)';
+
+        if (!data) {
+            // Seed initial update config in Firebase
+            updateRef.set({
+                latest_version: window.LATEST_RELEASE_APK_VERSION || 'v1.0.1',
+                is_forced: true,
+                apk_url: './app-release.apk',
+                notes_ar: targetNotesAr,
+                notes_bilingual: targetNotesBilingual,
+                updated_at: new Date().toISOString()
+            });
+            return;
+        }
+
+        // If Firebase has old notes or missing bilingual notes, sync the new notes automatically
+        if (!data.notes_bilingual || data.notes_ar !== targetNotesAr) {
+            updateRef.update({
+                notes_ar: targetNotesAr,
+                notes_bilingual: targetNotesBilingual,
+                latest_version: window.LATEST_RELEASE_APK_VERSION || 'v1.0.1',
+                apk_url: './app-release.apk'
+            }).catch(() => {});
+        }
+
+        const latestVer = data.latest_version || window.LATEST_RELEASE_APK_VERSION || 'v1.0.1';
+        const currentVer = window.CURRENT_APK_VERSION || 'v1.0.0';
+        const isForced = data.is_forced !== false;
+
+        // If mobile / APK user has an older version than latest_version
+        if (isMobileOrAndroid && isForced && compareAppVersions(currentVer, latestVer) < 0) {
+            triggerForceUpdatePopup(data);
+        }
+    });
+}
+
+function syncAppUpdateNotesToFirebase() {
+    if (typeof firebase === 'undefined' || !firebase.database) return;
+    const updateRef = firebase.database().ref('system_config/app_update');
+    const targetNotesBilingual = [
+        { ar: 'إصلاح الأخطاء البرمجية', en: 'Fix bugs & stability' },
+        { ar: 'تحسين وتطوير طباعة PDF وفواتير الطلبات', en: 'Improve the PDF printing and receipt printing' },
+        { ar: 'إضافة أقسام وميزات جديدة والمزيد', en: 'Add new sections and more' }
+    ];
+    const targetNotesAr = '• إصلاح الأخطاء البرمجية (Fix bugs & stability)\n• تحسين وتطوير طباعة PDF وفواتير الطلبات (Improve PDF & receipt printing)\n• إضافة أقسام وميزات جديدة والمزيد (Add new sections and more)';
+
+    updateRef.update({
+        notes_ar: targetNotesAr,
+        notes_bilingual: targetNotesBilingual,
+        latest_version: window.LATEST_RELEASE_APK_VERSION || 'v1.0.1',
+        is_forced: true,
+        apk_url: './app-release.apk',
+        updated_at: new Date().toISOString()
+    }).catch(e => console.warn('syncAppUpdateNotesToFirebase notice:', e));
+}
+window.syncAppUpdateNotesToFirebase = syncAppUpdateNotesToFirebase;
+
+function compareAppVersions(v1, v2) {
+    if (!v1) return -1;
+    if (!v2) return 0;
+    const clean1 = v1.replace(/^v/i, '').split('.').map(n => parseInt(n) || 0);
+    const clean2 = v2.replace(/^v/i, '').split('.').map(n => parseInt(n) || 0);
+    for (let i = 0; i < Math.max(clean1.length, clean2.length); i++) {
+        const a = clean1[i] || 0;
+        const b = clean2[i] || 0;
+        if (a < b) return -1;
+        if (a > b) return 1;
+    }
+    return 0;
+}
+
+function triggerForceUpdatePopup(config) {
+    const modal = document.getElementById('modal-force-update-apk');
+    const verTag = document.getElementById('force-update-ver-tag');
+    const notesText = document.getElementById('force-update-notes-text');
+    const dlBtn = document.getElementById('force-update-download-btn');
+    if (!modal) return;
+
+    if (verTag && config.latest_version) verTag.textContent = config.latest_version;
+    if (notesText) {
+        if (config.notes_bilingual && Array.isArray(config.notes_bilingual)) {
+            notesText.innerHTML = config.notes_bilingual.map(item => `
+                <div style="margin-bottom: 6px;">
+                    🔹 <strong>${item.ar}</strong><br>
+                    <span style="color: #94a3b8; font-size: 0.8rem; padding-inline-start: 16px; display: inline-block;">• ${item.en}</span>
+                </div>
+            `).join('');
+        } else if (config.notes_ar) {
+            notesText.innerHTML = config.notes_ar.split('\n').map(l => `<div>${l}</div>`).join('');
+        }
+    }
+    if (dlBtn && config.apk_url) {
+        dlBtn.href = config.apk_url;
+    }
+
+    modal.style.display = 'flex';
+}
+window.initAppVersionChecker = initAppVersionChecker;
+window.triggerForceUpdatePopup = triggerForceUpdatePopup;
+initAppVersionChecker();
+
 // --- Auth UI Helpers ---
 function togglePassword() {
     const pwdInput = document.getElementById('auth-password');
@@ -955,6 +1075,7 @@ auth.onAuthStateChanged((user) => {
         currentUser = { email: user.email, uid: user.uid };
         document.getElementById('display-user-email').textContent = currentUser.email;
         startGlobalNotificationListeners(user.email);
+        try { syncAppUpdateNotesToFirebase(); } catch (e) { }
 
         document.getElementById('auth-loader').style.display = 'block';
         document.getElementById('auth-btn').style.display = 'none';
