@@ -81,7 +81,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=161">
+    <link rel="stylesheet" href="style.css?v=166">
 </head>
 
 <body class="theme-burgeroov">
@@ -5409,128 +5409,133 @@
         </div>
     </div>
 
-    <!-- Order Receipt Modal (Formal A4 Paper Document Style) -->
-    <div id="market-order-receipt-modal"
-        style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 10000; backdrop-filter: blur(6px); align-items: center; justify-content: center; padding: 20px; overflow-y: auto;">
-        <div class="card formal-a4-receipt"
-            style="max-width: 680px; width: 100%; max-height: 92vh; display: flex; flex-direction: column; background: #ffffff !important; color: #0f172a !important; border: 2px solid #0f172a; box-shadow: 0 15px 40px rgba(0,0,0,0.4); border-radius: 12px; overflow: hidden; padding: 0; font-family: 'Inter', system-ui, sans-serif;">
+    <!-- Order Receipt Modal (Formal A4 Paper Document Style with Modern HUD Toolbar & Mobile Optimization) -->
+    <div id="market-order-receipt-modal" class="modal-overlay" onclick="if(event.target === this) closeMarketOrderReceiptModal();"
+        style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; backdrop-filter: blur(8px); justify-content: center; align-items: center; padding: 12px 8px; overflow-y: auto;">
+        <div class="modal-content"
+            style="max-width: 780px; width: 100%; max-height: 94vh; display: flex; flex-direction: column; background: var(--card-bg, #1e293b); border: 2px solid var(--primary, #c5832b); box-shadow: 0 16px 50px rgba(0,0,0,0.6); border-radius: 20px; overflow: hidden; padding: 16px; position: relative;">
 
-            <!-- Formal A4 Header -->
-            <div
-                style="padding: 24px 28px 18px 28px; border-bottom: 2px solid #0f172a; background: #f8fafc; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
-                <div>
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
-                        <span style="font-size: 1.8rem; line-height: 1;">🏪</span>
-                        <h2
-                            style="margin: 0; font-size: 1.4rem; font-weight: 900; color: #0f172a; letter-spacing: -0.5px; text-transform: uppercase;">
-                            MVC TEAM MARKET</h2>
-                    </div>
-                    <div style="font-size: 0.92rem; font-weight: 800; color: #334155;">فاتورة طلب رسمية / OFFICIAL ORDER
-                        RECEIPT</div>
-                    <div style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">نظام إدارة وتوزيع الطلبات
-                        والمنتجات</div>
+            <!-- Toolbar Header HUD -->
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 1.3rem;">🏪</span>
+                    <h3 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: var(--text-main);" data-i18n="title-market-receipt-hud">Market Receipt Preview / معاينة الفاتورة</h3>
                 </div>
-
-                <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-                    <div style="font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase;">Order
-                        Number / رقم الطلب</div>
-                    <div id="receipt-order-num"
-                        style="font-size: 1.25rem; font-weight: 900; color: #1e40af; font-family: monospace, system-ui; letter-spacing: 1px; background: #dbeafe; padding: 4px 10px; border-radius: 6px; border: 1px solid #bfdbfe;">
-                        #ORD-000000</div>
-                    <div id="receipt-order-date"
-                        style="font-size: 0.8rem; font-weight: 700; color: #475569; margin-top: 4px;">-</div>
-                </div>
-            </div>
-
-            <!-- Customer & Order Information Box -->
-            <div
-                style="padding: 16px 28px; background: #ffffff; border-bottom: 1px solid #cbd5e1; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; font-size: 0.88rem;">
-                <div>
-                    <span style="color: #64748b; font-weight: 600;">اسم العميل / Customer:</span>
-                    <div id="receipt-customer-name"
-                        style="font-weight: 800; color: #0f172a; font-size: 1rem; margin-top: 2px;">-</div>
-                </div>
-                <div>
-                    <span style="color: #64748b; font-weight: 600;">حالة الطلب / Order Status:</span>
-                    <div style="margin-top: 2px;">
-                        <span id="receipt-order-status-badge" class="badge"
-                            style="font-weight: 900; font-size: 0.82rem; padding: 4px 12px; border-radius: 100px; background: #fef3c7; color: #d97706;">Pending</span>
-                    </div>
-                </div>
-                <div>
-                    <span style="color: #64748b; font-weight: 600;">طريقة الدفع / Payment Method:</span>
-                    <div style="font-weight: 800; color: #15803d; margin-top: 2px;">رصيد النقاط والحوافز (SR 💵)</div>
-                </div>
-                <div>
-                    <span style="color: #64748b; font-weight: 600;">الشركة والفرع / Company:</span>
-                    <div id="receipt-company-tag" style="font-weight: 800; color: #0f172a; margin-top: 2px;">MVC Fresh
-                    </div>
-                </div>
-            </div>
-
-            <!-- Formal Items Table Container -->
-            <div style="padding: 20px 28px; overflow-y: auto; flex: 1; min-height: 160px;">
-                <h4
-                    style="margin: 0 0 12px 0; font-size: 0.95rem; font-weight: 900; color: #0f172a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
-                    <span>بيانات المنتجات / Order Items Details</span>
-                    <span style="font-size: 0.8rem; font-weight: 700; color: #64748b;">(أصناف محددة)</span>
-                </h4>
-
-                <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem; text-align: left;">
-                    <thead>
-                        <tr style="background: #f1f5f9; color: #1e293b; border-bottom: 2px solid #cbd5e1;">
-                            <th style="padding: 8px 10px; font-weight: 800; width: 40px; text-align: center;">#</th>
-                            <th style="padding: 8px 10px; font-weight: 800;">الصنف / Product Description</th>
-                            <th style="padding: 8px 10px; font-weight: 800; text-align: center; width: 80px;">الكمية
-                            </th>
-                            <th style="padding: 8px 10px; font-weight: 800; text-align: right; width: 110px;">سعر الوحدة
-                            </th>
-                            <th style="padding: 8px 10px; font-weight: 800; text-align: right; width: 120px;">الإجمالي
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody id="receipt-items-list">
-                        <!-- Dynamically populated in app.js -->
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Formal Total Box & Stamp Signatures Line -->
-            <div
-                style="padding: 16px 28px; background: #f8fafc; border-top: 2px solid #0f172a; display: flex; flex-direction: column; gap: 14px;">
-                <div
-                    style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #0f172a; color: #ffffff; border-radius: 8px;">
-                    <span style="font-size: 1.05rem; font-weight: 800;">المجموع الكلي المدفوع / Grand Total Paid:</span>
-                    <span id="receipt-total-cost"
-                        style="font-size: 1.3rem; font-weight: 900; color: #4ade80; font-family: monospace, system-ui;">0
-                        العملات</span>
-                </div>
-
-                <!-- Signatures / Stamp Verification Footer -->
-                <div
-                    style="display: flex; justify-content: space-between; align-items: flex-end; padding-top: 10px; border-top: 1px dashed #cbd5e1; font-size: 0.8rem; color: #475569;">
-                    <div>
-                        <div>توقيع مسؤول التحضير: ____________________</div>
-                        <div style="margin-top: 4px; font-size: 0.72rem; color: #94a3b8;">توقيع الاستلام والمصادقة على
-                            الفاتورة</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div>ختم الاعتماد والموافقة 🔴</div>
-                        <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">MVC Official Seal</div>
-                    </div>
-                </div>
-
-                <!-- Action Buttons (Hidden when printing via CSS .no-print) -->
-                <div class="no-print" style="display: flex; gap: 12px; margin-top: 8px;">
-                    <button type="button" onclick="window.print()" class="btn-outline"
-                        style="flex: 1; padding: 11px; font-weight: 800; font-size: 0.92rem; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; background: #ffffff; color: #0f172a; border: 2px solid #0f172a;">
-                        🖨️ طباعة الفاتورة الرسمية (Print A4)
+                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                    <button type="button" onclick="downloadMarketOrderReceiptPDF()" class="btn-primary"
+                        style="padding: 8px 14px; border-radius: 10px; font-weight: 800; font-size: 0.82rem; background: linear-gradient(135deg, #10b981, #059669); border: none; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 3px 10px rgba(16,185,129,0.3);">
+                        <span>📥</span> <span>تحميل PDF</span>
                     </button>
-                    <button type="button" onclick="closeMarketOrderReceiptModal()" class="btn-primary"
-                        style="flex: 1; padding: 11px; font-weight: 800; font-size: 0.92rem; border-radius: 10px; background: #16a34a; color: white; border: none; cursor: pointer;">
-                        ✔ إغلاق / Close
+                    <button type="button" onclick="printMarketReceiptDirect()" class="btn-outline"
+                        style="padding: 8px 12px; border-radius: 10px; font-weight: 800; font-size: 0.82rem; background: #ffffff; color: #0f172a; border: 1.5px solid #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
+                        <span>🖨️</span> <span>طباعة</span>
                     </button>
+                    <button type="button" onclick="shareMarketOrderReceiptText()" class="btn-success"
+                        style="padding: 8px 12px; border-radius: 10px; font-weight: 800; font-size: 0.82rem; background: linear-gradient(135deg, #25D366, #128C7E); border: none; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 3px 10px rgba(37,211,102,0.3);">
+                        <span>💬</span> <span>مشاركة</span>
+                    </button>
+                    <button type="button" onclick="closeMarketOrderReceiptModal()" title="Close / إغلاق"
+                        style="width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.35); border-radius: 50%; font-size: 1.15rem; cursor: pointer; color: #ef4444; margin-inline-start: 4px;">✖</button>
                 </div>
+            </div>
+
+            <!-- Scrollable Paper Container -->
+            <div id="market-receipt-paper-scroll" style="flex: 1; overflow-y: auto; padding: 10px 4px; background: #e2e8f0; border-radius: 12px;">
+                <div id="market-order-receipt-paper-content" class="formal-a4-receipt"
+                    style="max-width: 680px; width: 100%; margin: 0 auto; background: #ffffff !important; color: #0f172a !important; border: 1px solid #cbd5e1; box-shadow: 0 4px 20px rgba(0,0,0,0.15); border-radius: 8px; overflow: hidden; font-family: 'Segoe UI', 'Cairo', Tahoma, Arial, sans-serif; box-sizing: border-box;">
+
+                    <!-- Formal A4 Header -->
+                    <div class="receipt-header-row" style="padding: 16px 20px 14px 20px; border-bottom: 2px solid #0f172a; background: #f8fafc; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 3px;">
+                                <span style="font-size: 1.5rem; line-height: 1;">🏪</span>
+                                <h2 style="margin: 0; font-size: 1.2rem; font-weight: 900; color: #0f172a; letter-spacing: -0.5px; text-transform: uppercase;">MVC TEAM MARKET</h2>
+                            </div>
+                            <div style="font-size: 0.85rem; font-weight: 800; color: #334155;">فاتورة طلب رسمية / OFFICIAL ORDER RECEIPT</div>
+                            <div style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">نظام إدارة وتوزيع الطلبات والمنتجات</div>
+                        </div>
+
+                        <div class="receipt-header-right" style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 3px;">
+                            <div style="font-size: 0.7rem; font-weight: 700; color: #475569; text-transform: uppercase;">Order Number / رقم الطلب</div>
+                            <div id="receipt-order-num" style="font-size: 1.1rem; font-weight: 900; color: #1e40af; font-family: monospace, system-ui; letter-spacing: 1px; background: #dbeafe; padding: 3px 8px; border-radius: 6px; border: 1px solid #bfdbfe;">#ORD-000000</div>
+                            <div id="receipt-order-date" style="font-size: 0.74rem; font-weight: 700; color: #475569; margin-top: 2px;">-</div>
+                        </div>
+                    </div>
+
+                    <!-- Customer & Order Information Box -->
+                    <div class="receipt-info-grid" style="padding: 12px 20px; background: #ffffff; border-bottom: 1px solid #cbd5e1; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 0.82rem;">
+                        <div>
+                            <span style="color: #64748b; font-weight: 600;">اسم العميل / Customer:</span>
+                            <div id="receipt-customer-name" style="font-weight: 800; color: #0f172a; font-size: 0.92rem; margin-top: 2px; word-break: break-word;">-</div>
+                        </div>
+                        <div>
+                            <span style="color: #64748b; font-weight: 600;">حالة الطلب / Order Status:</span>
+                            <div style="margin-top: 2px;">
+                                <span id="receipt-order-status-badge" class="badge" style="font-weight: 900; font-size: 0.76rem; padding: 2px 8px; border-radius: 100px; background: #fef3c7; color: #d97706;">Pending</span>
+                            </div>
+                        </div>
+                        <div>
+                            <span style="color: #64748b; font-weight: 600;">طريقة الدفع / Payment Method:</span>
+                            <div style="font-weight: 800; color: #15803d; margin-top: 2px;">رصيد الحوافز والنقاط (SR 💵)</div>
+                        </div>
+                        <div>
+                            <span style="color: #64748b; font-weight: 600;">الشركة والفرع / Company:</span>
+                            <div id="receipt-company-tag" style="font-weight: 800; color: #0f172a; margin-top: 2px;">MVC Fresh</div>
+                        </div>
+                    </div>
+
+                    <!-- Formal Items Table Container -->
+                    <div class="receipt-items-container" style="padding: 14px 18px; overflow-x: auto;">
+                        <h4 style="margin: 0 0 8px 0; font-size: 0.88rem; font-weight: 900; color: #0f172a; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
+                            <span>بيانات المنتجات / Order Items Details</span>
+                            <span style="font-size: 0.72rem; font-weight: 700; color: #64748b;">(أصناف محددة)</span>
+                        </h4>
+
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left;">
+                            <thead>
+                                <tr style="background: #f1f5f9; color: #1e293b; border-bottom: 2px solid #cbd5e1;">
+                                    <th style="padding: 6px 8px; font-weight: 800; width: 30px; text-align: center;">#</th>
+                                    <th style="padding: 6px 8px; font-weight: 800;">الصنف / Product</th>
+                                    <th style="padding: 6px 8px; font-weight: 800; text-align: center; width: 55px;">الكمية</th>
+                                    <th style="padding: 6px 8px; font-weight: 800; text-align: right; width: 85px;">السعر</th>
+                                    <th style="padding: 6px 8px; font-weight: 800; text-align: right; width: 95px;">الإجمالي</th>
+                                </tr>
+                            </thead>
+                            <tbody id="receipt-items-list">
+                                <!-- Dynamically populated in app.js -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Formal Total Box & Stamp Signatures Line -->
+                    <div class="receipt-total-footer" style="padding: 12px 18px; background: #f8fafc; border-top: 2px solid #0f172a; display: flex; flex-direction: column; gap: 10px;">
+                        <div class="receipt-total-bar" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #0f172a; color: #ffffff; border-radius: 8px;">
+                            <span style="font-size: 0.9rem; font-weight: 800;">المجموع الكلي / Total Paid:</span>
+                            <span id="receipt-total-cost" style="font-size: 1.15rem; font-weight: 900; color: #4ade80; font-family: monospace, system-ui;">0 ر.س</span>
+                        </div>
+
+                        <!-- Signatures / Stamp Verification Footer -->
+                        <div style="display: flex; justify-content: space-between; align-items: flex-end; padding-top: 6px; border-top: 1px dashed #cbd5e1; font-size: 0.74rem; color: #475569;">
+                            <div>
+                                <div>توقيع مسؤول التحضير: ____________________</div>
+                                <div style="margin-top: 2px; font-size: 0.68rem; color: #94a3b8;">توقيع الاستلام والمصادقة على الفاتورة</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div>ختم الاعتماد 🔴</div>
+                                <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 1px;">MVC Official Seal</div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Bottom Floating Action Bar for Mobile Touch (Hidden on PC/Desktop) -->
+            <div class="mobile-only-receipt-close" style="margin-top: 10px; justify-content: center;">
+                <button type="button" onclick="closeMarketOrderReceiptModal()" class="btn-neutral"
+                    style="width: 100%; max-width: 320px; padding: 10px; border-radius: 10px; font-weight: 800; font-size: 0.9rem; background: rgba(255,255,255,0.08); border: 1px solid var(--border-color); color: var(--text-main); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    <span>✖</span> <span>إغلاق الفاتورة / Close Receipt</span>
+                </button>
             </div>
 
         </div>
@@ -6221,16 +6226,19 @@
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:12px; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
                 <div style="display:flex; align-items:center; gap:8px;">
                     <span style="font-size:1.4rem;">📦</span>
-                    <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:var(--text-main);" data-i18n="title-restock-pdf-preview">Warehouse Restock Order / تقرير طلب بضاعة ونواقص المستودع</h3>
+                    <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:var(--text-main);" data-i18n="title-restock-pdf-preview">Warehouse Restock Preview / معاينة تقرير نواقص المستودع</h3>
                 </div>
                 <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                    <button type="button" onclick="printRestockPDF()" class="btn-primary" style="padding:8px 16px; border-radius:8px; font-weight:800; font-size:0.85rem; background:linear-gradient(135deg, #10b981, #059669); border:none; color:white; cursor:pointer; display:inline-flex; align-items:center; gap:6px; box-shadow:0 3px 10px rgba(16,185,129,0.3);">
-                        <span>🖨️</span> <span data-i18n="btn-print-download-pdf">طباعة أو حفظ PDF</span>
+                    <button type="button" onclick="downloadRestockPDF()" class="btn-primary" style="padding:9px 18px; border-radius:10px; font-weight:800; font-size:0.85rem; background:linear-gradient(135deg, #10b981, #059669); border:none; color:white; cursor:pointer; display:inline-flex; align-items:center; gap:6px; box-shadow:0 3px 10px rgba(16,185,129,0.3);">
+                        <span>📥</span> <span>تحميل ملف PDF</span>
                     </button>
-                    <button type="button" onclick="shareRestockTextReport()" class="btn-success" style="padding:8px 16px; border-radius:8px; font-weight:800; font-size:0.85rem; background:linear-gradient(135deg, #25D366, #128C7E); border:none; color:white; cursor:pointer; display:inline-flex; align-items:center; gap:6px; box-shadow:0 3px 10px rgba(37,211,102,0.3);">
-                        <span>💬</span> <span>مشاركة كطلب نصي</span>
+                    <button type="button" onclick="printRestockDirect()" class="btn-outline" style="padding:9px 16px; border-radius:10px; font-weight:800; font-size:0.85rem; background:#ffffff; color:#0f172a; border:1.5px solid #cbd5e1; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                        <span>🖨️</span> <span>طباعة</span>
                     </button>
-                    <button type="button" onclick="closeRestockPDFViewer()" style="background:transparent; border:none; font-size:1.3rem; cursor:pointer; color:var(--text-muted); padding:4px 8px;">✖</button>
+                    <button type="button" onclick="shareRestockTextReport()" class="btn-success" style="padding:9px 16px; border-radius:10px; font-weight:800; font-size:0.85rem; background:linear-gradient(135deg, #25D366, #128C7E); border:none; color:white; cursor:pointer; display:inline-flex; align-items:center; gap:6px; box-shadow:0 3px 10px rgba(37,211,102,0.3);">
+                        <span>💬</span> <span>مشاركة نصية</span>
+                    </button>
+                    <button type="button" onclick="closeRestockPDFViewer()" style="background:transparent; border:none; font-size:1.4rem; cursor:pointer; color:var(--text-muted); padding:4px 8px;">✖</button>
                 </div>
             </div>
 
@@ -6299,8 +6307,8 @@
 
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=195"></script>
-    <script src="app.js?v=195"></script>
+    <script src="translations.js?v=200"></script>
+    <script src="app.js?v=200"></script>
 </body>
 
 </html>

@@ -1209,6 +1209,10 @@ window.getMarketOrderStatusInfo = getMarketOrderStatusInfo;
 
 function openMarketOrderReceiptModal(order) {
     if (!order) return;
+    if (typeof order === 'string') {
+        const found = findMarketOrderById(order);
+        if (found && found.order) order = { ...found.order, companyKey: found.companyKey };
+    }
     const isAr = currentAppLang === 'ar';
 
     const modal = document.getElementById('market-order-receipt-modal');
@@ -1220,11 +1224,21 @@ function openMarketOrderReceiptModal(order) {
     const itemsListEl = document.getElementById('receipt-items-list');
     const totalCostEl = document.getElementById('receipt-total-cost');
 
+    const items = (order.items && Array.isArray(order.items) && order.items.length > 0) 
+        ? order.items 
+        : ((order.cart && Array.isArray(order.cart)) ? order.cart : ((order.products && Array.isArray(order.products)) ? order.products : []));
+
+    const totalCost = (order.totalCost !== undefined && order.totalCost !== null)
+        ? order.totalCost
+        : items.reduce((acc, it) => acc + ((parseFloat(it.price) || 0) * (parseInt(it.qty) || 1)), 0);
+
+    const custName = order.workerName || order.customerName || order.userName || (order.customerCode ? ('Customer ' + order.customerCode) : (isAr ? 'عميل المتجر' : 'Market Customer'));
+
     if (orderNumEl) orderNumEl.textContent = formatMarketOrderNum(order);
-    if (custNameEl) custNameEl.textContent = order.workerName || 'Customer';
-    if (dateEl) dateEl.textContent = order.createdAt ? new Date(order.createdAt).toLocaleString() : new Date().toLocaleString();
+    if (custNameEl) custNameEl.textContent = custName;
+    if (dateEl) dateEl.textContent = order.createdAt ? new Date(order.createdAt).toLocaleString(isAr ? 'ar-SA' : 'en-US') : new Date().toLocaleString(isAr ? 'ar-SA' : 'en-US');
     if (companyTagEl) companyTagEl.textContent = (order.companyKey || currentCompany || 'MVC').toUpperCase();
-    if (totalCostEl) totalCostEl.textContent = `${(order.totalCost || 0).toLocaleString()} ${isAr ? 'ر.س' : 'SR'} 💵`;
+    if (totalCostEl) totalCostEl.textContent = `${(totalCost || 0).toLocaleString()} ${isAr ? 'ر.س' : 'SR'} 💵`;
 
     if (statusBadgeEl) {
         const statusInfo = getMarketOrderStatusInfo(order.status);
@@ -1234,16 +1248,25 @@ function openMarketOrderReceiptModal(order) {
     }
 
     if (itemsListEl) {
-        const items = order.items || [];
-        itemsListEl.innerHTML = items.map((item, idx) => `
-            <tr style="background-color: ${idx % 2 === 1 ? '#f8fafc' : '#ffffff'} !important; border-bottom: 1px solid #cbd5e1 !important;">
-                <td style="padding: 12px 10px; text-align: center; font-weight: 800; color: #475569 !important; background-color: inherit !important;">${idx + 1}</td>
-                <td style="padding: 12px 10px; font-weight: 900; color: #000000 !important; font-size: 1rem !important; background-color: inherit !important;">${sanitizeMarketText(item.name)}</td>
-                <td style="padding: 12px 10px; text-align: center; font-weight: 900; color: #0f172a !important; background-color: inherit !important; font-size: 0.95rem !important;">${item.qty || 1}</td>
-                <td style="padding: 12px 10px; text-align: right; font-weight: 800; color: #334155 !important; background-color: inherit !important; font-size: 0.95rem !important;">${(item.price || 0).toLocaleString()}</td>
-                <td style="padding: 12px 10px; text-align: right; font-weight: 900; color: #059669 !important; background-color: inherit !important; font-size: 1rem !important;">${((item.price || 0) * (item.qty || 1)).toLocaleString()} ${isAr ? 'ر.س' : 'SR'} 💵</td>
-            </tr>
-        `).join('');
+        if (items.length === 0) {
+            itemsListEl.innerHTML = `
+                <tr style="background:#ffffff; border-bottom: 1px solid #cbd5e1;">
+                    <td colspan="5" style="padding: 16px; text-align: center; color: #64748b; font-weight: 700;">
+                        ${isAr ? 'لا توجد منتجات مسجلة في هذا الطلب' : 'No items recorded in this order'}
+                    </td>
+                </tr>
+            `;
+        } else {
+            itemsListEl.innerHTML = items.map((item, idx) => `
+                <tr style="background-color: ${idx % 2 === 1 ? '#f8fafc' : '#ffffff'} !important; border-bottom: 1px solid #cbd5e1 !important; page-break-inside: avoid !important; break-inside: avoid !important;">
+                    <td style="padding: 12px 10px; text-align: center; font-weight: 800; color: #475569 !important; background-color: inherit !important;">${idx + 1}</td>
+                    <td style="padding: 12px 10px; font-weight: 900; color: #000000 !important; font-size: 1rem !important; background-color: inherit !important;">${sanitizeMarketText(item.name || item.title || 'Product')}</td>
+                    <td style="padding: 12px 10px; text-align: center; font-weight: 900; color: #0f172a !important; background-color: inherit !important; font-size: 0.95rem !important;">${item.qty || 1}</td>
+                    <td style="padding: 12px 10px; text-align: right; font-weight: 800; color: #334155 !important; background-color: inherit !important; font-size: 0.95rem !important;">${(item.price || 0).toLocaleString()}</td>
+                    <td style="padding: 12px 10px; text-align: right; font-weight: 900; color: #059669 !important; background-color: inherit !important; font-size: 1rem !important;">${((item.price || 0) * (item.qty || 1)).toLocaleString()} ${isAr ? 'ر.س' : 'SR'} 💵</td>
+                </tr>
+            `).join('');
+        }
     }
 
     if (modal) modal.style.display = 'flex';
@@ -1255,6 +1278,159 @@ function closeMarketOrderReceiptModal() {
     if (modal) modal.style.display = 'none';
 }
 window.closeMarketOrderReceiptModal = closeMarketOrderReceiptModal;
+
+function downloadMarketOrderReceiptPDF() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const container = document.getElementById('market-order-receipt-paper-content');
+    if (!container) return;
+
+    const orderNum = document.getElementById('receipt-order-num')?.textContent?.trim() || 'ORD';
+    const fileName = `${orderNum}_receipt.pdf`;
+
+    if (typeof html2pdf !== 'undefined') {
+        const opt = {
+            margin: [8, 8, 8, 8],
+            filename: fileName,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        };
+
+        if (typeof showInAppNotification === 'function') {
+            showInAppNotification(isAr ? '⏳ جاري إنشاء فاتورة PDF...' : '⏳ Generating Receipt PDF...');
+        }
+
+        html2pdf().set(opt).from(container).save().then(() => {
+            if (typeof showInAppNotification === 'function') {
+                showInAppNotification(isAr ? '📄 تم حفظ وتحميل فاتورة الطلب بنجاح!' : '📄 Order receipt PDF downloaded successfully!');
+            }
+        }).catch(err => {
+            console.warn("html2pdf error, fallback to isolated iframe print:", err);
+            printMarketReceiptDirect();
+        });
+        return;
+    }
+
+    printMarketReceiptDirect();
+}
+window.downloadMarketOrderReceiptPDF = downloadMarketOrderReceiptPDF;
+window.printMarketOrderReceipt = downloadMarketOrderReceiptPDF;
+
+function printMarketReceiptDirect() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const container = document.getElementById('market-order-receipt-paper-content');
+    if (!container) return;
+    const orderNum = document.getElementById('receipt-order-num')?.textContent?.trim() || 'ORD';
+
+    const androidBridge = window.AndroidInterface || window.Android || window.AndroidShare;
+    if (androidBridge) {
+        if (typeof androidBridge.printMarketReceipt === 'function') {
+            try { androidBridge.printMarketReceipt(); return; } catch (e) { }
+        }
+        if (typeof androidBridge.printHtml === 'function') {
+            try { androidBridge.printHtml(container.outerHTML); return; } catch (e) { }
+        }
+    }
+
+    nativePrintReceiptIframe(container, isAr, orderNum);
+}
+window.printMarketReceiptDirect = printMarketReceiptDirect;
+
+function nativePrintReceiptIframe(container, isAr, orderNum) {
+    const printHTML = `
+        <!DOCTYPE html>
+        <html dir="${isAr ? 'rtl' : 'ltr'}" lang="${isAr ? 'ar' : 'en'}">
+        <head>
+            <meta charset="UTF-8">
+            <title>${orderNum || 'Order Receipt'}</title>
+            <style>
+                @page { size: A4 portrait; margin: 10mm; }
+                @media print {
+                    html, body { margin: 0 !important; padding: 0 !important; background: #ffffff !important; }
+                    .formal-a4-receipt { box-shadow: none !important; border: 1px solid #cbd5e1 !important; max-width: 100% !important; }
+                }
+                body {
+                    font-family: 'Segoe UI', 'Cairo', Tahoma, Arial, sans-serif;
+                    background: #ffffff;
+                    color: #0f172a;
+                    margin: 0;
+                    padding: 10mm;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+            </style>
+        </head>
+        <body>
+            ${container.outerHTML}
+        </body>
+        </html>
+    `;
+
+    const blob = new Blob([printHTML], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.src = url;
+    document.body.appendChild(iframe);
+
+    iframe.onload = function() {
+        setTimeout(function() {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } catch (e) {
+                console.warn("Iframe print error:", e);
+            }
+            setTimeout(() => {
+                try {
+                    document.body.removeChild(iframe);
+                    URL.revokeObjectURL(url);
+                } catch (e) {}
+            }, 3000);
+        }, 300);
+    };
+}
+
+function shareMarketOrderReceiptText() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const orderNum = document.getElementById('receipt-order-num')?.textContent?.trim() || '';
+    const custName = document.getElementById('receipt-customer-name')?.textContent?.trim() || '';
+    const dateStr = document.getElementById('receipt-order-date')?.textContent?.trim() || '';
+    const totalCost = document.getElementById('receipt-total-cost')?.textContent?.trim() || '';
+
+    const rows = document.querySelectorAll('#receipt-items-list tr');
+    let itemsText = [];
+    rows.forEach((row, i) => {
+        const cols = row.querySelectorAll('td');
+        if (cols.length >= 5) {
+            const name = cols[1].textContent.trim();
+            const qty = cols[2].textContent.trim();
+            const tot = cols[4].textContent.trim();
+            itemsText.push(`▪️ ${name} × ${qty} = ${tot}`);
+        }
+    });
+
+    const shareText = `🧾 *فاتورة طلب متجر MVC* (${orderNum})\n\n👤 العميل: ${custName}\n📅 التاريخ: ${dateStr}\n\n📦 *المنتجات:*\n${itemsText.join('\n')}\n\n💰 *المجموع الكلي:* ${totalCost}`;
+
+    if (navigator.share && navigator.canShare && navigator.canShare({ title: orderNum, text: shareText })) {
+        navigator.share({ title: orderNum, text: shareText }).catch(() => {});
+        return;
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareText);
+        if (typeof showInAppNotification === 'function') {
+            showInAppNotification(isAr ? '📋 تم نسخ تفاصيل الفاتورة إلى الحافظة!' : '📋 Receipt details copied to clipboard!');
+        }
+    }
+}
+window.shareMarketOrderReceiptText = shareMarketOrderReceiptText;
 
 function openCustomerOrdersModal() {
     renderCustomerOrders();

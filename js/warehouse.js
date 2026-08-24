@@ -210,7 +210,7 @@ function exportWarehousePDF() {
         const itemsInFolder = data.filter(i => (i.category || 'Uncategorized') === folder);
         if (itemsInFolder.length > 0) {
             rowsHtml += `
-                <tr style="background:#f1f5f9; border-top: 2px solid #cbd5e1; border-bottom: 2px solid #cbd5e1;">
+                <tr style="background:#f1f5f9; border-top: 2px solid #cbd5e1; border-bottom: 2px solid #cbd5e1; page-break-inside: avoid !important; break-inside: avoid !important; break-after: avoid !important;">
                     <td colspan="3" style="padding:10px 14px; font-weight:800; font-size:14px; color:#1e293b;">
                         📁 ${folder} <span style="font-size:12px; font-weight:600; color:#64748b; margin-inline-start:8px;">(${itemsInFolder.length} ${isAr ? 'صنف' : 'items'})</span>
                     </td>
@@ -225,7 +225,7 @@ function exportWarehousePDF() {
                 if (isLow) {
                     totalCritical++;
                     criticalList.push(`
-                        <li style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed #fca5a5; padding-bottom:6px;">
+                        <li style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed #fca5a5; padding-bottom:6px; page-break-inside: avoid !important; break-inside: avoid !important;">
                             <span>🚨 <strong>${i.name}</strong> <span style="color:#64748b; font-size:12px;">(${folder})</span></span>
                             <span style="background:#ef4444; color:#ffffff; font-weight:800; padding:2px 10px; border-radius:12px; font-size:12px;">
                                 ${isAr ? 'مطلوب:' : 'Need:'} ${toOrder}
@@ -247,7 +247,7 @@ function exportWarehousePDF() {
                 }
 
                 rowsHtml += `
-                    <tr style="${rowBg} border-bottom: 1px solid #e2e8f0;">
+                    <tr style="${rowBg} border-bottom: 1px solid #e2e8f0; page-break-inside: avoid !important; break-inside: avoid !important;">
                         <td style="padding:10px 14px; font-size:13px; ${nameStyle}">
                             ${isLow ? '🚨 ' : ''}${i.name}
                         </td>
@@ -268,7 +268,7 @@ function exportWarehousePDF() {
     let criticalHtml = '';
     if (criticalList.length > 0) {
         criticalHtml = `
-            <div style="margin-top:24px; border:2px solid #ef4444; border-radius:12px; background-color:#fef2f2; padding:18px; box-shadow:0 2px 8px rgba(239,68,68,0.1);">
+            <div style="margin-top:24px; border:2px solid #ef4444; border-radius:12px; background-color:#fef2f2; padding:18px; box-shadow:0 2px 8px rgba(239,68,68,0.1); page-break-inside: avoid !important; break-inside: avoid !important;">
                 <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px; color:#b91c1c; font-weight:900; font-size:15px;">
                     <span style="font-size:20px;">🚨</span>
                     <span>${isAr ? 'قائمة النواقص والأصناف الحرجة العاجلة للطلب فوراً' : 'CRITICAL RESTOCK ORDERS - IMMEDIATE ACTION REQUIRED'}</span>
@@ -286,7 +286,7 @@ function exportWarehousePDF() {
         <div id="restock-pdf-paper-content" class="a4-restock-page" style="background:#ffffff; color:#0f172a; max-width:820px; margin:0 auto; padding:32px 28px; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.1); box-sizing:border-box; font-family:'Segoe UI', 'Cairo', Tahoma, Arial, sans-serif; direction:${isAr ? 'rtl' : 'ltr'}; text-align:${isAr ? 'right' : 'left'};">
             
             <!-- Document Header -->
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #c5832b; padding-bottom:18px; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #c5832b; padding-bottom:18px; margin-bottom:20px; flex-wrap:wrap; gap:12px; page-break-inside: avoid !important; break-inside: avoid !important;">
                 <div style="display:flex; align-items:center; gap:14px;">
                     <img src="${compLogo}" alt="Logo" style="height:52px; max-width:130px; object-fit:contain;" onerror="this.style.display='none';" />
                     <div>
@@ -301,7 +301,7 @@ function exportWarehousePDF() {
             </div>
 
             <!-- Summary HUD KPI Cards -->
-            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:20px;">
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:20px; page-break-inside: avoid !important; break-inside: avoid !important;">
                 <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; text-align:center;">
                     <div style="font-size:11px; font-weight:700; color:#64748b;">${isAr ? 'إجمالي الأصناف' : 'Total Items'}</div>
                     <div style="font-size:20px; font-weight:900; color:#0f172a; margin-top:2px;">${totalItems}</div>
@@ -317,9 +317,9 @@ function exportWarehousePDF() {
             </div>
 
             <!-- Table of Items -->
-            <table style="width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden;">
+            <table style="width:100%; border-collapse:collapse; margin-top:10px; font-size:13px; border:1px solid #e2e8f0; border-radius:8px; page-break-inside: auto !important;">
                 <thead>
-                    <tr style="background:#1e293b; color:#ffffff;">
+                    <tr style="background:#1e293b; color:#ffffff; page-break-inside: avoid !important; break-inside: avoid !important;">
                         <th style="padding:12px 14px; text-align:${isAr ? 'right' : 'left'}; font-size:13px; font-weight:800;">${isAr ? 'اسم الصنف / المنتج' : 'Product Name'}</th>
                         <th style="padding:12px 14px; text-align:center; font-size:13px; font-weight:800; width:160px;">${isAr ? 'المتوفر / الأقصى' : 'Current / Max'}</th>
                         <th style="padding:12px 14px; text-align:center; font-size:13px; font-weight:800; width:140px;">${isAr ? 'الكمية للطلب' : 'Order Qty'}</th>
@@ -334,7 +334,7 @@ function exportWarehousePDF() {
             ${criticalHtml}
 
             <!-- Document Footer -->
-            <div style="margin-top:35px; padding-top:14px; border-top:1px dashed #cbd5e1; display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#64748b; flex-wrap:wrap; gap:8px;">
+            <div style="margin-top:35px; padding-top:14px; border-top:1px dashed #cbd5e1; display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#64748b; flex-wrap:wrap; gap:8px; page-break-inside: avoid !important; break-inside: avoid !important;">
                 <div>🏢 ${compName} Operations Management System</div>
                 <div>✅ Automated Restock Document</div>
             </div>
@@ -344,33 +344,64 @@ function exportWarehousePDF() {
     modal.style.display = 'flex';
 }
 
-function printRestockPDF() {
+function downloadRestockPDF() {
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     const container = document.getElementById('restock-pdf-paper-content');
     if (!container) return;
 
-    // Check if Android bridge supports printing custom HTML
+    const compName = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany.toUpperCase() : 'BURGEROOV';
+    const fileName = `${compName}_Warehouse_Restock_${Date.now()}.pdf`;
+
+    if (typeof html2pdf !== 'undefined') {
+        const opt = {
+            margin: [10, 8, 10, 8],
+            filename: fileName,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        };
+
+        if (typeof showInAppNotification === 'function') {
+            showInAppNotification(isAr ? '⏳ جاري إنشاء ملف PDF...' : '⏳ Generating PDF...');
+        }
+
+        html2pdf().set(opt).from(container).save().then(() => {
+            if (typeof showInAppNotification === 'function') {
+                showInAppNotification(isAr ? '📄 تم حفظ وتحميل تقرير المستودع بنجاح!' : '📄 Warehouse restock PDF downloaded successfully!');
+            }
+        }).catch(err => {
+            console.warn("html2pdf error, fallback to vector iframe print:", err);
+            printRestockDirect();
+        });
+        return;
+    }
+
+    printRestockDirect();
+}
+window.downloadRestockPDF = downloadRestockPDF;
+window.printRestockPDF = downloadRestockPDF;
+
+function printRestockDirect() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const container = document.getElementById('restock-pdf-paper-content');
+    if (!container) return;
+
     const androidBridge = window.AndroidInterface || window.Android || window.AndroidShare;
     if (androidBridge) {
         if (typeof androidBridge.printWarehousePDF === 'function') {
-            try {
-                androidBridge.printWarehousePDF();
-                return;
-            } catch (e) {
-                console.warn("androidBridge.printWarehousePDF error:", e);
-            }
+            try { androidBridge.printWarehousePDF(); return; } catch (e) { }
         }
         if (typeof androidBridge.printHtml === 'function') {
-            try {
-                androidBridge.printHtml(container.outerHTML);
-                return;
-            } catch (e) {
-                console.warn("androidBridge.printHtml error:", e);
-            }
+            try { androidBridge.printHtml(container.outerHTML); return; } catch (e) { }
         }
     }
 
-    // High quality native browser / mobile vector print (Crisp Arabic with NO canvas corruptions)
+    nativePrintWarehouseIframe(container, isAr);
+}
+window.printRestockDirect = printRestockDirect;
+
+function nativePrintWarehouseIframe(container, isAr) {
     const printHTML = `
         <!DOCTYPE html>
         <html dir="${isAr ? 'rtl' : 'ltr'}" lang="${isAr ? 'ar' : 'en'}">
@@ -379,22 +410,10 @@ function printRestockPDF() {
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>${isAr ? 'تقرير_طلب_بضاعة_ونواقص_المستودع' : 'Warehouse_Restock_Order_Report'}</title>
             <style>
-                @page {
-                    size: A4 portrait;
-                    margin: 10mm;
-                }
+                @page { size: A4 portrait; margin: 10mm; }
                 @media print {
-                    html, body {
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        background: #ffffff !important;
-                    }
-                    .a4-restock-page {
-                        box-shadow: none !important;
-                        border: none !important;
-                        padding: 0 !important;
-                        max-width: 100% !important;
-                    }
+                    html, body { margin: 0 !important; padding: 0 !important; background: #ffffff !important; }
+                    .a4-restock-page { box-shadow: none !important; border: none !important; padding: 0 !important; max-width: 100% !important; }
                 }
                 body {
                     font-family: 'Segoe UI', 'Cairo', Tahoma, Arial, sans-serif;
@@ -434,7 +453,6 @@ function printRestockPDF() {
                 iframe.contentWindow.print();
             } catch (e) {
                 console.warn("Iframe print error:", e);
-                window.print();
             }
             setTimeout(() => {
                 try {
@@ -445,7 +463,6 @@ function printRestockPDF() {
         }, 300);
     };
 }
-window.printRestockPDF = printRestockPDF;
 
 function shareRestockTextReport() {
     const data = getCompanyData().warehouse;
