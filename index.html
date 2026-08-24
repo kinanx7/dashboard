@@ -81,7 +81,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=169">
+    <link rel="stylesheet" href="style.css?v=170">
 </head>
 
 <body class="theme-burgeroov">
@@ -4879,12 +4879,17 @@
                 </div>
             </div>
 
-            <a id="force-update-download-btn" href="./app-release.apk" download="app-release.apk"
+            <a id="force-update-download-btn" href="./app-release.apk" download="app-release.apk" onclick="onDownloadApkClicked()"
                 style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; box-sizing: border-box; background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; padding: 14px 18px; border-radius: 14px; font-weight: 900; font-size: 1.05rem; text-decoration: none; box-shadow: 0 6px 20px rgba(16,185,129,0.4); cursor: pointer; transition: transform 0.2s;">
                 <span>📲</span> <span>تنزيل وتثبيت التحديث الآن</span>
             </a>
 
-            <div style="margin-top: 14px; font-size: 0.76rem; color: #64748b;">
+            <button type="button" onclick="dismissForceUpdateModal()"
+                style="margin-top: 10px; width: 100%; background: transparent; border: 1px solid rgba(255,255,255,0.15); color: #94a3b8; padding: 10px; border-radius: 10px; font-size: 0.85rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                <span>✅</span> <span>تم التحديث بالفعل / متابعة للوحة التحكم</span>
+            </button>
+
+            <div style="margin-top: 10px; font-size: 0.76rem; color: #64748b;">
                 يجب تنزيل وتثبيت التحديث لمتابعة استخدام لوحة التحكم
             </div>
         </div>
@@ -6352,8 +6357,8 @@
 
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=203"></script>
-    <script src="app.js?v=203"></script>
+    <script src="translations.js?v=204"></script>
+    <script src="app.js?v=204"></script>
 </body>
 
 </html>

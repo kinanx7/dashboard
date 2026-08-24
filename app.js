@@ -581,8 +581,59 @@ initPublicCustomerSync();
 // =============================================
 // AUTOMATIC APK VERSION CHECKER & FORCED UPDATE
 // =============================================
-window.CURRENT_APK_VERSION = 'v1.0.0'; // Base version tag for older APKs
 window.LATEST_RELEASE_APK_VERSION = 'v1.0.1'; // The newly uploaded APK version
+
+function getNativeBridgeVersion() {
+    const bridge = window.AndroidInterface || window.Android || window.AndroidShare;
+    if (bridge) {
+        if (typeof bridge.getAppVersion === 'function') {
+            try { const v = bridge.getAppVersion(); if (v) return v; } catch (e) { }
+        }
+        if (typeof bridge.getVersionCode === 'function') {
+            try { const v = bridge.getVersionCode(); if (v) return 'v' + v; } catch (e) { }
+        }
+        if (typeof bridge.getVersion === 'function') {
+            try { const v = bridge.getVersion(); if (v) return v; } catch (e) { }
+        }
+    }
+    return null;
+}
+
+function getStoredApkVersion() {
+    try {
+        return localStorage.getItem('burgeroov_installed_apk_version');
+    } catch (e) {
+        return null;
+    }
+}
+
+function onDownloadApkClicked() {
+    const latestVer = window.LATEST_RELEASE_APK_VERSION || 'v1.0.1';
+    try {
+        localStorage.setItem('burgeroov_installed_apk_version', latestVer);
+    } catch (e) { }
+
+    const modal = document.getElementById('modal-force-update-apk');
+    if (modal) {
+        setTimeout(() => {
+            modal.style.display = 'none';
+        }, 1500);
+    }
+}
+window.onDownloadApkClicked = onDownloadApkClicked;
+
+function dismissForceUpdateModal() {
+    const latestVer = window.LATEST_RELEASE_APK_VERSION || 'v1.0.1';
+    try {
+        localStorage.setItem('burgeroov_installed_apk_version', latestVer);
+    } catch (e) { }
+
+    const modal = document.getElementById('modal-force-update-apk');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+window.dismissForceUpdateModal = dismissForceUpdateModal;
 
 function initAppVersionChecker() {
     if (typeof firebase === 'undefined' || !firebase.database) return;
@@ -623,12 +674,18 @@ function initAppVersionChecker() {
         }
 
         const latestVer = data.latest_version || window.LATEST_RELEASE_APK_VERSION || 'v1.0.1';
-        const currentVer = window.CURRENT_APK_VERSION || 'v1.0.0';
         const isForced = data.is_forced !== false;
+
+        const nativeVer = getNativeBridgeVersion();
+        const storedVer = getStoredApkVersion();
+        const currentVer = nativeVer || storedVer || 'v1.0.0';
 
         // If mobile / APK user has an older version than latest_version
         if (isMobileOrAndroid && isForced && compareAppVersions(currentVer, latestVer) < 0) {
             triggerForceUpdatePopup(data);
+        } else {
+            const modal = document.getElementById('modal-force-update-apk');
+            if (modal) modal.style.display = 'none';
         }
     });
 }
