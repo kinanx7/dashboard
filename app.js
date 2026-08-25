@@ -8963,483 +8963,979 @@ function saveEditedTask() {
 }
 
 // =====================================================================
-// CONSTANT TASKS & WORKER RESPONSIBILITIES SYSTEM
+// CONSTANT TASKS & RESPONSIBILITIES SUBJECT-CENTRIC HUD SYSTEM
 // =====================================================================
 
-function fillConstantTaskPreset(title, amount, category) {
-    const titleInput = document.getElementById('constant-task-title');
-    const amountInput = document.getElementById('constant-task-amount');
-    if (titleInput) titleInput.value = title;
-    if (amountInput) amountInput.value = amount;
-    if (titleInput) titleInput.focus();
-}
-window.fillConstantTaskPreset = fillConstantTaskPreset;
+var activeViewingRespSubjectId = null;
 
-// =============================================
-// CONSTANT TASKS PRESET SHORTCUTS SYSTEM
-// =============================================
-var editingPresetId = null;
-
-function toggleConstantTaskPresetForm(optPresetId) {
-    const container = document.getElementById('constant-preset-form-container');
-    if (!container) return;
-
-    if (optPresetId) {
-        editingPresetId = optPresetId;
-        const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
-        const presetsObj = data.constantTaskPresets || {};
-        let pObj = presetsObj[optPresetId];
-
-        if (!pObj) {
-            const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
-            const defaultPresets = [
-                { id: 'preset_clean', title: isAr ? '🧹 تنظيف ومسح الطاولات' : '🧹 Cleaning Tables', amount: 'daily', icon: '🧹' },
-                { id: 'preset_upload', title: isAr ? '📦 تحميل وتنزيل العمالة/البضائع' : '📦 Uploading & Unloading Staff/Stock', amount: 'daily', icon: '📦' },
-                { id: 'preset_cashier', title: isAr ? '💵 عمليات الكاشير والنظام' : '💵 Cashier & POS Operations', amount: 'shift', icon: '💵' },
-                { id: 'preset_kitchen', title: isAr ? '👨‍🍳 تحضير وتعقيم المطبخ' : '👨‍🍳 Kitchen Prep & Sanitization', amount: 'daily', icon: '👨‍🍳' },
-                { id: 'preset_waste', title: isAr ? '🗑️ تفريغ وتدبير النفايات' : '🗑️ Waste & Trash Management', amount: '2 times/shift', icon: '🗑️' },
-                { id: 'preset_inv', title: isAr ? '📝 الجرد اليومي للمخزون' : '📝 Daily Inventory Check', amount: 'end of shift', icon: '📝' }
-            ];
-            pObj = defaultPresets.find(p => p.id === optPresetId);
+// Default Subject Templates
+function getDefaultResponsibilitySubjects(isAr) {
+    return [
+        {
+            id: 'resp_clean_tables',
+            title: isAr ? 'مسح وتنظيف الطاولات' : 'Cleaning Tables',
+            amount: isAr ? 'يومي / مستمر' : 'Daily / Ongoing',
+            icon: '🧹',
+            dept: 'hall',
+            createdAt: 1700000000000,
+            assignedWorkers: {},
+            historyLog: []
+        },
+        {
+            id: 'resp_serving_food',
+            title: isAr ? 'تقديم وتجهيز طلبات الطعام' : 'Serving & Order Dispatch',
+            amount: isAr ? 'طوال الوردية' : 'Full Shift',
+            icon: '🍽️',
+            dept: 'hall',
+            createdAt: 1700000000000,
+            assignedWorkers: {},
+            historyLog: []
+        },
+        {
+            id: 'resp_cashier_pos',
+            title: isAr ? 'عمليات الكاشير وإغلاق الصندوق' : 'Cashier & POS Operations',
+            amount: isAr ? 'وردية العمل' : 'Shift',
+            icon: '💵',
+            dept: 'cashier',
+            createdAt: 1700000000000,
+            assignedWorkers: {},
+            historyLog: []
+        },
+        {
+            id: 'resp_kitchen_prep',
+            title: isAr ? 'تحضير المطبخ والتعقيم' : 'Kitchen Prep & Sanitization',
+            amount: isAr ? 'يومي' : 'Daily',
+            icon: '👨‍🍳',
+            dept: 'kitchen',
+            createdAt: 1700000000000,
+            assignedWorkers: {},
+            historyLog: []
+        },
+        {
+            id: 'resp_waste_trash',
+            title: isAr ? 'تفريغ وتدبير النفايات' : 'Waste & Trash Management',
+            amount: isAr ? 'مرتان كل وردية' : '2 times per shift',
+            icon: '🗑️',
+            dept: 'general',
+            createdAt: 1700000000000,
+            assignedWorkers: {},
+            historyLog: []
+        },
+        {
+            id: 'resp_daily_inventory',
+            title: isAr ? 'الجرد اليومي للمخزون' : 'Daily Inventory Check',
+            amount: isAr ? 'نهاية الوردية' : 'End of shift',
+            icon: '📝',
+            dept: 'warehouse',
+            createdAt: 1700000000000,
+            assignedWorkers: {},
+            historyLog: []
         }
-
-        if (pObj) {
-            const tEl = document.getElementById('constant-preset-title-input');
-            const aEl = document.getElementById('constant-preset-amount-input');
-            const iEl = document.getElementById('constant-preset-icon-select');
-            if (tEl) tEl.value = pObj.title || '';
-            if (aEl) aEl.value = pObj.amount || '';
-            if (iEl) iEl.value = pObj.icon || '📌';
-        }
-    } else {
-        editingPresetId = null;
-        const titleEl = document.getElementById('constant-preset-title-input');
-        const amtEl = document.getElementById('constant-preset-amount-input');
-        if (titleEl) titleEl.value = '';
-        if (amtEl) amtEl.value = '';
-    }
-
-    if (container.style.display === 'none' || !container.style.display) {
-        container.style.display = 'block';
-        const titleEl = document.getElementById('constant-preset-title-input');
-        if (titleEl) titleEl.focus();
-    } else {
-        container.style.display = 'none';
-    }
-}
-window.toggleConstantTaskPresetForm = toggleConstantTaskPresetForm;
-
-function saveConstantTaskPreset() {
-    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
-    const titleInput = document.getElementById('constant-preset-title-input');
-    const amtInput = document.getElementById('constant-preset-amount-input');
-    const iconInput = document.getElementById('constant-preset-icon-select');
-
-    const title = titleInput ? titleInput.value.trim() : '';
-    const amount = amtInput ? amtInput.value.trim() : 'daily';
-    const icon = iconInput ? iconInput.value : '📌';
-
-    if (!title) {
-        const msg = isAr ? '⚠️ يرجى كتابة عنوان الاختصار.' : '⚠️ Please enter a shortcut title.';
-        if (typeof showInAppNotification === 'function') showInAppNotification(msg);
-        else alert(msg);
-        return;
-    }
-
-    const presetId = editingPresetId || ('preset_' + Date.now());
-    const presetObj = {
-        id: presetId,
-        title: title,
-        amount: amount || 'daily',
-        icon: icon,
-        createdAt: Date.now()
-    };
-
-    db.ref('companies/' + currentCompany + '/constantTaskPresets/' + presetId).set(presetObj)
-        .then(() => {
-            const successMsg = isAr ? '✅ تم حفظ الاختصار بنجاح!' : '✅ Preset shortcut saved!';
-            if (typeof showInAppNotification === 'function') showInAppNotification(successMsg);
-
-            toggleConstantTaskPresetForm();
-            renderConstantTaskPresets();
-        })
-        .catch(err => {
-            console.error("Failed to save preset:", err);
-        });
-}
-window.saveConstantTaskPreset = saveConstantTaskPreset;
-
-function deleteConstantTaskPreset(presetId, titleStr) {
-    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
-    if (!confirm(isAr ? `هل أنت تأكد من حذف الاختصار "${titleStr}"؟` : `Are you sure you want to delete preset "${titleStr}"?`)) return;
-
-    db.ref('companies/' + currentCompany + '/constantTaskPresets/' + presetId).set({
-        id: presetId,
-        deleted: true,
-        deletedAt: Date.now()
-    })
-        .then(() => {
-            if (typeof showInAppNotification === 'function') showInAppNotification(isAr ? '🗑️ تم حذف الاختصار.' : '🗑️ Preset deleted.');
-            renderConstantTaskPresets();
-        })
-        .catch(err => {
-            console.error("Failed to delete preset:", err);
-        });
-}
-window.deleteConstantTaskPreset = deleteConstantTaskPreset;
-
-function renderConstantTaskPresets() {
-    const container = document.getElementById('constant-task-presets-container');
-    if (!container) return;
-
-    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
-    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
-    const presetsObj = data.constantTaskPresets || {};
-    const storedPresets = Object.values(presetsObj).filter(p => p && p.id);
-
-    const defaultPresets = [
-        { id: 'preset_clean', title: isAr ? '🧹 تنظيف ومسح الطاولات' : '🧹 Cleaning Tables', amount: 'daily', icon: '🧹' },
-        { id: 'preset_upload', title: isAr ? '📦 تحميل وتنزيل العمالة/البضائع' : '📦 Uploading & Unloading Staff/Stock', amount: 'daily', icon: '📦' },
-        { id: 'preset_cashier', title: isAr ? '💵 عمليات الكاشير والنظام' : '💵 Cashier & POS Operations', amount: 'shift', icon: '💵' },
-        { id: 'preset_kitchen', title: isAr ? '👨‍🍳 تحضير وتعقيم المطبخ' : '👨‍🍳 Kitchen Prep & Sanitization', amount: 'daily', icon: '👨‍🍳' },
-        { id: 'preset_waste', title: isAr ? '🗑️ تفريغ وتدبير النفايات' : '🗑️ Waste & Trash Management', amount: '2 times/shift', icon: '🗑️' },
-        { id: 'preset_inv', title: isAr ? '📝 الجرد اليومي للمخزون' : '📝 Daily Inventory Check', amount: 'end of shift', icon: '📝' }
     ];
+}
 
-    const presetMap = {};
-    defaultPresets.forEach(p => { presetMap[p.id] = p; });
-    storedPresets.forEach(p => {
-        if (p.deleted) {
-            delete presetMap[p.id];
-        } else {
-            presetMap[p.id] = { ...presetMap[p.id], ...p };
+// 1. Get or Synchronize Responsibilities from Firebase Data
+function getAllResponsibilitySubjects() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const rawResps = companyData.constantResponsibilities || {};
+
+    const defaults = getDefaultResponsibilitySubjects(isAr);
+    const subjectMap = {};
+
+    // Seed defaults into map
+    defaults.forEach(d => {
+        subjectMap[d.id] = { ...d, assignedWorkers: {}, historyLog: [] };
+    });
+
+    // Overlay stored from Firebase
+    Object.keys(rawResps).forEach(key => {
+        const s = rawResps[key];
+        if (s && typeof s === 'object') {
+            const sid = s.id || key;
+            if (s.deleted) {
+                delete subjectMap[sid];
+            } else {
+                subjectMap[sid] = {
+                    ...(subjectMap[sid] || {}),
+                    ...s,
+                    id: sid,
+                    assignedWorkers: s.assignedWorkers || {},
+                    historyLog: Array.isArray(s.historyLog) ? s.historyLog : Object.values(s.historyLog || {})
+                };
+            }
         }
     });
 
-    const allPresets = Object.values(presetMap);
-
-    if (allPresets.length === 0) {
-        container.innerHTML = `<span style="font-size: 0.8rem; color: var(--text-muted); font-style: italic;">${isAr ? 'لا توجد اختصارات حالياً. اضغط على "+ إضافة اختصار" لإضافة اختصاراتك الخاصة.' : 'No shortcuts currently. Click "+ Add Preset" to create shortcuts.'}</span>`;
-        return;
-    }
-
-    container.innerHTML = allPresets.map(p => {
-        const safeTitle = typeof escapeHtml === 'function' ? escapeHtml(p.title) : p.title;
-        const displayTitle = safeTitle.replace(/'/g, "\\'");
-        const amtStr = (p.amount || 'daily').replace(/'/g, "\\'");
-
-        return `
-            <div style="display: inline-flex; align-items: center; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 2px 4px 2px 8px; gap: 4px; box-shadow: var(--shadow-sm);">
-                <button type="button" onclick="fillConstantTaskPreset('${displayTitle}', '${amtStr}')" style="background: none; border: none; font-size: 0.8rem; font-weight: 800; color: var(--text-main); cursor: pointer; padding: 4px 2px;" title="${isAr ? 'اضغط لتعبئة هذه المهمة' : 'Click to use shortcut'}">
-                    ${safeTitle}
-                </button>
-                <button type="button" onclick="toggleConstantTaskPresetForm('${p.id}')" style="background: none; border: none; color: #6366f1; cursor: pointer; font-size: 0.78rem; padding: 2px 4px;" title="${isAr ? 'تعديل الاختصار' : 'Edit shortcut'}">✏️</button>
-                <button type="button" onclick="deleteConstantTaskPreset('${p.id}', '${displayTitle}')" style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.78rem; padding: 2px 4px;" title="${isAr ? 'حذف الاختصار' : 'Delete shortcut'}">✖</button>
-            </div>
-        `;
-    }).join('');
+    return Object.values(subjectMap);
 }
-window.renderConstantTaskPresets = renderConstantTaskPresets;
 
-function addConstantTask() {
-    const isAr = currentAppLang === 'ar';
-    const workerSelect = document.getElementById('constant-task-worker-select');
-    const workerId = workerSelect ? workerSelect.value : '';
-    const title = document.getElementById('constant-task-title') ? document.getElementById('constant-task-title').value.trim() : '';
-    const amount = document.getElementById('constant-task-amount') ? document.getElementById('constant-task-amount').value.trim() : '';
-
-    if (!workerId || !title) {
-        alert(isAr ? 'الرجاء اختيار الموظف وكتابة عنوان المهمة المستمرة.' : 'Please select an employee and enter responsibility title.');
-        return;
-    }
-
-    const companyData = getCompanyData();
-    const workers = companyData.workers || [];
-    const workerIndex = workers.findIndex(w => String(w.id) === String(workerId));
-    if (workerIndex === -1) return;
-
-    const worker = workers[workerIndex];
-    if (!worker.constantTasks || !Array.isArray(worker.constantTasks)) {
-        worker.constantTasks = Object.values(worker.constantTasks || {});
-    }
-
-    const newConstantTask = {
-        id: 'ct-' + Date.now().toString(),
-        title: title,
-        amount: amount || (isAr ? 'يومي' : 'Daily'),
-        assignedAt: Date.now(),
-        assignedBy: currentUser ? currentUser.email : 'Admin'
-    };
-
-    worker.constantTasks.push(newConstantTask);
-
-    db.ref(`companies/${currentCompany}/workers/${workerIndex}/constantTasks`).set(worker.constantTasks)
-        .then(() => {
-            if (typeof logActivity === 'function') {
-                logActivity('task_constant', worker.id, worker.name, `Assigned constant task to ${worker.name}: "${title}" (${amount})`);
-            }
-            alert(isAr ? `تمت إضافة المهمة المستمرة "${title}" لـ ${worker.name} بنجاح!` : `Constant task "${title}" assigned to ${worker.name} successfully!`);
-            if (document.getElementById('constant-task-title')) document.getElementById('constant-task-title').value = '';
-            if (document.getElementById('constant-task-amount')) document.getElementById('constant-task-amount').value = '';
-            renderConstantTasks();
-        })
-        .catch(err => console.error("Error adding constant task:", err));
-}
-window.addConstantTask = addConstantTask;
-
-function removeConstantTask(workerId, taskId) {
-    const isAr = currentAppLang === 'ar';
-    if (!confirm(isAr ? 'هل أنت تأكد من حذف هذه المهمة المستمرة؟' : 'Are you sure you want to delete this constant task responsibility?')) return;
-
-    const companyData = getCompanyData();
-    const workers = companyData.workers || [];
-    const workerIndex = workers.findIndex(w => String(w.id) === String(workerId));
-    if (workerIndex === -1) return;
-
-    const worker = workers[workerIndex];
-    if (!worker.constantTasks || !Array.isArray(worker.constantTasks)) {
-        worker.constantTasks = Object.values(worker.constantTasks || {});
-    }
-
-    worker.constantTasks = worker.constantTasks.filter(ct => String(ct.id) !== String(taskId));
-
-    db.ref(`companies/${currentCompany}/workers/${workerIndex}/constantTasks`).set(worker.constantTasks)
-        .then(() => {
-            if (typeof logActivity === 'function') {
-                logActivity('task_constant_delete', worker.id, worker.name, `Removed constant task from ${worker.name}`);
-            }
-            renderConstantTasks();
-        })
-        .catch(err => console.error("Error removing constant task:", err));
-}
-window.removeConstantTask = removeConstantTask;
-
-function openTransferConstantTaskModal(fromWorkerId, taskId) {
-    const modal = document.getElementById('transfer-constant-task-modal');
+// 2. Open Modal to Add/Edit a Responsibility Subject
+function openAddResponsibilitySubjectModal(optSubjectId) {
+    const modal = document.getElementById('modal-add-responsibility-subject');
     if (!modal) return;
 
-    const isAr = currentAppLang === 'ar';
-    const companyData = getCompanyData();
+    const titleEl = document.getElementById('modal-resp-subject-title');
+    const idInput = document.getElementById('resp-edit-id');
+    const titleInput = document.getElementById('resp-title-input');
+    const amountInput = document.getElementById('resp-amount-input');
+    const iconSelect = document.getElementById('resp-icon-select');
+    const deptSelect = document.getElementById('resp-dept-select');
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    if (optSubjectId) {
+        const all = getAllResponsibilitySubjects();
+        const found = all.find(s => String(s.id) === String(optSubjectId));
+        if (found) {
+            if (idInput) idInput.value = found.id;
+            if (titleInput) titleInput.value = found.title || '';
+            if (amountInput) amountInput.value = found.amount || '';
+            if (iconSelect) iconSelect.value = found.icon || '📌';
+            if (deptSelect) deptSelect.value = found.dept || 'general';
+            if (titleEl) titleEl.innerHTML = `<span>✏️</span> <span>${isAr ? 'تعديل موضوع المسؤولية' : 'Edit Responsibility Subject'}</span>`;
+        }
+    } else {
+        if (idInput) idInput.value = '';
+        if (titleInput) titleInput.value = '';
+        if (amountInput) amountInput.value = '';
+        if (iconSelect) iconSelect.value = '🧹';
+        if (deptSelect) deptSelect.value = 'general';
+        if (titleEl) titleEl.innerHTML = `<span>➕</span> <span>${isAr ? 'إضافة موضوع مسؤولية جديد' : 'Add Responsibility Subject'}</span>`;
+    }
+
+    modal.style.display = 'flex';
+    if (titleInput) setTimeout(() => titleInput.focus(), 100);
+}
+window.openAddResponsibilitySubjectModal = openAddResponsibilitySubjectModal;
+
+function closeAddResponsibilitySubjectModal() {
+    const modal = document.getElementById('modal-add-responsibility-subject');
+    if (modal) modal.style.display = 'none';
+}
+window.closeAddResponsibilitySubjectModal = closeAddResponsibilitySubjectModal;
+
+// 3. Save Responsibility Subject
+function saveResponsibilitySubject() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const idInput = document.getElementById('resp-edit-id');
+    const titleInput = document.getElementById('resp-title-input');
+    const amountInput = document.getElementById('resp-amount-input');
+    const iconSelect = document.getElementById('resp-icon-select');
+    const deptSelect = document.getElementById('resp-dept-select');
+
+    const title = titleInput ? titleInput.value.trim() : '';
+    const amount = amountInput ? amountInput.value.trim() : (isAr ? 'يومي' : 'Daily');
+    const icon = iconSelect ? iconSelect.value : '📌';
+    const dept = deptSelect ? deptSelect.value : 'general';
+    const editId = idInput ? idInput.value : '';
+
+    if (!title) {
+        alert(isAr ? '⚠️ الرجاء كتابة عنوان المسؤولية.' : '⚠️ Please enter responsibility title.');
+        return;
+    }
+
+    const subjectId = editId || ('resp_' + Date.now());
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    if (!companyData.constantResponsibilities) companyData.constantResponsibilities = {};
+    const existing = companyData.constantResponsibilities[subjectId] || {};
+
+    const subjectObj = {
+        ...existing,
+        id: subjectId,
+        title: title,
+        amount: amount || (isAr ? 'يومي' : 'Daily'),
+        icon: icon || '📌',
+        dept: dept || 'general',
+        assignedWorkers: existing.assignedWorkers || {},
+        historyLog: existing.historyLog || [],
+        updatedAt: Date.now()
+    };
+    if (!existing.createdAt) subjectObj.createdAt = Date.now();
+
+    // Direct local update for instant UI feedback
+    companyData.constantResponsibilities[subjectId] = subjectObj;
+
+    db.ref(`companies/${currentCompany}/constantResponsibilities/${subjectId}`).set(subjectObj)
+        .then(() => {
+            closeAddResponsibilitySubjectModal();
+            renderConstantTasks();
+            if (typeof showInAppNotification === 'function') {
+                showInAppNotification(isAr ? '✅ تم حفظ موضوع المسؤولية بنجاح!' : '✅ Responsibility subject saved!');
+            }
+        })
+        .catch(err => {
+            console.error("Error saving responsibility subject:", err);
+            alert("Error saving subject: " + err.message);
+        });
+}
+window.saveResponsibilitySubject = saveResponsibilitySubject;
+
+// 4. Delete Responsibility Subject
+function deleteResponsibilitySubject(subjectId, titleStr) {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    if (!confirm(isAr ? `هل أنت متأكد من حذف موضوع المسؤولية "${titleStr}"؟` : `Are you sure you want to delete responsibility subject "${titleStr}"?`)) return;
+
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    if (companyData.constantResponsibilities && companyData.constantResponsibilities[subjectId]) {
+        delete companyData.constantResponsibilities[subjectId];
+    }
+
+    db.ref(`companies/${currentCompany}/constantResponsibilities/${subjectId}`).set({
+        id: subjectId,
+        deleted: true,
+        deletedAt: Date.now()
+    }).then(() => {
+        if (typeof showInAppNotification === 'function') {
+            showInAppNotification(isAr ? '🗑️ تم حذف موضوع المسؤولية.' : '🗑️ Responsibility subject deleted.');
+        }
+        renderConstantTasks();
+    }).catch(err => console.error("Error deleting responsibility subject:", err));
+}
+window.deleteResponsibilitySubject = deleteResponsibilitySubject;
+
+// 5. Assign Responsibility to Worker
+function assignResponsibilityToWorker(subjectId, workerId, customAmount) {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    if (!subjectId || !workerId) {
+        alert(isAr ? 'الرجاء اختيار الموظف والمهمة.' : 'Please select employee and responsibility.');
+        return;
+    }
+
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
     const workers = companyData.workers || [];
-    const fromWorker = workers.find(w => String(w.id) === String(fromWorkerId));
-    if (!fromWorker || !fromWorker.constantTasks) return;
+    const workerIndex = workers.findIndex(w => String(w.id) === String(workerId));
+    if (workerIndex === -1) {
+        alert(isAr ? '⚠️ لم يتم العثور على الموظف في النظام.' : '⚠️ Worker not found in system.');
+        return;
+    }
+    const worker = workers[workerIndex];
 
-    let fromTasks = fromWorker.constantTasks;
+    const all = getAllResponsibilitySubjects();
+    const subject = all.find(s => String(s.id) === String(subjectId));
+    if (!subject) {
+        alert(isAr ? '⚠️ لم يتم العثور على موضوع المسؤولية.' : '⚠️ Responsibility subject not found.');
+        return;
+    }
+
+    const assignedWorkers = subject.assignedWorkers ? { ...subject.assignedWorkers } : {};
+    if (assignedWorkers[workerId]) {
+        alert(isAr ? `⚠️ الموظف ${worker.name} مكلف بالفعل بهذه المسؤولية!` : `⚠️ Worker ${worker.name} is already assigned to this responsibility!`);
+        return;
+    }
+
+    const assignedAt = Date.now();
+    const assignedBy = (currentUser && currentUser.email) ? currentUser.email : 'Admin';
+    const amount = customAmount || subject.amount || (isAr ? 'يومي' : 'Daily');
+
+    assignedWorkers[workerId] = {
+        workerId: String(worker.id),
+        workerName: worker.name,
+        assignedAt: assignedAt,
+        assignedBy: assignedBy,
+        amount: amount
+    };
+
+    let historyLog = subject.historyLog || [];
+    if (!Array.isArray(historyLog)) historyLog = Object.values(historyLog);
+    historyLog.unshift({
+        id: 'log_' + Date.now(),
+        type: 'assigned',
+        workerId: String(worker.id),
+        workerName: worker.name,
+        timestamp: assignedAt,
+        by: assignedBy,
+        amount: amount,
+        note: isAr ? `تكليف جديد لـ ${worker.name}` : `Assigned to ${worker.name}`
+    });
+
+    // Construct full complete subject object
+    const fullSubject = {
+        ...subject,
+        id: subject.id,
+        title: subject.title,
+        icon: subject.icon || '📌',
+        amount: subject.amount || (isAr ? 'يومي' : 'Daily'),
+        dept: subject.dept || 'general',
+        assignedWorkers: assignedWorkers,
+        historyLog: historyLog,
+        updatedAt: Date.now()
+    };
+    if (!fullSubject.createdAt) fullSubject.createdAt = Date.now();
+
+    // Direct local cache update for instant UI feedback
+    if (!companyData.constantResponsibilities) companyData.constantResponsibilities = {};
+    companyData.constantResponsibilities[subject.id] = fullSubject;
+
+    // Sync to worker's constantTasks array
+    let wTasks = worker.constantTasks || [];
+    if (!Array.isArray(wTasks)) wTasks = Object.values(wTasks);
+    wTasks = wTasks.filter(ct => ct && String(ct.subjectId) !== String(subject.id) && ct.id !== ('ct_' + subject.id));
+    wTasks.push({
+        id: 'ct_' + subject.id,
+        subjectId: subject.id,
+        title: subject.title,
+        amount: amount,
+        icon: subject.icon || '📌',
+        assignedAt: assignedAt,
+        assignedBy: assignedBy
+    });
+    worker.constantTasks = wTasks;
+
+    const updates = {};
+    updates[`companies/${currentCompany}/constantResponsibilities/${subject.id}`] = fullSubject;
+    updates[`companies/${currentCompany}/workers/${workerIndex}/constantTasks`] = wTasks;
+
+    db.ref().update(updates).then(() => {
+        if (typeof logActivity === 'function') {
+            logActivity('task_constant_assign', worker.id, worker.name, `Assigned constant responsibility "${subject.title}" to ${worker.name}`);
+        }
+        if (typeof showInAppNotification === 'function') {
+            showInAppNotification(isAr ? `✅ تم تكليف ${worker.name} بمسؤولية "${subject.title}" بنجاح!` : `✅ Assigned "${subject.title}" to ${worker.name}!`);
+        }
+        renderConstantTasks();
+        if (activeViewingRespSubjectId === subject.id) {
+            openResponsibilityInfoModal(subject.id);
+        }
+    }).catch(err => console.error("Error assigning responsibility:", err));
+}
+window.assignResponsibilityToWorker = assignResponsibilityToWorker;
+
+// 6. Transfer Responsibility from Worker A to Worker B
+function transferResponsibilityWorker(subjectId, fromWorkerId, toWorkerId) {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    if (!subjectId || !fromWorkerId || !toWorkerId) {
+        alert(isAr ? 'الرجاء اختيار الموظف المستهدف لنقل المهمة إليه.' : 'Please select target worker to transfer to.');
+        return;
+    }
+    if (String(fromWorkerId) === String(toWorkerId)) {
+        alert(isAr ? '⚠️ لا يمكن نقل المهمة لنفس الموظف.' : '⚠️ Cannot transfer task to the same worker.');
+        return;
+    }
+
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const workers = companyData.workers || [];
+    const fromIndex = workers.findIndex(w => String(w.id) === String(fromWorkerId));
+    const toIndex = workers.findIndex(w => String(w.id) === String(toWorkerId));
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    const fromWorker = workers[fromIndex];
+    const toWorker = workers[toIndex];
+
+    const all = getAllResponsibilitySubjects();
+    const subject = all.find(s => String(s.id) === String(subjectId));
+    if (!subject) return;
+
+    const assignedWorkers = subject.assignedWorkers ? { ...subject.assignedWorkers } : {};
+    const prevAssignment = assignedWorkers[fromWorkerId] || {};
+    delete assignedWorkers[fromWorkerId];
+
+    const transferTime = Date.now();
+    const transferredBy = (currentUser && currentUser.email) ? currentUser.email : 'Admin';
+    const amount = prevAssignment.amount || subject.amount || (isAr ? 'يومي' : 'Daily');
+
+    assignedWorkers[toWorkerId] = {
+        workerId: String(toWorker.id),
+        workerName: toWorker.name,
+        assignedAt: transferTime,
+        assignedBy: transferredBy,
+        amount: amount,
+        transferredFrom: fromWorker.name
+    };
+
+    let historyLog = subject.historyLog || [];
+    if (!Array.isArray(historyLog)) historyLog = Object.values(historyLog);
+    historyLog.unshift({
+        id: 'log_' + Date.now(),
+        type: 'transferred',
+        fromWorkerId: String(fromWorker.id),
+        fromWorkerName: fromWorker.name,
+        toWorkerId: String(toWorker.id),
+        toWorkerName: toWorker.name,
+        timestamp: transferTime,
+        by: transferredBy,
+        amount: amount,
+        note: isAr ? `تم نقل المسؤولية من ${fromWorker.name} إلى ${toWorker.name}` : `Transferred from ${fromWorker.name} to ${toWorker.name}`
+    });
+
+    const fullSubject = {
+        ...subject,
+        id: subject.id,
+        title: subject.title,
+        icon: subject.icon || '📌',
+        amount: subject.amount || (isAr ? 'يومي' : 'Daily'),
+        dept: subject.dept || 'general',
+        assignedWorkers: assignedWorkers,
+        historyLog: historyLog,
+        updatedAt: Date.now()
+    };
+    if (!fullSubject.createdAt) fullSubject.createdAt = Date.now();
+
+    if (!companyData.constantResponsibilities) companyData.constantResponsibilities = {};
+    companyData.constantResponsibilities[subject.id] = fullSubject;
+
+    // Update fromWorker constantTasks
+    let fromTasks = fromWorker.constantTasks || [];
     if (!Array.isArray(fromTasks)) fromTasks = Object.values(fromTasks);
+    fromTasks = fromTasks.filter(ct => ct && String(ct.subjectId) !== String(subject.id) && ct.id !== ('ct_' + subject.id));
+    fromWorker.constantTasks = fromTasks;
 
-    const task = fromTasks.find(ct => String(ct.id) === String(taskId));
-    if (!task) return;
+    // Update toWorker constantTasks
+    let toTasks = toWorker.constantTasks || [];
+    if (!Array.isArray(toTasks)) toTasks = Object.values(toTasks);
+    toTasks = toTasks.filter(ct => ct && String(ct.subjectId) !== String(subject.id) && ct.id !== ('ct_' + subject.id));
+    toTasks.push({
+        id: 'ct_' + subject.id,
+        subjectId: subject.id,
+        title: subject.title,
+        amount: amount,
+        icon: subject.icon || '📌',
+        assignedAt: transferTime,
+        assignedBy: transferredBy,
+        transferredFrom: fromWorker.name
+    });
+    toWorker.constantTasks = toTasks;
 
-    document.getElementById('transfer-constant-from-worker-id').value = fromWorkerId;
-    document.getElementById('transfer-constant-task-id').value = taskId;
-    document.getElementById('transfer-constant-task-title-display').textContent = `${task.title} (${task.amount || ''})`;
+    const updates = {};
+    updates[`companies/${currentCompany}/constantResponsibilities/${subject.id}`] = fullSubject;
+    updates[`companies/${currentCompany}/workers/${fromIndex}/constantTasks`] = fromTasks;
+    updates[`companies/${currentCompany}/workers/${toIndex}/constantTasks`] = toTasks;
 
-    const targetSelect = document.getElementById('transfer-constant-target-worker-select');
-    if (targetSelect) {
-        let html = `<option value="">-- ${isAr ? 'اختر الموظف البديل' : 'Choose Target Worker'} --</option>`;
+    db.ref().update(updates).then(() => {
+        if (typeof logActivity === 'function') {
+            logActivity('task_constant_transfer', toWorker.id, toWorker.name, `Transferred constant responsibility "${subject.title}" from ${fromWorker.name} to ${toWorker.name}`);
+        }
+        if (typeof showInAppNotification === 'function') {
+            showInAppNotification(isAr ? `🔁 تم نقل المسؤولية إلى ${toWorker.name} بنجاح!` : `🔁 Transferred to ${toWorker.name}!`);
+        }
+        renderConstantTasks();
+        if (activeViewingRespSubjectId === subject.id) {
+            openResponsibilityInfoModal(subject.id);
+        }
+    }).catch(err => console.error("Error transferring responsibility:", err));
+}
+window.transferResponsibilityWorker = transferResponsibilityWorker;
+
+// 7. Unassign Responsibility from Worker
+function unassignResponsibilityWorker(subjectId, workerId) {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const workers = companyData.workers || [];
+    const workerIndex = workers.findIndex(w => String(w.id) === String(workerId));
+    const workerName = workerIndex !== -1 ? workers[workerIndex].name : workerId;
+
+    if (!confirm(isAr ? `هل أنت متأكد من إلغاء تكليف (${workerName}) بهذه المسؤولية؟` : `Are you sure you want to unassign (${workerName}) from this responsibility?`)) return;
+
+    const all = getAllResponsibilitySubjects();
+    const subject = all.find(s => String(s.id) === String(subjectId));
+    if (!subject) return;
+
+    const assignedWorkers = subject.assignedWorkers ? { ...subject.assignedWorkers } : {};
+    delete assignedWorkers[workerId];
+
+    const unassignedAt = Date.now();
+    const unassignedBy = (currentUser && currentUser.email) ? currentUser.email : 'Admin';
+
+    let historyLog = subject.historyLog || [];
+    if (!Array.isArray(historyLog)) historyLog = Object.values(historyLog);
+    historyLog.unshift({
+        id: 'log_' + Date.now(),
+        type: 'unassigned',
+        workerId: String(workerId),
+        workerName: workerName,
+        timestamp: unassignedAt,
+        by: unassignedBy,
+        note: isAr ? `تم إلغاء تكليف ${workerName}` : `Unassigned from ${workerName}`
+    });
+
+    const fullSubject = {
+        ...subject,
+        id: subject.id,
+        title: subject.title,
+        icon: subject.icon || '📌',
+        amount: subject.amount || (isAr ? 'يومي' : 'Daily'),
+        dept: subject.dept || 'general',
+        assignedWorkers: assignedWorkers,
+        historyLog: historyLog,
+        updatedAt: Date.now()
+    };
+    if (!fullSubject.createdAt) fullSubject.createdAt = Date.now();
+
+    if (!companyData.constantResponsibilities) companyData.constantResponsibilities = {};
+    companyData.constantResponsibilities[subject.id] = fullSubject;
+
+    const updates = {};
+    updates[`companies/${currentCompany}/constantResponsibilities/${subject.id}`] = fullSubject;
+
+    if (workerIndex !== -1) {
+        const worker = workers[workerIndex];
+        let wTasks = worker.constantTasks || [];
+        if (!Array.isArray(wTasks)) wTasks = Object.values(wTasks);
+        wTasks = wTasks.filter(ct => ct && String(ct.subjectId) !== String(subject.id) && ct.id !== ('ct_' + subject.id));
+        worker.constantTasks = wTasks;
+        updates[`companies/${currentCompany}/workers/${workerIndex}/constantTasks`] = wTasks;
+    }
+
+    db.ref().update(updates).then(() => {
+        if (typeof logActivity === 'function') {
+            logActivity('task_constant_unassign', workerId, workerName, `Unassigned constant responsibility "${subject.title}" from ${workerName}`);
+        }
+        renderConstantTasks();
+        if (activeViewingRespSubjectId === subject.id) {
+            openResponsibilityInfoModal(subject.id);
+        }
+    }).catch(err => console.error("Error unassigning responsibility:", err));
+}
+window.unassignResponsibilityWorker = unassignResponsibilityWorker;
+
+// 8. Open Info Inspector & Transfer Modal
+function openResponsibilityInfoModal(subjectId) {
+    const modal = document.getElementById('modal-responsibility-info');
+    if (!modal) return;
+
+    activeViewingRespSubjectId = subjectId;
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const all = getAllResponsibilitySubjects();
+    const subject = all.find(s => String(s.id) === String(subjectId));
+    if (!subject) return;
+
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const workers = companyData.workers || [];
+
+    // Header updates
+    const iconEl = document.getElementById('resp-info-header-icon');
+    const titleEl = document.getElementById('resp-info-header-title');
+    const deptEl = document.getElementById('resp-info-header-dept');
+    const amountEl = document.getElementById('resp-info-header-amount');
+    const countEl = document.getElementById('resp-info-header-count');
+    const activeBadgeNum = document.getElementById('resp-info-active-badge-num');
+
+    const assignedWorkersMap = subject.assignedWorkers || {};
+    const assignedList = Object.values(assignedWorkersMap).filter(w => w && w.workerId);
+
+    if (iconEl) iconEl.textContent = subject.icon || '📌';
+    if (titleEl) titleEl.textContent = subject.title || '';
+    if (deptEl) {
+        const deptNames = {
+            general: isAr ? 'عام' : 'General',
+            kitchen: isAr ? 'المطبخ' : 'Kitchen',
+            hall: isAr ? 'الصالة والخدمة' : 'Hall & Dining',
+            cashier: isAr ? 'الكاشير' : 'Cashier',
+            warehouse: isAr ? 'المستودع' : 'Warehouse'
+        };
+        deptEl.textContent = deptNames[subject.dept] || subject.dept || 'General';
+    }
+    if (amountEl) amountEl.textContent = subject.amount || (isAr ? 'يومي' : 'Daily');
+    const countText = isAr ? `👥 ${assignedList.length} عمال مكلفين` : `👥 ${assignedList.length} Assigned Workers`;
+    if (countEl) countEl.textContent = countText;
+    if (activeBadgeNum) activeBadgeNum.textContent = countText;
+
+    // Populate quick assign select
+    const quickSelect = document.getElementById('resp-info-quick-worker-select');
+    const quickAmt = document.getElementById('resp-info-quick-amount-input');
+    if (quickAmt) quickAmt.value = subject.amount || '';
+    if (quickSelect) {
+        let opts = `<option value="">-- ${isAr ? 'اختر الموظف للتكليف' : 'Choose Employee to Assign'} --</option>`;
         workers.forEach(w => {
-            if (String(w.id) !== String(fromWorkerId)) {
-                html += `<option value="${w.id}">👤 ${w.name}</option>`;
+            const isAlready = assignedList.some(a => String(a.workerId) === String(w.id));
+            if (!isAlready) {
+                opts += `<option value="${w.id}">👤 ${w.name}</option>`;
             }
         });
-        targetSelect.innerHTML = html;
+        quickSelect.innerHTML = opts;
+    }
+
+    // Hide inline transfer box
+    const transferBox = document.getElementById('resp-inline-transfer-box');
+    if (transferBox) transferBox.style.display = 'none';
+
+    // Render Active Workers List
+    const workersContainer = document.getElementById('resp-info-workers-list');
+    if (workersContainer) {
+        if (assignedList.length === 0) {
+            workersContainer.innerHTML = `
+                <div style="background: var(--input-bg); border: 1px dashed var(--border-color); border-radius: 12px; padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.88rem;">
+                    ⚠️ ${isAr ? 'لا يوجد أي موظف مكلف بهذه المسؤولية حالياً. يمكنك استخدام النموذج أعلاه لتكليف موظف.' : 'No workers assigned to this responsibility yet. Use the bar above to assign a worker.'}
+                </div>
+            `;
+        } else {
+            workersContainer.innerHTML = assignedList.map(a => {
+                const dateStr = a.assignedAt ? new Date(a.assignedAt).toLocaleString(isAr ? 'ar-EG' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+                const safeName = typeof escapeHtml === 'function' ? escapeHtml(a.workerName) : a.workerName;
+                const safeAmount = typeof escapeHtml === 'function' ? escapeHtml(a.amount || subject.amount || '') : (a.amount || '');
+
+                return `
+                    <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 14px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1rem;">
+                                👤
+                            </div>
+                            <div>
+                                <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-main);">${safeName}</div>
+                                <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 2px;">
+                                    🕒 ${isAr ? 'تاريخ التكليف:' : 'Assigned:'} <strong style="color: var(--text-main);">${dateStr}</strong>
+                                    ${a.assignedBy ? ` • <span style="color:#6366f1;">${a.assignedBy}</span>` : ''}
+                                    ${safeAmount ? ` • 🎯 <span style="color:#10b981;">${safeAmount}</span>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button type="button" onclick="startInlineTransfer('${subject.id}', '${a.workerId}', '${safeName}')" class="btn-outline" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 800; border-radius: 8px; color: #6366f1; border-color: #6366f1; cursor: pointer; background: rgba(99,102,241,0.08); display: flex; align-items: center; gap: 4px;">
+                                <span>🔁</span> <span>${isAr ? 'نقل المهمة' : 'Transfer'}</span>
+                            </button>
+                            <button type="button" onclick="unassignResponsibilityWorker('${subject.id}', '${a.workerId}')" class="btn-outline-danger" style="padding: 6px 10px; font-size: 0.8rem; font-weight: 800; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                                <span>❌</span> <span>${isAr ? 'إلغاء' : 'Unassign'}</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    // Render History Timeline
+    const timelineContainer = document.getElementById('resp-info-history-timeline');
+    if (timelineContainer) {
+        let historyLog = subject.historyLog || [];
+        if (!Array.isArray(historyLog)) historyLog = Object.values(historyLog);
+
+        if (historyLog.length === 0) {
+            timelineContainer.innerHTML = `<span style="color: var(--text-muted); font-size: 0.82rem; font-style: italic;">${isAr ? 'لا توجد سجلات تاريخية حتى الآن.' : 'No audit history events recorded yet.'}</span>`;
+        } else {
+            timelineContainer.innerHTML = historyLog.map(item => {
+                const dateStr = item.timestamp ? new Date(item.timestamp).toLocaleString(isAr ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+                let iconStr = '🟢';
+                let typeClass = 'log-assigned';
+                let typeTitle = isAr ? 'تكليف موظف' : 'Worker Assigned';
+
+                if (item.type === 'transferred') {
+                    iconStr = '🔁';
+                    typeClass = 'log-transferred';
+                    typeTitle = isAr ? `نقل مسؤولية: من (${item.fromWorkerName || '-'}) إلى (${item.toWorkerName || '-'})` : `Transferred from (${item.fromWorkerName || '-'}) to (${item.toWorkerName || '-'})`;
+                } else if (item.type === 'unassigned') {
+                    iconStr = '🔴';
+                    typeClass = 'log-unassigned';
+                    typeTitle = isAr ? `إلغاء تكليف: (${item.workerName || '-'})` : `Unassigned: (${item.workerName || '-'})`;
+                } else {
+                    typeTitle = isAr ? `تكليف: (${item.workerName || '-'})` : `Assigned: (${item.workerName || '-'})`;
+                }
+
+                return `
+                    <div class="resp-timeline-item ${typeClass}">
+                        <div style="font-size: 0.85rem; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                            <span>${iconStr}</span> <span>${typeTitle}</span>
+                        </div>
+                        <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 2px;">
+                            📅 ${dateStr} ${item.by ? `• 👤 <span style="color: #6366f1;">${item.by}</span>` : ''}
+                        </div>
+                        ${item.note ? `<div style="font-size: 0.78rem; color: var(--text-main); margin-top: 3px; background: rgba(255,255,255,0.03); padding: 4px 8px; border-radius: 6px; display: inline-block;">${typeof escapeHtml === 'function' ? escapeHtml(item.note) : item.note}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
     }
 
     modal.style.display = 'flex';
 }
-window.openTransferConstantTaskModal = openTransferConstantTaskModal;
+window.openResponsibilityInfoModal = openResponsibilityInfoModal;
 
-function closeTransferConstantTaskModal() {
-    const modal = document.getElementById('transfer-constant-task-modal');
+function closeResponsibilityInfoModal() {
+    const modal = document.getElementById('modal-responsibility-info');
     if (modal) modal.style.display = 'none';
+    activeViewingRespSubjectId = null;
 }
-window.closeTransferConstantTaskModal = closeTransferConstantTaskModal;
+window.closeResponsibilityInfoModal = closeResponsibilityInfoModal;
 
-function transferConstantTask() {
-    const isAr = currentAppLang === 'ar';
-    const fromWorkerId = document.getElementById('transfer-constant-from-worker-id').value;
-    const taskId = document.getElementById('transfer-constant-task-id').value;
-    const targetWorkerId = document.getElementById('transfer-constant-target-worker-select').value;
+function assignWorkerFromInfoModal() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    if (!activeViewingRespSubjectId) return;
 
-    if (!fromWorkerId || !taskId || !targetWorkerId) {
-        alert(isAr ? 'يرجى اختيار الموظف المستهدف لنقل المهمة إليه.' : 'Please select the target worker to transfer the task to.');
+    const workerSelect = document.getElementById('resp-info-quick-worker-select');
+    const amtInput = document.getElementById('resp-info-quick-amount-input');
+    const workerId = workerSelect ? workerSelect.value : '';
+    const amount = amtInput ? amtInput.value.trim() : '';
+
+    if (!workerId) {
+        alert(isAr ? 'الرجاء اختيار الموظف أولاً.' : 'Please select an employee first.');
         return;
     }
 
-    const companyData = getCompanyData();
-    const workers = companyData.workers || [];
-
-    const fromWorkerIndex = workers.findIndex(w => String(w.id) === String(fromWorkerId));
-    const targetWorkerIndex = workers.findIndex(w => String(w.id) === String(targetWorkerId));
-
-    if (fromWorkerIndex === -1 || targetWorkerIndex === -1) return;
-
-    const fromWorker = workers[fromWorkerIndex];
-    const targetWorker = workers[targetWorkerIndex];
-
-    if (!fromWorker.constantTasks || !Array.isArray(fromWorker.constantTasks)) {
-        fromWorker.constantTasks = Object.values(fromWorker.constantTasks || {});
-    }
-    if (!targetWorker.constantTasks || !Array.isArray(targetWorker.constantTasks)) {
-        targetWorker.constantTasks = Object.values(targetWorker.constantTasks || {});
-    }
-
-    const taskIndex = fromWorker.constantTasks.findIndex(ct => String(ct.id) === String(taskId));
-    if (taskIndex === -1) return;
-
-    const [transferredTask] = fromWorker.constantTasks.splice(taskIndex, 1);
-    transferredTask.assignedAt = Date.now();
-    transferredTask.transferredFrom = fromWorker.name;
-
-    targetWorker.constantTasks.push(transferredTask);
-
-    const updates = {};
-    updates[`companies/${currentCompany}/workers/${fromWorkerIndex}/constantTasks`] = fromWorker.constantTasks;
-    updates[`companies/${currentCompany}/workers/${targetWorkerIndex}/constantTasks`] = targetWorker.constantTasks;
-
-    db.ref().update(updates)
-        .then(() => {
-            if (typeof logActivity === 'function') {
-                logActivity('task_constant_transfer', targetWorker.id, targetWorker.name, `Transferred constant task "${transferredTask.title}" from ${fromWorker.name} to ${targetWorker.name}`);
-            }
-            alert(isAr ? `تم نقل المهمة المستمرة "${transferredTask.title}" إلى ${targetWorker.name} بنجاح!` : `Constant task "${transferredTask.title}" transferred to ${targetWorker.name} successfully!`);
-            closeTransferConstantTaskModal();
-            renderConstantTasks();
-        })
-        .catch(err => console.error("Error transferring constant task:", err));
+    assignResponsibilityToWorker(activeViewingRespSubjectId, workerId, amount);
 }
-window.transferConstantTask = transferConstantTask;
+window.assignWorkerFromInfoModal = assignWorkerFromInfoModal;
 
-function renderConstantTasks() {
-    const isAr = currentAppLang === 'ar';
-    const companyData = getCompanyData();
+function startInlineTransfer(subjectId, fromWorkerId, fromWorkerName) {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const transferBox = document.getElementById('resp-inline-transfer-box');
+    const nameDisplay = document.getElementById('transfer-from-worker-name-display');
+    const fromIdInput = document.getElementById('transfer-from-worker-id');
+    const subIdInput = document.getElementById('transfer-subject-id');
+    const toSelect = document.getElementById('transfer-to-worker-select');
+
+    if (!transferBox) return;
+
+    if (nameDisplay) nameDisplay.textContent = fromWorkerName;
+    if (fromIdInput) fromIdInput.value = fromWorkerId;
+    if (subIdInput) subIdInput.value = subjectId;
+
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
     const workers = companyData.workers || [];
 
-    // Automatically render preset shortcuts
-    renderConstantTaskPresets();
-
-    // 1. Populate Manager Worker Select dropdown
-    const select = document.getElementById('constant-task-worker-select');
-    if (select && select.options.length <= 1) {
-        let html = `<option value="">-- ${isAr ? 'اختر الموظف' : 'Choose Employee'} --</option>`;
+    if (toSelect) {
+        let opts = `<option value="">-- ${isAr ? 'اختر الموظف البديل' : 'Choose Replacement Worker'} --</option>`;
         workers.forEach(w => {
-            html += `<option value="${w.id}">👤 ${w.name}</option>`;
+            if (String(w.id) !== String(fromWorkerId)) {
+                opts += `<option value="${w.id}">👤 ${w.name}</option>`;
+            }
         });
-        select.innerHTML = html;
+        toSelect.innerHTML = opts;
     }
 
-    // 2. Render Manager Constant Tasks List
-    const managerList = document.getElementById('constant-tasks-manager-list');
-    if (managerList) {
-        const selectedWorkerId = select ? select.value : '';
-        let targetWorkers = workers;
-        if (selectedWorkerId) {
-            targetWorkers = workers.filter(w => String(w.id) === String(selectedWorkerId));
+    transferBox.style.display = 'block';
+    transferBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+window.startInlineTransfer = startInlineTransfer;
+
+function cancelInlineTransfer() {
+    const transferBox = document.getElementById('resp-inline-transfer-box');
+    if (transferBox) transferBox.style.display = 'none';
+}
+window.cancelInlineTransfer = cancelInlineTransfer;
+
+function confirmInlineTransfer() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const fromIdInput = document.getElementById('transfer-from-worker-id');
+    const subIdInput = document.getElementById('transfer-subject-id');
+    const toSelect = document.getElementById('transfer-to-worker-select');
+
+    const fromWorkerId = fromIdInput ? fromIdInput.value : '';
+    const subjectId = subIdInput ? subIdInput.value : '';
+    const toWorkerId = toSelect ? toSelect.value : '';
+
+    if (!subjectId || !fromWorkerId || !toWorkerId) {
+        alert(isAr ? 'الرجاء اختيار الموظف البديل لنقل المسؤولية إليه.' : 'Please select replacement worker.');
+        return;
+    }
+
+    transferResponsibilityWorker(subjectId, fromWorkerId, toWorkerId);
+}
+window.confirmInlineTransfer = confirmInlineTransfer;
+
+// 9. Main Render Function: Constant Responsibilities Grid & HUD
+function renderConstantTasks() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const grid = document.getElementById('constant-responsibilities-grid');
+    if (!grid) return;
+
+    const allSubjects = getAllResponsibilitySubjects();
+    const searchInput = document.getElementById('resp-search-input');
+    const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    const filterSelect = document.getElementById('resp-filter-status');
+    const filterStatus = filterSelect ? filterSelect.value : 'all';
+
+    let totalAssignments = 0;
+    allSubjects.forEach(s => {
+        const assigned = s.assignedWorkers ? Object.values(s.assignedWorkers).filter(w => w && w.workerId) : [];
+        totalAssignments += assigned.length;
+    });
+
+    const statSubjects = document.getElementById('resp-stat-total-subjects');
+    const statAssignments = document.getElementById('resp-stat-total-assignments');
+    if (statSubjects) statSubjects.textContent = allSubjects.length;
+    if (statAssignments) statAssignments.textContent = totalAssignments;
+
+    let filtered = allSubjects.filter(s => {
+        const assigned = s.assignedWorkers ? Object.values(s.assignedWorkers).filter(w => w && w.workerId) : [];
+        const isAssigned = assigned.length > 0;
+
+        if (filterStatus === 'assigned' && !isAssigned) return false;
+        if (filterStatus === 'unassigned' && isAssigned) return false;
+
+        if (query) {
+            const matchTitle = (s.title && s.title.toLowerCase().includes(query));
+            const matchDept = (s.dept && s.dept.toLowerCase().includes(query));
+            const matchWorker = assigned.some(w => w.workerName && w.workerName.toLowerCase().includes(query));
+            if (!matchTitle && !matchDept && !matchWorker) return false;
         }
 
-        let html = '';
-        let totalCount = 0;
+        return true;
+    });
 
-        targetWorkers.forEach(w => {
-            let tasks = w.constantTasks || [];
-            if (!Array.isArray(tasks)) tasks = Object.values(tasks);
-            tasks = tasks.filter(ct => ct && (ct.id || ct.title));
+    if (filtered.length === 0) {
+        grid.innerHTML = `
+            <div style="grid-column: 1 / -1; background: var(--input-bg); border: 1px dashed var(--border-color); border-radius: 16px; padding: 32px; text-align: center; color: var(--text-muted);">
+                <div style="font-size: 2rem; margin-bottom: 8px;">📌</div>
+                <div style="font-weight: 800; font-size: 1rem; color: var(--text-main); margin-bottom: 4px;">
+                    ${isAr ? 'لا توجد مواضيع مسؤوليات مطابقة' : 'No matching responsibility subjects'}
+                </div>
+                <p style="font-size: 0.85rem; margin: 0 0 14px 0;">
+                    ${isAr ? 'يمكنك إضافة موضوع مسؤولية جديد وتكليف العمال به.' : 'You can create a new responsibility subject and assign workers to it.'}
+                </p>
+                <button type="button" onclick="openAddResponsibilitySubjectModal()" class="btn-primary" style="padding: 8px 18px; border-radius: 10px; font-weight: 800; font-size: 0.85rem; background: linear-gradient(135deg, #6366f1, #4f46e5); border: none; color: white; cursor: pointer;">
+                    ➕ ${isAr ? 'إضافة موضوع مسؤولية' : 'Add Subject'}
+                </button>
+            </div>
+        `;
+        return;
+    }
 
-            if (tasks.length > 0) {
-                totalCount += tasks.length;
-                html += `
-                    <div class="ledger-card" style="margin-bottom: 14px; background: var(--input-bg); border-radius: 12px; padding: 14px; border: 1px solid var(--border-color);">
-                        <div class="flex-between" style="margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
-                            <strong style="font-size: 1rem; color: var(--text-main);">👤 ${w.name}</strong>
-                            <span class="badge" style="background: #6366f1; color: #fff; font-weight: 800;">${tasks.length} ${isAr ? 'مهام مستمرة' : 'Constant Tasks'}</span>
-                        </div>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px;">
-                            ${tasks.map(ct => `
-                                <div style="background: var(--card-bg); padding: 12px; border-radius: 10px; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; gap: 10px;">
-                                    <div>
-                                        <div style="font-weight: 800; color: var(--text-main); font-size: 0.92rem;">📌 ${ct.title}</div>
-                                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">🕒 ${isAr ? 'الكمية / التكرار:' : 'Target:'} <strong style="color:#6366f1;">${ct.amount || (isAr ? 'يومي' : 'Daily')}</strong></div>
-                                    </div>
-                                    <div style="display: flex; gap: 6px; flex-shrink: 0;">
-                                        <button type="button" onclick="openTransferConstantTaskModal('${w.id}', '${ct.id}')" class="btn-outline" style="padding: 4px 8px; font-size: 0.75rem; border-radius: 6px; font-weight: 700; cursor: pointer; border: 1px solid #10b981; color: #10b981;" title="${isAr ? 'نقل المهمة لموظف آخر' : 'Transfer task'}">🔁 ${isAr ? 'نقل' : 'Transfer'}</button>
-                                        <button type="button" onclick="removeConstantTask('${w.id}', '${ct.id}')" class="btn-outline-danger" style="padding: 4px 8px; font-size: 0.75rem; border-radius: 6px; font-weight: 700; cursor: pointer;" title="${isAr ? 'حذف المهمة' : 'Delete task'}">🗑️</button>
-                                    </div>
+    grid.innerHTML = filtered.map(s => {
+        const assigned = s.assignedWorkers ? Object.values(s.assignedWorkers).filter(w => w && w.workerId) : [];
+        const count = assigned.length;
+        const safeTitle = typeof escapeHtml === 'function' ? escapeHtml(s.title) : s.title;
+        const displayTitle = safeTitle.replace(/'/g, "\\'");
+        const safeAmt = typeof escapeHtml === 'function' ? escapeHtml(s.amount || (isAr ? 'يومي' : 'Daily')) : (s.amount || 'Daily');
+        const icon = s.icon || '📌';
+
+        const deptNames = {
+            general: isAr ? 'عام' : 'General',
+            kitchen: isAr ? 'المطبخ' : 'Kitchen',
+            hall: isAr ? 'الصالة والخدمة' : 'Hall',
+            cashier: isAr ? 'الكاشير' : 'Cashier',
+            warehouse: isAr ? 'المستودع' : 'Warehouse'
+        };
+        const deptLabel = deptNames[s.dept] || s.dept || 'General';
+
+        let workersPreviewHtml = '';
+        if (count > 0) {
+            workersPreviewHtml = `
+                <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;">
+                    ${assigned.map(a => `
+                        <span class="resp-worker-chip" title="${isAr ? 'تاريخ التكليف: ' + (a.assignedAt ? new Date(a.assignedAt).toLocaleDateString() : '') : ''}">
+                            <span>👤</span> <span>${typeof escapeHtml === 'function' ? escapeHtml(a.workerName) : a.workerName}</span>
+                        </span>
+                    `).join('')}
+                </div>
+            `;
+        } else {
+            workersPreviewHtml = `
+                <div style="margin-top: 10px; font-size: 0.78rem; color: #f59e0b; font-weight: 700; display: flex; align-items: center; gap: 4px;">
+                    <span>⚠️</span> <span>${isAr ? 'غير مخصصة لأي موظف حالياً' : 'Unassigned (No workers)'}</span>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="responsibility-card">
+                <div>
+                    <!-- Top Bar: Icon, Title, Dept, Menu -->
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 10px;">
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <div class="card-top-icon">${icon}</div>
+                            <div>
+                                <h3 style="margin: 0; font-size: 0.98rem; font-weight: 900; color: var(--text-main); line-height: 1.3;">
+                                    ${safeTitle}
+                                </h3>
+                                <div style="display: flex; gap: 6px; align-items: center; margin-top: 4px;">
+                                    <span class="badge" style="background: rgba(99,102,241,0.12); color: #818cf8; font-size: 0.72rem; font-weight: 800; padding: 2px 6px; border-radius: 6px;">
+                                        ${deptLabel}
+                                    </span>
+                                    <span class="badge" style="background: var(--input-bg); color: var(--text-muted); font-size: 0.72rem; font-weight: 700; padding: 2px 6px; border-radius: 6px;">
+                                        🕒 ${safeAmt}
+                                    </span>
                                 </div>
-                            `).join('')}
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 4px;">
+                            <button type="button" onclick="openAddResponsibilitySubjectModal('${s.id}')" style="background: none; border: none; color: #6366f1; cursor: pointer; font-size: 0.82rem; padding: 3px;" title="${isAr ? 'تعديل الموضوع' : 'Edit subject'}">✏️</button>
+                            <button type="button" onclick="deleteResponsibilitySubject('${s.id}', '${displayTitle}')" style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.82rem; padding: 3px;" title="${isAr ? 'حذف الموضوع' : 'Delete subject'}">🗑️</button>
                         </div>
                     </div>
-                `;
-            }
-        });
 
-        if (!html) {
-            html = `<p style="text-align: center; color: var(--text-muted); padding: 20px; font-size: 0.9rem;">${isAr ? 'لا توجد مهام مستمرة مخصصة حالياً.' : 'No constant tasks assigned yet.'}</p>`;
-        }
+                    <!-- Middle: Worker Count & Preview -->
+                    <div style="border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 6px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 0.8rem; font-weight: 800; color: var(--text-muted);">
+                                ${isAr ? 'الموظفون المكلفون:' : 'Assigned Workers:'}
+                            </span>
+                            <span class="badge" style="background: ${count > 0 ? 'linear-gradient(135deg, #10b981, #059669)' : 'rgba(245,158,11,0.2)'}; color: ${count > 0 ? '#ffffff' : '#f59e0b'}; font-size: 0.78rem; font-weight: 900; padding: 3px 8px; border-radius: 8px;">
+                                👥 ${count} ${isAr ? 'عمال' : 'Workers'}
+                            </span>
+                        </div>
+                        ${workersPreviewHtml}
+                    </div>
+                </div>
 
-        managerList.innerHTML = html;
-    }
+                <!-- Bottom Actions -->
+                <div style="border-top: 1px solid var(--border-color); padding-top: 12px; margin-top: 14px; display: flex; gap: 8px; justify-content: space-between; align-items: center;">
+                    <button type="button" onclick="openResponsibilityInfoModal('${s.id}')" class="btn-primary" style="flex: 1; padding: 8px 12px; font-size: 0.82rem; font-weight: 800; border-radius: 10px; background: linear-gradient(135deg, #6366f1, #4f46e5); border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 8px rgba(99,102,241,0.25);">
+                        <span>ℹ️</span> <span>${isAr ? 'تفاصيل وسجل النقل' : 'Info & Transfer Log'}</span>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
 
-    // 3. Render Worker's Own Constant Tasks Card (#worker-constant-tasks-card)
+    // Also update worker's own view if applicable
+    renderWorkerOwnConstantTasksCard();
+}
+window.renderConstantTasks = renderConstantTasks;
+
+function filterConstantResponsibilities() {
+    renderConstantTasks();
+}
+window.filterConstantResponsibilities = filterConstantResponsibilities;
+
+// 10. Worker's own constant tasks card
+function renderWorkerOwnConstantTasksCard() {
+    const isAr = currentAppLang === 'ar';
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const workers = companyData.workers || [];
+
     const workerCard = document.getElementById('worker-constant-tasks-card');
     const workerList = document.getElementById('worker-constant-tasks-list');
     const countBadge = document.getElementById('worker-constant-tasks-count');
     const cardTitle = document.getElementById('worker-constant-tasks-title');
 
-    if (workerCard && workerList) {
-        const isAdmin = currentUser && currentUser.role === 'admin';
-        let myWorker = null;
+    if (!workerCard || !workerList) return;
 
-        // Non-admin workers match via email or active worker profile
-        const currentEmail = currentUser && currentUser.email ? currentUser.email.toLowerCase() : '';
-        if (currentEmail) {
-            myWorker = workers.find(w => w.email && w.email.toLowerCase() === currentEmail);
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    let myWorker = null;
+
+    const currentEmail = currentUser && currentUser.email ? currentUser.email.toLowerCase() : '';
+    if (currentEmail) {
+        myWorker = workers.find(w => w.email && w.email.toLowerCase() === currentEmail);
+    }
+    if (!myWorker && typeof getActiveWorker === 'function') {
+        const activeW = getActiveWorker();
+        if (activeW) {
+            myWorker = workers.find(w => 
+                (w.id && activeW.id && String(w.id) === String(activeW.id)) ||
+                (w.email && activeW.email && w.email.toLowerCase() === activeW.email.toLowerCase()) ||
+                (w.name && activeW.name && String(w.name).trim().toLowerCase() === String(activeW.name).trim().toLowerCase())
+            );
         }
-        if (!myWorker && typeof getActiveWorker === 'function') {
-            const activeW = getActiveWorker();
-            if (activeW) {
-                myWorker = workers.find(w => 
-                    (w.id && activeW.id && String(w.id) === String(activeW.id)) ||
-                    (w.email && activeW.email && w.email.toLowerCase() === activeW.email.toLowerCase()) ||
-                    (w.name && activeW.name && String(w.name).trim().toLowerCase() === String(activeW.name).trim().toLowerCase())
-                );
-            }
+    }
+
+    if (isAdmin) {
+        workerCard.style.display = 'none';
+    } else if (myWorker) {
+        workerCard.style.display = 'block';
+        let myTasks = myWorker.constantTasks || [];
+        if (!Array.isArray(myTasks)) myTasks = Object.values(myTasks);
+        myTasks = myTasks.filter(ct => ct && (ct.id || ct.title));
+
+        if (cardTitle) {
+            cardTitle.textContent = isAr ? `مسؤولياتي والمهام المستمرة (${myWorker.name})` : `My Responsibilities & Constant Tasks (${myWorker.name})`;
+        }
+        if (countBadge) {
+            countBadge.textContent = `${myTasks.length} ${isAr ? 'مسؤوليات مستمرة' : 'Responsibilities'}`;
         }
 
-        // Admin accounts manage all constant tasks via the Constant Tasks Panel above and NEVER see a personal missions card.
-        // Non-admin workers see their assigned constant tasks card.
-        if (isAdmin) {
-            workerCard.style.display = 'none';
-        } else if (myWorker) {
-            workerCard.style.display = 'block';
-            let myTasks = myWorker.constantTasks || [];
-            if (!Array.isArray(myTasks)) myTasks = Object.values(myTasks);
-            myTasks = myTasks.filter(ct => ct && (ct.id || ct.title));
-
-            if (cardTitle) {
-                cardTitle.textContent = isAr ? `مسؤولياتي والمهام المستمرة (${myWorker.name})` : `My Responsibilities & Constant Tasks (${myWorker.name})`;
-            }
-
-            if (countBadge) {
-                countBadge.textContent = `${myTasks.length} ${isAr ? 'مسؤوليات مستمرة' : 'Responsibilities'}`;
-            }
-
-            if (myTasks.length === 0) {
-                workerList.innerHTML = `<p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">${isAr ? 'لا توجد مسؤوليات مستمرة مسندة إليك حالياً.' : 'No constant responsibilities assigned to you currently.'}</p>`;
-            } else {
-                workerList.innerHTML = myTasks.map(ct => `
-                    <div style="background: var(--card-bg); padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 10px; min-width: 200px; flex: 1;">
-                        <span style="font-size: 1.2rem;">📌</span>
-                        <div>
-                            <div style="font-weight: 800; font-size: 0.9rem; color: var(--text-main);">${ct.title}</div>
-                            <div style="font-size: 0.76rem; color: var(--text-muted);">📋 ${isAr ? 'المطلوب / الكمية:' : 'Amount:'} <strong style="color: #6366f1;">${ct.amount || (isAr ? 'يومي' : 'Daily')}</strong></div>
-                        </div>
-                    </div>
-                `).join('');
-            }
+        if (myTasks.length === 0) {
+            workerList.innerHTML = `<p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">${isAr ? 'لا توجد مسؤوليات مستمرة مسندة إليك حالياً.' : 'No constant responsibilities assigned to you currently.'}</p>`;
         } else {
-            // General fallback if no worker matches
-            workerCard.style.display = 'none';
+            workerList.innerHTML = myTasks.map(ct => `
+                <div style="background: var(--card-bg); padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 10px; min-width: 200px; flex: 1;">
+                    <span style="font-size: 1.2rem;">${ct.icon || '📌'}</span>
+                    <div>
+                        <div style="font-weight: 800; font-size: 0.9rem; color: var(--text-main);">${ct.title}</div>
+                        <div style="font-size: 0.76rem; color: var(--text-muted);">📋 ${isAr ? 'المطلوب / الكمية:' : 'Amount:'} <strong style="color: #6366f1;">${ct.amount || (isAr ? 'يومي' : 'Daily')}</strong></div>
+                    </div>
+                </div>
+            `).join('');
         }
+    } else {
+        workerCard.style.display = 'none';
     }
 }
 window.renderConstantTasks = renderConstantTasks;

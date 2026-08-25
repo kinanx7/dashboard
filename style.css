@@ -1432,7 +1432,18 @@ body:not(.role-admin) .task-grid {
 
 @media(max-width: 800px) {
     .task-grid {
-        grid-template-columns: 1fr;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 16px !important;
+    }
+    .task-main-content {
+        order: 1 !important;
+        width: 100% !important;
+    }
+    .task-admin-sidebar {
+        order: 2 !important;
+        width: 100% !important;
+        margin-top: 8px !important;
     }
 }
 
@@ -2291,9 +2302,25 @@ body:not(.role-admin) .task-grid {
     }
 
     /* --- Grids collapse --- */
-    .grid-2-col,
-    .task-grid {
+    .grid-2-col {
         grid-template-columns: 1fr;
+    }
+
+    .task-grid {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 16px !important;
+    }
+
+    .task-main-content {
+        order: 1 !important;
+        width: 100% !important;
+    }
+
+    .task-admin-sidebar {
+        order: 2 !important;
+        width: 100% !important;
+        margin-top: 12px !important;
     }
 
     /* --- Tables: allow horizontal scroll within container only --- */
@@ -2517,6 +2544,228 @@ body:not(.role-admin) .task-grid {
         height: 100px !important;
         margin-bottom: 16px !important;
     }
+
+    /* ========================================================= */
+    /* TASKS DEPARTMENT MOBILE & PHONE UI ENHANCEMENTS          */
+    /* ========================================================= */
+    
+    /* 1. Mode Selector Ribbon: Smooth Horizontal Scroll on Mobile */
+    .task-mode-nav-bar {
+        display: flex !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+        flex-wrap: nowrap !important;
+        gap: 8px !important;
+        padding-bottom: 6px !important;
+        margin-bottom: 14px !important;
+        width: 100% !important;
+    }
+    .task-mode-nav-bar::-webkit-scrollbar {
+        display: none !important;
+    }
+    .task-mode-nav-bar button {
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
+        padding: 9px 14px !important;
+        font-size: 0.82rem !important;
+        border-radius: 12px !important;
+        min-height: 40px !important;
+    }
+
+    /* 2. Responsibilities HUD Cards Grid on Mobile */
+    #constant-responsibilities-grid {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+    .responsibility-card {
+        padding: 14px !important;
+        border-radius: 14px !important;
+    }
+    #constant-tasks-container .card-title {
+        font-size: 1.1rem !important;
+    }
+    #constant-tasks-container > div:nth-child(2) {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 10px !important;
+        padding: 10px !important;
+    }
+    #constant-tasks-container > div:nth-child(2) > div:first-child {
+        min-width: 100% !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+    }
+    #resp-search-input,
+    #resp-filter-status {
+        width: 100% !important;
+    }
+
+    /* 3. Responsibilities Inspector Modal on Phone */
+    #modal-responsibility-info .modal-content,
+    #modal-add-responsibility-subject .modal-content {
+        max-width: 96% !important;
+        width: 96% !important;
+        padding: 16px !important;
+        border-radius: 18px !important;
+        max-height: 92vh !important;
+    }
+    #modal-responsibility-info .modal-content > div:first-child {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 10px !important;
+    }
+    #resp-info-quick-worker-select,
+    #resp-info-quick-amount-input {
+        flex: 1 1 100% !important;
+        width: 100% !important;
+        min-width: 100% !important;
+    }
+    #modal-responsibility-info .btn-success[onclick="assignWorkerFromInfoModal()"] {
+        width: 100% !important;
+        justify-content: center !important;
+        min-height: 42px !important;
+    }
+    #resp-info-workers-list > div {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 10px !important;
+    }
+    #resp-info-workers-list > div > div:last-child {
+        display: flex !important;
+        width: 100% !important;
+        gap: 8px !important;
+    }
+    #resp-info-workers-list > div > div:last-child button {
+        flex: 1 !important;
+        justify-content: center !important;
+        min-height: 38px !important;
+    }
+    #resp-inline-transfer-box > div:last-child {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 8px !important;
+    }
+    #transfer-to-worker-select,
+    #resp-inline-transfer-box button[onclick="confirmInlineTransfer()"] {
+        width: 100% !important;
+        min-height: 42px !important;
+    }
+
+    /* 4. Tasks Filter Controls Bar */
+    #tasks-filter-controls-bar {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 10px !important;
+        padding: 12px !important;
+    }
+    #tasks-search-container,
+    #tasks-status-filter-container,
+    #tasks-worker-filter-container,
+    #tasks-timeframe-filter-container,
+    #tasks-custom-range {
+        width: 100% !important;
+        min-width: 100% !important;
+        flex: 1 1 100% !important;
+    }
+    #tasks-search-input,
+    #tasks-filter-status,
+    #tasks-filter-worker,
+    #tasks-filter-timeframe {
+        width: 100% !important;
+        box-sizing: border-box !important;
+        min-height: 40px !important;
+    }
+
+    /* 5. Tasks Statistics Banner on Phone */
+    #tasks-stats-banner {
+        padding: 12px 10px !important;
+        margin-bottom: 14px !important;
+    }
+    #tasks-stats-banner > div:last-child {
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 6px !important;
+    }
+    #tasks-stats-banner > div:last-child > div {
+        padding: 8px 4px !important;
+    }
+    #task-stats-total,
+    #task-stats-completed,
+    #task-stats-pending {
+        font-size: 1.15rem !important;
+    }
+
+    /* 6. Mission Items & Task Action Buttons on Mobile */
+    .mission-item {
+        padding: 12px !important;
+        border-radius: 10px !important;
+    }
+    .mission-item button {
+        min-height: 40px !important;
+        font-size: 0.85rem !important;
+        width: 100% !important;
+    }
+    .general-task-item {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 10px !important;
+    }
+    .general-task-item > div:last-child {
+        width: 100% !important;
+    }
+    .general-task-item button {
+        width: 100% !important;
+        min-height: 40px !important;
+    }
+
+    /* 7. Tracked Task & Inquiries Forms on Mobile */
+    #tracked-task-form > div:nth-child(2) {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+    }
+    #task-inquiry-form textarea,
+    #tracked-task-form input,
+    #tracked-task-form select {
+        font-size: 0.9rem !important;
+    }
+}
+
+/* ========================================================= */
+/* INFORMATIONS / VAULT & NOTES EXPANDED TEXTAREA STYLING   */
+/* ========================================================= */
+#vault-note-text {
+    min-height: 260px !important;
+    font-size: 0.95rem !important;
+    line-height: 1.6 !important;
+    font-family: inherit !important;
+    resize: vertical !important;
+    padding: 14px 16px !important;
+    border-radius: 12px !important;
+    box-sizing: border-box !important;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+#vault-note-text:focus {
+    border-color: #6366f1 !important;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2) !important;
+    outline: none !important;
+}
+
+#edit-note-text-input {
+    min-height: 220px !important;
+    font-size: 0.95rem !important;
+    line-height: 1.6 !important;
+    font-family: inherit !important;
+    resize: vertical !important;
+    padding: 14px 16px !important;
+    border-radius: 12px !important;
+    box-sizing: border-box !important;
+}
+
+#edit-note-text-input:focus {
+    border-color: #4f46e5 !important;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2) !important;
+    outline: none !important;
 }
 
 /* Very small phones (≤ 400px) */
@@ -2942,6 +3191,91 @@ body:not(.role-admin) .task-grid {
     .no-print {
         display: none !important;
     }
+}
+
+/* =============================================
+   CONSTANT RESPONSIBILITIES & TASKS HUD SYSTEM
+   ============================================= */
+.responsibility-card {
+    background: var(--card-bg, #1e293b);
+    border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+    border-radius: 16px;
+    padding: 18px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+.responsibility-card:hover {
+    transform: translateY(-3px);
+    border-color: #6366f1;
+    box-shadow: 0 10px 25px rgba(99,102,241,0.2);
+}
+
+.responsibility-card .card-top-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: rgba(99,102,241,0.15);
+    border: 1px solid rgba(99,102,241,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.resp-worker-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+    padding: 4px 10px;
+    border-radius: 100px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.resp-timeline-item {
+    position: relative;
+    padding-inline-start: 24px;
+    padding-bottom: 18px;
+    border-inline-start: 2px solid rgba(255,255,255,0.1);
+}
+
+.resp-timeline-item:last-child {
+    border-inline-start-color: transparent;
+    padding-bottom: 0;
+}
+
+.resp-timeline-item::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: -7px;
+    top: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #6366f1;
+    border: 2px solid var(--card-bg, #1e293b);
+}
+
+.resp-timeline-item.log-assigned::before {
+    background: #10b981;
+}
+
+.resp-timeline-item.log-transferred::before {
+    background: #3b82f6;
+}
+
+.resp-timeline-item.log-unassigned::before {
+    background: #ef4444;
 }
 
 /* =============================================

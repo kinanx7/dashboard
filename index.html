@@ -81,7 +81,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=170">
+    <link rel="stylesheet" href="style.css?v=175">
 </head>
 
 <body class="theme-burgeroov">
@@ -1478,7 +1478,7 @@
             <div id="view-tasks" class="view-section">
                 <div class="task-grid">
                     <!-- Sidebar: Task Templates (Admin Only) -->
-                    <div class="admin-only">
+                    <div class="admin-only task-admin-sidebar">
                         <div class="card">
                             <h2 class="card-title" data-i18n="title-task-shortcuts">Task Shortcuts</h2>
                             <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;"
@@ -1518,9 +1518,9 @@
                     </div>
 
                     <!-- Main Content: Task Assignment & Board -->
-                    <div>
+                    <div class="task-main-content">
                         <!-- Mode Selector Bar (Assign Task vs Make Inquiry vs View Inquiries HUD) -->
-                        <div class="task-assign-access-only" style="display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
+                        <div class="task-assign-access-only task-mode-nav-bar" style="display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
                             <button type="button" id="task-mode-assign-btn" onclick="setTaskFormMode('assign')" class="btn-primary"
                                 style="padding: 10px 18px; border-radius: 12px; font-weight: 800; font-size: 0.88rem; background: linear-gradient(135deg, #4f46e5, #3730a3); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px;">
                                 <span data-i18n="btn-mode-assign-task">📋 Assign a Task</span>
@@ -1548,75 +1548,47 @@
                         </div>
 
                         <!-- Constant Tasks & Worker Responsibilities Container (Admin / Task Manager) -->
-                        <div id="constant-tasks-container" class="card task-assign-access-only" style="display: none; margin-bottom: 20px;">
-                            <div class="flex-between" style="align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
-                                <h2 class="card-title" style="margin:0; border:none; padding:0; display:flex; align-items:center; gap:8px;" data-i18n="title-constant-tasks-mgmt">
-                                    <span>📌</span> <span>Constant Tasks & Worker Responsibilities</span>
-                                </h2>
-                                <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700;" data-i18n="desc-constant-tasks-mgmt">Assign recurring duties to employees.</span>
-                            </div>
-
-                            <!-- Pre-defined preset shortcuts -->
-                            <div style="background: var(--input-bg); border-radius: 12px; padding: 12px; border: 1px solid var(--border-color); margin-bottom: 16px;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                    <label style="font-size: 0.8rem; font-weight: 800; color: var(--text-muted); margin: 0;" data-i18n="label-preset-shortcuts">💡 Fast Preset Responsibilities Shortcuts:</label>
-                                    <button type="button" onclick="toggleConstantTaskPresetForm()" class="btn-outline" style="padding: 4px 10px; font-size: 0.78rem; font-weight: 800; border-radius: 8px; color: #6366f1; border-color: #6366f1; cursor: pointer; background: rgba(99,102,241,0.1);">
-                                        ➕ <span data-i18n="btn-add-preset-shortcut">+ Add Preset</span>
+                        <div id="constant-tasks-container" class="card task-assign-access-only" style="display: none; margin-bottom: 20px; border-top: 3px solid #6366f1;">
+                            <!-- Header HUD -->
+                            <div class="flex-between" style="align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                                <div>
+                                    <h2 class="card-title" style="margin:0; border:none; padding:0; display:flex; align-items:center; gap:8px;" data-i18n="title-constant-tasks-mgmt">
+                                        <span>📌</span> <span>Constant Tasks & Worker Responsibilities</span>
+                                    </h2>
+                                    <p style="margin: 4px 0 0 0; font-size: 0.82rem; color: var(--text-muted);" data-i18n="desc-constant-tasks-hud">
+                                        Define recurring responsibilities, assign workers, track active workloads, and transfer tasks with complete history log.
+                                    </p>
+                                </div>
+                                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                    <button type="button" onclick="openAddResponsibilitySubjectModal()" class="btn-primary" style="padding: 9px 16px; border-radius: 10px; font-weight: 800; font-size: 0.85rem; background: linear-gradient(135deg, #6366f1, #4f46e5); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(99,102,241,0.3);">
+                                        <span>➕</span> <span data-i18n="btn-add-resp-subject">+ Add Responsibility Subject</span>
                                     </button>
                                 </div>
-                                <div id="constant-preset-form-container" style="display: none; background: var(--card-bg); border: 1.5px dashed #6366f1; border-radius: 10px; padding: 12px; margin-bottom: 12px;">
-                                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; margin-bottom: 10px;">
-                                        <input type="text" id="constant-preset-title-input" placeholder="Shortcut title e.g. Clean Fryers..." style="padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.85rem;">
-                                        <input type="text" id="constant-preset-amount-input" placeholder="e.g. daily, 3 times..." style="padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.85rem;">
-                                        <select id="constant-preset-icon-select" style="padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.85rem;">
-                                            <option value="📌">📌 Pin</option>
-                                            <option value="🧹">🧹 Clean</option>
-                                            <option value="📦">📦 Stock</option>
-                                            <option value="💵">💵 Cashier</option>
-                                            <option value="👨‍🍳">👨‍🍳 Kitchen</option>
-                                            <option value="🗑️">🗑️ Waste</option>
-                                            <option value="📝">📝 Inventory</option>
-                                            <option value="🧼">🧼 Sanitization</option>
-                                            <option value="🍳">🍳 Cooking</option>
-                                            <option value="🚗">🚗 Delivery</option>
-                                        </select>
+                            </div>
+
+                            <!-- Search, Filter & Quick Stats HUD -->
+                            <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 14px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                                <div style="display: flex; gap: 10px; align-items: center; flex: 1; min-width: 260px;">
+                                    <div style="position: relative; flex: 1;">
+                                        <span style="position: absolute; inset-inline-start: 10px; top: 50%; transform: translateY(-50%); font-size: 0.9rem; color: var(--text-muted);">🔍</span>
+                                        <input type="text" id="resp-search-input" onkeyup="filterConstantResponsibilities()" placeholder="Search responsibilities or worker names..." style="width: 100%; padding: 8px 12px 8px 34px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-size: 0.85rem; box-sizing: border-box;" data-i18n="[placeholder]placeholder-search-responsibilities">
                                     </div>
-                                    <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                                        <button type="button" onclick="toggleConstantTaskPresetForm()" class="btn-neutral" style="padding: 6px 12px; font-size: 0.8rem; border-radius: 6px;">Cancel</button>
-                                        <button type="button" onclick="saveConstantTaskPreset()" class="btn-primary" style="padding: 6px 16px; font-size: 0.8rem; border-radius: 6px; background: #6366f1; border: none; color: white; cursor: pointer; font-weight: 800;">🔒 Save Preset</button>
-                                    </div>
+                                    <select id="resp-filter-status" onchange="filterConstantResponsibilities()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-size: 0.85rem;">
+                                        <option value="all" data-i18n="opt-all-responsibilities">All Responsibilities</option>
+                                        <option value="assigned" data-i18n="opt-assigned-only">👥 Assigned (Active)</option>
+                                        <option value="unassigned" data-i18n="opt-unassigned-only">⚠️ Unassigned</option>
+                                    </select>
                                 </div>
-                                <div id="constant-task-presets-container" style="display: flex; flex-wrap: wrap; gap: 8px;">
-                                    <!-- Rendered dynamically by renderConstantTaskPresets() -->
+                                <div style="display: flex; gap: 12px; align-items: center; font-size: 0.82rem; font-weight: 800;">
+                                    <span style="color: var(--text-muted);"><span id="resp-stat-total-subjects" style="color: #6366f1;">0</span> <span data-i18n="lbl-subjects">Subjects</span></span>
+                                    <span style="color: var(--border-color);">|</span>
+                                    <span style="color: var(--text-muted);"><span id="resp-stat-total-assignments" style="color: #10b981;">0</span> <span data-i18n="lbl-assignments">Active Assignments</span></span>
                                 </div>
                             </div>
 
-                            <!-- Constant Task Assignment Form -->
-                            <form onsubmit="event.preventDefault(); addConstantTask();">
-                                <div class="grid-3-col" style="gap: 12px; margin-bottom: 14px;">
-                                    <div class="form-group" style="margin-bottom:0;">
-                                        <label data-i18n="label-select-worker">Select Employee</label>
-                                        <select id="constant-task-worker-select" onchange="renderConstantTasks()">
-                                            <option value="" data-i18n="opt-choose-emp">-- Choose Employee --</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group" style="margin-bottom:0;">
-                                        <label data-i18n="label-responsibility-title">Responsibility / Task Title</label>
-                                        <input type="text" id="constant-task-title" placeholder="e.g. Clean Dining Tables" data-i18n="[placeholder]placeholder-responsibility-title" required>
-                                    </div>
-                                    <div class="form-group" style="margin-bottom:0;">
-                                        <label data-i18n="label-responsibility-amount">Amount / Frequency / Target</label>
-                                        <input type="text" id="constant-task-amount" placeholder="e.g. 3 times per shift, or 50 items" data-i18n="[placeholder]placeholder-responsibility-amount">
-                                    </div>
-                                </div>
-                                <div style="text-align: right;">
-                                    <button type="submit" class="btn-success" style="padding: 10px 22px; border-radius: 10px; font-weight: 800; font-size: 0.9rem;" data-i18n="btn-assign-constant-task">➕ Assign Constant Task</button>
-                                </div>
-                            </form>
-
-                            <!-- Constant Tasks Assigned List per Worker -->
-                            <div id="constant-tasks-manager-list" style="margin-top: 20px;">
-                                <!-- Rendered dynamically -->
+                            <!-- Responsibilities Grid / Cards List -->
+                            <div id="constant-responsibilities-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 14px;">
+                                <!-- Rendered dynamically in js/tasks.js -->
                             </div>
                         </div>
 
@@ -3989,10 +3961,10 @@
                         <label
                             style="font-weight: 800; font-size: 0.82rem; color: var(--text-main); margin-bottom: 6px; display: block;"
                             data-i18n="label-vault-text">Notes / Description / Details</label>
-                        <textarea id="vault-note-text" rows="3"
+                        <textarea id="vault-note-text" rows="10"
                             placeholder="Write plate numbers, renewal dates, passwords, or detailed text notes here..."
                             data-i18n="[placeholder]placeholder-vault-text"
-                            style="width:100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-weight: 600; font-size: 0.9rem; font-family: inherit; line-height: 1.5;"></textarea>
+                            style="width:100%; min-height: 240px; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-weight: 600; font-size: 0.95rem; font-family: inherit; line-height: 1.6; resize: vertical; box-sizing: border-box;"></textarea>
                     </div>
 
                     <div style="margin-bottom: 18px;">
@@ -6268,6 +6240,161 @@
         </div>
     </div>
 
+    <!-- ======================================================== -->
+    <!-- CONSTANT TASKS & RESPONSIBILITIES SYSTEM MODALS          -->
+    <!-- ======================================================== -->
+
+    <!-- 1. ADD / EDIT RESPONSIBILITY SUBJECT MODAL -->
+    <div id="modal-add-responsibility-subject" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.8); backdrop-filter:blur(6px); justify-content:center; align-items:center; z-index:9999999; padding: 16px;">
+        <div class="modal-content" style="max-width: 520px; width: 100%; border-radius: 20px; padding: 22px; background:var(--card-bg); border: 2px solid #6366f1; box-shadow:0 14px 45px rgba(0,0,0,0.6);">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:12px; margin-bottom:16px;">
+                <h3 id="modal-resp-subject-title" style="margin:0; font-size:1.15rem; font-weight:800; color:#6366f1; display:flex; align-items:center; gap:8px;">
+                    <span>📌</span> <span data-i18n="title-add-resp-subject">Add Responsibility Subject / إضافة موضوع مسؤولية</span>
+                </h3>
+                <button type="button" onclick="closeAddResponsibilitySubjectModal()" style="background:transparent; border:none; font-size:1.3rem; cursor:pointer; color:var(--text-muted);">✖</button>
+            </div>
+
+            <form onsubmit="event.preventDefault(); saveResponsibilitySubject();">
+                <input type="hidden" id="resp-edit-id" value="">
+                
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label style="font-weight:700; font-size:0.85rem;" data-i18n="label-resp-title">Responsibility Title / عنوان موضوع المسؤولية *</label>
+                    <input type="text" id="resp-title-input" placeholder="e.g. Cleaning Tables / مسح وتنظيف الطاولات" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.9rem; box-sizing: border-box;" required>
+                </div>
+
+                <div class="grid-2-col" style="gap: 12px; margin-bottom: 14px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="font-weight:700; font-size:0.85rem;" data-i18n="label-resp-icon">Icon / الرمز التعبيري</label>
+                        <select id="resp-icon-select" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.9rem; box-sizing: border-box;">
+                            <option value="🧹">🧹 Cleaning / تنظيف</option>
+                            <option value="🍽️">🍽️ Serving / تقديم الطعام</option>
+                            <option value="💵">💵 Cashier / كاشير</option>
+                            <option value="👨‍🍳">👨‍🍳 Kitchen Prep / تحضير المطبخ</option>
+                            <option value="📦">📦 Warehouse & Stock / مستودع وبضائع</option>
+                            <option value="🗑️">🗑️ Waste & Trash / تفريغ النفايات</option>
+                            <option value="📝">📝 Inventory Check / جرد المخزون</option>
+                            <option value="🧼">🧼 Sanitization / تعقيم</option>
+                            <option value="🍳">🍳 Cooking / طهي</option>
+                            <option value="🚗">🚗 Delivery / توصيل</option>
+                            <option value="🥤">🥤 Beverages / مشروبات</option>
+                            <option value="⭐">⭐ Priority / مهمة خاصة</option>
+                            <option value="📌">📌 General / عام</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="font-weight:700; font-size:0.85rem;" data-i18n="label-resp-amount">Target / Frequency / التكرار</label>
+                        <input type="text" id="resp-amount-input" placeholder="e.g. Daily / يومي, 3 times/shift" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.9rem; box-sizing: border-box;">
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label style="font-weight:700; font-size:0.85rem;" data-i18n="label-resp-dept">Department / القسم</label>
+                    <select id="resp-dept-select" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.9rem; box-sizing: border-box;">
+                        <option value="general" data-i18n="opt-dept-general">General / عام</option>
+                        <option value="kitchen" data-i18n="opt-dept-kitchen">Kitchen / المطبخ</option>
+                        <option value="hall" data-i18n="opt-dept-hall">Hall & Dining / الصالة والخدمة</option>
+                        <option value="cashier" data-i18n="opt-dept-cashier">Cashier & POS / الكاشير</option>
+                        <option value="warehouse" data-i18n="opt-dept-warehouse">Warehouse / المستودع</option>
+                    </select>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border-color); padding-top:14px;">
+                    <button type="button" onclick="closeAddResponsibilitySubjectModal()" class="btn-neutral" style="padding:9px 16px; border-radius:10px; font-weight:700;" data-i18n="btn-cancel">Cancel</button>
+                    <button type="submit" class="btn-primary" style="padding:9px 22px; border-radius:10px; font-weight:800; background:linear-gradient(135deg, #6366f1, #4f46e5); border:none; color:white; cursor:pointer;" data-i18n="btn-save-resp-subject">💾 Save Subject / حفظ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 2. RESPONSIBILITY INSPECTOR & AUDIT TRANSFER HISTORY MODAL -->
+    <div id="modal-responsibility-info" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); justify-content:center; align-items:center; z-index:9999999; padding: 14px;">
+        <div class="modal-content" style="max-width: 760px; width: 100%; max-height: 94vh; display:flex; flex-direction:column; border-radius: 22px; padding: 22px; background:var(--card-bg); border: 2px solid #6366f1; box-shadow:0 16px 50px rgba(0,0,0,0.6); overflow: hidden;">
+            
+            <!-- Modal Header -->
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:14px; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div id="resp-info-header-icon" style="width:44px; height:44px; border-radius:12px; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); display:flex; align-items:center; justify-content:center; font-size:1.6rem;">📌</div>
+                    <div>
+                        <h3 id="resp-info-header-title" style="margin:0; font-size:1.2rem; font-weight:900; color:var(--text-main);">Responsibility Title</h3>
+                        <div style="display:flex; gap:8px; align-items:center; margin-top:3px;">
+                            <span id="resp-info-header-dept" class="badge" style="background:#3b82f6; color:white; font-size:0.75rem; font-weight:800; padding:2px 8px; border-radius:8px;">General</span>
+                            <span id="resp-info-header-amount" class="badge" style="background:rgba(99,102,241,0.15); color:#818cf8; font-size:0.75rem; font-weight:800; padding:2px 8px; border-radius:8px;">Daily</span>
+                        </div>
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span id="resp-info-header-count" class="badge" style="background:linear-gradient(135deg, #10b981, #059669); color:white; font-weight:900; font-size:0.85rem; padding:6px 14px; border-radius:12px;">👥 0 Assigned Workers</span>
+                    <button type="button" onclick="closeResponsibilityInfoModal()" style="background:rgba(255,255,255,0.08); border:none; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.2rem; cursor:pointer; color:var(--text-muted);">✖</button>
+                </div>
+            </div>
+
+            <!-- Scrollable Body -->
+            <div style="flex:1; overflow-y:auto; padding-inline-end:6px; display:flex; flex-direction:column; gap:18px;">
+                
+                <!-- Quick Assign Worker Strip -->
+                <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 14px; padding: 12px 14px;">
+                    <div style="font-size: 0.82rem; font-weight: 800; color: #6366f1; margin-bottom: 8px; display:flex; align-items:center; gap:6px;">
+                        <span>➕</span> <span>تكليف موظف جديد بهذه المسؤولية / Assign New Worker:</span>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <select id="resp-info-quick-worker-select" style="flex: 2; min-width: 180px; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-size: 0.88rem;">
+                            <option value="">-- Choose Employee / اختر الموظف --</option>
+                        </select>
+                        <input type="text" id="resp-info-quick-amount-input" placeholder="Frequency e.g. Daily" style="flex: 1; min-width: 130px; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-size: 0.88rem;">
+                        <button type="button" onclick="assignWorkerFromInfoModal()" class="btn-success" style="padding: 9px 18px; border-radius: 10px; font-weight: 800; font-size: 0.88rem; background: linear-gradient(135deg, #10b981, #059669); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                            <span>➕</span> <span>تكليف / Assign</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Active Assigned Workers List -->
+                <div>
+                    <h4 style="margin: 0 0 10px 0; font-size: 0.95rem; font-weight: 900; color: var(--text-main); display: flex; align-items: center; justify-content: space-between;">
+                        <span>👥 الموظفون المكلفون حالياً / Active Assigned Workers:</span>
+                        <span id="resp-info-active-badge-num" style="font-size: 0.8rem; color: #10b981; font-weight: 800;">0 Workers</span>
+                    </h4>
+                    <div id="resp-info-workers-list" style="display: flex; flex-direction: column; gap: 10px;">
+                        <!-- Rendered dynamically -->
+                    </div>
+                </div>
+
+                <!-- Transfer / Reassignment Inline Box (Hidden by default, triggered on worker transfer click) -->
+                <div id="resp-inline-transfer-box" style="display: none; background: rgba(99,102,241,0.08); border: 1.5px dashed #6366f1; border-radius: 14px; padding: 14px;">
+                    <div style="font-weight: 800; color: #6366f1; font-size: 0.9rem; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                        <span>🔁 نقل المهمة من (<span id="transfer-from-worker-name-display">-</span>) إلى موظف آخر</span>
+                        <button type="button" onclick="cancelInlineTransfer()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.9rem;">✖ إلغاء</button>
+                    </div>
+                    <input type="hidden" id="transfer-from-worker-id" value="">
+                    <input type="hidden" id="transfer-subject-id" value="">
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <select id="transfer-to-worker-select" style="flex: 2; min-width: 180px; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-size: 0.88rem;">
+                            <option value="">-- Choose Replacement Worker / اختر الموظف البديل --</option>
+                        </select>
+                        <button type="button" onclick="confirmInlineTransfer()" class="btn-primary" style="padding: 9px 20px; border-radius: 10px; font-weight: 800; font-size: 0.88rem; background: linear-gradient(135deg, #6366f1, #4f46e5); border: none; color: white; cursor: pointer;">
+                            🔁 تأكيد النقل والتسجيل
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Chronological Audit Trail & Transfer History Log -->
+                <div style="border-top: 1px solid var(--border-color); padding-top: 14px;">
+                    <h4 style="margin: 0 0 12px 0; font-size: 0.95rem; font-weight: 900; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                        <span>📜</span> <span>سجل النقل والتكليف التاريخي / Transfer & Assignment History Log:</span>
+                    </h4>
+                    <div id="resp-info-history-timeline" style="display: flex; flex-direction: column; padding-inline-start: 4px;">
+                        <!-- Rendered dynamically -->
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Footer Close Bar -->
+            <div style="display:flex; justify-content:flex-end; border-top:1px solid var(--border-color); padding-top:12px; margin-top:12px;">
+                <button type="button" onclick="closeResponsibilityInfoModal()" class="btn-neutral" style="padding:8px 20px; border-radius:10px; font-weight:700;">إغلاق / Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 3.5. IN-APP WAREHOUSE RESTOCK PDF VIEWER & PRINT MODAL -->
     <div id="modal-warehouse-restock-pdf-viewer" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); justify-content:center; align-items:center; z-index:9999999;">
         <div class="modal-content" style="max-width: 960px; width: 95%; max-height: 94vh; display:flex; flex-direction:column; border-radius: 20px; padding: 20px; background:var(--card-bg); border: 2px solid var(--primary, #c5832b); box-shadow:0 12px 50px rgba(0,0,0,0.6);">
@@ -6357,8 +6484,8 @@
 
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=204"></script>
-    <script src="app.js?v=204"></script>
+    <script src="translations.js?v=209"></script>
+    <script src="app.js?v=209"></script>
 </body>
 
 </html>
