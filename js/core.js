@@ -1715,6 +1715,10 @@ function ensureArraysExist(data) {
         if (!w.constantTasks) w.constantTasks = [];
         else if (!Array.isArray(w.constantTasks)) w.constantTasks = Object.values(w.constantTasks);
         w.constantTasks = w.constantTasks.filter(ct => ct && (ct.id || ct.title));
+
+        if (!w.pendingResponsibilities) w.pendingResponsibilities = [];
+        else if (!Array.isArray(w.pendingResponsibilities)) w.pendingResponsibilities = Object.values(w.pendingResponsibilities);
+        w.pendingResponsibilities = w.pendingResponsibilities.filter(pr => pr && (pr.subjectId || pr.id || pr.title));
     });
 
     if (data.generalTasks && !Array.isArray(data.generalTasks)) {
@@ -2733,6 +2737,9 @@ function renderAll() {
     else if (currentTab === 'tasks') {
         if (typeof renderTasks === 'function') renderTasks();
         if (typeof renderConstantTasks === 'function') renderConstantTasks();
+        if (typeof currentConstantTasksViewMode !== 'undefined' && currentConstantTasksViewMode === 'workers' && typeof renderWorkerResponsibilitiesView === 'function') {
+            renderWorkerResponsibilitiesView(typeof currentWorkloadSelectedWorkerId !== 'undefined' ? currentWorkloadSelectedWorkerId : null);
+        }
     }
     else if (currentTab === 'finance') {
         if (typeof renderFinanceTable === 'function') renderFinanceTable();

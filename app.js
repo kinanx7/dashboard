@@ -1715,6 +1715,10 @@ function ensureArraysExist(data) {
         if (!w.constantTasks) w.constantTasks = [];
         else if (!Array.isArray(w.constantTasks)) w.constantTasks = Object.values(w.constantTasks);
         w.constantTasks = w.constantTasks.filter(ct => ct && (ct.id || ct.title));
+
+        if (!w.pendingResponsibilities) w.pendingResponsibilities = [];
+        else if (!Array.isArray(w.pendingResponsibilities)) w.pendingResponsibilities = Object.values(w.pendingResponsibilities);
+        w.pendingResponsibilities = w.pendingResponsibilities.filter(pr => pr && (pr.subjectId || pr.id || pr.title));
     });
 
     if (data.generalTasks && !Array.isArray(data.generalTasks)) {
@@ -2733,6 +2737,9 @@ function renderAll() {
     else if (currentTab === 'tasks') {
         if (typeof renderTasks === 'function') renderTasks();
         if (typeof renderConstantTasks === 'function') renderConstantTasks();
+        if (typeof currentConstantTasksViewMode !== 'undefined' && currentConstantTasksViewMode === 'workers' && typeof renderWorkerResponsibilitiesView === 'function') {
+            renderWorkerResponsibilitiesView(typeof currentWorkloadSelectedWorkerId !== 'undefined' ? currentWorkloadSelectedWorkerId : null);
+        }
     }
     else if (currentTab === 'finance') {
         if (typeof renderFinanceTable === 'function') renderFinanceTable();
@@ -9079,11 +9086,31 @@ function getAllResponsibilitySubjects() {
             if (s.deleted) {
                 delete subjectMap[sid];
             } else {
+                let aWorkers = {};
+                if (s.assignedWorkers) {
+                    if (Array.isArray(s.assignedWorkers)) {
+                        s.assignedWorkers.forEach((w, idx) => {
+                            if (w && (w.workerId || w.id)) {
+                                const wid = String(w.workerId || w.id);
+                                aWorkers[wid] = { ...w, workerId: wid };
+                            }
+                        });
+                    } else if (typeof s.assignedWorkers === 'object') {
+                        Object.keys(s.assignedWorkers).forEach(k => {
+                            const w = s.assignedWorkers[k];
+                            if (w && typeof w === 'object') {
+                                const wid = String(w.workerId || k);
+                                aWorkers[wid] = { ...w, workerId: wid };
+                            }
+                        });
+                    }
+                }
+
                 subjectMap[sid] = {
                     ...(subjectMap[sid] || {}),
                     ...s,
                     id: sid,
-                    assignedWorkers: s.assignedWorkers || {},
+                    assignedWorkers: aWorkers,
                     historyLog: Array.isArray(s.historyLog) ? s.historyLog : Object.values(s.historyLog || {})
                 };
             }
@@ -10117,6 +10144,52 @@ function renderWorkerResponsibilitiesView(optWorkerId) {
         }
     });
 
+    if (selectedWorker.constantTasks) {
+        let cTasks = selectedWorker.constantTasks;
+        if (!Array.isArray(cTasks)) cTasks = Object.values(cTasks);
+        cTasks.forEach(ct => {
+            if (ct && ct.subjectId && !workerAssignments.some(wa => String(wa.subjectId) === String(ct.subjectId))) {
+                const subj = allSubjects.find(s => String(s.id) === String(ct.subjectId));
+                workerAssignments.push({
+                    subjectId: ct.subjectId,
+                    title: ct.title || (subj ? subj.title : ''),
+                    icon: ct.icon || (subj ? subj.icon : '📌'),
+                    dept: ct.dept || (subj ? subj.dept : 'general'),
+                    amount: ct.amount || (subj ? subj.amount : (isAr ? 'يومي' : 'Daily')),
+                    assignedAt: ct.assignedAt || Date.now(),
+                    assignedBy: ct.assignedBy || 'Admin',
+                    confirmedAt: ct.confirmedAt || Date.now(),
+                    viewedAt: ct.viewedAt || Date.now(),
+                    transferredFrom: ct.transferredFrom || '',
+                    status: 'active'
+                });
+            }
+        });
+    }
+
+    if (selectedWorker.pendingResponsibilities) {
+        let pList = selectedWorker.pendingResponsibilities;
+        if (!Array.isArray(pList)) pList = Object.values(pList);
+        pList.forEach(pr => {
+            if (pr && pr.subjectId && !workerAssignments.some(wa => String(wa.subjectId) === String(pr.subjectId))) {
+                const subj = allSubjects.find(s => String(s.id) === String(pr.subjectId));
+                workerAssignments.push({
+                    subjectId: pr.subjectId,
+                    title: pr.title || (subj ? subj.title : ''),
+                    icon: pr.icon || (subj ? subj.icon : '📌'),
+                    dept: pr.dept || (subj ? subj.dept : 'general'),
+                    amount: pr.amount || (subj ? subj.amount : (isAr ? 'يومي' : 'Daily')),
+                    assignedAt: pr.assignedAt || Date.now(),
+                    assignedBy: pr.assignedBy || 'Admin',
+                    confirmedAt: null,
+                    viewedAt: pr.viewedAt || null,
+                    transferredFrom: pr.transferredFrom || '',
+                    status: 'pending_confirmation'
+                });
+            }
+        });
+    }
+
     const activeDuties = workerAssignments.filter(a => a.status === 'active' || a.confirmedAt);
     const pendingDuties = workerAssignments.filter(a => a.status === 'pending_confirmation' && !a.confirmedAt);
 
@@ -10145,7 +10218,10 @@ function renderWorkerResponsibilitiesView(optWorkerId) {
                 <select id="worker-workload-select" onchange="renderWorkerResponsibilitiesView(this.value)" style="flex: 1; padding: 9px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-weight: 800; font-size: 0.9rem;">
                     ${workers.map(w => {
                         let totalAssigned = 0;
-                        allSubjects.forEach(s => { if (s.assignedWorkers && s.assignedWorkers[w.id]) totalAssigned++; });
+                        allSubjects.forEach(s => {
+                            const aMap = s.assignedWorkers || {};
+                            if (aMap[w.id] || Object.values(aMap).find(x => x && String(x.workerId) === String(w.id))) totalAssigned++;
+                        });
                         return `<option value="${w.id}" ${String(w.id) === String(selectedWorker.id) ? 'selected' : ''}>👤 ${w.name} (${totalAssigned} ${isAr ? 'مسؤوليات' : 'tasks'}) - ${w.role || (isAr ? 'موظف' : 'Staff')}</option>`;
                     }).join('')}
                 </select>
@@ -10867,6 +10943,18 @@ function renderConstantTasks() {
     }).join('');
 
     renderWorkerOwnConstantTasksCard();
+
+    // Also instantly refresh Worker Workload view if currently active
+    if (typeof currentConstantTasksViewMode !== 'undefined' && currentConstantTasksViewMode === 'workers' && typeof renderWorkerResponsibilitiesView === 'function') {
+        renderWorkerResponsibilitiesView(typeof currentWorkloadSelectedWorkerId !== 'undefined' ? currentWorkloadSelectedWorkerId : null);
+    }
+    // Also instantly refresh info modal if currently open
+    if (typeof activeViewingRespSubjectId !== 'undefined' && activeViewingRespSubjectId) {
+        const modal = document.getElementById('modal-responsibility-info');
+        if (modal && modal.style.display === 'flex') {
+            openResponsibilityInfoModal(activeViewingRespSubjectId);
+        }
+    }
 }
 window.renderConstantTasks = renderConstantTasks;
 
