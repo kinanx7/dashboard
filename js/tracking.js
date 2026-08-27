@@ -7,7 +7,7 @@ var trackingStreetLayer = null;
 var trackingSatelliteLayer = null;
 var trackingCurrentLayerType = 'satellite'; // default to high-res satellite
 var trackingWorkZoneLayer = null;
-var trackingPlacesLayerGroup = null; // Custom Pinned Places
+var trackingPlacesLayerGroup = null; // Custom Pinned Places & Branches
 var trackingPlacesMarkersMap = {}; // Map of placeId -> L.marker
 var trackingAimMarker = null;
 var trackingAimCircle = null;
@@ -271,7 +271,7 @@ async function searchTrackingMapLocation() {
 window.searchTrackingMapLocation = searchTrackingMapLocation;
 
 // =====================================================================
-// 7. CUSTOM SAVED PLACES & PINS MANAGEMENT (NO RE-SEARCHING NEEDED)
+// 7. CUSTOM SAVED PLACES & PINS MANAGEMENT & EDITING
 // =====================================================================
 
 function toggleAddCustomPlaceMode() {
@@ -321,6 +321,12 @@ function openAddTrackingPlaceModal(optLat, optLng) {
     if (!modal) return;
     cancelAddCustomPlaceMode();
 
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const titleEl = document.getElementById('modal-add-tracking-place-title');
+    if (titleEl) {
+        titleEl.textContent = isAr ? '📍 تثبيت وحفظ موقع دائم' : 'Pin & Save Permanent Place';
+    }
+
     let lat = optLat;
     let lng = optLng;
     if (!lat || !lng) {
@@ -334,6 +340,7 @@ function openAddTrackingPlaceModal(optLat, optLng) {
         }
     }
 
+    document.getElementById('place-pin-id').value = '';
     document.getElementById('place-pin-lat').value = lat;
     document.getElementById('place-pin-lng').value = lng;
     document.getElementById('place-pin-coords-text').textContent = `📍 ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
@@ -347,6 +354,35 @@ function openAddTrackingPlaceModal(optLat, optLng) {
 }
 window.openAddTrackingPlaceModal = openAddTrackingPlaceModal;
 
+function openEditTrackingPlaceModal(placeId) {
+    const modal = document.getElementById('modal-add-tracking-place');
+    if (!modal || !placeId) return;
+
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const places = companyData.trackingPlaces || {};
+    const place = places[placeId];
+    if (!place) return;
+
+    const titleEl = document.getElementById('modal-add-tracking-place-title');
+    if (titleEl) {
+        titleEl.textContent = isAr ? `✏️ تعديل الموقع المثبت (${place.name})` : `✏️ Edit Pinned Place (${place.name})`;
+    }
+
+    document.getElementById('place-pin-id').value = place.id || placeId;
+    document.getElementById('place-pin-lat').value = place.lat;
+    document.getElementById('place-pin-lng').value = place.lng;
+    document.getElementById('place-pin-coords-text').textContent = `📍 ${place.lat.toFixed(6)}, ${place.lng.toFixed(6)}`;
+    document.getElementById('place-pin-name').value = place.name || '';
+    document.getElementById('place-pin-note').value = place.note || '';
+    document.getElementById('place-pin-category').value = place.category || 'branch';
+    document.getElementById('place-pin-icon').value = place.icon || '📍';
+    document.getElementById('place-pin-color').value = place.color || '#10b981';
+
+    modal.style.display = 'flex';
+}
+window.openEditTrackingPlaceModal = openEditTrackingPlaceModal;
+
 function closeAddTrackingPlaceModal() {
     const modal = document.getElementById('modal-add-tracking-place');
     if (modal) modal.style.display = 'none';
@@ -355,6 +391,7 @@ window.closeAddTrackingPlaceModal = closeAddTrackingPlaceModal;
 
 function saveTrackingPlaceModal() {
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const existingId = document.getElementById('place-pin-id').value;
     const name = document.getElementById('place-pin-name').value.trim();
     const lat = parseFloat(document.getElementById('place-pin-lat').value);
     const lng = parseFloat(document.getElementById('place-pin-lng').value);
@@ -368,7 +405,7 @@ function saveTrackingPlaceModal() {
         return;
     }
 
-    const placeId = 'place_' + Date.now();
+    const placeId = existingId || ('place_' + Date.now());
     const placeData = {
         id: placeId,
         name: name,
@@ -378,7 +415,7 @@ function saveTrackingPlaceModal() {
         lat: lat,
         lng: lng,
         note: note,
-        createdAt: Date.now(),
+        updatedAt: Date.now(),
         createdBy: (typeof currentUser !== 'undefined' && currentUser && currentUser.email) ? currentUser.email : 'Admin'
     };
 
@@ -389,7 +426,7 @@ function saveTrackingPlaceModal() {
     db.ref(`companies/${currentCompany}/trackingPlaces/${placeId}`).set(placeData).then(() => {
         closeAddTrackingPlaceModal();
         if (typeof showInAppNotification === 'function') {
-            showInAppNotification(isAr ? `📍 تم حفظ وتثبيت موقع (${name}) بنجاح!` : `📍 Saved place pin (${name}) successfully!`);
+            showInAppNotification(isAr ? `📍 تم حفظ الموقع (${name}) بنجاح!` : `📍 Saved place pin (${name}) successfully!`);
         }
         renderSavedTrackingPlaces();
         jumpToTrackingPlace(placeId);
@@ -420,10 +457,66 @@ function deleteTrackingPlace(placeId) {
 }
 window.deleteTrackingPlace = deleteTrackingPlace;
 
-// Instant Aim & High-Zoom to Saved Place
+// Quick Jump to edit a company workzone directly from the list
+function editCompanyWorkZone(branchName) {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const branch = branchName || 'Main Branch';
+    const zone = getActiveWorkZone(branch);
+
+    let lat = zone ? zone.lat : (currentCompany === 'mvc' ? 26.4207 : (currentCompany === 'mvcfresh' ? 21.4858 : 24.7136));
+    let lng = zone ? zone.lng : (currentCompany === 'mvc' ? 50.0888 : (currentCompany === 'mvcfresh' ? 39.1925 : 46.6753));
+    let radius = zone ? (zone.radiusMeters || 100) : 100;
+
+    isAimingWorkZone = true;
+    if (isAddingCustomPlace) cancelAddCustomPlaceMode();
+
+    const aimPanel = document.getElementById('tracking-aim-panel');
+    const btnAim = document.getElementById('tracking-btn-aim-mode');
+    const mapEl = document.getElementById('tracking-map');
+    const branchSelect = document.getElementById('tracking-aim-branch-select');
+    const radiusInput = document.getElementById('tracking-aim-radius-input');
+
+    if (aimPanel) aimPanel.style.display = 'block';
+    if (btnAim) {
+        btnAim.classList.add('btn-danger');
+        btnAim.classList.remove('btn-primary');
+        btnAim.innerHTML = `<span>❌</span> <span>${isAr ? 'إلغاء وضع التوجيه' : 'Cancel Aiming'}</span>`;
+    }
+    if (branchSelect) branchSelect.value = branch;
+    if (radiusInput) radiusInput.value = radius;
+
+    if (mapEl) {
+        mapEl.style.cursor = 'crosshair';
+        mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    if (trackingMap) {
+        trackingMap.flyTo([lat, lng], 16, { duration: 1.2 });
+    }
+
+    setAimWorkZoneCenter(lat, lng, radius);
+}
+window.editCompanyWorkZone = editCompanyWorkZone;
+
+// Instant Aim & High-Zoom to Saved Place or Company Branch
 function jumpToTrackingPlace(placeId) {
     if (!placeId || !trackingMap) return;
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    
+    // Check if it is a company branch
+    if (String(placeId).startsWith('branch_')) {
+        const branchName = decodeURIComponent(String(placeId).replace('branch_', ''));
+        const zone = getActiveWorkZone(branchName);
+        let lat = zone ? zone.lat : (currentCompany === 'mvc' ? 26.4207 : (currentCompany === 'mvcfresh' ? 21.4858 : 24.7136));
+        let lng = zone ? zone.lng : (currentCompany === 'mvc' ? 50.0888 : (currentCompany === 'mvcfresh' ? 39.1925 : 46.6753));
+        
+        trackingMap.flyTo([lat, lng], 17, { duration: 1.5 });
+        const mapContainer = document.getElementById('tracking-map');
+        if (mapContainer) mapContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+    }
+
     const places = companyData.trackingPlaces || {};
     const place = places[placeId];
     if (!place || !place.lat || !place.lng) return;
@@ -454,37 +547,60 @@ function renderSavedTrackingPlaces() {
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
     const rawPlaces = companyData.trackingPlaces || {};
-    const places = Array.isArray(rawPlaces) ? rawPlaces : Object.values(rawPlaces);
+    const customPlaces = Array.isArray(rawPlaces) ? rawPlaces : Object.values(rawPlaces);
     const activeZone = getActiveWorkZone();
+    const branches = companyData.branches || ['Main Branch'];
 
-    // 1. Update Saved Places Dropdown Selector in toolbar
+    // 1. Build List of Company Branches / Headquarters
+    const branchPlaces = [];
+    branches.forEach(b => {
+        const zone = getActiveWorkZone(b);
+        const bLat = zone ? zone.lat : (currentCompany === 'mvc' ? 26.4207 : (currentCompany === 'mvcfresh' ? 21.4858 : 24.7136));
+        const bLng = zone ? zone.lng : (currentCompany === 'mvc' ? 50.0888 : (currentCompany === 'mvcfresh' ? 39.1925 : 46.6753));
+        const radius = zone ? (zone.radiusMeters || 100) : 100;
+
+        branchPlaces.push({
+            id: 'branch_' + encodeURIComponent(b),
+            name: `${b} (${isAr ? 'مقر ونطاق الفرع' : 'Branch Work Zone'})`,
+            category: 'branch',
+            icon: '🏢',
+            color: '#10b981',
+            lat: bLat,
+            lng: bLng,
+            radius: radius,
+            isBranch: true,
+            branchName: b,
+            note: zone ? (isAr ? `نطاق العمل المعتمد للفرع (قطر ${radius}م)` : `Approved Work Zone (Radius: ${radius}m)`) : (isAr ? 'المقر الرئيسي للشركة' : 'Main Company Branch')
+        });
+    });
+
+    const allPlaces = [...branchPlaces, ...customPlaces.filter(p => p && p.lat && p.lng)];
+
+    // 2. Update Saved Places Dropdown Selector in toolbar
     const sel = document.getElementById('tracking-saved-places-select');
     if (sel) {
-        let opts = `<option value="">📍 ${isAr ? 'المواقع المثبتة والمحفوظة (' + places.length + ')...' : 'Saved Pinned Places (' + places.length + ')...'}</option>`;
-        places.forEach(p => {
+        let opts = `<option value="">📍 ${isAr ? 'المواقع المثبتة والفروع (' + allPlaces.length + ')...' : 'Saved Places & Branches (' + allPlaces.length + ')...'}</option>`;
+        allPlaces.forEach(p => {
             if (!p || !p.name) return;
             opts += `<option value="${p.id}">${p.icon || '📍'} ${p.name}</option>`;
         });
         sel.innerHTML = opts;
     }
 
-    // 2. Render Interactive Saved Places Cards Grid
+    // 3. Render Interactive Saved Places Cards Grid
     const cardsGrid = document.getElementById('tracking-saved-places-cards-grid');
     if (cardsGrid) {
-        if (places.length === 0) {
+        if (allPlaces.length === 0) {
             cardsGrid.innerHTML = `
                 <div style="grid-column: 1 / -1; background: var(--input-bg); border: 1.5px dashed var(--border-color); border-radius: 12px; padding: 20px; text-align: center; color: var(--text-muted);">
                     <div style="font-size: 1.8rem; margin-bottom: 4px;">📌</div>
                     <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-main);">
                         ${isAr ? 'لا توجد مواقع مثبتة بعد' : 'No pinned places saved yet'}
                     </div>
-                    <div style="font-size: 0.8rem; margin-top: 4px;">
-                        ${isAr ? 'انقر على "تثبيت موقع دائم" في الأعلى لإضافة فروعك، المطابخ، ومستودعات التوزيع لتسهيل الوصول إليها.' : 'Click "Pin Place" above to pin and bookmark your branches, prep kitchens, warehouses, or supplier points.'}
-                    </div>
                 </div>
             `;
         } else {
-            cardsGrid.innerHTML = places.map(p => {
+            cardsGrid.innerHTML = allPlaces.map(p => {
                 if (!p || !p.lat || !p.lng) return '';
                 const iconEmoji = p.icon || '📍';
                 const color = p.color || '#10b981';
@@ -492,7 +608,7 @@ function renderSavedTrackingPlaces() {
                 const safeNote = typeof escapeHtml === 'function' ? escapeHtml(p.note || '') : (p.note || '');
 
                 let distText = '';
-                if (activeZone && activeZone.lat && activeZone.lng) {
+                if (!p.isBranch && activeZone && activeZone.lat && activeZone.lng) {
                     const d = calculateDistanceMeters(activeZone.lat, activeZone.lng, p.lat, p.lng);
                     if (d !== null) {
                         distText = isAr ? `📏 ${d}م عن الفرع` : `📏 ${d}m from store`;
@@ -510,7 +626,7 @@ function renderSavedTrackingPlaces() {
                                             ${safeName}
                                         </h4>
                                         <span style="font-size:0.72rem; font-weight:700; color:${color};">
-                                            ${p.category ? p.category.toUpperCase() : 'PLACE'}
+                                            ${p.isBranch ? (isAr ? `🏢 فرع معتمد (نطاق ${p.radius}م)` : `🏢 OFFICIAL BRANCH (${p.radius}m)`) : (p.category ? p.category.toUpperCase() : 'CUSTOM PIN')}
                                         </span>
                                     </div>
                                 </div>
@@ -521,13 +637,22 @@ function renderSavedTrackingPlaces() {
                             </div>
                         </div>
 
-                        <div style="display:flex; gap:6px; margin-top:4px; border-top:1px solid var(--border-color); padding-top:8px;">
-                            <button type="button" onclick="jumpToTrackingPlace('${p.id}')" class="btn-primary" style="flex:1; padding:6px 10px; font-size:0.75rem; font-weight:800; border-radius:6px; display:flex; align-items:center; justify-content:center; gap:4px; background:${color}; border:none;">
+                        <div style="display:flex; gap:6px; margin-top:4px; border-top:1px solid var(--border-color); padding-top:8px; flex-wrap:wrap;">
+                            <button type="button" onclick="jumpToTrackingPlace('${p.id}')" class="btn-primary" style="flex:1; min-width:80px; padding:6px 10px; font-size:0.75rem; font-weight:800; border-radius:6px; display:flex; align-items:center; justify-content:center; gap:4px; background:${color}; border:none;">
                                 <span>🎯</span> <span>${isAr ? 'توجيه وتقريب' : 'Aim & Zoom'}</span>
                             </button>
-                            <button type="button" onclick="deleteTrackingPlace('${p.id}')" style="background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.3); color:#ef4444; border-radius:6px; padding:6px 8px; font-size:0.72rem; font-weight:800; cursor:pointer;" title="${isAr ? 'حذف الموقع' : 'Delete Pin'}">
-                                🗑️
-                            </button>
+                            ${p.isBranch ? `
+                                <button type="button" onclick="editCompanyWorkZone('${p.branchName}')" class="btn-neutral" style="padding:6px 10px; font-size:0.75rem; font-weight:800; border-radius:6px; display:flex; align-items:center; gap:4px;" title="${isAr ? 'تعديل مركز ونطاق العمل' : 'Edit work zone and range'}">
+                                    <span>✏️</span> <span>${isAr ? 'تعديل النطاق' : 'Edit Range'}</span>
+                                </button>
+                            ` : `
+                                <button type="button" onclick="openEditTrackingPlaceModal('${p.id}')" class="btn-neutral" style="padding:6px 8px; font-size:0.75rem; font-weight:800; border-radius:6px; display:flex; align-items:center; gap:2px;" title="${isAr ? 'تعديل الموقع' : 'Edit Pin'}">
+                                    <span>✏️</span>
+                                </button>
+                                <button type="button" onclick="deleteTrackingPlace('${p.id}')" style="background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.3); color:#ef4444; border-radius:6px; padding:6px 8px; font-size:0.72rem; font-weight:800; cursor:pointer;" title="${isAr ? 'حذف الموقع' : 'Delete Pin'}">
+                                    🗑️
+                                </button>
+                            `}
                         </div>
                     </div>
                 `;
@@ -535,8 +660,8 @@ function renderSavedTrackingPlaces() {
         }
     }
 
-    // 3. Render Markers on Leaflet Map
-    places.forEach(p => {
+    // 4. Render Custom Places Markers on Leaflet Map
+    customPlaces.forEach(p => {
         if (!p || !p.lat || !p.lng) return;
         const iconEmoji = p.icon || '📍';
         const color = p.color || '#10b981';
@@ -549,7 +674,7 @@ function renderSavedTrackingPlaces() {
                         <div style="background: ${color}; color: white; padding: 4px 8px; border-radius: 8px; font-weight: 800; font-size: 0.75rem; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 1.5px solid #ffffff; margin-bottom: 2px;">
                             ${iconEmoji} ${typeof escapeHtml === 'function' ? escapeHtml(p.name) : p.name}
                         </div>
-                        <div style="width: 14px; height: 14px; background: ${color}; border: 2.5px solid #ffffff; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>
+                        <div style="width: 14px; height: 14px; background: ${color}; border: 2.5px solid #ffffff; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.4); margin-top: -1px;"></div>
                     </div>
                 `,
                 iconSize: [24, 24],
@@ -568,9 +693,12 @@ function renderSavedTrackingPlaces() {
                 <div style="font-size:0.75rem; color:#64748b; margin-bottom:8px;">
                     📍 ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #e2e8f0; padding-top:6px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #e2e8f0; padding-top:6px; gap:4px;">
                     <button type="button" onclick="jumpToTrackingPlace('${p.id}')" style="background:#10b981; color:white; border:none; border-radius:6px; padding:4px 8px; font-size:0.72rem; font-weight:800; cursor:pointer;">
                         🎯 ${isAr ? 'تقريب' : 'Zoom'}
+                    </button>
+                    <button type="button" onclick="openEditTrackingPlaceModal('${p.id}')" style="background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.3); color:#4f46e5; border-radius:6px; padding:4px 8px; font-size:0.72rem; font-weight:800; cursor:pointer;">
+                        ✏️ ${isAr ? 'تعديل' : 'Edit'}
                     </button>
                     <button type="button" onclick="deleteTrackingPlace('${p.id}')" style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); color:#ef4444; border-radius:6px; padding:4px 8px; font-size:0.72rem; font-weight:800; cursor:pointer;">
                         🗑️ ${isAr ? 'حذف' : 'Delete'}
@@ -583,12 +711,10 @@ function renderSavedTrackingPlaces() {
 window.renderSavedTrackingPlaces = renderSavedTrackingPlaces;
 
 // =====================================================================
-// 8. ULTRA HIGH-PRECISION WORKER GPS BROADCASTER & SYNC ENGINE
+// 8. 100% FORCED SILENT GPS BROADCASTER & LOCATION SYNC ENGINE
 // =====================================================================
 
 function startWorkerLocationBroadcaster() {
-    console.log("[GPS] Initializing ultra high-precision silent GPS broadcaster...");
-
     // 1. Check Android Native Bridge first if available
     const androidBridge = window.AndroidInterface || window.Android || window.AndroidShare;
     if (androidBridge) {
@@ -611,7 +737,7 @@ function startWorkerLocationBroadcaster() {
     if (navigator.geolocation) {
         const highAccuracyOptions = {
             enableHighAccuracy: true,
-            maximumAge: 0, // Force fresh calculation from GPS satellite constellation
+            maximumAge: 0, // Force raw fresh satellite fix
             timeout: 10000
         };
 
@@ -619,7 +745,7 @@ function startWorkerLocationBroadcaster() {
         try {
             navigator.geolocation.getCurrentPosition(
                 pos => handleGpsPositionUpdate(pos, true),
-                err => handleGpsError(err),
+                err => console.warn("[GPS] Initial fix error:", err.message),
                 highAccuracyOptions
             );
         } catch (e) { }
@@ -629,7 +755,7 @@ function startWorkerLocationBroadcaster() {
             try {
                 workerGpsWatcherId = navigator.geolocation.watchPosition(
                     handleGpsPositionUpdate,
-                    handleGpsError,
+                    err => console.warn("[GPS] Watcher error:", err.message),
                     highAccuracyOptions
                 );
             } catch (e) { }
@@ -650,7 +776,7 @@ function broadcastWorkerGpsHeartbeat(force) {
     try {
         navigator.geolocation.getCurrentPosition(
             pos => handleGpsPositionUpdate(pos, force || false),
-            err => handleGpsError(err),
+            err => {},
             { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
         );
     } catch (e) { }
@@ -671,36 +797,8 @@ if (typeof window !== 'undefined') {
     }
 }
 
-function requestWorkerGpsBroadcast() {
-    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
-    if (!navigator.geolocation) {
-        alert(isAr ? '⚠️ جهازك لا يدعم خاصية تحديد الموقع الجغرافي GPS.' : '⚠️ Geolocation is not supported on this device.');
-        return;
-    }
-
-    updateGpsStatusBadge('acquiring', isAr ? '📡 جاري جلب إحداثيات GPS الدقيقة...' : '📡 Acquiring high-precision GPS...');
-
-    navigator.geolocation.getCurrentPosition(
-        pos => {
-            handleGpsPositionUpdate(pos, true);
-            alert(isAr ? `✅ تم تحديد وبث موقعك بدقة (±${Math.round(pos.coords.accuracy || 0)} متر)!` : `✅ Live high-accuracy GPS broadcasted (±${Math.round(pos.coords.accuracy || 0)}m)!`);
-        },
-        err => {
-            handleGpsError(err);
-            if (err.code === 1) { // PERMISSION_DENIED
-                alert(isAr ? '⚠️ تم رفض إذن الوصول للموقع. يرجى تفعيل إذن الموقع GPS في إعدادات التطبيق أو المتصفح.' : '⚠️ GPS permission denied. Please allow location access in your device settings.');
-            } else {
-                alert(isAr ? '⚠️ تعذر جلب الموقع. يرجى التأكد من تشغيل الـ GPS في الهاتف.' : '⚠️ Unable to fetch location. Please ensure device GPS is turned on.');
-            }
-        },
-        { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
-    );
-}
-window.requestWorkerGpsBroadcast = requestWorkerGpsBroadcast;
-
 function handleGpsPositionUpdate(position, forceWrite) {
     if (!position || !position.coords) return;
-    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     const { latitude, longitude, accuracy, speed, heading, altitude } = position.coords;
     const now = Date.now();
 
@@ -715,28 +813,31 @@ function handleGpsPositionUpdate(position, forceWrite) {
     lastBroadcastCoords = { lat: latitude, lng: longitude };
     lastGpsBroadcastTime = now;
 
-    updateGpsStatusBadge('active', `${isAr ? '🟢 GPS نشط' : '🟢 GPS Active'} (±${Math.round(accuracy)}m)`);
-
-    // Determine target worker identity
+    // Resolve target worker identity using ALL available stores
     const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
     const workers = companyData.workers || [];
     let myWorker = null;
 
     if (typeof currentUser !== 'undefined' && currentUser) {
-        if (currentUser.email) {
-            myWorker = workers.find(w => w && w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+        const email = currentUser.email ? currentUser.email.toLowerCase() : '';
+        const name = currentUser.name ? String(currentUser.name).trim().toLowerCase() : '';
+
+        if (email) {
+            myWorker = workers.find(w => w && w.email && w.email.toLowerCase() === email);
         }
-        if (!myWorker && currentUser.name) {
-            myWorker = workers.find(w => w && w.name && String(w.name).trim().toLowerCase() === String(currentUser.name).trim().toLowerCase());
+        if (!myWorker && name) {
+            myWorker = workers.find(w => w && w.name && String(w.name).trim().toLowerCase() === name);
         }
     }
 
     const workerId = myWorker ? String(myWorker.id) : (currentUser ? (currentUser.workerId || currentUser.uid || 'current_user') : 'user');
-    const workerName = myWorker ? myWorker.name : (currentUser ? (currentUser.displayName || currentUser.email || 'Worker') : 'Worker');
+    const workerName = myWorker ? myWorker.name : (currentUser ? (currentUser.displayName || currentUser.name || currentUser.email || 'Worker') : 'Worker');
+    const workerEmail = myWorker ? (myWorker.email || '') : (currentUser ? (currentUser.email || '') : '');
 
     const liveLocData = {
         workerId: workerId,
         name: workerName,
+        email: workerEmail,
         role: myWorker ? (myWorker.role || 'Staff') : 'Staff',
         branch: myWorker ? (myWorker.branch || 'Main Branch') : 'Main Branch',
         lat: latitude,
@@ -749,11 +850,25 @@ function handleGpsPositionUpdate(position, forceWrite) {
     };
 
     if (typeof db !== 'undefined' && db) {
-        // Broadcast to all 3 companies so manager can see worker regardless of selected company
         const allCompanies = ['burgeroov', 'mvc', 'mvcfresh'];
+        
         allCompanies.forEach(cKey => {
+            // 1. Primary write by worker ID
             db.ref(`companies/${cKey}/liveLocations/${workerId}`).set(liveLocData)
                 .catch(e => console.warn(`[GPS] LiveLocation write error for ${cKey}:`, e));
+
+            // 2. Also write by sanitized email if available for foolproof lookups
+            if (workerEmail) {
+                const sEmail = workerEmail.toLowerCase().replace(/\./g, '_');
+                if (sEmail !== workerId) {
+                    db.ref(`companies/${cKey}/liveLocations/${sEmail}`).set(liveLocData).catch(() => {});
+                }
+            }
+
+            // 3. Also write by Firebase UID if available
+            if (currentUser && currentUser.uid && currentUser.uid !== workerId) {
+                db.ref(`companies/${cKey}/liveLocations/${currentUser.uid}`).set(liveLocData).catch(() => {});
+            }
         });
 
         // Also update worker object node if found in current company
@@ -770,37 +885,6 @@ function handleGpsPositionUpdate(position, forceWrite) {
         }
     }
 }
-
-function handleGpsError(err) {
-    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
-    console.warn("[GPS] Geolocation status:", err.code, err.message);
-    if (err.code === 1) { // PERMISSION_DENIED
-        updateGpsStatusBadge('denied', isAr ? '🔴 إذن الـ GPS معطل' : '🔴 GPS Permission Denied');
-    } else {
-        updateGpsStatusBadge('error', isAr ? '⚠️ بانتظار إشارة GPS' : '⚠️ No GPS Signal');
-    }
-}
-
-function updateGpsStatusBadge(status, text) {
-    const chips = document.querySelectorAll('.worker-gps-status-badge');
-    chips.forEach(c => {
-        c.textContent = text;
-        if (status === 'active') {
-            c.style.background = 'rgba(16,185,129,0.15)';
-            c.style.color = '#10b981';
-            c.style.border = '1px solid rgba(16,185,129,0.3)';
-        } else if (status === 'denied') {
-            c.style.background = 'rgba(239,68,68,0.15)';
-            c.style.color = '#ef4444';
-            c.style.border = '1px solid rgba(239,68,68,0.3)';
-        } else {
-            c.style.background = 'rgba(245,158,11,0.15)';
-            c.style.color = '#f59e0b';
-            c.style.border = '1px solid rgba(245,158,11,0.3)';
-        }
-    });
-}
-window.updateGpsStatusBadge = updateGpsStatusBadge;
 
 // Start broadcaster immediately when script loads
 if (typeof navigator !== 'undefined' && navigator.geolocation) {
@@ -963,6 +1047,7 @@ function saveWorkZone() {
         }
         cancelAimWorkZone();
         renderMapWorkZones();
+        renderSavedTrackingPlaces();
         renderTrackingSection();
     }).catch(err => {
         console.error("Error saving work zone:", err);
@@ -1013,9 +1098,9 @@ function renderMapWorkZones() {
         const marker = L.marker([z.lat, z.lng], {
             icon: L.divIcon({
                 className: 'custom-store-pin',
-                html: `<div style="width:34px; height:34px; border-radius:50%; background: linear-gradient(135deg, #10b981, #059669); border: 2.5px solid #ffffff; box-shadow: 0 3px 10px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">🏢</div>`,
-                iconSize: [34, 34],
-                iconAnchor: [17, 17]
+                html: `<div style="width:36px; height:36px; border-radius:50%; background: linear-gradient(135deg, #10b981, #059669); border: 2.5px solid #ffffff; box-shadow: 0 3px 10px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">🏢</div>`,
+                iconSize: [36, 36],
+                iconAnchor: [18, 18]
             })
         }).addTo(trackingWorkZoneLayer);
 
@@ -1077,14 +1162,23 @@ function checkWorkerGeofence(worker, optZone) {
     let speed = null;
     let lastPing = null;
 
-    // 1. Check liveLocations map
+    // 1. Check liveLocations map using ALL possible keys (ID, string ID, email, sanitized email, name)
     const liveLocs = companyData.liveLocations || {};
-    let loc = liveLocs[worker.id] || liveLocs[String(worker.id)];
-    if (!loc && worker.name) {
-        loc = Object.values(liveLocs).find(l => l && l.name && String(l.name).trim().toLowerCase() === String(worker.name).trim().toLowerCase());
+    let loc = null;
+
+    if (worker.id !== undefined && worker.id !== null) {
+        loc = liveLocs[worker.id] || liveLocs[String(worker.id)];
     }
     if (!loc && worker.email) {
-        loc = Object.values(liveLocs).find(l => l && l.email && String(l.email).trim().toLowerCase() === String(worker.email).trim().toLowerCase());
+        const em = worker.email.toLowerCase();
+        loc = liveLocs[em] || liveLocs[em.replace(/\./g, '_')] || liveLocs[em.replace(/\./g, ',')];
+    }
+    if (!loc && worker.name) {
+        const nm = String(worker.name).trim().toLowerCase();
+        loc = Object.values(liveLocs).find(l => l && l.name && String(l.name).trim().toLowerCase() === nm);
+    }
+    if (!loc && worker.uid) {
+        loc = liveLocs[worker.uid];
     }
 
     if (loc && loc.lat && loc.lng) {
@@ -1094,11 +1188,11 @@ function checkWorkerGeofence(worker, optZone) {
         speed = loc.speed;
         lastPing = loc.timestamp;
     } else {
-        // 2. Fallback to worker object fields
-        wLat = worker.liveLat || (worker.lastLocation && worker.lastLocation.lat) || (worker.location && worker.location.lat);
-        wLng = worker.liveLng || (worker.lastLocation && worker.lastLocation.lng) || (worker.location && worker.location.lng);
-        lastPing = worker.lastGpsTimestamp || (worker.lastLocation && worker.lastLocation.timestamp);
-        accuracy = worker.gpsAccuracy;
+        // 2. Fallback to direct worker object fields
+        wLat = worker.liveLat || (worker.lastLocation && worker.lastLocation.lat) || (worker.location && worker.location.lat) || worker.lat;
+        wLng = worker.liveLng || (worker.lastLocation && worker.lastLocation.lng) || (worker.location && worker.location.lng) || worker.lng;
+        lastPing = worker.lastGpsTimestamp || (worker.lastLocation && worker.lastLocation.timestamp) || worker.timestamp;
+        accuracy = worker.gpsAccuracy || worker.accuracy;
     }
 
     if (!wLat || !wLng || isNaN(wLat) || isNaN(wLng)) {
@@ -1157,7 +1251,7 @@ function toggleWorkerExitPermission(workerId) {
 }
 window.toggleWorkerExitPermission = toggleWorkerExitPermission;
 
-// 12. Render Worker Pins on Map with Accuracy Auras
+// 12. Render Worker Pins on Map with Name Badges (Unified with liveLocations Stream)
 function renderMapWorkerPins() {
     if (!trackingMap || !trackingWorkersLayerGroup) return;
     trackingWorkersLayerGroup.clearLayers();
@@ -1166,11 +1260,12 @@ function renderMapWorkerPins() {
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
     const workers = companyData.workers || [];
+    const liveLocs = companyData.liveLocations || {};
 
-    workers.forEach(w => {
-        const geo = checkWorkerGeofence(w);
-        if (!geo.hasGPS || !geo.workerLat || !geo.workerLng) return;
+    const renderedWorkerKeys = new Set();
 
+    // Helper to render a pin
+    function drawWorkerPin(w, geo) {
         const isDriver = (w.role && w.role.toLowerCase().includes('driver')) || (w.isDriver);
         const hasPermission = w.hasExitPermission;
         const isInside = geo.inside;
@@ -1189,28 +1284,31 @@ function renderMapWorkerPins() {
             pinIcon = '🚗';
         }
 
-        // Draw glowing accuracy circle aura (shows meter-level confidence)
-        if (geo.accuracy) {
-            L.circle([geo.workerLat, geo.workerLng], {
-                radius: Math.max(geo.accuracy, 5),
-                color: pinColor,
-                fillColor: pinColor,
-                fillOpacity: 0.14,
-                weight: 1.5,
-                dashArray: '4, 4'
-            }).addTo(trackingWorkersLayerGroup);
-        }
+        const safeFullName = typeof escapeHtml === 'function' ? escapeHtml(w.name || 'Worker') : (w.name || 'Worker');
+        const firstName = String(w.name || 'Worker').trim().split(' ')[0];
+        const safeFirstName = typeof escapeHtml === 'function' ? escapeHtml(firstName) : firstName;
 
+        // Clean Circular Name Badge Marker (NO red outer circle)
         const marker = L.marker([geo.workerLat, geo.workerLng], {
             icon: L.divIcon({
-                className: 'custom-worker-live-pin',
-                html: `<div style="width:36px; height:36px; border-radius:50%; background: ${pinColor}; border: 2.5px solid #ffffff; box-shadow: 0 4px 14px rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; font-size:1.15rem; color:white; animation: pulse 2s infinite;">${pinIcon}</div>`,
-                iconSize: [36, 36],
-                iconAnchor: [18, 18]
+                className: 'custom-worker-name-pin',
+                html: `
+                    <div style="display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%); filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));">
+                        <div style="background: ${pinColor}; color: #ffffff; padding: 4px 10px; border-radius: 18px; font-weight: 900; font-size: 0.82rem; white-space: nowrap; border: 2px solid #ffffff; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 8px rgba(0,0,0,0.35);">
+                            <span style="font-size: 0.95rem;">${isDriver ? '🛵' : '👤'}</span>
+                            <span>${safeFirstName}</span>
+                        </div>
+                        <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 7px solid ${pinColor}; margin-top: -1px;"></div>
+                        <div style="width: 8px; height: 8px; background: ${pinColor}; border: 1.5px solid #ffffff; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.4); margin-top: 1px;"></div>
+                    </div>
+                `,
+                iconSize: [30, 30],
+                iconAnchor: [15, 30]
             })
         }).addTo(trackingWorkersLayerGroup);
 
-        trackingWorkerMarkersMap[w.id] = marker;
+        const markerKey = w.id || w.workerId || safeFullName;
+        trackingWorkerMarkersMap[markerKey] = marker;
 
         const distText = geo.distance !== null ? `${geo.distance}m` : '-';
         const speedText = geo.speed ? `${(geo.speed * 3.6).toFixed(1)} km/h` : '0 km/h';
@@ -1218,7 +1316,7 @@ function renderMapWorkerPins() {
         marker.bindPopup(`
             <div style="font-family:'Inter', sans-serif; padding:6px; min-width:190px; color:#0f172a;">
                 <div style="font-weight:900; font-size:0.98rem; display:flex; align-items:center; gap:6px;">
-                    <span>👤</span> <span>${typeof escapeHtml === 'function' ? escapeHtml(w.name) : w.name}</span>
+                    <span>👤</span> <span>${safeFullName}</span>
                 </div>
                 <div style="font-size:0.8rem; color:#475569; margin-top:4px;">
                     💼 ${w.role || 'Staff'} • 🏢 ${w.branch || 'Main Branch'}
@@ -1237,6 +1335,44 @@ function renderMapWorkerPins() {
                 </div>
             </div>
         `);
+    }
+
+    // 1. Process all workers from registered workers list
+    workers.forEach(w => {
+        const geo = checkWorkerGeofence(w);
+        if (geo.hasGPS && geo.workerLat && geo.workerLng) {
+            drawWorkerPin(w, geo);
+            if (w.id) renderedWorkerKeys.add(String(w.id));
+            if (w.email) renderedWorkerKeys.add(w.email.toLowerCase());
+            if (w.name) renderedWorkerKeys.add(String(w.name).trim().toLowerCase());
+        }
+    });
+
+    // 2. Process any remaining live broadcasts from liveLocations stream (e.g. active APK sessions)
+    Object.keys(liveLocs).forEach(key => {
+        const loc = liveLocs[key];
+        if (!loc || !loc.lat || !loc.lng) return;
+
+        const locName = loc.name ? String(loc.name).trim().toLowerCase() : '';
+        const locEmail = loc.email ? String(loc.email).trim().toLowerCase() : '';
+
+        if (renderedWorkerKeys.has(String(key)) || (locName && renderedWorkerKeys.has(locName)) || (locEmail && renderedWorkerKeys.has(locEmail))) {
+            return; // already rendered
+        }
+
+        const fallbackWorker = {
+            id: loc.workerId || key,
+            name: loc.name || 'Worker',
+            role: loc.role || 'Staff',
+            branch: loc.branch || 'Main Branch',
+            email: loc.email || ''
+        };
+
+        const geo = checkWorkerGeofence(fallbackWorker);
+        if (geo.hasGPS && geo.workerLat && geo.workerLng) {
+            drawWorkerPin(fallbackWorker, geo);
+            renderedWorkerKeys.add(String(key));
+        }
     });
 }
 window.renderMapWorkerPins = renderMapWorkerPins;
@@ -1246,7 +1382,12 @@ function locateWorkerOnMap(workerId) {
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
     const workers = companyData.workers || [];
-    const worker = workers.find(w => String(w.id) === String(workerId));
+    const liveLocs = companyData.liveLocations || {};
+
+    let worker = workers.find(w => String(w.id) === String(workerId) || String(w.email).toLowerCase() === String(workerId).toLowerCase());
+    if (!worker && liveLocs[workerId]) {
+        worker = liveLocs[workerId];
+    }
 
     if (!worker || !trackingMap) return;
     const geo = checkWorkerGeofence(worker);
@@ -1257,7 +1398,7 @@ function locateWorkerOnMap(workerId) {
         if (mapContainer) mapContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
         setTimeout(() => {
-            const marker = trackingWorkerMarkersMap[workerId];
+            const marker = trackingWorkerMarkersMap[workerId] || trackingWorkerMarkersMap[worker.name];
             if (marker) marker.openPopup();
         }, 1200);
     } else {
@@ -1266,7 +1407,7 @@ function locateWorkerOnMap(workerId) {
         if (zone) {
             trackingMap.flyTo([zone.lat, zone.lng], 16, { duration: 1.5 });
         }
-        alert(isAr ? `📍 لم يتم استلام إحداثيات GPS حديثة من جهاز (${worker.name}) بعد.` : `📍 No recent GPS ping received from (${worker.name}) yet.`);
+        alert(isAr ? `📍 لم يتم استلام إحداثيات GPS حديثة من جهاز (${worker.name || workerId}) بعد.` : `📍 No recent GPS ping received from (${worker.name || workerId}) yet.`);
     }
 }
 window.locateWorkerOnMap = locateWorkerOnMap;

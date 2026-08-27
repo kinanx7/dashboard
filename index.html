@@ -739,27 +739,6 @@
 
                 <!-- Main Content: Daily Ops -->
                 <div>
-                    <!-- Worker Live GPS Broadcaster Banner -->
-                    <div id="worker-gps-broadcast-banner" class="card" style="margin-bottom: 20px; border-top: 4px solid #10b981; background: var(--card-bg); padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <span style="font-size: 1.6rem;">📡</span>
-                            <div>
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: var(--text-main);" data-i18n="title-worker-gps-radar">Live GPS Broadcasting / بث الموقع المباشر</h4>
-                                    <span class="badge worker-gps-status-badge" style="background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); font-size: 0.75rem; font-weight: 800; padding: 3px 8px; border-radius: 6px;">
-                                        ⏳ GPS Standby
-                                    </span>
-                                </div>
-                                <p style="margin: 2px 0 0 0; font-size: 0.8rem; color: var(--text-muted);" data-i18n="desc-worker-gps-radar">
-                                    Broadcast your live location to verify on-duty presence and work zone range.
-                                </p>
-                            </div>
-                        </div>
-                        <button type="button" onclick="requestWorkerGpsBroadcast()" class="btn-primary" style="padding: 8px 16px; border-radius: 10px; font-weight: 800; font-size: 0.85rem; background: linear-gradient(135deg, #10b981, #059669); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(16,185,129,0.25);" data-i18n="btn-broadcast-my-gps">
-                            <span>📡</span> <span>تفعيل / تحديث بث موقعي</span>
-                        </button>
-                    </div>
-
                     <!-- Worker Pending Responsibilities Confirmation Banner -->
                     <div id="worker-ops-pending-responsibilities-card" class="card" style="display: none; margin-bottom: 24px; border-top: 4px solid #6366f1; background: var(--card-bg);">
                         <!-- Dynamically rendered by renderWorkerOperationsResponsibilitiesBanner() -->
@@ -6743,17 +6722,18 @@
         </div>
     </div>
 
-    <!-- MODAL: ADD CUSTOM PINNED PLACE ON TRACKING MAP -->
+    <!-- MODAL: ADD / EDIT CUSTOM PINNED PLACE ON TRACKING MAP -->
     <div id="modal-add-tracking-place" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.8); backdrop-filter:blur(6px); justify-content:center; align-items:center; z-index:9999999; padding: 16px;">
         <div class="modal-content" style="max-width: 520px; width: 100%; border-radius: 20px; padding: 24px; background:var(--card-bg); border: 2px solid #10b981; box-shadow:0 14px 45px rgba(0,0,0,0.6);">
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:12px; margin-bottom:16px;">
                 <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:#10b981; display:flex; align-items:center; gap:8px;">
-                    <span>📍</span> <span data-i18n="title-add-place-modal">Pin & Save Permanent Place / تثبيت موقع دائم</span>
+                    <span>📍</span> <span id="modal-add-tracking-place-title" data-i18n="title-add-place-modal">Pin & Save Permanent Place / تثبيت موقع دائم</span>
                 </h3>
                 <button type="button" onclick="closeAddTrackingPlaceModal()" style="background:transparent; border:none; font-size:1.3rem; cursor:pointer; color:var(--text-muted);">✖</button>
             </div>
 
             <form onsubmit="event.preventDefault(); saveTrackingPlaceModal();">
+                <input type="hidden" id="place-pin-id" value="" />
                 <input type="hidden" id="place-pin-lat" value="" />
                 <input type="hidden" id="place-pin-lng" value="" />
 
@@ -6815,8 +6795,8 @@
 
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=220"></script>
-    <script src="app.js?v=220"></script>
+    <script src="translations.js?v=222"></script>
+    <script src="app.js?v=222"></script>
 </body>
 
 </html>
