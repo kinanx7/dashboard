@@ -29917,6 +29917,7 @@ var workerGpsWatcherId = null;
 var workerGpsHeartbeatTimer = null;
 var lastGpsBroadcastTime = 0;
 var lastBroadcastCoords = null;
+var globalLiveLocationsCache = {}; // Global multi-company live cache
 
 // Saudi Arabia Major Cities Coordinates for Quick Jump
 const SAUDI_CITIES = {
@@ -29947,7 +29948,6 @@ function initTrackingMap() {
     }
 
     // Default center: Current branch work zone or company default city
-    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
     const defaultZone = getActiveWorkZone();
     
     let initialLat = 24.7136;
@@ -30060,20 +30060,46 @@ function zoomToActiveCompanyWorkZone() {
 }
 window.zoomToActiveCompanyWorkZone = zoomToActiveCompanyWorkZone;
 
-// 3. Real-Time Cloud Listener for Worker Live Locations
+// 3. Real-Time Multi-Company Cloud Listener for Worker Live Locations
 function initGlobalLiveLocationListener() {
-    if (typeof db === 'undefined' || !db || typeof currentCompany === 'undefined' || !currentCompany) return;
+    if (typeof db === 'undefined' || !db) return;
 
-    if (window._currentLiveLocationRef) {
-        window._currentLiveLocationRef.off();
-    }
+    const allCompanies = ['burgeroov', 'mvc', 'mvcfresh'];
 
-    window._currentLiveLocationRef = db.ref(`companies/${currentCompany}/liveLocations`);
-    window._currentLiveLocationRef.on('value', snapshot => {
+    allCompanies.forEach(cKey => {
+        db.ref(`companies/${cKey}/liveLocations`).on('value', snapshot => {
+            const data = snapshot.val() || {};
+            Object.keys(data).forEach(k => {
+                if (data[k] && data[k].lat && data[k].lng) {
+                    globalLiveLocationsCache[k] = data[k];
+                }
+            });
+
+            const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+            if (!companyData.liveLocations) companyData.liveLocations = {};
+            Object.assign(companyData.liveLocations, globalLiveLocationsCache);
+
+            // Re-render pins if tracking tab is active
+            const trackingView = document.getElementById('view-tracking');
+            if (trackingView && trackingView.classList.contains('active-view')) {
+                renderMapWorkerPins();
+                renderTrackingSection();
+            }
+        });
+    });
+
+    // Also listen to global node
+    db.ref('globalLiveLocations').on('value', snapshot => {
+        const data = snapshot.val() || {};
+        Object.keys(data).forEach(k => {
+            if (data[k] && data[k].lat && data[k].lng) {
+                globalLiveLocationsCache[k] = data[k];
+            }
+        });
         const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
-        companyData.liveLocations = snapshot.val() || {};
-        
-        // Re-render pins & stats if tracking tab is visible
+        if (!companyData.liveLocations) companyData.liveLocations = {};
+        Object.assign(companyData.liveLocations, globalLiveLocationsCache);
+
         const trackingView = document.getElementById('view-tracking');
         if (trackingView && trackingView.classList.contains('active-view')) {
             renderMapWorkerPins();
@@ -30555,7 +30581,7 @@ function renderSavedTrackingPlaces() {
         }
     }
 
-    // 4. Render Custom Places Markers on Leaflet Map
+    // 4. Render Custom Places Markers on Leaflet Map with ZERO-DRIFT Anchor
     customPlaces.forEach(p => {
         if (!p || !p.lat || !p.lng) return;
         const iconEmoji = p.icon || '📍';
@@ -30563,17 +30589,18 @@ function renderSavedTrackingPlaces() {
 
         const marker = L.marker([p.lat, p.lng], {
             icon: L.divIcon({
-                className: 'custom-saved-place-pin',
+                className: 'custom-saved-place-pin-anchor',
                 html: `
-                    <div style="display:flex; flex-direction:column; align-items:center; transform: translate(-50%, -100%);">
-                        <div style="background: ${color}; color: white; padding: 4px 8px; border-radius: 8px; font-weight: 800; font-size: 0.75rem; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.3); border: 1.5px solid #ffffff; margin-bottom: 2px;">
+                    <div style="position: absolute; left: 0; bottom: 0; transform: translate(-50%, 0); display: flex; flex-direction: column; align-items: center; pointer-events: auto; white-space: nowrap; user-select: none;">
+                        <div style="background: ${color}; color: white; padding: 4px 9px; border-radius: 8px; font-weight: 800; font-size: 0.78rem; border: 1.5px solid #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.4); margin-bottom: 2px;">
                             ${iconEmoji} ${typeof escapeHtml === 'function' ? escapeHtml(p.name) : p.name}
                         </div>
-                        <div style="width: 14px; height: 14px; background: ${color}; border: 2.5px solid #ffffff; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.4); margin-top: -1px;"></div>
+                        <div style="width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid ${color}; margin-top: -3px;"></div>
+                        <div style="width: 8px; height: 8px; background: ${color}; border: 2px solid #ffffff; border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.4); margin-top: -1px;"></div>
                     </div>
                 `,
-                iconSize: [24, 24],
-                iconAnchor: [12, 24]
+                iconSize: [0, 0],
+                iconAnchor: [0, 0]
             })
         }).addTo(trackingPlacesLayerGroup);
 
@@ -30606,7 +30633,7 @@ function renderSavedTrackingPlaces() {
 window.renderSavedTrackingPlaces = renderSavedTrackingPlaces;
 
 // =====================================================================
-// 8. 100% FORCED SILENT GPS BROADCASTER & LOCATION SYNC ENGINE
+// 8. 100% FORCED SILENT GPS BROADCASTER (WITH DUAL-ACCURACY FALLBACK)
 // =====================================================================
 
 function startWorkerLocationBroadcaster() {
@@ -30618,8 +30645,15 @@ function startWorkerLocationBroadcaster() {
                 const locStr = androidBridge.getGPSLocation();
                 if (locStr) {
                     const parsed = JSON.parse(locStr);
-                    if (parsed && parsed.latitude && parsed.longitude) {
-                        handleGpsPositionUpdate({ coords: parsed });
+                    if (parsed && (parsed.latitude || parsed.lat) && (parsed.longitude || parsed.lng)) {
+                        handleGpsPositionUpdate({
+                            coords: {
+                                latitude: parsed.latitude || parsed.lat,
+                                longitude: parsed.longitude || parsed.lng,
+                                accuracy: parsed.accuracy || 10,
+                                speed: parsed.speed || 0
+                            }
+                        }, true);
                     }
                 }
             }
@@ -30628,39 +30662,50 @@ function startWorkerLocationBroadcaster() {
         }
     }
 
-    // 2. Standard HTML5 Geolocation with MAXIMAL High-Accuracy Options
+    // 2. Standard HTML5 Geolocation with Dual Accuracy Fallback
     if (navigator.geolocation) {
-        const highAccuracyOptions = {
-            enableHighAccuracy: true,
-            maximumAge: 0, // Force raw fresh satellite fix
-            timeout: 10000
-        };
-
-        // Immediate silent fix
-        try {
-            navigator.geolocation.getCurrentPosition(
-                pos => handleGpsPositionUpdate(pos, true),
-                err => console.warn("[GPS] Initial fix error:", err.message),
-                highAccuracyOptions
-            );
-        } catch (e) { }
+        // A. Primary High-Accuracy attempt
+        navigator.geolocation.getCurrentPosition(
+            pos => handleGpsPositionUpdate(pos, true),
+            err => {
+                console.warn("[GPS] High accuracy fix failed, falling back to network geolocation:", err.message);
+                // B. Immediate Fallback to Network / Low Accuracy (Works fast indoors / on cellular)
+                try {
+                    navigator.geolocation.getCurrentPosition(
+                        pos2 => handleGpsPositionUpdate(pos2, true),
+                        err2 => console.warn("[GPS] Low accuracy fix also failed:", err2.message),
+                        { enableHighAccuracy: false, maximumAge: 60000, timeout: 15000 }
+                    );
+                } catch (e) { }
+            },
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 8000 }
+        );
 
         // Continuous hardware watcher
         if (workerGpsWatcherId === null) {
             try {
                 workerGpsWatcherId = navigator.geolocation.watchPosition(
-                    handleGpsPositionUpdate,
-                    err => console.warn("[GPS] Watcher error:", err.message),
-                    highAccuracyOptions
+                    pos => handleGpsPositionUpdate(pos),
+                    err => {
+                        // Watcher fallback
+                        try {
+                            navigator.geolocation.watchPosition(
+                                pos2 => handleGpsPositionUpdate(pos2),
+                                err2 => {},
+                                { enableHighAccuracy: false, maximumAge: 30000, timeout: 15000 }
+                            );
+                        } catch (e) { }
+                    },
+                    { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
                 );
             } catch (e) { }
         }
 
-        // Background Heartbeat Interval (every 15 seconds)
+        // Fast 10s Heartbeat Interval
         if (!workerGpsHeartbeatTimer) {
             workerGpsHeartbeatTimer = setInterval(() => {
                 broadcastWorkerGpsHeartbeat();
-            }, 15000);
+            }, 10000);
         }
     }
 }
@@ -30671,24 +30716,32 @@ function broadcastWorkerGpsHeartbeat(force) {
     try {
         navigator.geolocation.getCurrentPosition(
             pos => handleGpsPositionUpdate(pos, force || false),
-            err => {},
-            { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+            err => {
+                try {
+                    navigator.geolocation.getCurrentPosition(
+                        pos2 => handleGpsPositionUpdate(pos2, force || false),
+                        err2 => {},
+                        { enableHighAccuracy: false, maximumAge: 60000, timeout: 15000 }
+                    );
+                } catch (e) { }
+            },
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 8000 }
         );
     } catch (e) { }
 }
 window.broadcastWorkerGpsHeartbeat = broadcastWorkerGpsHeartbeat;
 
-// Attach window focus & visibility listeners for instant ping when app is opened
+// Attach window focus, visibility & user touch listeners for instant ping
 if (typeof window !== 'undefined') {
-    window.addEventListener('focus', () => {
-        broadcastWorkerGpsHeartbeat(true);
-    });
+    window.addEventListener('focus', () => broadcastWorkerGpsHeartbeat(true));
+    window.addEventListener('load', () => startWorkerLocationBroadcaster());
     if (typeof document !== 'undefined') {
         document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) {
-                broadcastWorkerGpsHeartbeat(true);
-            }
+            if (!document.hidden) broadcastWorkerGpsHeartbeat(true);
         });
+        // User interaction triggers immediate broadcaster wake-up
+        document.addEventListener('touchstart', () => broadcastWorkerGpsHeartbeat(false), { passive: true, once: true });
+        document.addEventListener('click', () => broadcastWorkerGpsHeartbeat(false), { passive: true, once: true });
     }
 }
 
@@ -30697,11 +30750,11 @@ function handleGpsPositionUpdate(position, forceWrite) {
     const { latitude, longitude, accuracy, speed, heading, altitude } = position.coords;
     const now = Date.now();
 
-    // High precision: broadcast immediately if moved even slightly (> 0.5m)
+    // Broadcast immediately if moved even slightly (> 0.5m)
     if (!forceWrite && lastBroadcastCoords) {
         const movedMeters = calculateDistanceMeters(lastBroadcastCoords.lat, lastBroadcastCoords.lng, latitude, longitude);
-        if (movedMeters < 0.5 && (now - lastGpsBroadcastTime) < 10000) {
-            return; // unchanged position within 10 seconds
+        if (movedMeters < 0.5 && (now - lastGpsBroadcastTime) < 8000) {
+            return; // unchanged position within 8 seconds
         }
     }
 
@@ -30713,21 +30766,42 @@ function handleGpsPositionUpdate(position, forceWrite) {
     const workers = companyData.workers || [];
     let myWorker = null;
 
-    if (typeof currentUser !== 'undefined' && currentUser) {
-        const email = currentUser.email ? currentUser.email.toLowerCase() : '';
-        const name = currentUser.name ? String(currentUser.name).trim().toLowerCase() : '';
+    let userEmail = '';
+    let userName = '';
+    let userUid = '';
 
-        if (email) {
-            myWorker = workers.find(w => w && w.email && w.email.toLowerCase() === email);
-        }
-        if (!myWorker && name) {
-            myWorker = workers.find(w => w && w.name && String(w.name).trim().toLowerCase() === name);
-        }
+    if (typeof currentUser !== 'undefined' && currentUser) {
+        userEmail = (currentUser.email || '').toLowerCase();
+        userName = String(currentUser.name || currentUser.displayName || '').trim();
+        userUid = currentUser.uid || '';
+    } else if (typeof auth !== 'undefined' && auth.currentUser) {
+        userEmail = (auth.currentUser.email || '').toLowerCase();
+        userName = String(auth.currentUser.displayName || '').trim();
+        userUid = auth.currentUser.uid || '';
     }
 
-    const workerId = myWorker ? String(myWorker.id) : (currentUser ? (currentUser.workerId || currentUser.uid || 'current_user') : 'user');
-    const workerName = myWorker ? myWorker.name : (currentUser ? (currentUser.displayName || currentUser.name || currentUser.email || 'Worker') : 'Worker');
-    const workerEmail = myWorker ? (myWorker.email || '') : (currentUser ? (currentUser.email || '') : '');
+    if (userEmail) {
+        myWorker = workers.find(w => w && w.email && w.email.toLowerCase() === userEmail);
+    }
+    if (!myWorker && userName) {
+        myWorker = workers.find(w => w && w.name && String(w.name).trim().toLowerCase() === userName.toLowerCase());
+    }
+
+    // Determine device fallback ID if unregistered
+    let deviceId = '';
+    try {
+        deviceId = localStorage.getItem('app_worker_device_id');
+        if (!deviceId) {
+            deviceId = 'dev_' + Math.random().toString(36).substring(2, 9);
+            localStorage.setItem('app_worker_device_id', deviceId);
+        }
+    } catch (e) {
+        deviceId = 'dev_' + Math.random().toString(36).substring(2, 9);
+    }
+
+    const workerId = myWorker ? String(myWorker.id) : (userEmail ? userEmail.replace(/\./g, '_') : (userUid || deviceId));
+    const workerName = myWorker ? myWorker.name : (userName || (userEmail ? userEmail.split('@')[0] : 'App Worker'));
+    const workerEmail = myWorker ? (myWorker.email || '') : userEmail;
 
     const liveLocData = {
         workerId: workerId,
@@ -30749,10 +30823,9 @@ function handleGpsPositionUpdate(position, forceWrite) {
         
         allCompanies.forEach(cKey => {
             // 1. Primary write by worker ID
-            db.ref(`companies/${cKey}/liveLocations/${workerId}`).set(liveLocData)
-                .catch(e => console.warn(`[GPS] LiveLocation write error for ${cKey}:`, e));
+            db.ref(`companies/${cKey}/liveLocations/${workerId}`).set(liveLocData).catch(() => {});
 
-            // 2. Also write by sanitized email if available for foolproof lookups
+            // 2. Also write by sanitized email if available
             if (workerEmail) {
                 const sEmail = workerEmail.toLowerCase().replace(/\./g, '_');
                 if (sEmail !== workerId) {
@@ -30760,11 +30833,14 @@ function handleGpsPositionUpdate(position, forceWrite) {
                 }
             }
 
-            // 3. Also write by Firebase UID if available
-            if (currentUser && currentUser.uid && currentUser.uid !== workerId) {
-                db.ref(`companies/${cKey}/liveLocations/${currentUser.uid}`).set(liveLocData).catch(() => {});
+            // 3. Also write by UID if available
+            if (userUid && userUid !== workerId) {
+                db.ref(`companies/${cKey}/liveLocations/${userUid}`).set(liveLocData).catch(() => {});
             }
         });
+
+        // 4. Global root broadcast
+        db.ref(`globalLiveLocations/${workerId}`).set(liveLocData).catch(() => {});
 
         // Also update worker object node if found in current company
         if (myWorker && typeof currentCompany !== 'undefined' && currentCompany) {
@@ -30775,7 +30851,7 @@ function handleGpsPositionUpdate(position, forceWrite) {
                     liveLng: longitude,
                     lastGpsTimestamp: now,
                     gpsAccuracy: accuracy || 0
-                }).catch(e => console.warn("[GPS] Worker GPS update error:", e));
+                }).catch(() => {});
             }
         }
     }
@@ -30871,12 +30947,16 @@ function setAimWorkZoneCenter(lat, lng, optRadius) {
     if (trackingAimMarker) trackingMap.removeLayer(trackingAimMarker);
     if (trackingAimCircle) trackingMap.removeLayer(trackingAimCircle);
 
-    // Center pin (Store Icon)
+    // Center pin with ZERO-DRIFT anchor
     const storeIcon = L.divIcon({
-        className: 'custom-aim-store-pin',
-        html: `<div style="width:36px; height:36px; border-radius:50%; background: linear-gradient(135deg, #10b981, #059669); border: 3px solid #ffffff; box-shadow: 0 4px 14px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; animation: pulse 1.5s infinite;">🏢</div>`,
-        iconSize: [36, 36],
-        iconAnchor: [18, 18]
+        className: 'custom-aim-store-pin-anchor',
+        html: `
+            <div style="position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #10b981, #059669); border: 3px solid #ffffff; box-shadow: 0 4px 14px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; animation: pulse 1.5s infinite; pointer-events: auto;">
+                🏢
+            </div>
+        `,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0]
     });
 
     trackingAimMarker = L.marker([lat, lng], { icon: storeIcon, draggable: true }).addTo(trackingMap);
@@ -30989,13 +31069,17 @@ function renderMapWorkZones() {
         if (!z || !z.lat || !z.lng) return;
         const radius = z.radiusMeters || 100;
 
-        // Store center marker
+        // Store center marker with ZERO-DRIFT anchor
         const marker = L.marker([z.lat, z.lng], {
             icon: L.divIcon({
-                className: 'custom-store-pin',
-                html: `<div style="width:36px; height:36px; border-radius:50%; background: linear-gradient(135deg, #10b981, #059669); border: 2.5px solid #ffffff; box-shadow: 0 3px 10px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">🏢</div>`,
-                iconSize: [36, 36],
-                iconAnchor: [18, 18]
+                className: 'custom-store-pin-anchor',
+                html: `
+                    <div style="position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #10b981, #059669); border: 2.5px solid #ffffff; box-shadow: 0 3px 12px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; pointer-events: auto;">
+                        🏢
+                    </div>
+                `,
+                iconSize: [0, 0],
+                iconAnchor: [0, 0]
             })
         }).addTo(trackingWorkZoneLayer);
 
@@ -31057,8 +31141,8 @@ function checkWorkerGeofence(worker, optZone) {
     let speed = null;
     let lastPing = null;
 
-    // 1. Check liveLocations map using ALL possible keys (ID, string ID, email, sanitized email, name)
-    const liveLocs = companyData.liveLocations || {};
+    // 1. Check liveLocations cache using ALL possible keys
+    const liveLocs = Object.assign({}, companyData.liveLocations || {}, globalLiveLocationsCache || {});
     let loc = null;
 
     if (worker.id !== undefined && worker.id !== null) {
@@ -31146,7 +31230,7 @@ function toggleWorkerExitPermission(workerId) {
 }
 window.toggleWorkerExitPermission = toggleWorkerExitPermission;
 
-// 12. Render Worker Pins on Map with Name Badges (Unified with liveLocations Stream)
+// 12. Render Worker Pins on Map with ZERO-DRIFT Anchored Name Badges
 function renderMapWorkerPins() {
     if (!trackingMap || !trackingWorkersLayerGroup) return;
     trackingWorkersLayerGroup.clearLayers();
@@ -31155,11 +31239,11 @@ function renderMapWorkerPins() {
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
     const workers = companyData.workers || [];
-    const liveLocs = companyData.liveLocations || {};
+    const liveLocs = Object.assign({}, companyData.liveLocations || {}, globalLiveLocationsCache || {});
 
     const renderedWorkerKeys = new Set();
 
-    // Helper to render a pin
+    // Helper to render a pin with zero-drift Leaflet anchoring
     function drawWorkerPin(w, geo) {
         const isDriver = (w.role && w.role.toLowerCase().includes('driver')) || (w.isDriver);
         const hasPermission = w.hasExitPermission;
@@ -31183,22 +31267,22 @@ function renderMapWorkerPins() {
         const firstName = String(w.name || 'Worker').trim().split(' ')[0];
         const safeFirstName = typeof escapeHtml === 'function' ? escapeHtml(firstName) : firstName;
 
-        // Clean Circular Name Badge Marker (NO red outer circle)
+        // ZERO-DRIFT Pin: [0,0] is locked to the coordinate; bottom dot sits on [0,0]
         const marker = L.marker([geo.workerLat, geo.workerLng], {
             icon: L.divIcon({
-                className: 'custom-worker-name-pin',
+                className: 'custom-worker-pin-anchor',
                 html: `
-                    <div style="display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%); filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));">
-                        <div style="background: ${pinColor}; color: #ffffff; padding: 4px 10px; border-radius: 18px; font-weight: 900; font-size: 0.82rem; white-space: nowrap; border: 2px solid #ffffff; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 8px rgba(0,0,0,0.35);">
+                    <div style="position: absolute; left: 0; bottom: 0; transform: translate(-50%, 0); display: flex; flex-direction: column; align-items: center; pointer-events: auto; white-space: nowrap; user-select: none;">
+                        <div style="background: ${pinColor}; color: #ffffff; padding: 4px 10px; border-radius: 20px; font-weight: 900; font-size: 0.82rem; border: 2px solid #ffffff; display: flex; align-items: center; gap: 5px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
                             <span style="font-size: 0.95rem;">${isDriver ? '🛵' : '👤'}</span>
                             <span>${safeFirstName}</span>
                         </div>
-                        <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 7px solid ${pinColor}; margin-top: -1px;"></div>
-                        <div style="width: 8px; height: 8px; background: ${pinColor}; border: 1.5px solid #ffffff; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.4); margin-top: 1px;"></div>
+                        <div style="width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid ${pinColor}; margin-top: -1px;"></div>
+                        <div style="width: 6px; height: 6px; background: ${pinColor}; border: 1.5px solid #ffffff; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.4); margin-top: -1px;"></div>
                     </div>
                 `,
-                iconSize: [30, 30],
-                iconAnchor: [15, 30]
+                iconSize: [0, 0],
+                iconAnchor: [0, 0]
             })
         }).addTo(trackingWorkersLayerGroup);
 
@@ -31243,7 +31327,7 @@ function renderMapWorkerPins() {
         }
     });
 
-    // 2. Process any remaining live broadcasts from liveLocations stream (e.g. active APK sessions)
+    // 2. Process all active live broadcasts from liveLocations stream & global cache
     Object.keys(liveLocs).forEach(key => {
         const loc = liveLocs[key];
         if (!loc || !loc.lat || !loc.lng) return;
@@ -31277,7 +31361,7 @@ function locateWorkerOnMap(workerId) {
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
     const workers = companyData.workers || [];
-    const liveLocs = companyData.liveLocations || {};
+    const liveLocs = Object.assign({}, companyData.liveLocations || {}, globalLiveLocationsCache || {});
 
     let worker = workers.find(w => String(w.id) === String(workerId) || String(w.email).toLowerCase() === String(workerId).toLowerCase());
     if (!worker && liveLocs[workerId]) {
