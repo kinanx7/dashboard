@@ -192,6 +192,9 @@ function renderOpsWorkersTable() {
     if (typeof renderWorkerOperationsContractBanner === 'function') {
         renderWorkerOperationsContractBanner();
     }
+    if (typeof renderWorkerOperationsResponsibilitiesBanner === 'function') {
+        renderWorkerOperationsResponsibilitiesBanner();
+    }
 }
 
 function renderOpsDetails() {

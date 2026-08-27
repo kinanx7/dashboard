@@ -1962,6 +1962,9 @@ function listenToCloudData() {
         if (typeof renderWorkerOperationsContractBanner === 'function') {
             renderWorkerOperationsContractBanner();
         }
+        if (typeof renderWorkerOperationsResponsibilitiesBanner === 'function') {
+            renderWorkerOperationsResponsibilitiesBanner();
+        }
 
         if (isInitialLoad) {
             migrateMonthlyData();
@@ -2360,6 +2363,9 @@ function switchTab(tab) {
     if (tab === 'ops' && typeof renderWorkerOperationsContractBanner === 'function') {
         renderWorkerOperationsContractBanner();
     }
+    if (tab === 'ops' && typeof renderWorkerOperationsResponsibilitiesBanner === 'function') {
+        renderWorkerOperationsResponsibilitiesBanner();
+    }
     if (tab === 'tasks' && typeof renderInquiries === 'function') {
         renderInquiries();
     }
@@ -2720,6 +2726,7 @@ function renderAll() {
         if (typeof renderOpsDetails === 'function') renderOpsDetails();
         if (typeof renderSelectedWorkerSysViolations === 'function') renderSelectedWorkerSysViolations();
         if (typeof renderWorkerOperationsContractBanner === 'function') renderWorkerOperationsContractBanner();
+        if (typeof renderWorkerOperationsResponsibilitiesBanner === 'function') renderWorkerOperationsResponsibilitiesBanner();
     }
     else if (currentTab === 'ranks') { if (typeof renderRanksTable === 'function') renderRanksTable(); }
     else if (currentTab === 'attendance') { if (typeof renderAttendance === 'function') renderAttendance(); }
@@ -7750,7 +7757,7 @@ function assignTask() {
         status: 'assigned', // new states: assigned, seen, completed
         done: false, // legacy flag
         assignedByEmail: currentUser ? (currentUser.email || '') : '',
-        assignedByName: currentUser ? (currentUser.displayName || currentUser.email || 'Manager') : 'Manager',
+        assignedByName: currentUser ? (currentUser.displayName || (currentUser.email ? formatAssignerName(currentUser.email) : 'Manager')) : 'Manager',
         assignedById: activeWorker ? activeWorker.id : ''
     });
 
@@ -9034,6 +9041,22 @@ function getDefaultResponsibilitySubjects(isAr) {
     ];
 }
 
+// Helper: Format Assigner Display Name (Strip email domains, capitalize first name)
+function formatAssignerName(nameOrEmail) {
+    if (!nameOrEmail) return 'Admin';
+    let str = String(nameOrEmail).trim();
+    if (str.includes('@')) {
+        let localPart = str.split('@')[0];
+        let first = localPart.split(/[._-]/)[0];
+        if (first) {
+            return first.charAt(0).toUpperCase() + first.slice(1);
+        }
+        return localPart;
+    }
+    return str;
+}
+window.formatAssignerName = formatAssignerName;
+
 // 1. Get or Synchronize Responsibilities from Firebase Data
 function getAllResponsibilitySubjects() {
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
@@ -9218,13 +9241,13 @@ function assignResponsibilityToWorker(subjectId, workerId, customAmount) {
     }
 
     const assignedWorkers = subject.assignedWorkers ? { ...subject.assignedWorkers } : {};
-    if (assignedWorkers[workerId]) {
+    if (assignedWorkers[workerId] && assignedWorkers[workerId].status === 'active') {
         alert(isAr ? `⚠️ الموظف ${worker.name} مكلف بالفعل بهذه المسؤولية!` : `⚠️ Worker ${worker.name} is already assigned to this responsibility!`);
         return;
     }
 
     const assignedAt = Date.now();
-    const assignedBy = (currentUser && currentUser.email) ? currentUser.email : 'Admin';
+    const assignedBy = (currentUser && (currentUser.displayName || currentUser.name)) ? (currentUser.displayName || currentUser.name) : (currentUser && currentUser.email ? formatAssignerName(currentUser.email) : 'Admin');
     const amount = customAmount || subject.amount || (isAr ? 'يومي' : 'Daily');
 
     assignedWorkers[workerId] = {
@@ -9232,7 +9255,8 @@ function assignResponsibilityToWorker(subjectId, workerId, customAmount) {
         workerName: worker.name,
         assignedAt: assignedAt,
         assignedBy: assignedBy,
-        amount: amount
+        amount: amount,
+        status: 'pending_confirmation' // Requires worker confirmation in Operations
     };
 
     let historyLog = subject.historyLog || [];
@@ -9245,10 +9269,10 @@ function assignResponsibilityToWorker(subjectId, workerId, customAmount) {
         timestamp: assignedAt,
         by: assignedBy,
         amount: amount,
-        note: isAr ? `تكليف جديد لـ ${worker.name}` : `Assigned to ${worker.name}`
+        status: 'pending_confirmation',
+        note: isAr ? `طلب تكليف جديد لـ ${worker.name} (بانتظار التأكيد بالعمليات)` : `Assignment requested for ${worker.name} (Pending Confirmation in Ops)`
     });
 
-    // Construct full complete subject object
     const fullSubject = {
         ...subject,
         id: subject.id,
@@ -9262,39 +9286,46 @@ function assignResponsibilityToWorker(subjectId, workerId, customAmount) {
     };
     if (!fullSubject.createdAt) fullSubject.createdAt = Date.now();
 
-    // Direct local cache update for instant UI feedback
     if (!companyData.constantResponsibilities) companyData.constantResponsibilities = {};
     companyData.constantResponsibilities[subject.id] = fullSubject;
 
-    // Sync to worker's constantTasks array
-    let wTasks = worker.constantTasks || [];
-    if (!Array.isArray(wTasks)) wTasks = Object.values(wTasks);
-    wTasks = wTasks.filter(ct => ct && String(ct.subjectId) !== String(subject.id) && ct.id !== ('ct_' + subject.id));
-    wTasks.push({
-        id: 'ct_' + subject.id,
+    // Add to worker's pendingResponsibilities list
+    let wPending = worker.pendingResponsibilities || [];
+    if (!Array.isArray(wPending)) wPending = Object.values(wPending);
+    wPending = wPending.filter(pr => pr && String(pr.subjectId) !== String(subject.id));
+    wPending.push({
+        id: 'pr_' + subject.id + '_' + Date.now(),
         subjectId: subject.id,
         title: subject.title,
         amount: amount,
         icon: subject.icon || '📌',
+        dept: subject.dept || 'general',
         assignedAt: assignedAt,
-        assignedBy: assignedBy
+        assignedBy: assignedBy,
+        status: 'pending_confirmation'
     });
-    worker.constantTasks = wTasks;
+    worker.pendingResponsibilities = wPending;
 
     const updates = {};
     updates[`companies/${currentCompany}/constantResponsibilities/${subject.id}`] = fullSubject;
-    updates[`companies/${currentCompany}/workers/${workerIndex}/constantTasks`] = wTasks;
+    updates[`companies/${currentCompany}/workers/${workerIndex}/pendingResponsibilities`] = wPending;
 
     db.ref().update(updates).then(() => {
         if (typeof logActivity === 'function') {
-            logActivity('task_constant_assign', worker.id, worker.name, `Assigned constant responsibility "${subject.title}" to ${worker.name}`);
+            logActivity('task_constant_assign_req', worker.id, worker.name, `Requested constant responsibility assignment "${subject.title}" for ${worker.name}`);
         }
         if (typeof showInAppNotification === 'function') {
-            showInAppNotification(isAr ? `✅ تم تكليف ${worker.name} بمسؤولية "${subject.title}" بنجاح!` : `✅ Assigned "${subject.title}" to ${worker.name}!`);
+            showInAppNotification(isAr ? `✅ تم إرسال طلب التكليف لـ ${worker.name}! بانتظار تأكيده في قسم العمليات.` : `✅ Assignment requested for ${worker.name}! Awaiting confirmation in Operations.`);
         }
         renderConstantTasks();
+        if (currentConstantTasksViewMode === 'workers') {
+            renderWorkerResponsibilitiesView(worker.id);
+        }
         if (activeViewingRespSubjectId === subject.id) {
             openResponsibilityInfoModal(subject.id);
+        }
+        if (typeof renderWorkerOperationsResponsibilitiesBanner === 'function') {
+            renderWorkerOperationsResponsibilitiesBanner();
         }
     }).catch(err => console.error("Error assigning responsibility:", err));
 }
@@ -9330,7 +9361,7 @@ function transferResponsibilityWorker(subjectId, fromWorkerId, toWorkerId) {
     delete assignedWorkers[fromWorkerId];
 
     const transferTime = Date.now();
-    const transferredBy = (currentUser && currentUser.email) ? currentUser.email : 'Admin';
+    const transferredBy = (currentUser && (currentUser.displayName || currentUser.name)) ? (currentUser.displayName || currentUser.name) : (currentUser && currentUser.email ? formatAssignerName(currentUser.email) : 'Admin');
     const amount = prevAssignment.amount || subject.amount || (isAr ? 'يومي' : 'Daily');
 
     assignedWorkers[toWorkerId] = {
@@ -9339,7 +9370,8 @@ function transferResponsibilityWorker(subjectId, fromWorkerId, toWorkerId) {
         assignedAt: transferTime,
         assignedBy: transferredBy,
         amount: amount,
-        transferredFrom: fromWorker.name
+        transferredFrom: fromWorker.name,
+        status: 'pending_confirmation' // Requires confirmation by replacement worker
     };
 
     let historyLog = subject.historyLog || [];
@@ -9354,7 +9386,8 @@ function transferResponsibilityWorker(subjectId, fromWorkerId, toWorkerId) {
         timestamp: transferTime,
         by: transferredBy,
         amount: amount,
-        note: isAr ? `تم نقل المسؤولية من ${fromWorker.name} إلى ${toWorker.name}` : `Transferred from ${fromWorker.name} to ${toWorker.name}`
+        status: 'pending_confirmation',
+        note: isAr ? `طلب نقل المسؤولية من ${fromWorker.name} إلى ${toWorker.name} (بانتظار التأكيد)` : `Transfer requested from ${fromWorker.name} to ${toWorker.name} (Pending Confirmation)`
     });
 
     const fullSubject = {
@@ -9373,43 +9406,57 @@ function transferResponsibilityWorker(subjectId, fromWorkerId, toWorkerId) {
     if (!companyData.constantResponsibilities) companyData.constantResponsibilities = {};
     companyData.constantResponsibilities[subject.id] = fullSubject;
 
-    // Update fromWorker constantTasks
+    // Remove from fromWorker active constantTasks and pending
     let fromTasks = fromWorker.constantTasks || [];
     if (!Array.isArray(fromTasks)) fromTasks = Object.values(fromTasks);
     fromTasks = fromTasks.filter(ct => ct && String(ct.subjectId) !== String(subject.id) && ct.id !== ('ct_' + subject.id));
     fromWorker.constantTasks = fromTasks;
 
-    // Update toWorker constantTasks
-    let toTasks = toWorker.constantTasks || [];
-    if (!Array.isArray(toTasks)) toTasks = Object.values(toTasks);
-    toTasks = toTasks.filter(ct => ct && String(ct.subjectId) !== String(subject.id) && ct.id !== ('ct_' + subject.id));
-    toTasks.push({
-        id: 'ct_' + subject.id,
+    let fromPending = fromWorker.pendingResponsibilities || [];
+    if (!Array.isArray(fromPending)) fromPending = Object.values(fromPending);
+    fromPending = fromPending.filter(pr => pr && String(pr.subjectId) !== String(subject.id));
+    fromWorker.pendingResponsibilities = fromPending;
+
+    // Add to toWorker pendingResponsibilities
+    let toPending = toWorker.pendingResponsibilities || [];
+    if (!Array.isArray(toPending)) toPending = Object.values(toPending);
+    toPending = toPending.filter(pr => pr && String(pr.subjectId) !== String(subject.id));
+    toPending.push({
+        id: 'pr_' + subject.id + '_' + Date.now(),
         subjectId: subject.id,
         title: subject.title,
         amount: amount,
         icon: subject.icon || '📌',
+        dept: subject.dept || 'general',
         assignedAt: transferTime,
         assignedBy: transferredBy,
-        transferredFrom: fromWorker.name
+        transferredFrom: fromWorker.name,
+        status: 'pending_confirmation'
     });
-    toWorker.constantTasks = toTasks;
+    toWorker.pendingResponsibilities = toPending;
 
     const updates = {};
     updates[`companies/${currentCompany}/constantResponsibilities/${subject.id}`] = fullSubject;
     updates[`companies/${currentCompany}/workers/${fromIndex}/constantTasks`] = fromTasks;
-    updates[`companies/${currentCompany}/workers/${toIndex}/constantTasks`] = toTasks;
+    updates[`companies/${currentCompany}/workers/${fromIndex}/pendingResponsibilities`] = fromPending;
+    updates[`companies/${currentCompany}/workers/${toIndex}/pendingResponsibilities`] = toPending;
 
     db.ref().update(updates).then(() => {
         if (typeof logActivity === 'function') {
-            logActivity('task_constant_transfer', toWorker.id, toWorker.name, `Transferred constant responsibility "${subject.title}" from ${fromWorker.name} to ${toWorker.name}`);
+            logActivity('task_constant_transfer_req', toWorker.id, toWorker.name, `Requested transfer of responsibility "${subject.title}" from ${fromWorker.name} to ${toWorker.name}`);
         }
         if (typeof showInAppNotification === 'function') {
-            showInAppNotification(isAr ? `🔁 تم نقل المسؤولية إلى ${toWorker.name} بنجاح!` : `🔁 Transferred to ${toWorker.name}!`);
+            showInAppNotification(isAr ? `🔁 تم إرسال طلب نقل المسؤولية إلى ${toWorker.name}! بانتظار تأكيده في قسم العمليات.` : `🔁 Transfer requested to ${toWorker.name}! Awaiting confirmation in Operations.`);
         }
         renderConstantTasks();
+        if (currentConstantTasksViewMode === 'workers') {
+            renderWorkerResponsibilitiesView(toWorker.id);
+        }
         if (activeViewingRespSubjectId === subject.id) {
             openResponsibilityInfoModal(subject.id);
+        }
+        if (typeof renderWorkerOperationsResponsibilitiesBanner === 'function') {
+            renderWorkerOperationsResponsibilitiesBanner();
         }
     }).catch(err => console.error("Error transferring responsibility:", err));
 }
@@ -9433,7 +9480,7 @@ function unassignResponsibilityWorker(subjectId, workerId) {
     delete assignedWorkers[workerId];
 
     const unassignedAt = Date.now();
-    const unassignedBy = (currentUser && currentUser.email) ? currentUser.email : 'Admin';
+    const unassignedBy = (currentUser && (currentUser.displayName || currentUser.name)) ? (currentUser.displayName || currentUser.name) : (currentUser && currentUser.email ? formatAssignerName(currentUser.email) : 'Admin');
 
     let historyLog = subject.historyLog || [];
     if (!Array.isArray(historyLog)) historyLog = Object.values(historyLog);
@@ -9473,6 +9520,12 @@ function unassignResponsibilityWorker(subjectId, workerId) {
         wTasks = wTasks.filter(ct => ct && String(ct.subjectId) !== String(subject.id) && ct.id !== ('ct_' + subject.id));
         worker.constantTasks = wTasks;
         updates[`companies/${currentCompany}/workers/${workerIndex}/constantTasks`] = wTasks;
+
+        let wPending = worker.pendingResponsibilities || [];
+        if (!Array.isArray(wPending)) wPending = Object.values(wPending);
+        wPending = wPending.filter(pr => pr && String(pr.subjectId) !== String(subject.id));
+        worker.pendingResponsibilities = wPending;
+        updates[`companies/${currentCompany}/workers/${workerIndex}/pendingResponsibilities`] = wPending;
     }
 
     db.ref().update(updates).then(() => {
@@ -9480,14 +9533,869 @@ function unassignResponsibilityWorker(subjectId, workerId) {
             logActivity('task_constant_unassign', workerId, workerName, `Unassigned constant responsibility "${subject.title}" from ${workerName}`);
         }
         renderConstantTasks();
+        if (currentConstantTasksViewMode === 'workers') {
+            renderWorkerResponsibilitiesView(workerId);
+        }
         if (activeViewingRespSubjectId === subject.id) {
             openResponsibilityInfoModal(subject.id);
+        }
+        if (typeof renderWorkerOperationsResponsibilitiesBanner === 'function') {
+            renderWorkerOperationsResponsibilitiesBanner();
         }
     }).catch(err => console.error("Error unassigning responsibility:", err));
 }
 window.unassignResponsibilityWorker = unassignResponsibilityWorker;
 
-// 8. Open Info Inspector & Transfer Modal
+// 7.5 Mark Responsibility Request as Viewed by Worker
+function markWorkerResponsibilityViewed(subjectId, workerId) {
+    if (!subjectId || !workerId) return;
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const all = getAllResponsibilitySubjects();
+    const subject = all.find(s => String(s.id) === String(subjectId));
+    if (!subject || !subject.assignedWorkers) return;
+
+    const assignedWorkers = subject.assignedWorkers || {};
+    const assign = assignedWorkers[workerId] || Object.values(assignedWorkers).find(a => a && String(a.workerId) === String(workerId));
+    if (!assign || assign.status !== 'pending_confirmation' || assign.viewedAt) return;
+
+    const now = Date.now();
+    assign.viewedAt = now;
+
+    // Mutate in local companyData cache
+    if (companyData.constantResponsibilities && companyData.constantResponsibilities[subject.id]) {
+        const subMap = companyData.constantResponsibilities[subject.id].assignedWorkers;
+        if (subMap) {
+            if (subMap[workerId]) subMap[workerId].viewedAt = now;
+            Object.values(subMap).forEach(aw => {
+                if (aw && String(aw.workerId) === String(workerId)) aw.viewedAt = now;
+            });
+        }
+    }
+
+    const updates = {};
+    updates[`companies/${currentCompany}/constantResponsibilities/${subject.id}/assignedWorkers/${workerId}/viewedAt`] = now;
+
+    const workers = companyData.workers || [];
+    const wIndex = workers.findIndex(w => String(w.id) === String(workerId));
+    if (wIndex !== -1) {
+        let pList = workers[wIndex].pendingResponsibilities;
+        if (pList) {
+            if (!Array.isArray(pList)) pList = Object.values(pList);
+            const pItem = pList.find(p => p && String(p.subjectId) === String(subjectId));
+            if (pItem) {
+                pItem.viewedAt = now;
+                updates[`companies/${currentCompany}/workers/${wIndex}/pendingResponsibilities`] = pList;
+            }
+        }
+    }
+
+    db.ref().update(updates).catch(e => console.warn('Could not mark duty request as viewed:', e));
+}
+window.markWorkerResponsibilityViewed = markWorkerResponsibilityViewed;
+
+// 8. Confirm Worker Responsibility (Called from Operations Section by Worker ONLY)
+function confirmWorkerResponsibility(subjectId, optWorkerId) {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const isAdmin = (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager' || currentUser.isAdmin));
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const workers = companyData.workers || [];
+
+    // Admin is NOT allowed to confirm on behalf of the worker
+    if (isAdmin && (!currentUser.isWorkerAccount && !currentUser.workerId)) {
+        alert(isAr ? '⚠️ عذراً، لا يحق للمدير قبول المسؤولية نيابة عن الموظف. يجب على الموظف نفسه تسجيل الدخول وتأكيد استلام المسؤولية من قسم العمليات.' : '⚠️ Admin cannot confirm duty acceptance on behalf of worker. The employee must log in and confirm from Operations.');
+        return;
+    }
+
+    let targetWorker = null;
+    let workerIndex = -1;
+
+    if (optWorkerId) {
+        workerIndex = workers.findIndex(w => String(w.id) === String(optWorkerId));
+        if (workerIndex !== -1) targetWorker = workers[workerIndex];
+    }
+    if (!targetWorker) {
+        const currentEmail = currentUser && currentUser.email ? currentUser.email.toLowerCase() : '';
+        if (currentEmail) {
+            workerIndex = workers.findIndex(w => w.email && w.email.toLowerCase() === currentEmail);
+            if (workerIndex !== -1) targetWorker = workers[workerIndex];
+        }
+    }
+    if (!targetWorker && typeof getActiveWorker === 'function') {
+        const activeW = getActiveWorker();
+        if (activeW) {
+            workerIndex = workers.findIndex(w => 
+                (w.id && activeW.id && String(w.id) === String(activeW.id)) ||
+                (w.email && activeW.email && w.email.toLowerCase() === activeW.email.toLowerCase()) ||
+                (w.name && activeW.name && String(w.name).trim().toLowerCase() === String(activeW.name).trim().toLowerCase())
+            );
+            if (workerIndex !== -1) targetWorker = workers[workerIndex];
+        }
+    }
+
+    if (!targetWorker) {
+        alert(isAr ? '⚠️ لم يتم التعرف على حساب الموظف.' : '⚠️ Worker account could not be identified.');
+        return;
+    }
+
+    const all = getAllResponsibilitySubjects();
+    const subject = all.find(s => String(s.id) === String(subjectId));
+    if (!subject) {
+        alert(isAr ? '⚠️ لم يتم العثور على موضوع المسؤولية.' : '⚠️ Responsibility subject not found.');
+        return;
+    }
+
+    const confirmTime = Date.now();
+    const assignedWorkers = subject.assignedWorkers ? { ...subject.assignedWorkers } : {};
+    const currentAssign = assignedWorkers[targetWorker.id] || {};
+    const amount = currentAssign.amount || subject.amount || (isAr ? 'يومي' : 'Daily');
+
+    assignedWorkers[targetWorker.id] = {
+        ...currentAssign,
+        workerId: String(targetWorker.id),
+        workerName: targetWorker.name,
+        assignedAt: currentAssign.assignedAt || confirmTime,
+        assignedBy: currentAssign.assignedBy || 'Admin',
+        confirmedAt: confirmTime,
+        viewedAt: currentAssign.viewedAt || confirmTime,
+        status: 'active',
+        amount: amount
+    };
+
+    let historyLog = subject.historyLog || [];
+    if (!Array.isArray(historyLog)) historyLog = Object.values(historyLog);
+    historyLog.unshift({
+        id: 'log_' + Date.now(),
+        type: 'confirmed',
+        workerId: String(targetWorker.id),
+        workerName: targetWorker.name,
+        timestamp: confirmTime,
+        by: targetWorker.name,
+        amount: amount,
+        note: isAr ? `تأكيد استلام: قام ${targetWorker.name} بتأكيد استلام وتفعيل المسؤولية` : `Confirmed and activated by ${targetWorker.name}`
+    });
+
+    const fullSubject = {
+        ...subject,
+        id: subject.id,
+        title: subject.title,
+        icon: subject.icon || '📌',
+        amount: subject.amount || (isAr ? 'يومي' : 'Daily'),
+        dept: subject.dept || 'general',
+        assignedWorkers: assignedWorkers,
+        historyLog: historyLog,
+        updatedAt: Date.now()
+    };
+    if (!fullSubject.createdAt) fullSubject.createdAt = Date.now();
+
+    if (!companyData.constantResponsibilities) companyData.constantResponsibilities = {};
+    companyData.constantResponsibilities[subject.id] = fullSubject;
+
+    // Move from pendingResponsibilities to active constantTasks
+    let wPending = targetWorker.pendingResponsibilities || [];
+    if (!Array.isArray(wPending)) wPending = Object.values(wPending);
+    wPending = wPending.filter(pr => pr && String(pr.subjectId) !== String(subject.id));
+    targetWorker.pendingResponsibilities = wPending;
+
+    let wTasks = targetWorker.constantTasks || [];
+    if (!Array.isArray(wTasks)) wTasks = Object.values(wTasks);
+    wTasks = wTasks.filter(ct => ct && String(ct.subjectId) !== String(subject.id) && ct.id !== ('ct_' + subject.id));
+    wTasks.push({
+        id: 'ct_' + subject.id,
+        subjectId: subject.id,
+        title: subject.title,
+        amount: amount,
+        icon: subject.icon || '📌',
+        dept: subject.dept || 'general',
+        assignedAt: currentAssign.assignedAt || confirmTime,
+        assignedBy: currentAssign.assignedBy || 'Admin',
+        confirmedAt: confirmTime,
+        transferredFrom: currentAssign.transferredFrom || ''
+    });
+    targetWorker.constantTasks = wTasks;
+
+    const updates = {};
+    updates[`companies/${currentCompany}/constantResponsibilities/${subject.id}`] = fullSubject;
+    updates[`companies/${currentCompany}/workers/${workerIndex}/constantTasks`] = wTasks;
+    updates[`companies/${currentCompany}/workers/${workerIndex}/pendingResponsibilities`] = wPending;
+
+    db.ref().update(updates).then(() => {
+        if (typeof logActivity === 'function') {
+            logActivity('task_constant_confirmed', targetWorker.id, targetWorker.name, `Confirmed and activated responsibility "${subject.title}" for ${targetWorker.name}`);
+        }
+        if (typeof showInAppNotification === 'function') {
+            showInAppNotification(isAr ? `🎉 تم تأكيد استلام المسؤولية "${subject.title}" بنجاح وتم إضافتها إلى واجباتك المستمرة!` : `🎉 Confirmed responsibility "${subject.title}" successfully!`);
+        }
+        renderWorkerOperationsResponsibilitiesBanner();
+        renderConstantTasks();
+        if (currentConstantTasksViewMode === 'workers') {
+            renderWorkerResponsibilitiesView(targetWorker.id);
+        }
+        renderWorkerOwnConstantTasksCard();
+    }).catch(err => {
+        console.error("Error confirming responsibility:", err);
+        alert("Error confirming responsibility: " + err.message);
+    });
+}
+window.confirmWorkerResponsibility = confirmWorkerResponsibility;
+
+// 9. Operations Section Banner: Pending Responsibilities Confirmation & Status Tracking
+function renderWorkerOperationsResponsibilitiesBanner() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const container = document.getElementById('worker-ops-pending-responsibilities-card');
+    if (!container) return;
+
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const workers = companyData.workers || [];
+
+    const currentEmail = (typeof currentUser !== 'undefined' && currentUser && currentUser.email) ? currentUser.email.toLowerCase() : '';
+    const isAdmin = (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager' || currentUser.isAdmin));
+
+    const opsWorkerSelect = document.getElementById('ops-worker-select');
+    const selectedWorkerId = opsWorkerSelect ? opsWorkerSelect.value : '';
+
+    let targetWorker = null;
+    if (selectedWorkerId) {
+        targetWorker = workers.find(w => String(w.id) === String(selectedWorkerId));
+    }
+    if (!targetWorker && currentEmail) {
+        targetWorker = workers.find(w => w.email && w.email.toLowerCase() === currentEmail);
+    }
+    if (!targetWorker && typeof getActiveWorker === 'function') {
+        const activeW = getActiveWorker();
+        if (activeW) {
+            targetWorker = workers.find(w => 
+                (w.id && activeW.id && String(w.id) === String(activeW.id)) ||
+                (w.email && activeW.email && w.email.toLowerCase() === activeW.email.toLowerCase()) ||
+                (w.name && activeW.name && String(w.name).trim().toLowerCase() === String(activeW.name).trim().toLowerCase())
+            );
+        }
+    }
+    if (!targetWorker && currentUser && currentUser.name) {
+        targetWorker = workers.find(w => w.name && String(w.name).trim().toLowerCase() === String(currentUser.name).trim().toLowerCase());
+    }
+
+    const allSubjects = getAllResponsibilitySubjects();
+    const pendingList = [];
+
+    if (targetWorker) {
+        // Collect pending responsibilities for this specific worker
+        allSubjects.forEach(s => {
+            if (s.assignedWorkers) {
+                const assignedMap = s.assignedWorkers;
+                Object.keys(assignedMap).forEach(wKey => {
+                    const a = assignedMap[wKey];
+                    if (a && (String(a.workerId) === String(targetWorker.id) || String(wKey) === String(targetWorker.id))) {
+                        if (a.status === 'pending_confirmation' && !a.confirmedAt) {
+                            pendingList.push({
+                                subjectId: s.id,
+                                workerId: targetWorker.id,
+                                workerName: targetWorker.name,
+                                title: s.title,
+                                icon: s.icon || '📌',
+                                dept: s.dept || 'general',
+                                amount: a.amount || s.amount || (isAr ? 'طوال الوردية' : 'Full Shift'),
+                                assignedAt: a.assignedAt,
+                                assignedBy: a.assignedBy,
+                                viewedAt: a.viewedAt,
+                                transferredFrom: a.transferredFrom
+                            });
+                        }
+                    }
+                });
+            }
+        });
+
+        // Also check targetWorker.pendingResponsibilities array
+        if (targetWorker.pendingResponsibilities) {
+            let rawPending = targetWorker.pendingResponsibilities;
+            if (!Array.isArray(rawPending)) rawPending = Object.values(rawPending);
+            rawPending.forEach(pr => {
+                if (pr && pr.subjectId && !pendingList.some(p => String(p.subjectId) === String(pr.subjectId))) {
+                    pendingList.push({
+                        subjectId: pr.subjectId,
+                        workerId: targetWorker.id,
+                        workerName: targetWorker.name,
+                        title: pr.title,
+                        icon: pr.icon || '📌',
+                        dept: pr.dept || 'general',
+                        amount: pr.amount || (isAr ? 'طوال الوردية' : 'Full Shift'),
+                        assignedAt: pr.assignedAt,
+                        assignedBy: pr.assignedBy,
+                        viewedAt: pr.viewedAt,
+                        transferredFrom: pr.transferredFrom
+                    });
+                }
+            });
+        }
+    } else if (isAdmin) {
+        // Admin overview without worker selected: show all pending requests across all workers
+        allSubjects.forEach(s => {
+            if (s.assignedWorkers) {
+                const assignedMap = s.assignedWorkers;
+                Object.keys(assignedMap).forEach(wKey => {
+                    const a = assignedMap[wKey];
+                    if (a && a.status === 'pending_confirmation' && !a.confirmedAt) {
+                        const matchedW = workers.find(w => String(w.id) === String(a.workerId || wKey)) || { id: a.workerId || wKey, name: a.workerName || 'Employee' };
+                        pendingList.push({
+                            subjectId: s.id,
+                            workerId: matchedW.id,
+                            workerName: matchedW.name || a.workerName,
+                            title: s.title,
+                            icon: s.icon || '📌',
+                            dept: s.dept || 'general',
+                            amount: a.amount || s.amount || (isAr ? 'طوال الوردية' : 'Full Shift'),
+                            assignedAt: a.assignedAt,
+                            assignedBy: a.assignedBy,
+                            viewedAt: a.viewedAt,
+                            transferredFrom: a.transferredFrom
+                        });
+                    }
+                });
+            }
+        });
+
+        // Also scan workers' pendingResponsibilities
+        workers.forEach(w => {
+            if (w.pendingResponsibilities) {
+                let rawPending = w.pendingResponsibilities;
+                if (!Array.isArray(rawPending)) rawPending = Object.values(rawPending);
+                rawPending.forEach(pr => {
+                    if (pr && pr.subjectId && !pendingList.some(p => String(p.subjectId) === String(pr.subjectId) && String(p.workerId) === String(w.id))) {
+                        pendingList.push({
+                            subjectId: pr.subjectId,
+                            workerId: w.id,
+                            workerName: w.name,
+                            title: pr.title,
+                            icon: pr.icon || '📌',
+                            dept: pr.dept || 'general',
+                            amount: pr.amount || (isAr ? 'طوال الوردية' : 'Full Shift'),
+                            assignedAt: pr.assignedAt,
+                            assignedBy: pr.assignedBy,
+                            viewedAt: pr.viewedAt,
+                            transferredFrom: pr.transferredFrom
+                        });
+                    }
+                });
+            }
+        });
+    }
+
+    if (pendingList.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    // Mark pending items as viewed when worker opens this section
+    if (targetWorker) {
+        pendingList.forEach(item => {
+            if (!item.viewedAt) {
+                if (!isAdmin || selectedWorkerId) {
+                    markWorkerResponsibilityViewed(item.subjectId, targetWorker.id);
+                }
+            }
+        });
+    }
+
+    const deptLabels = {
+        general: isAr ? 'عام' : 'General',
+        kitchen: isAr ? 'المطبخ' : 'Kitchen',
+        hall: isAr ? 'الصالة والخدمة' : 'Hall',
+        cashier: isAr ? 'الكاشير' : 'Cashier',
+        warehouse: isAr ? 'المستودع' : 'Warehouse'
+    };
+
+    container.style.display = 'block';
+    container.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px; border-bottom:1px solid var(--border-color); padding-bottom:10px;">
+            <div>
+                <h2 class="card-title" style="margin:0; border:none; padding:0; display:flex; align-items:center; gap:8px; color:#6366f1;">
+                    <span style="font-size:1.3rem; animation: pulse 1.5s infinite;">🔔</span>
+                    <span>${isAdmin ? 
+                        (isAr ? 'متابعة تكليفات العمل بانتظار استلام وقبول الموظفين' : 'Duty Assignments Awaiting Worker Confirmation') : 
+                        (isAr ? 'مسؤوليات وتكليفات عمل جديدة بانتظار تأكيدك واستلامك' : 'New Duty Assignments Awaiting Your Confirmation')}</span>
+                </h2>
+                <p style="margin:4px 0 0 0; font-size:0.84rem; color:var(--text-muted);">
+                    ${isAdmin ?
+                        (isAr ? `يوجد ${pendingList.length} تكليفات مرسلة للعمال. يمكنك متابعة ما إذا كان الموظف قد شاهد الطلب أو يتأخر في قبوله.` : `There are ${pendingList.length} pending duty requests. You can track whether workers viewed the request or are skipping acceptance.`) :
+                        (isAr ? `مرحباً ${targetWorker ? targetWorker.name : ''}، تم إسناد ${pendingList.length} مسؤوليات جديدة لك. يرجى مراجعة التفاصيل والضغط على تأكيد الاستلام للبدء.` : `Hello ${targetWorker ? targetWorker.name : ''}, you have ${pendingList.length} new responsibility assignments. Please review and confirm to activate.`)}
+                </p>
+            </div>
+            <span class="badge" style="background:linear-gradient(135deg, #6366f1, #4f46e5); color:white; font-size:0.82rem; font-weight:800; padding:4px 10px; border-radius:8px;">
+                ⏳ ${pendingList.length} ${isAr ? 'بانتظار تأكيد العامل' : 'Pending Confirmation'}
+            </span>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:12px;">
+            ${pendingList.map(item => {
+                const dateStr = item.assignedAt ? new Date(item.assignedAt).toLocaleString(isAr ? 'ar-EG' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+                const viewedDateStr = item.viewedAt ? new Date(item.viewedAt).toLocaleString(isAr ? 'ar-EG' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
+                const safeTitle = typeof escapeHtml === 'function' ? escapeHtml(item.title) : item.title;
+                const safeAmt = typeof escapeHtml === 'function' ? escapeHtml(item.amount) : item.amount;
+                const safeWName = typeof escapeHtml === 'function' ? escapeHtml(item.workerName) : item.workerName;
+                const deptText = deptLabels[item.dept] || item.dept || 'General';
+
+                return `
+                    <div style="background:var(--input-bg); border:1px solid rgba(99,102,241,0.3); border-radius:14px; padding:14px 16px; display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap; box-shadow:0 2px 10px rgba(99,102,241,0.06);">
+                        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:240px;">
+                            <div style="width:44px; height:44px; border-radius:12px; background:rgba(99,102,241,0.15); display:flex; align-items:center; justify-content:center; font-size:1.4rem;">
+                                ${item.icon || '📌'}
+                            </div>
+                            <div>
+                                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                    <span style="font-weight:900; font-size:1rem; color:var(--text-main);">${safeTitle}</span>
+                                    <span class="badge" style="background:rgba(99,102,241,0.12); color:#818cf8; font-size:0.74rem; font-weight:800; padding:2px 6px; border-radius:6px;">
+                                        ${deptText}
+                                    </span>
+                                    <span class="badge" style="background:rgba(245,158,11,0.15); color:#f59e0b; font-size:0.74rem; font-weight:800; padding:2px 6px; border-radius:6px;">
+                                        👤 ${safeWName}
+                                    </span>
+                                </div>
+                                <div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                                    <span>🎯 <strong>${isAr ? 'المستهدف / التكرار:' : 'Target:'}</strong> <span style="color:#6366f1; font-weight:800;">${safeAmt}</span></span>
+                                    <span>🕒 <strong>${isAr ? 'تاريخ الإسناد:' : 'Assigned:'}</strong> ${dateStr}</span>
+                                    ${item.assignedBy ? `<span>👤 <strong>${isAr ? 'بواسطة:' : 'By:'}</strong> ${typeof escapeHtml === 'function' ? escapeHtml(formatAssignerName(item.assignedBy)) : formatAssignerName(item.assignedBy)}</span>` : ''}
+                                </div>
+                                ${item.transferredFrom ? `
+                                    <div style="margin-top:4px; font-size:0.78rem; color:#f59e0b; font-weight:700;">
+                                        🔁 ${isAr ? `منقولة إليك من الزميل: ${typeof escapeHtml === 'function' ? escapeHtml(item.transferredFrom) : item.transferredFrom}` : `Transferred from colleague: ${item.transferredFrom}`}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+
+                        <!-- Action / Status Area -->
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                            ${isAdmin ? `
+                                <!-- Admin View: Status Tracking and Skipping Indicator ONLY (No acceptance button) -->
+                                <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
+                                    ${item.viewedAt ? `
+                                        <span class="badge" style="background:rgba(239,68,68,0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3); font-size:0.8rem; font-weight:800; padding:4px 10px; border-radius:8px;">
+                                            👁️ ${isAr ? `شاهدها الموظف: ${viewedDateStr}` : `Viewed by worker: ${viewedDateStr}`}
+                                        </span>
+                                        <span style="font-size:0.74rem; color:#f59e0b; font-weight:700;">
+                                            ⚠️ ${isAr ? 'الموظف اطلع على الطلب ولم يقم بالتأكيد بعد (تأخر في القبول)' : 'Worker opened request but hasn\'t accepted yet'}
+                                        </span>
+                                    ` : `
+                                        <span class="badge" style="background:rgba(107,114,128,0.15); color:var(--text-muted); border:1px solid var(--border-color); font-size:0.8rem; font-weight:800; padding:4px 10px; border-radius:8px;">
+                                            ⏳ ${isAr ? 'لم يشاهدها بعد (بانتظار دخوله لقسم العمليات)' : 'Not viewed yet (Awaiting worker login)'}
+                                        </span>
+                                    `}
+                                </div>
+                                <button type="button" onclick="unassignResponsibilityWorker('${item.subjectId}', '${item.workerId}')" class="btn-outline-danger" style="padding:8px 14px; border-radius:10px; font-weight:700; font-size:0.82rem; cursor:pointer;" title="${isAr ? 'إلغاء وسحب طلب التكليف' : 'Cancel Request'}">
+                                    ❌ ${isAr ? 'إلغاء الطلب' : 'Cancel'}
+                                </button>
+                            ` : `
+                                <!-- Worker View: Confirm & Activate button -->
+                                <button type="button" onclick="confirmWorkerResponsibility('${item.subjectId}', '${item.workerId}')" class="btn-success" style="padding:10px 20px; border-radius:10px; font-weight:800; font-size:0.9rem; background:linear-gradient(135deg, #10b981, #059669); color:white; border:none; cursor:pointer; display:flex; align-items:center; gap:8px; box-shadow:0 3px 12px rgba(16,185,129,0.35);">
+                                    <span>✅</span> <span>${isAr ? 'تأكيد الاستلام وتفعيل المسؤولية' : 'Confirm & Activate'}</span>
+                                </button>
+                            `}
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+}
+window.renderWorkerOperationsResponsibilitiesBanner = renderWorkerOperationsResponsibilitiesBanner;
+
+// 10. View Mode Switcher: Subjects Grid vs Worker-Centric Workload
+let currentConstantTasksViewMode = 'subjects';
+let currentWorkloadSelectedWorkerId = '';
+
+function setConstantTasksViewMode(mode, optWorkerId) {
+    currentConstantTasksViewMode = mode;
+    if (optWorkerId) currentWorkloadSelectedWorkerId = String(optWorkerId);
+
+    const btnSubjects = document.getElementById('resp-view-tab-subjects');
+    const btnWorkers = document.getElementById('resp-view-tab-workers');
+    const containerSubjects = document.getElementById('constant-subjects-view-container');
+    const containerWorkers = document.getElementById('constant-worker-workload-view');
+
+    if (mode === 'subjects') {
+        if (btnSubjects) {
+            btnSubjects.className = 'btn-primary';
+            btnSubjects.style.background = 'linear-gradient(135deg, #6366f1, #4f46e5)';
+            btnSubjects.style.color = 'white';
+        }
+        if (btnWorkers) {
+            btnWorkers.className = 'btn-outline';
+            btnWorkers.style.background = 'var(--input-bg)';
+            btnWorkers.style.color = 'var(--text-main)';
+        }
+        if (containerSubjects) containerSubjects.style.display = 'block';
+        if (containerWorkers) containerWorkers.style.display = 'none';
+        renderConstantTasks();
+    } else {
+        if (btnWorkers) {
+            btnWorkers.className = 'btn-primary';
+            btnWorkers.style.background = 'linear-gradient(135deg, #6366f1, #4f46e5)';
+            btnWorkers.style.color = 'white';
+        }
+        if (btnSubjects) {
+            btnSubjects.className = 'btn-outline';
+            btnSubjects.style.background = 'var(--input-bg)';
+            btnSubjects.style.color = 'var(--text-main)';
+        }
+        if (containerSubjects) containerSubjects.style.display = 'none';
+        if (containerWorkers) containerWorkers.style.display = 'block';
+        renderWorkerResponsibilitiesView(currentWorkloadSelectedWorkerId);
+    }
+}
+window.setConstantTasksViewMode = setConstantTasksViewMode;
+
+function onResponsibilityWorkerFilterChanged() {
+    const select = document.getElementById('resp-filter-worker-select');
+    const val = select ? select.value : 'all';
+    if (val !== 'all') {
+        setConstantTasksViewMode('workers', val);
+    } else {
+        renderConstantTasks();
+    }
+}
+window.onResponsibilityWorkerFilterChanged = onResponsibilityWorkerFilterChanged;
+
+// 11. Worker-Centric Workload & Responsibilities Inspector
+function renderWorkerResponsibilitiesView(optWorkerId) {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const container = document.getElementById('constant-worker-workload-view');
+    if (!container) return;
+
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const workers = companyData.workers || [];
+
+    if (workers.length === 0) {
+        container.innerHTML = `
+            <div style="background: var(--input-bg); border: 1px dashed var(--border-color); border-radius: 14px; padding: 28px; text-align: center; color: var(--text-muted);">
+                ⚠️ ${isAr ? 'لم يتم العثور على أي موظفين مسجلين في النظام.' : 'No registered employees found in the system.'}
+            </div>
+        `;
+        return;
+    }
+
+    let selectedWorker = null;
+    if (optWorkerId) {
+        selectedWorker = workers.find(w => String(w.id) === String(optWorkerId));
+    }
+    if (!selectedWorker && currentWorkloadSelectedWorkerId) {
+        selectedWorker = workers.find(w => String(w.id) === String(currentWorkloadSelectedWorkerId));
+    }
+    if (!selectedWorker) {
+        selectedWorker = workers[0];
+    }
+    currentWorkloadSelectedWorkerId = String(selectedWorker.id);
+
+    const allSubjects = getAllResponsibilitySubjects();
+
+    // Collect all responsibilities assigned to this selected worker
+    const workerAssignments = [];
+    allSubjects.forEach(s => {
+        const assignedMap = s.assignedWorkers || {};
+        const a = assignedMap[selectedWorker.id] || Object.values(assignedMap).find(x => x && (String(x.workerId) === String(selectedWorker.id)));
+        if (a) {
+            let viewedAt = a.viewedAt;
+            if (!viewedAt && selectedWorker.pendingResponsibilities) {
+                let pList = selectedWorker.pendingResponsibilities;
+                if (!Array.isArray(pList)) pList = Object.values(pList);
+                const pItem = pList.find(p => p && String(p.subjectId) === String(s.id));
+                if (pItem && pItem.viewedAt) viewedAt = pItem.viewedAt;
+            }
+
+            workerAssignments.push({
+                subjectId: s.id,
+                title: s.title,
+                icon: s.icon || '📌',
+                dept: s.dept || 'general',
+                amount: a.amount || s.amount || (isAr ? 'يومي' : 'Daily'),
+                assignedAt: a.assignedAt,
+                assignedBy: a.assignedBy,
+                confirmedAt: a.confirmedAt,
+                viewedAt: viewedAt,
+                transferredFrom: a.transferredFrom,
+                status: a.status || (a.confirmedAt ? 'active' : 'pending_confirmation')
+            });
+        }
+    });
+
+    const activeDuties = workerAssignments.filter(a => a.status === 'active' || a.confirmedAt);
+    const pendingDuties = workerAssignments.filter(a => a.status === 'pending_confirmation' && !a.confirmedAt);
+
+    // Calculate normal tasks completed & stats
+    let completedJobsCount = 0;
+    if (selectedWorker.jobs) {
+        const jobs = Array.isArray(selectedWorker.jobs) ? selectedWorker.jobs : Object.values(selectedWorker.jobs);
+        completedJobsCount = jobs.filter(j => j && (j.completed || j.status === 'completed')).length;
+    }
+
+    const deptLabels = {
+        general: isAr ? 'عام' : 'General',
+        kitchen: isAr ? 'المطبخ' : 'Kitchen',
+        hall: isAr ? 'الصالة والخدمة' : 'Hall',
+        cashier: isAr ? 'الكاشير' : 'Cashier',
+        warehouse: isAr ? 'المستودع' : 'Warehouse'
+    };
+
+    container.innerHTML = `
+        <!-- Worker Picker Bar -->
+        <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 14px; padding: 12px 16px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 260px;">
+                <label style="font-weight: 800; font-size: 0.85rem; color: var(--text-main); white-space: nowrap; margin: 0;">
+                    👤 ${isAr ? 'اختر الموظف لعرض ملف المسؤوليات:' : 'Select Employee Profile:'}
+                </label>
+                <select id="worker-workload-select" onchange="renderWorkerResponsibilitiesView(this.value)" style="flex: 1; padding: 9px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-weight: 800; font-size: 0.9rem;">
+                    ${workers.map(w => {
+                        let totalAssigned = 0;
+                        allSubjects.forEach(s => { if (s.assignedWorkers && s.assignedWorkers[w.id]) totalAssigned++; });
+                        return `<option value="${w.id}" ${String(w.id) === String(selectedWorker.id) ? 'selected' : ''}>👤 ${w.name} (${totalAssigned} ${isAr ? 'مسؤوليات' : 'tasks'}) - ${w.role || (isAr ? 'موظف' : 'Staff')}</option>`;
+                    }).join('')}
+                </select>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button type="button" onclick="setConstantTasksViewMode('subjects')" class="btn-neutral" style="padding: 8px 14px; border-radius: 10px; font-weight: 800; font-size: 0.82rem; cursor: pointer;">
+                    ⬅️ ${isAr ? 'العودة للمواضيع' : 'Back to Subjects'}
+                </button>
+            </div>
+        </div>
+
+        <!-- Selected Worker Profile Header Card -->
+        <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 16px; padding: 18px 20px; margin-bottom: 20px; box-shadow: 0 4px 18px rgba(0,0,0,0.12);">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <div style="width: 52px; height: 52px; border-radius: 16px; background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 900; box-shadow: 0 4px 12px rgba(99,102,241,0.35);">
+                        👤
+                    </div>
+                    <div>
+                        <h2 style="margin: 0; font-size: 1.25rem; font-weight: 900; color: var(--text-main);">
+                            ${typeof escapeHtml === 'function' ? escapeHtml(selectedWorker.name) : selectedWorker.name}
+                        </h2>
+                        <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px; flex-wrap: wrap;">
+                            <span class="badge" style="background: rgba(99,102,241,0.15); color: #818cf8; font-size: 0.78rem; font-weight: 800; padding: 3px 8px; border-radius: 6px;">
+                                💼 ${selectedWorker.role || (isAr ? 'موظف تشغيلي' : 'Operations Staff')}
+                            </span>
+                            <span class="badge" style="background: var(--input-bg); color: var(--text-muted); font-size: 0.78rem; font-weight: 700; padding: 3px 8px; border-radius: 6px;">
+                                🏢 ${selectedWorker.branch || (isAr ? 'الفرع الرئيسي' : 'Main Branch')}
+                            </span>
+                            ${selectedWorker.email ? `<span style="font-size: 0.78rem; color: var(--text-muted);">📧 ${selectedWorker.email}</span>` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Metric Cards Grid -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+                <div style="background: var(--input-bg); border: 1px solid rgba(16,185,129,0.25); border-radius: 12px; padding: 12px 16px;">
+                    <div style="font-size: 0.78rem; font-weight: 800; color: var(--text-muted);">${isAr ? 'المسؤوليات المستمرة النشطة' : 'Active Constant Duties'}</div>
+                    <div style="font-size: 1.4rem; font-weight: 900; color: #10b981; margin-top: 4px;">
+                        📌 ${activeDuties.length} ${isAr ? 'مسؤوليات' : 'Duties'}
+                    </div>
+                </div>
+                <div style="background: var(--input-bg); border: 1px solid rgba(245,158,11,0.25); border-radius: 12px; padding: 12px 16px;">
+                    <div style="font-size: 0.78rem; font-weight: 800; color: var(--text-muted);">${isAr ? 'بانتظار تأكيد الموظف (بالعمليات)' : 'Awaiting Confirmation (Ops)'}</div>
+                    <div style="font-size: 1.4rem; font-weight: 900; color: #f59e0b; margin-top: 4px;">
+                        ⏳ ${pendingDuties.length} ${isAr ? 'بانتظار التأكيد' : 'Pending'}
+                    </div>
+                </div>
+                <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 16px;">
+                    <div style="font-size: 0.78rem; font-weight: 800; color: var(--text-muted);">${isAr ? 'إجمالي المهام الفردية المنجزة' : 'Individual Tasks Completed'}</div>
+                    <div style="font-size: 1.4rem; font-weight: 900; color: #6366f1; margin-top: 4px;">
+                        🏆 ${completedJobsCount} ${isAr ? 'مهمة' : 'Tasks'}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Assigned Responsibilities & Constant Tasks List -->
+        <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 16px; padding: 18px 20px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 900; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                    <span>📋</span> <span>${isAr ? 'قائمة المسؤوليات والواجبات المستمرة المسندة للموظف' : 'Assigned Responsibilities & Duties List'}</span>
+                </h3>
+                <span class="badge" style="background: #6366f1; color: white; font-size: 0.8rem; font-weight: 800; padding: 4px 10px; border-radius: 8px;">
+                    ${workerAssignments.length} ${isAr ? 'واجبات إجمالية' : 'Total Duties'}
+                </span>
+            </div>
+
+            <!-- Inline Transfer Box inside Worker View -->
+            <div id="worker-view-transfer-box" style="display: none; background: rgba(99,102,241,0.08); border: 1px solid #6366f1; border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+                <div style="font-weight: 800; font-size: 0.88rem; color: #818cf8; margin-bottom: 8px;">
+                    🔁 ${isAr ? 'نقل المسؤولية من هذا الموظف إلى موظف بديل:' : 'Transfer duty from this employee to replacement worker:'}
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <input type="hidden" id="wv-transfer-subject-id">
+                    <select id="wv-transfer-to-select" style="flex: 1; min-width: 200px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-weight: 700; font-size: 0.85rem;"></select>
+                    <button type="button" onclick="confirmWorkerWorkloadTransfer()" class="btn-primary" style="padding: 8px 16px; border-radius: 8px; font-weight: 800; font-size: 0.85rem; background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; border: none; cursor: pointer;">
+                        ✅ ${isAr ? 'تأكيد النقل' : 'Confirm Transfer'}
+                    </button>
+                    <button type="button" onclick="document.getElementById('worker-view-transfer-box').style.display='none'" class="btn-neutral" style="padding: 8px 12px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer;">
+                        ${isAr ? 'إلغاء' : 'Cancel'}
+                    </button>
+                </div>
+            </div>
+
+            ${workerAssignments.length === 0 ? `
+                <div style="background: var(--input-bg); border: 1px dashed var(--border-color); border-radius: 14px; padding: 28px; text-align: center; color: var(--text-muted);">
+                    <div style="font-size: 1.8rem; margin-bottom: 6px;">📌</div>
+                    <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-main); margin-bottom: 4px;">
+                        ${isAr ? `لا توجد مسؤوليات مستمرة مسندة إلى (${selectedWorker.name}) حالياً` : `No constant duties assigned to (${selectedWorker.name}) yet`}
+                    </div>
+                    <p style="font-size: 0.82rem; margin: 0 0 12px 0;">
+                        ${isAr ? 'يمكنك إسناد مسؤولية جديدة له باستخدام النموذج أدناه.' : 'You can assign a new responsibility to this worker using the quick form below.'}
+                    </p>
+                </div>
+            ` : `
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    ${workerAssignments.map(duty => {
+                        const assignDateStr = duty.assignedAt ? new Date(duty.assignedAt).toLocaleString(isAr ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+                        const confirmDateStr = duty.confirmedAt ? new Date(duty.confirmedAt).toLocaleString(isAr ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
+                        const safeTitle = typeof escapeHtml === 'function' ? escapeHtml(duty.title) : duty.title;
+                        const safeAmt = typeof escapeHtml === 'function' ? escapeHtml(duty.amount) : duty.amount;
+                        const deptText = deptLabels[duty.dept] || duty.dept || 'General';
+                        const isConfirmed = (duty.status === 'active' || duty.confirmedAt);
+
+                        return `
+                            <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 14px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;">
+                                <div style="display: flex; align-items: flex-start; gap: 12px; flex: 1; min-width: 260px;">
+                                    <div style="width: 44px; height: 44px; border-radius: 12px; background: ${isConfirmed ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)'}; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0;">
+                                        ${duty.icon || '📌'}
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                            <span style="font-weight: 900; font-size: 0.98rem; color: var(--text-main);">${safeTitle}</span>
+                                            <span class="badge" style="background: rgba(99,102,241,0.12); color: #818cf8; font-size: 0.72rem; font-weight: 800; padding: 2px 6px; border-radius: 6px;">
+                                                ${deptText}
+                                            </span>
+                                            ${isConfirmed ? `
+                                                <span class="badge" style="background: rgba(16,185,129,0.15); color: #10b981; font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 6px;">
+                                                    🟢 ${isAr ? 'نشطة ومؤكدة' : 'Active & Confirmed'}
+                                                </span>
+                                            ` : (duty.viewedAt ? `
+                                                <span class="badge" style="background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 6px;" title="${isAr ? 'شاهد الموظف الطلب ولم يؤكده بعد' : 'Viewed by worker, pending confirmation'}">
+                                                    👁️ ${isAr ? `شاهدها الموظف (${new Date(duty.viewedAt).toLocaleTimeString(isAr ? 'ar-EG' : 'en-US', {hour:'2-digit', minute:'2-digit'})})` : `Viewed (${new Date(duty.viewedAt).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'})})`}
+                                                </span>
+                                            ` : `
+                                                <span class="badge" style="background: rgba(245,158,11,0.15); color: #f59e0b; font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 6px;">
+                                                    ⏳ ${isAr ? 'لم يشاهدها بعد' : 'Not viewed yet'}
+                                                </span>
+                                            `)}
+                                        </div>
+                                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 6px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+                                            <span>🎯 <strong>${isAr ? 'المستهدف / التكرار:' : 'Target:'}</strong> <span style="color: #6366f1; font-weight: 800;">${safeAmt}</span></span>
+                                            <span>🕒 <strong>${isAr ? 'تاريخ التكليف:' : 'Assigned:'}</strong> ${assignDateStr}</span>
+                                            ${duty.assignedBy ? `<span>👤 <strong>${isAr ? 'بواسطة:' : 'By:'}</strong> ${typeof escapeHtml === 'function' ? escapeHtml(formatAssignerName(duty.assignedBy)) : formatAssignerName(duty.assignedBy)}</span>` : ''}
+                                        </div>
+                                        ${confirmDateStr ? `
+                                            <div style="font-size: 0.76rem; color: #10b981; margin-top: 3px; font-weight: 700;">
+                                                ✅ ${isAr ? `تم التأكيد والاستلام بتاريخ: ${confirmDateStr}` : `Confirmed on: ${confirmDateStr}`}
+                                            </div>
+                                        ` : ''}
+                                        ${duty.transferredFrom ? `
+                                            <div style="font-size: 0.76rem; color: #f59e0b; margin-top: 3px; font-weight: 700;">
+                                                🔁 ${isAr ? `منقولة من الزميل: ${typeof escapeHtml === 'function' ? escapeHtml(duty.transferredFrom) : duty.transferredFrom}` : `Transferred from colleague: ${duty.transferredFrom}`}
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+
+                                <!-- Action Buttons Beside Responsibility -->
+                                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                    <button type="button" onclick="startWorkerWorkloadTransfer('${duty.subjectId}')" class="btn-primary" style="padding: 8px 14px; border-radius: 8px; font-weight: 800; font-size: 0.82rem; background: linear-gradient(135deg, #6366f1, #4f46e5); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(99,102,241,0.25);">
+                                        <span>🔁</span> <span>${isAr ? 'نقل المهمة' : 'Transfer'}</span>
+                                    </button>
+                                    <button type="button" onclick="unassignResponsibilityWorker('${duty.subjectId}', '${selectedWorker.id}')" class="btn-outline-danger" style="padding: 8px 12px; border-radius: 8px; font-weight: 700; font-size: 0.82rem; cursor: pointer;" title="${isAr ? 'إلغاء التكليف' : 'Unassign'}">
+                                        ❌ ${isAr ? 'إلغاء التكليف' : 'Unassign'}
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `}
+
+            <!-- Quick Assign Strip for this Worker -->
+            <div style="border-top: 1px solid var(--border-color); margin-top: 20px; padding-top: 16px;">
+                <div style="font-weight: 800; font-size: 0.88rem; color: var(--text-main); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                    <span>➕</span> <span>${isAr ? `إسناد مسؤولية جديدة إلى (${selectedWorker.name}):` : `Assign New Duty to (${selectedWorker.name}):`}</span>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <select id="wv-quick-subject-select" style="flex: 2; min-width: 220px; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-weight: 700; font-size: 0.85rem;">
+                        <option value="">-- ${isAr ? 'اختر موضوع المسؤولية للإسناد' : 'Select Responsibility Subject'} --</option>
+                        ${allSubjects.map(s => {
+                            const isAlready = workerAssignments.some(a => String(a.subjectId) === String(s.id));
+                            return `<option value="${s.id}" ${isAlready ? 'disabled style="color:var(--text-muted);"' : ''}>${s.icon || '📌'} ${s.title} ${isAlready ? `(${isAr ? 'مسندة له بالفعل' : 'Already Assigned'})` : ''}</option>`;
+                        }).join('')}
+                    </select>
+                    <input type="text" id="wv-quick-amount-input" placeholder="${isAr ? 'الكمية/التكرار (مثل: يومي، طوال الوردية)' : 'e.g. Daily, Full Shift'}" style="flex: 1; min-width: 150px; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.85rem;">
+                    <button type="button" onclick="assignFromWorkerWorkloadView()" class="btn-primary" style="padding: 9px 18px; border-radius: 10px; font-weight: 800; font-size: 0.85rem; background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 3px 10px rgba(16,185,129,0.3);">
+                        <span>➕</span> <span>${isAr ? 'إسناد للموظف' : 'Assign Duty'}</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+window.renderWorkerResponsibilitiesView = renderWorkerResponsibilitiesView;
+
+function assignFromWorkerWorkloadView() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    if (!currentWorkloadSelectedWorkerId) return;
+
+    const subSelect = document.getElementById('wv-quick-subject-select');
+    const amtInput = document.getElementById('wv-quick-amount-input');
+    const subjectId = subSelect ? subSelect.value : '';
+    const amount = amtInput ? amtInput.value.trim() : '';
+
+    if (!subjectId) {
+        alert(isAr ? 'الرجاء اختيار موضوع المسؤولية أولاً.' : 'Please select responsibility subject.');
+        return;
+    }
+
+    assignResponsibilityToWorker(subjectId, currentWorkloadSelectedWorkerId, amount);
+}
+window.assignFromWorkerWorkloadView = assignFromWorkerWorkloadView;
+
+function startWorkerWorkloadTransfer(subjectId) {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const box = document.getElementById('worker-view-transfer-box');
+    const toSelect = document.getElementById('wv-transfer-to-select');
+    const subInput = document.getElementById('wv-transfer-subject-id');
+
+    if (!box || !toSelect || !subInput) return;
+
+    subInput.value = subjectId;
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const workers = companyData.workers || [];
+
+    let opts = `<option value="">-- ${isAr ? 'اختر الموظف البديل لنقل المهمة إليه' : 'Choose Replacement Worker'} --</option>`;
+    workers.forEach(w => {
+        if (String(w.id) !== String(currentWorkloadSelectedWorkerId)) {
+            opts += `<option value="${w.id}">👤 ${w.name} (${w.role || 'Staff'})</option>`;
+        }
+    });
+    toSelect.innerHTML = opts;
+
+    box.style.display = 'block';
+    box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+window.startWorkerWorkloadTransfer = startWorkerWorkloadTransfer;
+
+function confirmWorkerWorkloadTransfer() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const subInput = document.getElementById('wv-transfer-subject-id');
+    const toSelect = document.getElementById('wv-transfer-to-select');
+
+    const subjectId = subInput ? subInput.value : '';
+    const toWorkerId = toSelect ? toSelect.value : '';
+
+    if (!subjectId || !currentWorkloadSelectedWorkerId || !toWorkerId) {
+        alert(isAr ? 'الرجاء اختيار الموظف البديل.' : 'Please select replacement worker.');
+        return;
+    }
+
+    transferResponsibilityWorker(subjectId, currentWorkloadSelectedWorkerId, toWorkerId);
+}
+window.confirmWorkerWorkloadTransfer = confirmWorkerWorkloadTransfer;
+
+// Open Info Inspector & Transfer Modal
 function openResponsibilityInfoModal(subjectId) {
     const modal = document.getElementById('modal-responsibility-info');
     if (!modal) return;
@@ -9525,7 +10433,16 @@ function openResponsibilityInfoModal(subjectId) {
         deptEl.textContent = deptNames[subject.dept] || subject.dept || 'General';
     }
     if (amountEl) amountEl.textContent = subject.amount || (isAr ? 'يومي' : 'Daily');
-    const countText = isAr ? `👥 ${assignedList.length} عمال مكلفين` : `👥 ${assignedList.length} Assigned Workers`;
+    const activeList = assignedList.filter(a => a.status === 'active' || a.confirmedAt);
+    const pendingList = assignedList.filter(a => a.status === 'pending_confirmation' && !a.confirmedAt);
+    let countText = '';
+    if (isAr) {
+        countText = `👥 ${activeList.length} مكلفين`;
+        if (pendingList.length > 0) countText += ` • ⏳ ${pendingList.length} قيد الانتظار`;
+    } else {
+        countText = `👥 ${activeList.length} Active`;
+        if (pendingList.length > 0) countText += ` • ⏳ ${pendingList.length} Pending`;
+    }
     if (countEl) countEl.textContent = countText;
     if (activeBadgeNum) activeBadgeNum.textContent = countText;
 
@@ -9562,24 +10479,41 @@ function openResponsibilityInfoModal(subjectId) {
                 const dateStr = a.assignedAt ? new Date(a.assignedAt).toLocaleString(isAr ? 'ar-EG' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
                 const safeName = typeof escapeHtml === 'function' ? escapeHtml(a.workerName) : a.workerName;
                 const safeAmount = typeof escapeHtml === 'function' ? escapeHtml(a.amount || subject.amount || '') : (a.amount || '');
+                const safeAssigner = a.assignedBy ? formatAssignerName(a.assignedBy) : '';
+                const isConfirmed = (a.status === 'active' || a.confirmedAt);
 
                 return `
                     <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 14px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
                         <div style="display: flex; align-items: center; gap: 10px;">
-                            <div style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1rem;">
-                                👤
+                            <div style="width: 38px; height: 38px; border-radius: 50%; background: ${isConfirmed ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #f59e0b, #d97706)'}; color: white; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1rem;">
+                                ${isConfirmed ? '👤' : '⏳'}
                             </div>
                             <div>
-                                <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-main);">${safeName}</div>
+                                <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                                    <span>${safeName}</span>
+                                    ${isConfirmed ? `
+                                        <span class="badge" style="background: rgba(16,185,129,0.15); color: #10b981; font-size: 0.72rem; font-weight: 800; padding: 2px 6px; border-radius: 6px;">
+                                            🟢 ${isAr ? 'مؤكدة' : 'Active'}
+                                        </span>
+                                    ` : (a.viewedAt ? `
+                                        <span class="badge" style="background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); font-size: 0.72rem; font-weight: 800; padding: 2px 6px; border-radius: 6px;" title="${isAr ? 'شاهد الموظف الطلب ولم يؤكده بعد' : 'Viewed by worker, pending confirmation'}">
+                                            👁️ ${isAr ? `شاهدها الموظف (${new Date(a.viewedAt).toLocaleTimeString(isAr ? 'ar-EG' : 'en-US', {hour:'2-digit', minute:'2-digit'})})` : `Viewed (${new Date(a.viewedAt).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'})})`}
+                                        </span>
+                                    ` : `
+                                        <span class="badge" style="background: rgba(245,158,11,0.15); color: #f59e0b; font-size: 0.72rem; font-weight: 800; padding: 2px 6px; border-radius: 6px;">
+                                            ⏳ ${isAr ? 'لم يشاهدها بعد' : 'Not viewed yet'}
+                                        </span>
+                                    `)}
+                                </div>
                                 <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 2px;">
                                     🕒 ${isAr ? 'تاريخ التكليف:' : 'Assigned:'} <strong style="color: var(--text-main);">${dateStr}</strong>
-                                    ${a.assignedBy ? ` • <span style="color:#6366f1;">${a.assignedBy}</span>` : ''}
+                                    ${safeAssigner ? ` • <span style="color:#6366f1;">👤 ${typeof escapeHtml === 'function' ? escapeHtml(safeAssigner) : safeAssigner}</span>` : ''}
                                     ${safeAmount ? ` • 🎯 <span style="color:#10b981;">${safeAmount}</span>` : ''}
                                 </div>
                             </div>
                         </div>
                         <div style="display: flex; gap: 8px; align-items: center;">
-                            <button type="button" onclick="startInlineTransfer('${subject.id}', '${a.workerId}', '${safeName}')" class="btn-outline" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 800; border-radius: 8px; color: #6366f1; border-color: #6366f1; cursor: pointer; background: rgba(99,102,241,0.08); display: flex; align-items: center; gap: 4px;">
+                            <button type="button" onclick="startInlineTransfer('${subject.id}', '${a.workerId}', '${safeName.replace(/'/g, "\\'")}')" class="btn-outline" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 800; border-radius: 8px; color: #6366f1; border-color: #6366f1; cursor: pointer; background: rgba(99,102,241,0.08); display: flex; align-items: center; gap: 4px;">
                                 <span>🔁</span> <span>${isAr ? 'نقل المهمة' : 'Transfer'}</span>
                             </button>
                             <button type="button" onclick="unassignResponsibilityWorker('${subject.id}', '${a.workerId}')" class="btn-outline-danger" style="padding: 6px 10px; font-size: 0.8rem; font-weight: 800; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
@@ -9603,11 +10537,16 @@ function openResponsibilityInfoModal(subjectId) {
         } else {
             timelineContainer.innerHTML = historyLog.map(item => {
                 const dateStr = item.timestamp ? new Date(item.timestamp).toLocaleString(isAr ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+                const safeBy = item.by ? formatAssignerName(item.by) : '';
                 let iconStr = '🟢';
                 let typeClass = 'log-assigned';
                 let typeTitle = isAr ? 'تكليف موظف' : 'Worker Assigned';
 
-                if (item.type === 'transferred') {
+                if (item.type === 'confirmed') {
+                    iconStr = '✅';
+                    typeClass = 'log-confirmed';
+                    typeTitle = isAr ? `تأكيد استلام: (${item.workerName || '-'})` : `Confirmed: (${item.workerName || '-'})`;
+                } else if (item.type === 'transferred') {
                     iconStr = '🔁';
                     typeClass = 'log-transferred';
                     typeTitle = isAr ? `نقل مسؤولية: من (${item.fromWorkerName || '-'}) إلى (${item.toWorkerName || '-'})` : `Transferred from (${item.fromWorkerName || '-'}) to (${item.toWorkerName || '-'})`;
@@ -9616,7 +10555,7 @@ function openResponsibilityInfoModal(subjectId) {
                     typeClass = 'log-unassigned';
                     typeTitle = isAr ? `إلغاء تكليف: (${item.workerName || '-'})` : `Unassigned: (${item.workerName || '-'})`;
                 } else {
-                    typeTitle = isAr ? `تكليف: (${item.workerName || '-'})` : `Assigned: (${item.workerName || '-'})`;
+                    typeTitle = isAr ? `طلب تكليف: (${item.workerName || '-'})` : `Assigned: (${item.workerName || '-'})`;
                 }
 
                 return `
@@ -9625,7 +10564,7 @@ function openResponsibilityInfoModal(subjectId) {
                             <span>${iconStr}</span> <span>${typeTitle}</span>
                         </div>
                         <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 2px;">
-                            📅 ${dateStr} ${item.by ? `• 👤 <span style="color: #6366f1;">${item.by}</span>` : ''}
+                            📅 ${dateStr} ${safeBy ? `• 👤 <span style="color: #6366f1;">${typeof escapeHtml === 'function' ? escapeHtml(safeBy) : safeBy}</span>` : ''}
                         </div>
                         ${item.note ? `<div style="font-size: 0.78rem; color: var(--text-main); margin-top: 3px; background: rgba(255,255,255,0.03); padding: 4px 8px; border-radius: 6px; display: inline-block;">${typeof escapeHtml === 'function' ? escapeHtml(item.note) : item.note}</div>` : ''}
                     </div>
@@ -9720,7 +10659,7 @@ function confirmInlineTransfer() {
 }
 window.confirmInlineTransfer = confirmInlineTransfer;
 
-// 9. Main Render Function: Constant Responsibilities Grid & HUD
+// 12. Main Render Function: Constant Responsibilities Grid & HUD
 function renderConstantTasks() {
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     const grid = document.getElementById('constant-responsibilities-grid');
@@ -9731,17 +10670,39 @@ function renderConstantTasks() {
     const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
     const filterSelect = document.getElementById('resp-filter-status');
     const filterStatus = filterSelect ? filterSelect.value : 'all';
+    const filterWorkerSelect = document.getElementById('resp-filter-worker-select');
+    const filterWorkerId = filterWorkerSelect ? filterWorkerSelect.value : 'all';
 
-    let totalAssignments = 0;
+    // Populate worker filter select in toolbar if empty or on update
+    if (filterWorkerSelect) {
+        const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+        const workers = companyData.workers || [];
+        const currentSelected = filterWorkerSelect.value || 'all';
+        let opts = `<option value="all">${isAr ? '👥 تصفية حسب الموظف (الجميع)' : '👥 Filter by Worker (All)'}</option>`;
+        workers.forEach(w => {
+            opts += `<option value="${w.id}" ${String(w.id) === String(currentSelected) ? 'selected' : ''}>👤 ${w.name}</option>`;
+        });
+        filterWorkerSelect.innerHTML = opts;
+    }
+
+    let totalActiveAssignments = 0;
+    let totalPendingAssignments = 0;
     allSubjects.forEach(s => {
         const assigned = s.assignedWorkers ? Object.values(s.assignedWorkers).filter(w => w && w.workerId) : [];
-        totalAssignments += assigned.length;
+        totalActiveAssignments += assigned.filter(a => a.status === 'active' || a.confirmedAt).length;
+        totalPendingAssignments += assigned.filter(a => a.status === 'pending_confirmation' && !a.confirmedAt).length;
     });
 
     const statSubjects = document.getElementById('resp-stat-total-subjects');
     const statAssignments = document.getElementById('resp-stat-total-assignments');
     if (statSubjects) statSubjects.textContent = allSubjects.length;
-    if (statAssignments) statAssignments.textContent = totalAssignments;
+    if (statAssignments) {
+        if (totalPendingAssignments > 0) {
+            statAssignments.innerHTML = `${totalActiveAssignments} <span style="font-size:0.75rem; color:#f59e0b; font-weight:700;">(+${totalPendingAssignments} ${isAr ? 'قيد الانتظار' : 'Pending'})</span>`;
+        } else {
+            statAssignments.textContent = totalActiveAssignments;
+        }
+    }
 
     let filtered = allSubjects.filter(s => {
         const assigned = s.assignedWorkers ? Object.values(s.assignedWorkers).filter(w => w && w.workerId) : [];
@@ -9749,6 +10710,11 @@ function renderConstantTasks() {
 
         if (filterStatus === 'assigned' && !isAssigned) return false;
         if (filterStatus === 'unassigned' && isAssigned) return false;
+
+        if (filterWorkerId && filterWorkerId !== 'all') {
+            const hasWorker = assigned.some(w => String(w.workerId) === String(filterWorkerId));
+            if (!hasWorker) return false;
+        }
 
         if (query) {
             const matchTitle = (s.title && s.title.toLowerCase().includes(query));
@@ -9780,7 +10746,9 @@ function renderConstantTasks() {
 
     grid.innerHTML = filtered.map(s => {
         const assigned = s.assignedWorkers ? Object.values(s.assignedWorkers).filter(w => w && w.workerId) : [];
-        const count = assigned.length;
+        const activeWorkers = assigned.filter(a => a.status === 'active' || a.confirmedAt);
+        const pendingWorkers = assigned.filter(a => a.status === 'pending_confirmation' && !a.confirmedAt);
+
         const safeTitle = typeof escapeHtml === 'function' ? escapeHtml(s.title) : s.title;
         const displayTitle = safeTitle.replace(/'/g, "\\'");
         const safeAmt = typeof escapeHtml === 'function' ? escapeHtml(s.amount || (isAr ? 'يومي' : 'Daily')) : (s.amount || 'Daily');
@@ -9796,19 +10764,39 @@ function renderConstantTasks() {
         const deptLabel = deptNames[s.dept] || s.dept || 'General';
 
         let workersPreviewHtml = '';
-        if (count > 0) {
-            workersPreviewHtml = `
-                <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;">
-                    ${assigned.map(a => `
-                        <span class="resp-worker-chip" title="${isAr ? 'تاريخ التكليف: ' + (a.assignedAt ? new Date(a.assignedAt).toLocaleDateString() : '') : ''}">
-                            <span>👤</span> <span>${typeof escapeHtml === 'function' ? escapeHtml(a.workerName) : a.workerName}</span>
-                        </span>
-                    `).join('')}
-                </div>
-            `;
+        if (activeWorkers.length > 0 || pendingWorkers.length > 0) {
+            let parts = [];
+            if (activeWorkers.length > 0) {
+                parts.push(`
+                    <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
+                        ${activeWorkers.map(a => `
+                            <span class="resp-worker-chip" onclick="setConstantTasksViewMode('workers', '${a.workerId}')" style="cursor:pointer; background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.25);" title="${isAr ? 'موظف نشط ومستلم للمهمة' : 'Active assigned worker'}">
+                                <span>👤</span> <span>${typeof escapeHtml === 'function' ? escapeHtml(a.workerName) : a.workerName}</span>
+                            </span>
+                        `).join('')}
+                    </div>
+                `);
+            }
+            if (pendingWorkers.length > 0) {
+                parts.push(`
+                    <div style="margin-top: ${activeWorkers.length > 0 ? '8px' : '8px'}; border-top: ${activeWorkers.length > 0 ? '1px dashed var(--border-color)' : 'none'}; padding-top: ${activeWorkers.length > 0 ? '6px' : '0'};">
+                        <div style="font-size: 0.72rem; color: #f59e0b; font-weight: 800; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
+                            <span>⏳</span> <span>${isAr ? 'بانتظار قبول واستلام:' : 'Pending Acceptance:'}</span>
+                        </div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                            ${pendingWorkers.map(a => `
+                                <span class="resp-worker-chip" onclick="setConstantTasksViewMode('workers', '${a.workerId}')" style="cursor:pointer; background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px dashed rgba(245,158,11,0.4);" title="${a.viewedAt ? (isAr ? 'شاهد الطلب ولم يقبل بعد' : 'Viewed request, not accepted yet') : (isAr ? 'لم يشاهد الطلب بعد' : 'Not viewed yet')}">
+                                    <span>${a.viewedAt ? '👁️' : '⏳'}</span> <span>${typeof escapeHtml === 'function' ? escapeHtml(a.workerName) : a.workerName}</span>
+                                </span>
+                            `).join('')}
+                        </div>
+                    </div>
+                `);
+            }
+            workersPreviewHtml = parts.join('');
         } else {
             workersPreviewHtml = `
-                <div style="margin-top: 10px; font-size: 0.78rem; color: #f59e0b; font-weight: 700; display: flex; align-items: center; gap: 4px;">
+                <div style="margin-top: 10px; font-size: 0.78rem; color: var(--text-muted); font-weight: 700; display: flex; align-items: center; gap: 4px;">
                     <span>⚠️</span> <span>${isAr ? 'غير مخصصة لأي موظف حالياً' : 'Unassigned (No workers)'}</span>
                 </div>
             `;
@@ -9843,13 +10831,26 @@ function renderConstantTasks() {
 
                     <!-- Middle: Worker Count & Preview -->
                     <div style="border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 6px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
                             <span style="font-size: 0.8rem; font-weight: 800; color: var(--text-muted);">
                                 ${isAr ? 'الموظفون المكلفون:' : 'Assigned Workers:'}
                             </span>
-                            <span class="badge" style="background: ${count > 0 ? 'linear-gradient(135deg, #10b981, #059669)' : 'rgba(245,158,11,0.2)'}; color: ${count > 0 ? '#ffffff' : '#f59e0b'}; font-size: 0.78rem; font-weight: 900; padding: 3px 8px; border-radius: 8px;">
-                                👥 ${count} ${isAr ? 'عمال' : 'Workers'}
-                            </span>
+                            <div style="display: flex; gap: 5px; align-items: center; flex-wrap: wrap;">
+                                ${activeWorkers.length > 0 ? `
+                                    <span class="badge" style="background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; font-size: 0.78rem; font-weight: 900; padding: 3px 8px; border-radius: 8px;">
+                                        👥 ${activeWorkers.length} ${isAr ? 'مكلفين' : 'Active'}
+                                    </span>
+                                ` : `
+                                    <span class="badge" style="background: rgba(107,114,128,0.15); color: var(--text-muted); font-size: 0.78rem; font-weight: 800; padding: 3px 8px; border-radius: 8px;">
+                                        👥 0 ${isAr ? 'مكلفين' : 'Active'}
+                                    </span>
+                                `}
+                                ${pendingWorkers.length > 0 ? `
+                                    <span class="badge" style="background: rgba(245,158,11,0.18); color: #f59e0b; border: 1px solid rgba(245,158,11,0.35); font-size: 0.78rem; font-weight: 800; padding: 3px 8px; border-radius: 8px;" title="${isAr ? 'بانتظار تأكيد واستلام الموظف' : 'Awaiting worker confirmation'}">
+                                        ⏳ ${pendingWorkers.length} ${isAr ? 'قيد الانتظار' : 'Pending'}
+                                    </span>
+                                ` : ''}
+                            </div>
                         </div>
                         ${workersPreviewHtml}
                     </div>
@@ -9865,7 +10866,6 @@ function renderConstantTasks() {
         `;
     }).join('');
 
-    // Also update worker's own view if applicable
     renderWorkerOwnConstantTasksCard();
 }
 window.renderConstantTasks = renderConstantTasks;
@@ -9905,6 +10905,9 @@ function renderWorkerOwnConstantTasksCard() {
             );
         }
     }
+    if (!myWorker && currentUser && currentUser.name) {
+        myWorker = workers.find(w => w.name && String(w.name).trim().toLowerCase() === String(currentUser.name).trim().toLowerCase());
+    }
 
     if (isAdmin) {
         workerCard.style.display = 'none';
@@ -9914,17 +10917,82 @@ function renderWorkerOwnConstantTasksCard() {
         if (!Array.isArray(myTasks)) myTasks = Object.values(myTasks);
         myTasks = myTasks.filter(ct => ct && (ct.id || ct.title));
 
+        // Also gather any pending responsibilities for this worker
+        const allSubjects = getAllResponsibilitySubjects();
+        const pendingForMe = [];
+        allSubjects.forEach(s => {
+            if (s.assignedWorkers && s.assignedWorkers[myWorker.id]) {
+                const a = s.assignedWorkers[myWorker.id];
+                if (a.status === 'pending_confirmation' && !a.confirmedAt) {
+                    pendingForMe.push({
+                        subjectId: s.id,
+                        title: s.title,
+                        icon: s.icon || '📌',
+                        dept: s.dept || 'general',
+                        amount: a.amount || s.amount || (isAr ? 'يومي' : 'Daily'),
+                        assignedAt: a.assignedAt,
+                        assignedBy: a.assignedBy
+                    });
+                }
+            }
+        });
+        if (myWorker.pendingResponsibilities) {
+            let rawPending = myWorker.pendingResponsibilities;
+            if (!Array.isArray(rawPending)) rawPending = Object.values(rawPending);
+            rawPending.forEach(pr => {
+                if (pr && pr.subjectId && !pendingForMe.some(p => String(p.subjectId) === String(pr.subjectId))) {
+                    pendingForMe.push(pr);
+                }
+            });
+        }
+
         if (cardTitle) {
             cardTitle.textContent = isAr ? `مسؤولياتي والمهام المستمرة (${myWorker.name})` : `My Responsibilities & Constant Tasks (${myWorker.name})`;
         }
         if (countBadge) {
-            countBadge.textContent = `${myTasks.length} ${isAr ? 'مسؤوليات مستمرة' : 'Responsibilities'}`;
+            countBadge.textContent = `${myTasks.length} ${isAr ? 'مسؤوليات نشطة' : 'Active Duties'}`;
         }
 
-        if (myTasks.length === 0) {
-            workerList.innerHTML = `<p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">${isAr ? 'لا توجد مسؤوليات مستمرة مسندة إليك حالياً.' : 'No constant responsibilities assigned to you currently.'}</p>`;
-        } else {
-            workerList.innerHTML = myTasks.map(ct => `
+        let html = '';
+
+        if (pendingForMe.length > 0) {
+            pendingForMe.forEach(item => {
+                if (!item.viewedAt) {
+                    markWorkerResponsibilityViewed(item.subjectId, myWorker.id);
+                }
+            });
+            html += `
+                <div style="grid-column: 1 / -1; width: 100%; background: rgba(99,102,241,0.08); border: 2px dashed #6366f1; border-radius: 12px; padding: 14px; margin-bottom: 12px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+                        <div style="font-weight:900; font-size:0.95rem; color:#6366f1; display:flex; align-items:center; gap:6px;">
+                            <span style="font-size:1.2rem;">🔔</span>
+                            <span>${isAr ? `لديك ${pendingForMe.length} تكليفات عمل جديدة بانتظار تأكيدك:` : `You have ${pendingForMe.length} new duty assignments awaiting confirmation:`}</span>
+                        </div>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        ${pendingForMe.map(p => `
+                            <div style="background:var(--card-bg); border:1px solid var(--border-color); border-radius:10px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    <span style="font-size:1.3rem;">${p.icon || '📌'}</span>
+                                    <div>
+                                        <div style="font-weight:800; font-size:0.92rem; color:var(--text-main);">${p.title}</div>
+                                        <div style="font-size:0.75rem; color:var(--text-muted);">📋 ${isAr ? 'المطلوب:' : 'Target:'} <strong style="color:#6366f1;">${p.amount || (isAr ? 'يومي' : 'Daily')}</strong></div>
+                                    </div>
+                                </div>
+                                <button type="button" onclick="confirmWorkerResponsibility('${p.subjectId}', '${myWorker.id}')" class="btn-success" style="padding:6px 14px; font-size:0.82rem; font-weight:800; border-radius:8px; border:none; color:white; background:linear-gradient(135deg, #10b981, #059669); cursor:pointer;">
+                                    ✅ ${isAr ? 'تأكيد الاستلام' : 'Confirm'}
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        if (myTasks.length === 0 && pendingForMe.length === 0) {
+            html += `<p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">${isAr ? 'لا توجد مسؤوليات مستمرة مسندة إليك حالياً.' : 'No constant responsibilities assigned to you currently.'}</p>`;
+        } else if (myTasks.length > 0) {
+            html += myTasks.map(ct => `
                 <div style="background: var(--card-bg); padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 10px; min-width: 200px; flex: 1;">
                     <span style="font-size: 1.2rem;">${ct.icon || '📌'}</span>
                     <div>
@@ -9934,6 +11002,8 @@ function renderWorkerOwnConstantTasksCard() {
                 </div>
             `).join('');
         }
+
+        workerList.innerHTML = html;
     } else {
         workerCard.style.display = 'none';
     }
@@ -10000,7 +11070,7 @@ function addTrackedTask() {
         finishWindowMins: finishMins || 30,
         spyWindowMins: spyMins || 20,
         createdAt: Date.now(),
-        createdBy: currentUser ? currentUser.email : 'Admin',
+        createdBy: currentUser ? (currentUser.displayName || (currentUser.email ? formatAssignerName(currentUser.email) : 'Admin')) : 'Admin',
         status: 'assigned', // 'assigned' | 'seen' | 'pending_spy_verification' | 'completed' | 'reported' | 'violated'
         seenAt: null,
         finishedAt: null,
@@ -11732,7 +12802,11 @@ function updateFinancialRecord(type, action) {
         .catch(err => console.error(`Error updating financial record ${type}:`, err));
 }
 
-function handleOpsWorkerChange() { renderOpsDetails(); }
+function handleOpsWorkerChange() {
+    renderOpsDetails();
+    if (typeof renderWorkerOperationsContractBanner === 'function') renderWorkerOperationsContractBanner();
+    if (typeof renderWorkerOperationsResponsibilitiesBanner === 'function') renderWorkerOperationsResponsibilitiesBanner();
+}
 function handleFinWorkerChange() { renderFinDetails(); }
 
 function addDailyLog() {
@@ -12285,6 +13359,9 @@ function renderOpsWorkersTable() {
 
     if (typeof renderWorkerOperationsContractBanner === 'function') {
         renderWorkerOperationsContractBanner();
+    }
+    if (typeof renderWorkerOperationsResponsibilitiesBanner === 'function') {
+        renderWorkerOperationsResponsibilitiesBanner();
     }
 }
 

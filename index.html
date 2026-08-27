@@ -81,7 +81,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=175">
+    <link rel="stylesheet" href="style.css?v=176">
 </head>
 
 <body class="theme-burgeroov">
@@ -736,6 +736,11 @@
 
                 <!-- Main Content: Daily Ops -->
                 <div>
+                    <!-- Worker Pending Responsibilities Confirmation Banner -->
+                    <div id="worker-ops-pending-responsibilities-card" class="card" style="display: none; margin-bottom: 24px; border-top: 4px solid #6366f1; background: var(--card-bg);">
+                        <!-- Dynamically rendered by renderWorkerOperationsResponsibilitiesBanner() -->
+                    </div>
+
                     <!-- Worker Official Contracts & Digital Signature Card -->
                     <div id="worker-ops-contracts-card" class="card" style="margin-bottom: 24px; border-top: 4px solid #10b981; background: var(--card-bg);">
                         <!-- Dynamically rendered by renderWorkerOperationsContractBanner() -->
@@ -1566,28 +1571,49 @@
                                 </div>
                             </div>
 
-                            <!-- Search, Filter & Quick Stats HUD -->
-                            <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 14px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-                                <div style="display: flex; gap: 10px; align-items: center; flex: 1; min-width: 260px;">
-                                    <div style="position: relative; flex: 1;">
-                                        <span style="position: absolute; inset-inline-start: 10px; top: 50%; transform: translateY(-50%); font-size: 0.9rem; color: var(--text-muted);">🔍</span>
-                                        <input type="text" id="resp-search-input" onkeyup="filterConstantResponsibilities()" placeholder="Search responsibilities or worker names..." style="width: 100%; padding: 8px 12px 8px 34px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-size: 0.85rem; box-sizing: border-box;" data-i18n="[placeholder]placeholder-search-responsibilities">
+                            <!-- Sub-View Mode Selector Tabs (Subjects vs Worker Workload) -->
+                            <div style="display: flex; gap: 8px; margin-bottom: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; flex-wrap: wrap;">
+                                <button type="button" id="resp-view-tab-subjects" onclick="setConstantTasksViewMode('subjects')" class="btn-primary" style="padding: 8px 16px; border-radius: 10px; font-weight: 800; font-size: 0.85rem; background: linear-gradient(135deg, #6366f1, #4f46e5); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                                    <span>📚</span> <span data-i18n="tab-resp-subjects">Responsibility Subjects</span>
+                                </button>
+                                <button type="button" id="resp-view-tab-workers" onclick="setConstantTasksViewMode('workers')" class="btn-outline" style="padding: 8px 16px; border-radius: 10px; font-weight: 800; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px; background: var(--input-bg);">
+                                    <span>👤</span> <span data-i18n="tab-resp-workers">Worker Workload & Stats</span>
+                                </button>
+                            </div>
+
+                            <!-- VIEW 1: SUBJECTS CARDS & REPOSITORY VIEW -->
+                            <div id="constant-subjects-view-container">
+                                <!-- Search, Filter & Quick Stats HUD -->
+                                <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 14px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                                    <div style="display: flex; gap: 10px; align-items: center; flex: 1; min-width: 260px; flex-wrap: wrap;">
+                                        <div style="position: relative; flex: 1; min-width: 160px;">
+                                            <span style="position: absolute; inset-inline-start: 10px; top: 50%; transform: translateY(-50%); font-size: 0.9rem; color: var(--text-muted);">🔍</span>
+                                            <input type="text" id="resp-search-input" onkeyup="filterConstantResponsibilities()" placeholder="Search responsibilities or worker names..." style="width: 100%; padding: 8px 12px 8px 34px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-size: 0.85rem; box-sizing: border-box;" data-i18n="[placeholder]placeholder-search-responsibilities">
+                                        </div>
+                                        <select id="resp-filter-status" onchange="filterConstantResponsibilities()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-size: 0.85rem;">
+                                            <option value="all" data-i18n="opt-all-responsibilities">All Responsibilities</option>
+                                            <option value="assigned" data-i18n="opt-assigned-only">👥 Assigned (Active)</option>
+                                            <option value="unassigned" data-i18n="opt-unassigned-only">⚠️ Unassigned</option>
+                                        </select>
+                                        <select id="resp-filter-worker-select" onchange="onResponsibilityWorkerFilterChanged()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-size: 0.85rem;">
+                                            <option value="all" data-i18n="opt-all-workers">👥 Filter by Worker (All)</option>
+                                        </select>
                                     </div>
-                                    <select id="resp-filter-status" onchange="filterConstantResponsibilities()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-size: 0.85rem;">
-                                        <option value="all" data-i18n="opt-all-responsibilities">All Responsibilities</option>
-                                        <option value="assigned" data-i18n="opt-assigned-only">👥 Assigned (Active)</option>
-                                        <option value="unassigned" data-i18n="opt-unassigned-only">⚠️ Unassigned</option>
-                                    </select>
+                                    <div style="display: flex; gap: 12px; align-items: center; font-size: 0.82rem; font-weight: 800;">
+                                        <span style="color: var(--text-muted);"><span id="resp-stat-total-subjects" style="color: #6366f1;">0</span> <span data-i18n="lbl-subjects">Subjects</span></span>
+                                        <span style="color: var(--border-color);">|</span>
+                                        <span style="color: var(--text-muted);"><span id="resp-stat-total-assignments" style="color: #10b981;">0</span> <span data-i18n="lbl-assignments">Active Assignments</span></span>
+                                    </div>
                                 </div>
-                                <div style="display: flex; gap: 12px; align-items: center; font-size: 0.82rem; font-weight: 800;">
-                                    <span style="color: var(--text-muted);"><span id="resp-stat-total-subjects" style="color: #6366f1;">0</span> <span data-i18n="lbl-subjects">Subjects</span></span>
-                                    <span style="color: var(--border-color);">|</span>
-                                    <span style="color: var(--text-muted);"><span id="resp-stat-total-assignments" style="color: #10b981;">0</span> <span data-i18n="lbl-assignments">Active Assignments</span></span>
+
+                                <!-- Responsibilities Grid / Cards List -->
+                                <div id="constant-responsibilities-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 14px;">
+                                    <!-- Rendered dynamically in js/tasks.js -->
                                 </div>
                             </div>
 
-                            <!-- Responsibilities Grid / Cards List -->
-                            <div id="constant-responsibilities-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 14px;">
+                            <!-- VIEW 2: WORKER-CENTRIC WORKLOAD & RESPONSIBILITIES INSPECTOR -->
+                            <div id="constant-worker-workload-view" style="display: none;">
                                 <!-- Rendered dynamically in js/tasks.js -->
                             </div>
                         </div>
@@ -6484,8 +6510,8 @@
 
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=209"></script>
-    <script src="app.js?v=209"></script>
+    <script src="translations.js?v=214"></script>
+    <script src="app.js?v=214"></script>
 </body>
 
 </html>

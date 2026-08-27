@@ -1962,6 +1962,9 @@ function listenToCloudData() {
         if (typeof renderWorkerOperationsContractBanner === 'function') {
             renderWorkerOperationsContractBanner();
         }
+        if (typeof renderWorkerOperationsResponsibilitiesBanner === 'function') {
+            renderWorkerOperationsResponsibilitiesBanner();
+        }
 
         if (isInitialLoad) {
             migrateMonthlyData();
@@ -2360,6 +2363,9 @@ function switchTab(tab) {
     if (tab === 'ops' && typeof renderWorkerOperationsContractBanner === 'function') {
         renderWorkerOperationsContractBanner();
     }
+    if (tab === 'ops' && typeof renderWorkerOperationsResponsibilitiesBanner === 'function') {
+        renderWorkerOperationsResponsibilitiesBanner();
+    }
     if (tab === 'tasks' && typeof renderInquiries === 'function') {
         renderInquiries();
     }
@@ -2720,6 +2726,7 @@ function renderAll() {
         if (typeof renderOpsDetails === 'function') renderOpsDetails();
         if (typeof renderSelectedWorkerSysViolations === 'function') renderSelectedWorkerSysViolations();
         if (typeof renderWorkerOperationsContractBanner === 'function') renderWorkerOperationsContractBanner();
+        if (typeof renderWorkerOperationsResponsibilitiesBanner === 'function') renderWorkerOperationsResponsibilitiesBanner();
     }
     else if (currentTab === 'ranks') { if (typeof renderRanksTable === 'function') renderRanksTable(); }
     else if (currentTab === 'attendance') { if (typeof renderAttendance === 'function') renderAttendance(); }

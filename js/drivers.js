@@ -1092,7 +1092,11 @@ function updateFinancialRecord(type, action) {
         .catch(err => console.error(`Error updating financial record ${type}:`, err));
 }
 
-function handleOpsWorkerChange() { renderOpsDetails(); }
+function handleOpsWorkerChange() {
+    renderOpsDetails();
+    if (typeof renderWorkerOperationsContractBanner === 'function') renderWorkerOperationsContractBanner();
+    if (typeof renderWorkerOperationsResponsibilitiesBanner === 'function') renderWorkerOperationsResponsibilitiesBanner();
+}
 function handleFinWorkerChange() { renderFinDetails(); }
 
 function addDailyLog() {
