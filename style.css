@@ -3778,3 +3778,25 @@ body:not(.role-admin) .task-grid {
     padding: 0 24px;
     box-sizing: border-box;
 }
+
+#view-tracking.active-view {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 20px;
+    box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+    #view-tracking.active-view {
+        padding: 0 10px !important;
+    }
+    #tracking-map {
+        height: 440px !important;
+        min-height: 380px !important;
+    }
+    #tracking-hud-total, #tracking-hud-inside, #tracking-hud-alerts, #tracking-hud-permits {
+        font-size: 1.15rem !important;
+    }
+}

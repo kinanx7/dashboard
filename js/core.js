@@ -1681,7 +1681,8 @@ function markLockedTabs() {
         vault: isAdmin || document.body.classList.contains('perm-vault'),
         messaging: isAdmin || document.body.classList.contains('perm-messaging'),
         learning: true,
-        contracts: isAdmin
+        contracts: isAdmin,
+        tracking: isAdmin
     };
 
     Object.entries(access).forEach(([tabId, hasAccess]) => {
@@ -2412,6 +2413,7 @@ function switchTab(tab) {
         messaging: { icon: '💬', label: 'Messaging' },
         learning: { icon: '🎓', label: 'Learning' },
         contracts: { icon: '📜', label: 'Contracts' },
+        tracking: { icon: '📍', label: 'Live Radar' }
     };
     const meta = tabMeta[tab] || { icon: '⚙️', label: tab };
     const iconEl = document.getElementById('mob-active-icon');
