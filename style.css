@@ -785,7 +785,11 @@ body {
 #view-market.active-view,
 #view-prepare.active-view,
 #view-ai-assistant.active-view,
-#view-vault.active-view {
+#view-vault.active-view,
+#view-messaging.active-view,
+#view-learning.active-view,
+#view-contracts.active-view,
+#view-tracking.active-view {
     grid-template-columns: 1fr;
 }
 

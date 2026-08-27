@@ -81,7 +81,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=176">
+    <link rel="stylesheet" href="style.css?v=177">
 </head>
 
 <body class="theme-burgeroov">
@@ -493,6 +493,9 @@
                     <button id="tab-contracts" class="dept-tab" onclick="switchTab('contracts')"
                         data-i18n="tab-contracts">📜
                         Contracts</button>
+                    <button id="tab-tracking" class="dept-tab" onclick="switchTab('tracking')"
+                        data-i18n="tab-tracking">📍
+                        Live Tracking</button>
                 </div>
                 <button type="button" class="btn-outline" id="tab-reorder-btn" onclick="toggleTabReorderMode()"
                     style="padding: 8px 16px; border-radius: 100px; font-weight: 700; font-size: 0.85rem;"
@@ -736,6 +739,27 @@
 
                 <!-- Main Content: Daily Ops -->
                 <div>
+                    <!-- Worker Live GPS Broadcaster Banner -->
+                    <div id="worker-gps-broadcast-banner" class="card" style="margin-bottom: 20px; border-top: 4px solid #10b981; background: var(--card-bg); padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span style="font-size: 1.6rem;">📡</span>
+                            <div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: var(--text-main);" data-i18n="title-worker-gps-radar">Live GPS Broadcasting / بث الموقع المباشر</h4>
+                                    <span class="badge worker-gps-status-badge" style="background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); font-size: 0.75rem; font-weight: 800; padding: 3px 8px; border-radius: 6px;">
+                                        ⏳ GPS Standby
+                                    </span>
+                                </div>
+                                <p style="margin: 2px 0 0 0; font-size: 0.8rem; color: var(--text-muted);" data-i18n="desc-worker-gps-radar">
+                                    Broadcast your live location to verify on-duty presence and work zone range.
+                                </p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="requestWorkerGpsBroadcast()" class="btn-primary" style="padding: 8px 16px; border-radius: 10px; font-weight: 800; font-size: 0.85rem; background: linear-gradient(135deg, #10b981, #059669); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(16,185,129,0.25);" data-i18n="btn-broadcast-my-gps">
+                            <span>📡</span> <span>تفعيل / تحديث بث موقعي</span>
+                        </button>
+                    </div>
+
                     <!-- Worker Pending Responsibilities Confirmation Banner -->
                     <div id="worker-ops-pending-responsibilities-card" class="card" style="display: none; margin-bottom: 24px; border-top: 4px solid #6366f1; background: var(--card-bg);">
                         <!-- Dynamically rendered by renderWorkerOperationsResponsibilitiesBanner() -->
@@ -4758,6 +4782,217 @@
             </div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- VIEW: LIVE TRACKING & SAUDI GEOFENCING     -->
+        <!-- ========================================== -->
+        <div id="view-tracking" class="view-section" style="grid-template-columns: 1fr; max-width: 1400px; width: 100%; margin: 0 auto; padding: 0 20px; box-sizing: border-box;">
+            
+            <!-- Top Header Banner & HUD Stats -->
+            <div class="card" style="margin-bottom: 24px; border-top: 4px solid #10b981; background: var(--card-bg);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 18px;">
+                    <div>
+                        <h2 class="card-title" style="margin: 0; display: flex; align-items: center; gap: 8px;" data-i18n="title-tracking-main">
+                            <span>📍</span> <span>Live Tracking, Radar & Saudi Geofencing</span>
+                        </h2>
+                        <p style="font-size: 0.88rem; color: var(--text-muted); margin: 4px 0 0 0; line-height: 1.5;" data-i18n="desc-tracking-main">
+                            Monitor on-duty employees live on the Saudi Arabia map, switch to high-resolution satellite imagery, and define branch geofence work zones.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 4 Real-time Metric Badges -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;">
+                    <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(99, 102, 241, 0.15); color: #6366f1; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+                            👥
+                        </div>
+                        <div>
+                            <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted);" data-i18n="hud-total-duty">Total Staff on Radar</div>
+                            <div id="tracking-hud-total" style="font-size: 1.35rem; font-weight: 900; color: var(--text-main); line-height: 1.2;">0</div>
+                        </div>
+                    </div>
+
+                    <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(16, 185, 129, 0.15); color: #10b981; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+                            🟢
+                        </div>
+                        <div>
+                            <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted);" data-i18n="hud-inside-zone">Inside Work Zone</div>
+                            <div id="tracking-hud-inside" style="font-size: 1.35rem; font-weight: 900; color: #10b981; line-height: 1.2;">0</div>
+                        </div>
+                    </div>
+
+                    <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(239, 68, 68, 0.15); color: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+                            🚨
+                        </div>
+                        <div>
+                            <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted);" data-i18n="hud-out-bounds">Out of Bounds (Alerts)</div>
+                            <div id="tracking-hud-alerts" style="font-size: 1.35rem; font-weight: 900; color: #ef4444; line-height: 1.2;">0</div>
+                        </div>
+                    </div>
+
+                    <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(245, 158, 11, 0.15); color: #f59e0b; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+                            🚗
+                        </div>
+                        <div>
+                            <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted);" data-i18n="hud-exit-permits">Active Exit Permits</div>
+                            <div id="tracking-hud-permits" style="font-size: 1.35rem; font-weight: 900; color: #f59e0b; line-height: 1.2;">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Saudi Arabia Interactive Radar & Geofence Map Card -->
+            <div class="card" style="margin-bottom: 24px; padding: 20px;">
+                <!-- Map Toolbar Controls -->
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+                    <!-- Layer Switcher & Quick Navigation -->
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <button type="button" id="tracking-btn-layer-sat" onclick="setTrackingMapLayer('satellite')" class="btn-primary" style="padding: 8px 16px; border-radius: 10px; font-weight: 800; font-size: 0.85rem; background: linear-gradient(135deg, #10b981, #059669); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                            <span>🛰️</span> <span data-i18n="btn-layer-satellite">Satellite View</span>
+                        </button>
+                        <button type="button" id="tracking-btn-layer-street" onclick="setTrackingMapLayer('street')" class="btn-neutral" style="padding: 8px 16px; border-radius: 10px; font-weight: 800; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                            <span>🗺️</span> <span data-i18n="btn-layer-streets">Street Map</span>
+                        </button>
+                        
+                        <!-- Saudi Cities Jump Selector -->
+                        <select id="tracking-city-select" onchange="jumpToSaudiCity(this.value)" style="padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-weight: 700; font-size: 0.85rem;">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+
+                    <!-- Search, Saved Places & Aim Controls -->
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <!-- Saved Places Dropdown -->
+                        <select id="tracking-saved-places-select" onchange="jumpToTrackingPlace(this.value)" style="padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-weight: 700; font-size: 0.85rem; max-width: 220px;">
+                            <!-- Populated dynamically -->
+                        </select>
+
+                        <!-- Pin Custom Place Button -->
+                        <button type="button" id="tracking-btn-add-place" onclick="toggleAddCustomPlaceMode()" class="btn-primary" style="padding: 8px 14px; border-radius: 10px; font-weight: 800; font-size: 0.85rem; background: linear-gradient(135deg, #059669, #047857); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                            <span>➕</span> <span data-i18n="btn-add-place-pin">Pin Place</span>
+                        </button>
+
+                        <div style="display: flex; gap: 4px;">
+                            <input type="text" id="tracking-search-input" placeholder="Search address or landmark in Saudi Arabia..." style="padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.85rem; min-width: 170px;" onkeydown="if(event.key==='Enter'){event.preventDefault(); searchTrackingMapLocation();}" data-i18n="[placeholder]placeholder-search-map" />
+                            <button type="button" onclick="searchTrackingMapLocation()" class="btn-neutral" style="padding: 8px 12px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; cursor: pointer;">🔍</button>
+                        </div>
+
+                        <!-- Aim Work Area Button -->
+                        <button type="button" id="tracking-btn-aim-mode" onclick="toggleAimWorkZoneMode()" class="btn-primary" style="padding: 8px 16px; border-radius: 10px; font-weight: 800; font-size: 0.85rem; background: linear-gradient(135deg, #6366f1, #4f46e5); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(99,102,241,0.3);">
+                            <span>🎯</span> <span data-i18n="btn-aim-workzone">Aim / Define Work Area</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Aiming HUD Overlay Panel (Visible when Aim Mode is active) -->
+                <div id="tracking-aim-panel" style="display: none; background: rgba(99,102,241,0.08); border: 2px dashed #6366f1; border-radius: 14px; padding: 16px; margin-bottom: 14px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
+                        <div style="font-weight: 900; font-size: 0.95rem; color: #6366f1; display: flex; align-items: center; gap: 6px;" data-i18n="title-aim-panel">
+                            <span>🎯</span> <span>Aim Branch Work Zone & Geofence Perimeter</span>
+                        </div>
+                        <span id="tracking-aim-coords-text" style="font-size: 0.85rem; font-family: monospace; font-weight: 800; color: var(--text-main); background: var(--card-bg); padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                            📍 24.713600, 46.675300 (±100m)
+                        </span>
+                    </div>
+                    
+                    <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0 0 12px 0;" data-i18n="desc-aim-panel">
+                        Click on the map or drag the store marker to position the center of the branch, then adjust the radius slider.
+                    </p>
+
+                    <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                        <!-- Branch -->
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <label style="font-weight: 700; font-size: 0.82rem; color: var(--text-main);" data-i18n="label-aim-branch">Select Branch:</label>
+                            <select id="tracking-aim-branch-select" style="padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-weight: 700; font-size: 0.85rem;">
+                                <option value="Main Branch">Main Branch</option>
+                            </select>
+                        </div>
+
+                        <!-- Radius Slider -->
+                        <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 220px;">
+                            <label style="font-weight: 700; font-size: 0.82rem; color: var(--text-main); white-space: nowrap;" data-i18n="label-aim-radius">Geofence Radius:</label>
+                            <input type="range" id="tracking-aim-radius-input" min="30" max="1000" step="10" value="100" oninput="onAimRadiusSliderChange(this.value)" style="flex: 1; cursor: pointer;" />
+                            <strong id="tracking-aim-radius-label" style="font-size: 0.85rem; color: #10b981; white-space: nowrap; min-width: 75px;">100 m / متر</strong>
+                        </div>
+
+                        <!-- Save / Cancel -->
+                        <div style="display: flex; gap: 8px;">
+                            <button type="button" onclick="saveWorkZone()" class="btn-success" style="padding: 8px 16px; border-radius: 8px; font-weight: 800; font-size: 0.85rem; background: linear-gradient(135deg, #10b981, #059669); border: none; color: white; cursor: pointer;" data-i18n="btn-save-workzone">
+                                💾 Save & Activate
+                            </button>
+                            <button type="button" onclick="cancelAimWorkZone()" class="btn-neutral" style="padding: 8px 14px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer;" data-i18n="btn-cancel-aim">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Leaflet Interactive Map Container -->
+                <div id="tracking-map" style="width: 100%; height: 540px; border-radius: 14px; border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); z-index: 1;"></div>
+            </div>
+
+            <!-- Saved Permanent Places & Pinned Locations Quick Aim Bar -->
+            <div class="card" style="margin-bottom: 24px; padding: 18px; border-top: 3px solid #10b981; background: var(--card-bg);">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.3rem;">📌</span>
+                        <h3 style="margin: 0; font-size: 1.05rem; font-weight: 900; color: var(--text-main);" data-i18n="title-saved-places-panel">
+                            Saved Pinned Places & Landmarks / المواقع المثبتة والأماكن المحفوظة
+                        </h3>
+                    </div>
+                    <button type="button" onclick="toggleAddCustomPlaceMode()" class="btn-primary" style="padding: 7px 14px; border-radius: 8px; font-weight: 800; font-size: 0.82rem; background: linear-gradient(135deg, #10b981, #059669); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        <span>➕</span> <span data-i18n="btn-add-place-pin">Pin Place</span>
+                    </button>
+                </div>
+
+                <!-- Saved Places Cards Grid -->
+                <div id="tracking-saved-places-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px;">
+                    <!-- Dynamically rendered by renderSavedTrackingPlaces() -->
+                </div>
+            </div>
+
+            <!-- Staff Live Radar & Geofence Status Grid -->
+            <div class="card" style="margin-bottom: 24px; padding: 20px;">
+                <!-- Filter Bar -->
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.3rem;">📡</span>
+                        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 900; color: var(--text-main);">
+                            Staff Location Radar & Real-Time Status / رادار حالة العمال
+                        </h3>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <!-- Branch Filter -->
+                        <select id="tracking-filter-branch" onchange="renderTrackingSection()" style="padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-weight: 700; font-size: 0.85rem;">
+                            <option value="all">🏢 All Branches</option>
+                        </select>
+
+                        <!-- Status Filter -->
+                        <select id="tracking-filter-status" onchange="renderTrackingSection()" style="padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-weight: 700; font-size: 0.85rem;">
+                            <option value="all" data-i18n="filter-tracking-all">🌟 All Staff</option>
+                            <option value="inside" data-i18n="filter-tracking-inside">🟢 Inside Zone</option>
+                            <option value="outside" data-i18n="filter-tracking-outside">🚨 Out of Bounds</option>
+                            <option value="permits" data-i18n="filter-tracking-permits">🚗 Exit Permits</option>
+                            <option value="drivers" data-i18n="filter-tracking-drivers">🛵 Delivery Drivers</option>
+                        </select>
+
+                        <!-- Search Worker Name -->
+                        <input type="text" id="tracking-worker-search" oninput="renderTrackingSection()" placeholder="Search worker name or role..." style="padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.85rem; width: 190px;" data-i18n="[placeholder]placeholder-search-worker-radar" />
+                    </div>
+                </div>
+
+                <!-- Grid of Worker Cards -->
+                <div id="tracking-workers-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px;">
+                    <!-- Dynamically Populated by renderTrackingSection() -->
+                </div>
+            </div>
+
+        </div>
+
         <!-- Locked Department Overlay (shown when a worker taps a restricted tab) -->
         <div id="view-locked" class="view-section">
             <div style="text-align:center; max-width:480px; margin:0 auto; padding:20px;">
@@ -6508,10 +6743,80 @@
         </div>
     </div>
 
+    <!-- MODAL: ADD CUSTOM PINNED PLACE ON TRACKING MAP -->
+    <div id="modal-add-tracking-place" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.8); backdrop-filter:blur(6px); justify-content:center; align-items:center; z-index:9999999; padding: 16px;">
+        <div class="modal-content" style="max-width: 520px; width: 100%; border-radius: 20px; padding: 24px; background:var(--card-bg); border: 2px solid #10b981; box-shadow:0 14px 45px rgba(0,0,0,0.6);">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:12px; margin-bottom:16px;">
+                <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:#10b981; display:flex; align-items:center; gap:8px;">
+                    <span>📍</span> <span data-i18n="title-add-place-modal">Pin & Save Permanent Place / تثبيت موقع دائم</span>
+                </h3>
+                <button type="button" onclick="closeAddTrackingPlaceModal()" style="background:transparent; border:none; font-size:1.3rem; cursor:pointer; color:var(--text-muted);">✖</button>
+            </div>
+
+            <form onsubmit="event.preventDefault(); saveTrackingPlaceModal();">
+                <input type="hidden" id="place-pin-lat" value="" />
+                <input type="hidden" id="place-pin-lng" value="" />
+
+                <div style="margin-bottom: 12px; background: var(--input-bg); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 0.82rem; font-weight: 700; color: var(--text-muted);">Selected Coordinates:</span>
+                    <span id="place-pin-coords-text" style="font-size: 0.85rem; font-weight: 800; font-family: monospace; color: var(--text-main);">📍 -</span>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label style="font-weight:700; font-size:0.85rem;" data-i18n="label-place-name">Place Name / اسم الموقع *</label>
+                    <input type="text" id="place-pin-name" placeholder="e.g. Al Malaz Branch, Central Kitchen, Warehouse Gate..." style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.9rem; box-sizing: border-box;" required />
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 14px;">
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-weight:700; font-size:0.82rem;" data-i18n="label-place-category">Category</label>
+                        <select id="place-pin-category" style="width:100%; padding:9px 10px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.85rem;">
+                            <option value="branch">🏢 Branch (فرع)</option>
+                            <option value="kitchen">👨‍🍳 Kitchen (مطبخ)</option>
+                            <option value="warehouse">📦 Warehouse (مستودع)</option>
+                            <option value="supplier">🥩 Supplier (مورد)</option>
+                            <option value="delivery_point">🚚 Delivery Point (نقطة)</option>
+                            <option value="custom">📍 Other (أخرى)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-weight:700; font-size:0.82rem;" data-i18n="label-place-icon">Icon</label>
+                        <select id="place-pin-icon" style="width:100%; padding:9px 10px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.85rem;">
+                            <option value="🏢">🏢 Branch</option>
+                            <option value="👨‍🍳">👨‍🍳 Kitchen</option>
+                            <option value="📦">📦 Warehouse</option>
+                            <option value="🏪">🏪 Store</option>
+                            <option value="🥩">🥩 Meat Supplier</option>
+                            <option value="🚚">🚚 Delivery</option>
+                            <option value="⭐">⭐ Priority</option>
+                            <option value="📍">📍 Pin</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-weight:700; font-size:0.82rem;" data-i18n="label-place-color">Theme Color</label>
+                        <input type="color" id="place-pin-color" value="#10b981" style="width:100%; height:38px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); cursor:pointer;" />
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label style="font-weight:700; font-size:0.85rem;" data-i18n="label-place-note">Notes / ملاحظات (Optional)</label>
+                    <input type="text" id="place-pin-note" placeholder="e.g. Near King Fahd road, Gate 2" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.9rem; box-sizing: border-box;" />
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border-color); padding-top:14px;">
+                    <button type="button" onclick="closeAddTrackingPlaceModal()" class="btn-neutral" style="padding:9px 18px; border-radius:10px; font-weight:700;" data-i18n="btn-cancel">Cancel</button>
+                    <button type="submit" class="btn-success" style="padding:9px 22px; border-radius:10px; font-weight:800; background:linear-gradient(135deg, #10b981, #059669); border:none; color:white; cursor:pointer;" data-i18n="btn-save-place">💾 Save & Pin</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=215"></script>
-    <script src="app.js?v=215"></script>
+    <script src="translations.js?v=220"></script>
+    <script src="app.js?v=220"></script>
 </body>
 
 </html>

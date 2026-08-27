@@ -1102,11 +1102,17 @@ function selectCompany(companyId) {
             listenToCloudData();
             startGlobalTick();
             initFCMToken();
+            if (typeof startWorkerLocationBroadcaster === 'function') startWorkerLocationBroadcaster();
+            if (typeof initGlobalLiveLocationListener === 'function') initGlobalLiveLocationListener();
+            if (typeof zoomToActiveCompanyWorkZone === 'function') zoomToActiveCompanyWorkZone();
         });
     } else {
         listenToCloudData();
         startGlobalTick();
         initFCMToken();
+        if (typeof startWorkerLocationBroadcaster === 'function') startWorkerLocationBroadcaster();
+        if (typeof initGlobalLiveLocationListener === 'function') initGlobalLiveLocationListener();
+        if (typeof zoomToActiveCompanyWorkZone === 'function') zoomToActiveCompanyWorkZone();
     }
 }
 
@@ -1132,6 +1138,9 @@ auth.onAuthStateChanged((user) => {
         currentUser = { email: user.email, uid: user.uid };
         document.getElementById('display-user-email').textContent = currentUser.email;
         startGlobalNotificationListeners(user.email);
+        if (typeof startWorkerLocationBroadcaster === 'function') {
+            startWorkerLocationBroadcaster();
+        }
         try { syncAppUpdateNotesToFirebase(); } catch (e) { }
 
         document.getElementById('auth-loader').style.display = 'block';
@@ -1857,6 +1866,8 @@ function ensureArraysExist(data) {
     if (!data.activityLogs) data.activityLogs = {};
     if (!data.generalDeliveries) data.generalDeliveries = {};
     if (!data.marketProducts) data.marketProducts = {};
+    if (!data.liveLocations) data.liveLocations = {};
+    if (!data.trackingPlaces) data.trackingPlaces = {};
     if (!data.incomeSources) data.incomeSources = ['Cash', 'Credit Card'];
     if (!data.disabledSalesMethods) data.disabledSalesMethods = [];
 
@@ -1974,6 +1985,9 @@ function listenToCloudData() {
             migrateMonthlyData();
             runAutoLogger();
             initFCMToken(); // ← Capture & save device token on first load
+            if (typeof startWorkerLocationBroadcaster === 'function') {
+                startWorkerLocationBroadcaster();
+            }
 
             if (currentUser && currentUser.role === 'worker') {
                 const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
@@ -2332,7 +2346,7 @@ function switchTab(tab) {
         }
     }
 
-    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant', 'vault', 'messaging', 'learning', 'contracts'];
+    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant', 'vault', 'messaging', 'learning', 'contracts', 'tracking'];
 
     allTabs.forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
@@ -2363,6 +2377,10 @@ function switchTab(tab) {
     }
     if (tab === 'contracts' && typeof renderContractsSection === 'function') {
         renderContractsSection();
+    }
+    if (tab === 'tracking') {
+        if (typeof renderTrackingSection === 'function') renderTrackingSection();
+        if (typeof zoomToActiveCompanyWorkZone === 'function') zoomToActiveCompanyWorkZone();
     }
     if (tab === 'ops' && typeof renderWorkerOperationsContractBanner === 'function') {
         renderWorkerOperationsContractBanner();
@@ -2765,6 +2783,7 @@ function renderAll() {
     else if (currentTab === 'ai-assistant') { if (typeof renderAIAssistant === 'function') renderAIAssistant(); }
     else if (currentTab === 'learning') { if (typeof renderLearningProgram === 'function') renderLearningProgram(); }
     else if (currentTab === 'contracts') { if (typeof renderContractsSection === 'function') renderContractsSection(); }
+    else if (currentTab === 'tracking') { if (typeof renderTrackingSection === 'function') renderTrackingSection(); }
 
     if (typeof renderPaymentRequests === 'function') renderPaymentRequests();
     if (typeof renderWorkerCustodyRequests === 'function') renderWorkerCustodyRequests();
