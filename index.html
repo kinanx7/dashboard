@@ -81,7 +81,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=178">
+    <link rel="stylesheet" href="style.css?v=179">
 </head>
 
 <body class="theme-burgeroov">
@@ -4412,7 +4412,7 @@
                                     <label style="font-weight: 900; font-size: 0.85rem; color: #3b82f6; display: flex; align-items:center; gap:6px;" data-i18n="label-tpl-task">📋 New Task WhatsApp Template</label>
                                     <button type="button" onclick="resetTemplateToDefault('task')" style="background:none; border:none; color:var(--text-muted); font-size:0.72rem; font-weight:700; cursor:pointer;">↺ Reset</button>
                                 </div>
-                                <textarea id="msg-tpl-task" rows="3" onfocus="setActiveTemplateInput('msg-tpl-task')" oninput="autoSaveMessagingTemplate('task')" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.84rem; font-weight:600; resize:vertical; font-family:inherit;"></textarea>
+                                <textarea id="msg-tpl-task" rows="8" onfocus="setActiveTemplateInput('msg-tpl-task')" oninput="autoSaveMessagingTemplate('task')" style="width:100%; min-height:170px; padding:12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; font-weight:600; line-height:1.6; resize:vertical; font-family:inherit;"></textarea>
                             </div>
                             <div style="margin-top:10px; text-align:right;">
                                 <button type="button" onclick="sendTestTemplateAlert('task')" style="background:rgba(59,130,246,0.1); color:#3b82f6; border:1px solid rgba(59,130,246,0.3); border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:800; cursor:pointer;">🚀 Test Alert</button>
@@ -4426,7 +4426,7 @@
                                     <label style="font-weight: 900; font-size: 0.85rem; color: #6366f1; display: flex; align-items:center; gap:6px;" data-i18n="label-tpl-cycle">🔁 Scheduled Task Cycle Template</label>
                                     <button type="button" onclick="resetTemplateToDefault('cycle')" style="background:none; border:none; color:var(--text-muted); font-size:0.72rem; font-weight:700; cursor:pointer;">↺ Reset</button>
                                 </div>
-                                <textarea id="msg-tpl-cycle" rows="3" onfocus="setActiveTemplateInput('msg-tpl-cycle')" oninput="autoSaveMessagingTemplate('cycle')" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.84rem; font-weight:600; resize:vertical; font-family:inherit;"></textarea>
+                                <textarea id="msg-tpl-cycle" rows="8" onfocus="setActiveTemplateInput('msg-tpl-cycle')" oninput="autoSaveMessagingTemplate('cycle')" style="width:100%; min-height:170px; padding:12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; font-weight:600; line-height:1.6; resize:vertical; font-family:inherit;"></textarea>
                             </div>
                             <div style="margin-top:10px; text-align:right;">
                                 <button type="button" onclick="sendTestTemplateAlert('cycle')" style="background:rgba(99,102,241,0.1); color:#6366f1; border:1px solid rgba(99,102,241,0.3); border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:800; cursor:pointer;">🚀 Test Alert</button>
@@ -4440,7 +4440,7 @@
                                     <label style="font-weight: 900; font-size: 0.85rem; color: #a855f7; display: flex; align-items:center; gap:6px;" data-i18n="label-tpl-inquiry">❓ Task Inquiry Question Template</label>
                                     <button type="button" onclick="resetTemplateToDefault('inquiry')" style="background:none; border:none; color:var(--text-muted); font-size:0.72rem; font-weight:700; cursor:pointer;">↺ Reset</button>
                                 </div>
-                                <textarea id="msg-tpl-inquiry" rows="3" onfocus="setActiveTemplateInput('msg-tpl-inquiry')" oninput="autoSaveMessagingTemplate('inquiry')" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.84rem; font-weight:600; resize:vertical; font-family:inherit;"></textarea>
+                                <textarea id="msg-tpl-inquiry" rows="8" onfocus="setActiveTemplateInput('msg-tpl-inquiry')" oninput="autoSaveMessagingTemplate('inquiry')" style="width:100%; min-height:170px; padding:12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; font-weight:600; line-height:1.6; resize:vertical; font-family:inherit;"></textarea>
                             </div>
                             <div style="margin-top:10px; text-align:right;">
                                 <button type="button" onclick="sendTestTemplateAlert('inquiry')" style="background:rgba(168,85,247,0.1); color:#a855f7; border:1px solid rgba(168,85,247,0.3); border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:800; cursor:pointer;">🚀 Test Alert</button>
@@ -4454,7 +4454,7 @@
                                     <label style="font-weight: 900; font-size: 0.85rem; color: #10b981; display: flex; align-items:center; gap:6px;" data-i18n="label-tpl-delivery">🛵 Delivery Order WhatsApp Template</label>
                                     <button type="button" onclick="resetTemplateToDefault('delivery')" style="background:none; border:none; color:var(--text-muted); font-size:0.72rem; font-weight:700; cursor:pointer;">↺ Reset</button>
                                 </div>
-                                <textarea id="msg-tpl-delivery" rows="3" onfocus="setActiveTemplateInput('msg-tpl-delivery')" oninput="autoSaveMessagingTemplate('delivery')" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.84rem; font-weight:600; resize:vertical; font-family:inherit;"></textarea>
+                                <textarea id="msg-tpl-delivery" rows="8" onfocus="setActiveTemplateInput('msg-tpl-delivery')" oninput="autoSaveMessagingTemplate('delivery')" style="width:100%; min-height:170px; padding:12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; font-weight:600; line-height:1.6; resize:vertical; font-family:inherit;"></textarea>
                             </div>
                             <div style="margin-top:10px; text-align:right;">
                                 <button type="button" onclick="sendTestTemplateAlert('delivery')" style="background:rgba(16,185,129,0.1); color:#10b981; border:1px solid rgba(16,185,129,0.3); border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:800; cursor:pointer;">🚀 Test Alert</button>
@@ -4468,7 +4468,7 @@
                                     <label style="font-weight: 900; font-size: 0.85rem; color: #f59e0b; display: flex; align-items:center; gap:6px;" data-i18n="label-tpl-prepare">👨‍🍳 Kitchen/Market Prepare Template</label>
                                     <button type="button" onclick="resetTemplateToDefault('prepare')" style="background:none; border:none; color:var(--text-muted); font-size:0.72rem; font-weight:700; cursor:pointer;">↺ Reset</button>
                                 </div>
-                                <textarea id="msg-tpl-prepare" rows="3" onfocus="setActiveTemplateInput('msg-tpl-prepare')" oninput="autoSaveMessagingTemplate('prepare')" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.84rem; font-weight:600; resize:vertical; font-family:inherit;"></textarea>
+                                <textarea id="msg-tpl-prepare" rows="8" onfocus="setActiveTemplateInput('msg-tpl-prepare')" oninput="autoSaveMessagingTemplate('prepare')" style="width:100%; min-height:170px; padding:12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; font-weight:600; line-height:1.6; resize:vertical; font-family:inherit;"></textarea>
                             </div>
                             <div style="margin-top:10px; text-align:right;">
                                 <button type="button" onclick="sendTestTemplateAlert('prepare')" style="background:rgba(245,158,11,0.1); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:800; cursor:pointer;">🚀 Test Alert</button>
@@ -4482,7 +4482,7 @@
                                     <label style="font-weight: 900; font-size: 0.85rem; color: #22c55e; display: flex; align-items:center; gap:6px;" data-i18n="label-tpl-payment">💵 Salary Advance Approved Template</label>
                                     <button type="button" onclick="resetTemplateToDefault('payment')" style="background:none; border:none; color:var(--text-muted); font-size:0.72rem; font-weight:700; cursor:pointer;">↺ Reset</button>
                                 </div>
-                                <textarea id="msg-tpl-payment" rows="3" onfocus="setActiveTemplateInput('msg-tpl-payment')" oninput="autoSaveMessagingTemplate('payment')" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.84rem; font-weight:600; resize:vertical; font-family:inherit;"></textarea>
+                                <textarea id="msg-tpl-payment" rows="8" onfocus="setActiveTemplateInput('msg-tpl-payment')" oninput="autoSaveMessagingTemplate('payment')" style="width:100%; min-height:170px; padding:12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; font-weight:600; line-height:1.6; resize:vertical; font-family:inherit;"></textarea>
                             </div>
                             <div style="margin-top:10px; text-align:right;">
                                 <button type="button" onclick="sendTestTemplateAlert('payment')" style="background:rgba(34,197,94,0.1); color:#22c55e; border:1px solid rgba(34,197,94,0.3); border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:800; cursor:pointer;">🚀 Test Alert</button>
@@ -4496,7 +4496,7 @@
                                     <label style="font-weight: 900; font-size: 0.85rem; color: #a855f7; display: flex; align-items:center; gap:6px;" data-i18n="label-tpl-custody">📦 Custody Release Code Template</label>
                                     <button type="button" onclick="resetTemplateToDefault('custody')" style="background:none; border:none; color:var(--text-muted); font-size:0.72rem; font-weight:700; cursor:pointer;">↺ Reset</button>
                                 </div>
-                                <textarea id="msg-tpl-custody" rows="3" onfocus="setActiveTemplateInput('msg-tpl-custody')" oninput="autoSaveMessagingTemplate('custody')" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.84rem; font-weight:600; resize:vertical; font-family:inherit;"></textarea>
+                                <textarea id="msg-tpl-custody" rows="8" onfocus="setActiveTemplateInput('msg-tpl-custody')" oninput="autoSaveMessagingTemplate('custody')" style="width:100%; min-height:170px; padding:12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; font-weight:600; line-height:1.6; resize:vertical; font-family:inherit;"></textarea>
                             </div>
                             <div style="margin-top:10px; text-align:right;">
                                 <button type="button" onclick="sendTestTemplateAlert('custody')" style="background:rgba(168,85,247,0.1); color:#a855f7; border:1px solid rgba(168,85,247,0.3); border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:800; cursor:pointer;">🚀 Test Alert</button>
@@ -4510,7 +4510,7 @@
                                     <label style="font-weight: 900; font-size: 0.85rem; color: #8b5cf6; display: flex; align-items:center; gap:6px;" data-i18n="label-tpl-reward">🎉 Reward / Bonus Added Template</label>
                                     <button type="button" onclick="resetTemplateToDefault('reward')" style="background:none; border:none; color:var(--text-muted); font-size:0.72rem; font-weight:700; cursor:pointer;">↺ Reset</button>
                                 </div>
-                                <textarea id="msg-tpl-reward" rows="3" onfocus="setActiveTemplateInput('msg-tpl-reward')" oninput="autoSaveMessagingTemplate('reward')" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.84rem; font-weight:600; resize:vertical; font-family:inherit;"></textarea>
+                                <textarea id="msg-tpl-reward" rows="8" onfocus="setActiveTemplateInput('msg-tpl-reward')" oninput="autoSaveMessagingTemplate('reward')" style="width:100%; min-height:170px; padding:12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; font-weight:600; line-height:1.6; resize:vertical; font-family:inherit;"></textarea>
                             </div>
                             <div style="margin-top:10px; text-align:right;">
                                 <button type="button" onclick="sendTestTemplateAlert('reward')" style="background:rgba(139,92,246,0.1); color:#8b5cf6; border:1px solid rgba(139,92,246,0.3); border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:800; cursor:pointer;">🚀 Test Alert</button>
@@ -4524,7 +4524,7 @@
                                     <label style="font-weight: 900; font-size: 0.85rem; color: #ef4444; display: flex; align-items:center; gap:6px;" data-i18n="label-tpl-violation">⚠️ Violation / Deduction Template</label>
                                     <button type="button" onclick="resetTemplateToDefault('violation')" style="background:none; border:none; color:var(--text-muted); font-size:0.72rem; font-weight:700; cursor:pointer;">↺ Reset</button>
                                 </div>
-                                <textarea id="msg-tpl-violation" rows="3" onfocus="setActiveTemplateInput('msg-tpl-violation')" oninput="autoSaveMessagingTemplate('violation')" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.84rem; font-weight:600; resize:vertical; font-family:inherit;"></textarea>
+                                <textarea id="msg-tpl-violation" rows="8" onfocus="setActiveTemplateInput('msg-tpl-violation')" oninput="autoSaveMessagingTemplate('violation')" style="width:100%; min-height:170px; padding:12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; font-weight:600; line-height:1.6; resize:vertical; font-family:inherit;"></textarea>
                             </div>
                             <div style="margin-top:10px; text-align:right;">
                                 <button type="button" onclick="sendTestTemplateAlert('violation')" style="background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.3); border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:800; cursor:pointer;">🚀 Test Alert</button>
@@ -4538,7 +4538,7 @@
                                     <label style="font-weight: 900; font-size: 0.85rem; color: #0ea5e9; display: flex; align-items:center; gap:6px;" data-i18n="label-tpl-reminder">⏰ Reminder Alert Template</label>
                                     <button type="button" onclick="resetTemplateToDefault('reminder')" style="background:none; border:none; color:var(--text-muted); font-size:0.72rem; font-weight:700; cursor:pointer;">↺ Reset</button>
                                 </div>
-                                <textarea id="msg-tpl-reminder" rows="3" onfocus="setActiveTemplateInput('msg-tpl-reminder')" oninput="autoSaveMessagingTemplate('reminder')" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.84rem; font-weight:600; resize:vertical; font-family:inherit;"></textarea>
+                                <textarea id="msg-tpl-reminder" rows="8" onfocus="setActiveTemplateInput('msg-tpl-reminder')" oninput="autoSaveMessagingTemplate('reminder')" style="width:100%; min-height:170px; padding:12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; font-weight:600; line-height:1.6; resize:vertical; font-family:inherit;"></textarea>
                             </div>
                             <div style="margin-top:10px; text-align:right;">
                                 <button type="button" onclick="sendTestTemplateAlert('reminder')" style="background:rgba(14,165,233,0.1); color:#0ea5e9; border:1px solid rgba(14,165,233,0.3); border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:800; cursor:pointer;">🚀 Test Alert</button>
@@ -4552,7 +4552,7 @@
                                     <label style="font-weight: 900; font-size: 0.85rem; color: #06b6d4; display: flex; align-items:center; gap:6px;" data-i18n="label-tpl-expiry">⏰ Document Expiry Template</label>
                                     <button type="button" onclick="resetTemplateToDefault('expiry')" style="background:none; border:none; color:var(--text-muted); font-size:0.72rem; font-weight:700; cursor:pointer;">↺ Reset</button>
                                 </div>
-                                <textarea id="msg-tpl-expiry" rows="3" onfocus="setActiveTemplateInput('msg-tpl-expiry')" oninput="autoSaveMessagingTemplate('expiry')" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.84rem; font-weight:600; resize:vertical; font-family:inherit;"></textarea>
+                                <textarea id="msg-tpl-expiry" rows="8" onfocus="setActiveTemplateInput('msg-tpl-expiry')" oninput="autoSaveMessagingTemplate('expiry')" style="width:100%; min-height:170px; padding:12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; font-weight:600; line-height:1.6; resize:vertical; font-family:inherit;"></textarea>
                             </div>
                             <div style="margin-top:10px; text-align:right;">
                                 <button type="button" onclick="sendTestTemplateAlert('expiry')" style="background:rgba(6,182,212,0.1); color:#06b6d4; border:1px solid rgba(6,182,212,0.3); border-radius:6px; padding:4px 10px; font-size:0.75rem; font-weight:800; cursor:pointer;">🚀 Test Alert</button>
@@ -6799,8 +6799,8 @@
 
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=226"></script>
-    <script src="app.js?v=226"></script>
+    <script src="translations.js?v=227"></script>
+    <script src="app.js?v=227"></script>
 </body>
 
 </html>
