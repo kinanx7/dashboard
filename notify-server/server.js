@@ -1260,6 +1260,20 @@ app.post(['/salla*', '/salla/webhook', '/salla/webhcook', '/salla/webhcoo', '/sa
         const event = body.event || 'order.created';
         const orderData = body.data || body;
 
+        // Handle Easy Mode Automatic Authorization
+        if (event === 'app.store.authorize' || event === 'app.installed' || event === 'app.trial.started') {
+            const authData = body.data || body;
+            const companyKeys = ['burgeroov', 'mvc', 'mvcfresh'];
+            for (const c of companyKeys) {
+                await db.ref(`companies/${c}/sallaAuth`).set({
+                    ...authData,
+                    installedAt: Date.now()
+                });
+            }
+            console.log('🎉 [Salla Easy Mode Auth Received & Stored!]', authData);
+            return res.status(200).json({ status: 'success', message: 'App authorized successfully via Easy Mode' });
+        }
+
         const baseOrder = (orderData && orderData.order) ? orderData.order : (orderData || {});
         const rawOrderId = baseOrder.reference_id || baseOrder.id || orderData.reference_id || orderData.id || (orderData.invoice && orderData.invoice.order_id);
 
