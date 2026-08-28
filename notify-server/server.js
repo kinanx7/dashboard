@@ -994,6 +994,8 @@ const SALLA_CLIENT_ID = process.env.SALLA_CLIENT_ID || '12683e56-fcb1-4c9d-bac4-
 const SALLA_CLIENT_SECRET = process.env.SALLA_CLIENT_SECRET || 'a9c8efe0a97f043f704becb568941cc055e020204577c93a4e4eb23c77f0ef47';
 const SALLA_REDIRECT_URI = 'https://burgeroov-notify.onrender.com/salla/callback';
 
+let lastSallaAuthAttempt = null;
+
 async function exchangeSallaCodeForToken(code) {
     if (!code) return null;
     return new Promise((resolve) => {
@@ -1004,6 +1006,8 @@ async function exchangeSallaCodeForToken(code) {
             code: code,
             redirect_uri: SALLA_REDIRECT_URI
         }).toString();
+
+        console.log('📤 [Salla Token Exchange Request Payload]', postBody);
 
         const https = require('https');
         const req = https.request('https://accounts.salla.sa/oauth2/token', {
@@ -1018,10 +1022,20 @@ async function exchangeSallaCodeForToken(code) {
             res.on('end', () => {
                 try {
                     const json = JSON.parse(data);
-                    console.log('🎉 [Salla OAuth Token Exchange]', json);
+                    console.log('🎉 [Salla OAuth Token Exchange Response]', json);
+                    lastSallaAuthAttempt = {
+                        timestamp: new Date().toISOString(),
+                        statusCode: res.statusCode,
+                        response: json
+                    };
                     resolve(json);
                 } catch (e) {
                     console.error('❌ [Salla Token Parse Error]', data);
+                    lastSallaAuthAttempt = {
+                        timestamp: new Date().toISOString(),
+                        statusCode: res.statusCode,
+                        rawResponse: data
+                    };
                     resolve({ raw: data });
                 }
             });
@@ -1029,6 +1043,10 @@ async function exchangeSallaCodeForToken(code) {
 
         req.on('error', (err) => {
             console.error('❌ [Salla Token Request Error]', err.message);
+            lastSallaAuthAttempt = {
+                timestamp: new Date().toISOString(),
+                error: err.message
+            };
             resolve(null);
         });
 
@@ -1036,6 +1054,19 @@ async function exchangeSallaCodeForToken(code) {
         req.end();
     });
 }
+
+app.get('/salla/auth-debug', async (_req, res) => {
+    try {
+        const snap = await db.ref('companies/burgeroov/sallaAuth').once('value');
+        res.json({
+            databaseAuthSaved: !!snap.val(),
+            databaseAuth: snap.val(),
+            lastAuthAttempt: lastSallaAuthAttempt
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
 app.get('/salla/webhook', (_req, res) => {
     res.status(200).json({ status: 'ok', message: 'Salla Webhook Endpoint is active and listening for orders ✅' });
@@ -1125,12 +1156,14 @@ app.get('/salla/sync-orders', async (_req, res) => {
 
 app.get('/salla/callback', async (req, res) => {
     const code = req.query.code;
+    let tokenData = null;
     let isInstalled = false;
+    let errorMsg = null;
 
     if (code) {
         try {
             console.log('🔄 [Salla Callback] Exchanging authorization code with Salla OAuth token endpoint...');
-            const tokenData = await exchangeSallaCodeForToken(code);
+            tokenData = await exchangeSallaCodeForToken(code);
             if (tokenData && (tokenData.access_token || tokenData.token_type)) {
                 isInstalled = true;
                 const companyKeys = ['burgeroov', 'mvc', 'mvcfresh'];
@@ -1141,36 +1174,67 @@ app.get('/salla/callback', async (req, res) => {
                     });
                 }
                 console.log('🎉 [Salla App Installed Successfully] Token stored to Firebase RTDB!');
+            } else if (tokenData && (tokenData.error || tokenData.message)) {
+                errorMsg = JSON.stringify(tokenData);
             }
         } catch (err) {
             console.error('❌ [Salla Callback Error]:', err.message);
+            errorMsg = err.message;
         }
     }
 
-    res.send(`
-        <!DOCTYPE html>
-        <html lang="ar" dir="rtl">
-        <head>
-            <meta charset="UTF-8">
-            <title>تم تثبيت وتفعيل تطبيق متجر سلة بنجاح</title>
-            <style>
-                body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
-                .card { background: #1e293b; border: 2px solid #10b981; border-radius: 20px; padding: 40px 30px; max-width: 480px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
-                h1 { color: #10b981; margin: 0 0 10px 0; font-size: 1.6rem; }
-                p { color: #94a3b8; line-height: 1.6; font-size: 0.95rem; }
-                .badge { display: inline-block; background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 6px 16px; border-radius: 100px; font-weight: 800; font-size: 0.85rem; margin-top: 15px; }
-            </style>
-        </head>
-        <body>
-            <div class="card">
-                <div style="font-size: 3.5rem; margin-bottom: 12px;">🛍️</div>
-                <h1>تم تثبيت وتفعيل تطبيق متجر سلة بنجاح!</h1>
-                <p>تم إتمام المصادقة وتبادل المفاتيح رسمياً مع متجرك في سلة. التطبيق الآن مثبت وجاهز لبدء إرسال طلباتك تلقائياً للوحة التحكم.</p>
-                <div class="badge">✅ تم التثبيت بنجاح والتطبيق متصل بالمتجر</div>
-            </div>
-        </body>
-        </html>
-    `);
+    if (isInstalled) {
+        res.send(`
+            <!DOCTYPE html>
+            <html lang="ar" dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <title>تم تثبيت وتفعيل تطبيق متجر سلة بنجاح</title>
+                <style>
+                    body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+                    .card { background: #1e293b; border: 2px solid #10b981; border-radius: 20px; padding: 40px 30px; max-width: 480px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+                    h1 { color: #10b981; margin: 0 0 10px 0; font-size: 1.6rem; }
+                    p { color: #94a3b8; line-height: 1.6; font-size: 0.95rem; }
+                    .badge { display: inline-block; background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 6px 16px; border-radius: 100px; font-weight: 800; font-size: 0.85rem; margin-top: 15px; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <div style="font-size: 3.5rem; margin-bottom: 12px;">🛍️</div>
+                    <h1>تم تثبيت وتفعيل تطبيق متجر سلة بنجاح!</h1>
+                    <p>تم إتمام المصادقة وتبادل المفاتيح رسمياً وحفظ توكن الربط في قاعدة البيانات. التطبيق الآن مثبت بنجاح ومستعد لاستقبال ومزامنة طلباتك.</p>
+                    <div class="badge">✅ تم التثبيت وتفعيل الربط بنجاح</div>
+                </div>
+            </body>
+            </html>
+        `);
+    } else {
+        res.send(`
+            <!DOCTYPE html>
+            <html lang="ar" dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <title>تنبيه ربط سلة</title>
+                <style>
+                    body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+                    .card { background: #1e293b; border: 2px solid #f59e0b; border-radius: 20px; padding: 40px 30px; max-width: 480px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+                    h1 { color: #f59e0b; margin: 0 0 10px 0; font-size: 1.6rem; }
+                    p { color: #94a3b8; line-height: 1.6; font-size: 0.95rem; }
+                    pre { background: #0f172a; padding: 10px; border-radius: 8px; color: #ef4444; font-size: 0.8rem; text-align: left; direction: ltr; overflow-x: auto; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <div style="font-size: 3.5rem; margin-bottom: 12px;">⚠️</div>
+                    <h1>تنبيه ربط سلة</h1>
+                    <p>${errorMsg ? 'استجابة سلة أثناء محاولة التثبيت:' : 'لم يتم استلام كود التثبيت من سلة.'}</p>
+                    ${errorMsg ? `<pre>${errorMsg}</pre>` : ''}
+                    <p style="margin-top: 15px; font-size: 0.85rem;">يرجى إعادة المحاولة من رابط التثبيت بالمتجر.</p>
+                </div>
+            </body>
+            </html>
+        `);
+    }
 });
 
 let lastSallaWebhooks = [];
