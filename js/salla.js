@@ -755,6 +755,36 @@ function copySallaWebhookUrl() {
 window.copySallaWebhookUrl = copySallaWebhookUrl;
 
 /**
+ * Manually Trigger Salla API Sync from Dashboard
+ */
+async function syncSallaOrdersDirect() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    if (typeof showInAppNotification === 'function') {
+        showInAppNotification(isAr ? '🔄 جاري مزامنة الطلبات من سلة...' : 'Syncing orders from Salla API...');
+    }
+
+    try {
+        const res = await fetch('https://burgeroov-notify.onrender.com/salla/sync-orders');
+        const data = await res.json();
+        if (data.status === 'success') {
+            if (typeof showInAppNotification === 'function') {
+                showInAppNotification(isAr ? `✅ تم جلب ${data.syncedCount} طلب بنجاح من متجر سلة!` : `Successfully synced ${data.syncedCount} orders from Salla!`);
+            }
+            updateSallaHUDStats();
+            renderSallaOrdersGrid();
+        } else {
+            alert(isAr ? `تنبيه سلة: ${data.message || 'يرجى النقر على رابط تثبيت التطبيق في المتجر أولاً.'}` : `Salla Notice: ${data.message || 'Please complete app authorization first.'}`);
+        }
+    } catch (e) {
+        console.error("Sync error:", e);
+        if (typeof showInAppNotification === 'function') {
+            showInAppNotification(isAr ? '❌ تعذر الاتصال بالخادم' : 'Server connection error');
+        }
+    }
+}
+window.syncSallaOrdersDirect = syncSallaOrdersDirect;
+
+/**
  * Generate a realistic simulated Test Salla Order
  */
 function generateTestSallaOrder() {

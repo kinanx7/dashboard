@@ -954,6 +954,13 @@ var uiTranslations = {
         "btn-assign-tracked-task-submit": "🕵️ Assign Tracked Task",
         "title-tracked-task-alerts-hud": "🚨 Tracked Tasks Inaction & Escalation Alerts",
 
+        // Salla Section
+        "tab-salla": "🛍️ Salla",
+        "btn-salla-sync": "Sync Salla Orders",
+        "btn-salla-stats": "Salla Stats & Analytics",
+        "btn-salla-test-order": "Create Test Order",
+        "btn-salla-settings": "Webhook Settings",
+
         // Market Section Translations
         "tab-market": "🏪 Market",
         "title-add-market-product": "🛒 Add New Market Product",
@@ -1899,6 +1906,13 @@ var uiTranslations = {
         "label-time-spy-act-mins": "وقت اتخاذ إجراء المراقب (بالدقائق) *",
         "label-tracked-violation-amount": "مبلغ خصم المخالفة (ريال) *",
         "btn-assign-tracked-task-submit": "🕵️ إسناد المهمة المتتبعة",
-        "title-tracked-task-alerts-hud": "🚨 تنبيهات وتصعيدات المهام المتتبعة"
+        "title-tracked-task-alerts-hud": "🚨 تنبيهات وتصعيدات المهام المتتبعة",
+
+        // Salla Section
+        "tab-salla": "🛍️ سلة",
+        "btn-salla-sync": "مزامنة طلبات متجر سلة",
+        "btn-salla-stats": "إحصائيات وتحليلات سلة",
+        "btn-salla-test-order": "إنشاء طلب تجريبي",
+        "btn-salla-settings": "إعدادات الربط والويب هوك"
     }
 };

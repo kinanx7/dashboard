@@ -1041,6 +1041,88 @@ app.get('/salla/webhook', (_req, res) => {
     res.status(200).json({ status: 'ok', message: 'Salla Webhook Endpoint is active and listening for orders ✅' });
 });
 
+app.get('/salla/sync-orders', async (_req, res) => {
+    try {
+        const snap = await db.ref('companies/burgeroov/sallaAuth').once('value');
+        const auth = snap.val();
+        if (!auth || !auth.access_token) {
+            return res.status(400).json({ status: 'error', message: 'No Salla access token found yet.' });
+        }
+
+        const https = require('https');
+        const fetchOrders = () => new Promise((resolve, reject) => {
+            const req = https.request('https://api.salla.dev/admin/v2/orders?page=1&per_page=20', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${auth.access_token}`,
+                    'Accept': 'application/json'
+                }
+            }, (apiRes) => {
+                let d = '';
+                apiRes.on('data', c => d += c);
+                apiRes.on('end', () => {
+                    try {
+                        resolve(JSON.parse(d));
+                    } catch (e) {
+                        resolve({ raw: d });
+                    }
+                });
+            });
+            req.on('error', reject);
+            req.end();
+        });
+
+        const sallaResponse = await fetchOrders();
+        console.log('📦 [Salla Orders API Sync Response]', sallaResponse);
+
+        if (sallaResponse && sallaResponse.data && Array.isArray(sallaResponse.data)) {
+            const companyKeys = ['burgeroov', 'mvc', 'mvcfresh'];
+            let count = 0;
+            for (const item of sallaResponse.data) {
+                const orderId = String(item.reference_id || item.id);
+                const cust = item.customer || {};
+                const ship = item.shipping || {};
+                const receiver = ship.receiver || {};
+                const address = ship.address || item.address || {};
+
+                const formattedOrder = {
+                    id: orderId,
+                    orderNumber: orderId,
+                    customerName: `${cust.first_name || ''} ${cust.last_name || ''}`.trim() || receiver.name || 'عميل متجر سلة',
+                    customerPhone: cust.mobile || cust.phone || receiver.phone || '',
+                    city: address.city || 'الرياض',
+                    addressLine: address.shipping_address || address.street || address.details || 'العنوان المسجل في سلة',
+                    coords: address.location || null,
+                    total: parseFloat((item.amounts && item.amounts.total && item.amounts.total.amount) || item.total || 0).toFixed(2),
+                    paymentMethod: item.payment_method || 'Mada',
+                    status: (item.status && item.status.slug) || 'in_progress',
+                    createdAt: item.date && item.date.date ? new Date(item.date.date).getTime() : Date.now(),
+                    notes: item.notes || item.customer_note || '',
+                    items: (item.items || []).map(i => ({
+                        name: i.name || i.product_name || i.title || 'وجبة',
+                        quantity: i.quantity || i.qty || 1,
+                        options: i.options && Array.isArray(i.options) ? i.options.map(o => `${o.name}: ${o.value}`).join(', ') : '',
+                        price: (i.price && i.price.amount) || i.price || 0
+                    })),
+                    checklist: {}
+                };
+
+                for (const c of companyKeys) {
+                    await db.ref(`companies/${c}/sallaOrders/${orderId}`).set(formattedOrder);
+                }
+                count++;
+            }
+
+            return res.json({ status: 'success', syncedCount: count, data: sallaResponse.data });
+        }
+
+        return res.json({ status: 'ok', response: sallaResponse });
+    } catch (e) {
+        console.error('❌ [Sync Orders Error]:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.get('/salla/callback', async (req, res) => {
     const code = req.query.code;
     let isInstalled = false;
