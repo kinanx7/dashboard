@@ -32357,6 +32357,10 @@ function openSallaStatsModal() {
     let outCount = 0;
     let prepCount = 0;
 
+    const comp = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
+    const compData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const excludedProducts = (compData.sallaExcludedProducts || (typeof appData !== 'undefined' && appData[comp] && appData[comp].sallaExcludedProducts) || {});
+
     const productSalesMap = {};
 
     orders.forEach(o => {
@@ -32370,8 +32374,11 @@ function openSallaStatsModal() {
         if (!isNaN(amt)) totalRevenue += amt;
 
         (o.items || []).forEach(item => {
-            const name = item.name || item.title || 'Product';
-            const qty = parseInt(item.quantity || 1);
+            const name = String(item.name || item.title || '').trim();
+            if (!name || name === 'طلب متجر سلة' || name.includes('ملاحظات العميل') || name.includes('رسوم الشحن')) return;
+            if (excludedProducts[name] === true) return; // Excluded test product
+
+            const qty = parseInt(item.quantity || item.qty || 1);
             productSalesMap[name] = (productSalesMap[name] || 0) + qty;
         });
     });
@@ -32379,22 +32386,28 @@ function openSallaStatsModal() {
     const aov = totalOrders > 0 ? (totalRevenue / totalOrders).toFixed(2) : '0.00';
     const fulfillmentRate = totalOrders > 0 ? Math.round((deliveredCount / totalOrders) * 100) : 0;
 
-    // Top Products
+    // Top Products (excluding test products)
     const topProducts = Object.entries(productSalesMap)
         .sort((a, b) => b[1] - a[1])
-        .slice(0, 5);
+        .slice(0, 8);
 
     const maxQty = topProducts.length > 0 ? Math.max(...topProducts.map(p => p[1])) : 1;
+    const hasExcluded = Object.keys(excludedProducts).length > 0;
 
     const topProductsHtml = topProducts.length > 0 ? topProducts.map(([name, qty]) => {
         const pct = Math.round((qty / maxQty) * 100);
         return `
-            <div style="margin-bottom: 12px;">
-                <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 0.85rem; color: var(--text-main); margin-bottom: 4px;">
-                    <span>🍔 ${name}</span>
-                    <span style="color: #10b981;">${qty} ${isAr ? 'طلب' : 'Sold'}</span>
+            <div style="margin-bottom: 14px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 0.86rem; color: var(--text-main); margin-bottom: 6px;">
+                    <span style="display: flex; align-items: center; gap: 6px;">🍔 ${name}</span>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="color: #10b981; font-weight: 900;">${qty} ${isAr ? 'مباع' : 'Sold'}</span>
+                        <button type="button" onclick="excludeSallaStatProduct('${name.replace(/'/g, "\\'")}')" title="${isAr ? 'استبعاد / حذف هذا المنتج التجريبي من الإحصائيات' : 'Exclude this test product from stats'}" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 6px; padding: 2px 6px; font-size: 0.72rem; cursor: pointer;">
+                            🗑️ ${isAr ? 'استبعاد' : 'Delete'}
+                        </button>
+                    </div>
                 </div>
-                <div style="width: 100%; height: 8px; background: var(--input-bg); border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color);">
+                <div style="width: 100%; height: 7px; background: var(--input-bg); border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color);">
                     <div style="width: ${pct}%; height: 100%; background: linear-gradient(90deg, #10b981, #059669); border-radius: 6px;"></div>
                 </div>
             </div>
@@ -32448,11 +32461,18 @@ function openSallaStatsModal() {
                 </div>
             </div>
 
-            <!-- Top Selling Salla Products -->
+            <!-- Top Selling Salla Products with Exclude Ability -->
             <div style="background: var(--input-bg); border-radius: 14px; border: 1px solid var(--border-color); padding: 16px;">
-                <h4 style="margin: 0 0 14px 0; font-size: 0.92rem; font-weight: 900; color: var(--text-main);">
-                    🔥 ${isAr ? 'الأصناف الأكثر طلباً من سلة' : 'Top Selling Salla Products'}
-                </h4>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+                    <h4 style="margin: 0; font-size: 0.92rem; font-weight: 900; color: var(--text-main);">
+                        🔥 ${isAr ? 'الأصناف الأكثر طلباً من متجر سلة' : 'Top Selling Salla Products'}
+                    </h4>
+                    ${hasExcluded ? `
+                        <button type="button" onclick="resetSallaExcludedProducts()" class="btn-outline" style="padding: 4px 10px; font-size: 0.74rem; border-radius: 8px; font-weight: 800;">
+                            🔄 ${isAr ? 'إلغاء الاستبعاد وإظهار الكل' : 'Reset Excluded'}
+                        </button>
+                    ` : ''}
+                </div>
                 ${topProductsHtml}
             </div>
         `;
@@ -32462,14 +32482,399 @@ function openSallaStatsModal() {
 }
 window.openSallaStatsModal = openSallaStatsModal;
 
-/**
- * Close Salla Stats Modal
- */
 function closeSallaStatsModal() {
     const modal = document.getElementById('modal-salla-stats');
     if (modal) modal.style.display = 'none';
 }
 window.closeSallaStatsModal = closeSallaStatsModal;
+
+/**
+ * Exclude a test product from Salla analytics
+ */
+function excludeSallaStatProduct(productName) {
+    if (!productName) return;
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const comp = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
+    
+    if (!confirm(isAr ? `هل تريد استبعاد المنتج التجريبي "${productName}" من الإحصائيات؟` : `Exclude "${productName}" from analytics?`)) return;
+
+    if (typeof appData !== 'undefined' && appData[comp]) {
+        if (!appData[comp].sallaExcludedProducts) appData[comp].sallaExcludedProducts = {};
+        appData[comp].sallaExcludedProducts[productName] = true;
+    }
+
+    if (typeof db !== 'undefined' && db) {
+        db.ref(`companies/${comp}/sallaExcludedProducts/${productName.replace(/[.#$[\]/]/g, '_')}`).set(true).catch(() => {});
+    }
+
+    openSallaStatsModal();
+    if (typeof showInAppNotification === 'function') {
+        showInAppNotification(isAr ? `🗑️ تم استبعاد "${productName}" من الإحصائيات!` : `"${productName}" excluded from analytics!`);
+    }
+}
+window.excludeSallaStatProduct = excludeSallaStatProduct;
+
+/**
+ * Reset excluded test products in Salla analytics
+ */
+function resetSallaExcludedProducts() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const comp = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
+
+    if (typeof appData !== 'undefined' && appData[comp]) {
+        appData[comp].sallaExcludedProducts = {};
+    }
+
+    if (typeof db !== 'undefined' && db) {
+        db.ref(`companies/${comp}/sallaExcludedProducts`).remove().catch(() => {});
+    }
+
+    openSallaStatsModal();
+    if (typeof showInAppNotification === 'function') {
+        showInAppNotification(isAr ? '🔄 تم إعادة تفعيل جميع المنتجات في الإحصائيات!' : 'All products restored in analytics!');
+    }
+}
+window.resetSallaExcludedProducts = resetSallaExcludedProducts;
+
+// ─── TOTAL BATCH PREPARATION & PURCHASING HUB ─────────────────────────────
+let sallaBatchFilterMode = 'ALL';
+
+function openSallaBatchPrepModal() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const comp = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
+    const compData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const batchPurchases = compData.sallaBatchPurchases || (typeof appData !== 'undefined' && appData[comp] && appData[comp].sallaBatchPurchases) || {};
+
+    const ordersMap = getSallaOrdersMap();
+    const activeOrders = Object.values(ordersMap || {}).filter(o => {
+        if (!o) return false;
+        const st = String(o.status || 'in_progress').toLowerCase();
+        return st !== 'delivered' && st !== 'completed' && st !== 'done' && st !== 'canceled' && st !== 'cancelled';
+    });
+
+    // Aggregate items across all active orders
+    const batchMap = {};
+    activeOrders.forEach(o => {
+        const orderRef = o.order_reference_id || o.reference_id || o.order_id || (o.invoice_number ? (isAr ? 'فاتورة #' + o.invoice_number : 'INV-#' + o.invoice_number) : o.id);
+        const custName = o.customerName || (isAr ? 'عميل' : 'Customer');
+
+        (o.items || []).forEach(item => {
+            const name = String(item.name || item.title || '').trim();
+            if (!name || name === 'طلب متجر سلة' || name.includes('ملاحظات العميل') || name.includes('رسوم الشحن')) return;
+            const qty = parseInt(item.quantity || item.qty || 1);
+
+            if (!batchMap[name]) {
+                batchMap[name] = {
+                    name: name,
+                    totalQty: 0,
+                    orders: [],
+                    options: item.options || ''
+                };
+            }
+            batchMap[name].totalQty += qty;
+            batchMap[name].orders.push({
+                orderNum: orderRef,
+                qty: qty,
+                customer: custName
+            });
+        });
+    });
+
+    let batchItems = Object.values(batchMap).sort((a, b) => b.totalQty - a.totalQty);
+    const totalUniqueProducts = batchItems.length;
+    let totalUnitsCount = 0;
+    let totalPurchasedCount = 0;
+
+    batchItems.forEach(item => {
+        totalUnitsCount += item.totalQty;
+        if (batchPurchases[item.name] === true) {
+            totalPurchasedCount += item.totalQty;
+        }
+    });
+
+    // Apply Filter (All / To Buy / Purchased)
+    let filteredItems = batchItems;
+    if (sallaBatchFilterMode === 'TO_BUY') {
+        filteredItems = batchItems.filter(i => batchPurchases[i.name] !== true);
+    } else if (sallaBatchFilterMode === 'PURCHASED') {
+        filteredItems = batchItems.filter(i => batchPurchases[i.name] === true);
+    }
+
+    // Remove existing modal if any
+    const existing = document.getElementById('modal-salla-batch-prep');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'modal-salla-batch-prep';
+    modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); z-index:99999; display:flex; align-items:center; justify-content:center; padding:15px;';
+
+    const purchasedPct = totalUnitsCount > 0 ? Math.round((totalPurchasedCount / totalUnitsCount) * 100) : 0;
+
+    modal.innerHTML = `
+        <div style="background:#1e293b; border:2px solid #10b981; border-radius:20px; max-width:840px; width:100%; max-height:92vh; display:flex; flex-direction:column; box-shadow:0 25px 60px rgba(0,0,0,0.7); color:#f8fafc; text-align:${isAr ? 'right' : 'left'}; direction:${isAr ? 'rtl' : 'ltr'}; overflow:hidden;">
+            
+            <!-- Modal Header -->
+            <div style="padding:20px 24px; border-bottom:1px solid #334155; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div style="width:48px; height:48px; border-radius:14px; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); display:flex; align-items:center; justify-content:center; font-size:1.8rem;">
+                        📦
+                    </div>
+                    <div>
+                        <h3 style="margin:0; font-size:1.25rem; color:#10b981; font-weight:900;">
+                            ${isAr ? 'مجمع تجهيز وشراء الأصناف الكلي (سلة)' : 'Total Salla Batch Preparation & Purchasing'}
+                        </h3>
+                        <p style="margin:4px 0 0 0; font-size:0.82rem; color:#94a3b8;">
+                            ${isAr ? 'حساب إجمالي كل صنف مطلوب تحضيره أو شراؤه لجميع طلبات العملاء النشطة دفعة واحدة' : 'Total quantity of every product to purchase/prepare across all active customer orders'}
+                        </p>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <button type="button" onclick="printSallaBatchPurchases()" style="padding:8px 14px; background:#334155; color:#f8fafc; border:1px solid #475569; border-radius:10px; font-weight:800; font-size:0.82rem; cursor:pointer; display:flex; align-items:center; gap:5px;">
+                        <span>🖨️</span> <span>${isAr ? 'طباعة القائمة' : 'Print Sheet'}</span>
+                    </button>
+                    <button type="button" onclick="closeSallaBatchPrepModal()" style="width:36px; height:36px; border-radius:50%; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#ef4444; font-size:1.2rem; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                        ✕
+                    </button>
+                </div>
+            </div>
+
+            <!-- Top Summary Badges & Progress -->
+            <div style="padding:16px 24px; background:rgba(15,23,42,0.6); border-bottom:1px solid #334155;">
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:10px; margin-bottom:12px;">
+                    <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:10px 14px;">
+                        <div style="font-size:0.75rem; color:#94a3b8; font-weight:700;">${isAr ? 'إجمالي القطع المطلوبة' : 'Total Units to Prepare'}</div>
+                        <div style="font-size:1.4rem; font-weight:900; color:#38bdf8; margin-top:2px;">${totalUnitsCount} ${isAr ? 'قطعة / وحدة' : 'Units'}</div>
+                    </div>
+                    <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:10px 14px;">
+                        <div style="font-size:0.75rem; color:#94a3b8; font-weight:700;">${isAr ? 'عدد الأصناف الفريدة' : 'Unique Products'}</div>
+                        <div style="font-size:1.4rem; font-weight:900; color:#f59e0b; margin-top:2px;">${totalUniqueProducts} ${isAr ? 'صنف' : 'Products'}</div>
+                    </div>
+                    <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:10px 14px;">
+                        <div style="font-size:0.75rem; color:#94a3b8; font-weight:700;">${isAr ? 'تم شراؤها / تجهيزها' : 'Purchased & Ready'}</div>
+                        <div style="font-size:1.4rem; font-weight:900; color:#10b981; margin-top:2px;">${totalPurchasedCount} / ${totalUnitsCount} (${purchasedPct}%)</div>
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div style="width:100%; height:8px; background:#0f172a; border-radius:10px; overflow:hidden; border:1px solid #334155;">
+                    <div style="width:${purchasedPct}%; height:100%; background:linear-gradient(90deg, #10b981, #059669); transition:width 0.3s ease;"></div>
+                </div>
+
+                <!-- Filter Buttons -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; flex-wrap:wrap; gap:8px;">
+                    <div style="display:flex; gap:6px;">
+                        <button type="button" onclick="setSallaBatchFilter('ALL')" style="padding:6px 14px; border-radius:8px; font-weight:800; font-size:0.78rem; cursor:pointer; border:1px solid ${sallaBatchFilterMode === 'ALL' ? '#10b981' : '#475569'}; background:${sallaBatchFilterMode === 'ALL' ? 'rgba(16,185,129,0.2)' : '#1e293b'}; color:${sallaBatchFilterMode === 'ALL' ? '#10b981' : '#94a3b8'};">
+                            ${isAr ? 'الكل' : 'All Items'} (${batchItems.length})
+                        </button>
+                        <button type="button" onclick="setSallaBatchFilter('TO_BUY')" style="padding:6px 14px; border-radius:8px; font-weight:800; font-size:0.78rem; cursor:pointer; border:1px solid ${sallaBatchFilterMode === 'TO_BUY' ? '#f59e0b' : '#475569'}; background:${sallaBatchFilterMode === 'TO_BUY' ? 'rgba(245,158,11,0.2)' : '#1e293b'}; color:${sallaBatchFilterMode === 'TO_BUY' ? '#f59e0b' : '#94a3b8'};">
+                            🛒 ${isAr ? 'مطلوب للشراء' : 'To Buy'} (${batchItems.filter(i => batchPurchases[i.name] !== true).length})
+                        </button>
+                        <button type="button" onclick="setSallaBatchFilter('PURCHASED')" style="padding:6px 14px; border-radius:8px; font-weight:800; font-size:0.78rem; cursor:pointer; border:1px solid ${sallaBatchFilterMode === 'PURCHASED' ? '#10b981' : '#475569'}; background:${sallaBatchFilterMode === 'PURCHASED' ? 'rgba(16,185,129,0.2)' : '#1e293b'}; color:${sallaBatchFilterMode === 'PURCHASED' ? '#10b981' : '#94a3b8'};">
+                            ✅ ${isAr ? 'تم الشراء والتوفير' : 'Purchased'} (${batchItems.filter(i => batchPurchases[i.name] === true).length})
+                        </button>
+                    </div>
+
+                    <button type="button" onclick="resetAllSallaBatchChecks()" style="padding:6px 12px; background:none; border:none; color:#94a3b8; font-size:0.75rem; font-weight:700; cursor:pointer; text-decoration:underline;">
+                        ${isAr ? 'إعادة ضبط كل التحديدات' : 'Reset All Checks'}
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scrollable Items List -->
+            <div id="salla-batch-prep-list" style="flex:1; overflow-y:auto; padding:18px 24px; display:flex; flex-direction:column; gap:12px;">
+                ${filteredItems.length > 0 ? filteredItems.map(item => {
+                    const isPurchased = batchPurchases[item.name] === true;
+                    const ordersBreakdown = item.orders.map(o => `<span style="background:#0f172a; border:1px solid #334155; padding:2px 8px; border-radius:6px; font-size:0.75rem; color:#94a3b8; margin:2px;">#${o.orderNum} (${o.qty}x ${o.customer})</span>`).join(' ');
+
+                    return `
+                        <div style="background:${isPurchased ? 'rgba(16,185,129,0.08)' : '#0f172a'}; border:1.5px solid ${isPurchased ? 'rgba(16,185,129,0.4)' : '#334155'}; border-radius:14px; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; gap:16px; transition:all 0.2s ease;">
+                            
+                            <div style="display:flex; align-items:center; gap:14px; flex:1;">
+                                <input type="checkbox" ${isPurchased ? 'checked' : ''} onchange="toggleBatchItemPurchased('${item.name.replace(/'/g, "\\'")}')" style="width:22px; height:22px; cursor:pointer; accent-color:#10b981; flex-shrink:0;">
+                                
+                                <div style="flex:1;">
+                                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                        <span style="font-size:1.15rem; font-weight:900; color:${isPurchased ? '#10b981' : '#f8fafc'}; text-decoration:${isPurchased ? 'line-through' : 'none'};">
+                                            ${item.name}
+                                        </span>
+                                        ${item.options ? `<span style="font-size:0.75rem; color:#94a3b8;">(${item.options})</span>` : ''}
+                                    </div>
+                                    
+                                    <div style="margin-top:6px; font-size:0.78rem; color:#64748b; line-height:1.6;">
+                                        <b>${isAr ? 'مطلوب في الطلبات:' : 'Required for:'}</b> ${ordersBreakdown}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Quantity Badge & Status -->
+                            <div style="text-align:center; flex-shrink:0;">
+                                <div style="background:${isPurchased ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.18)'}; color:${isPurchased ? '#10b981' : '#f59e0b'}; border:1px solid ${isPurchased ? 'rgba(16,185,129,0.4)' : 'rgba(245,158,11,0.3)'}; padding:6px 14px; border-radius:10px; font-weight:900; font-size:1.15rem; min-width:65px;">
+                                    ${item.totalQty}x
+                                </div>
+                                <div style="font-size:0.72rem; font-weight:800; color:${isPurchased ? '#10b981' : '#f59e0b'}; margin-top:4px;">
+                                    ${isPurchased ? (isAr ? '✅ تم الشراء' : 'Purchased') : (isAr ? '🛒 للشراء' : 'To Buy')}
+                                </div>
+                            </div>
+
+                        </div>
+                    `;
+                }).join('') : `
+                    <div style="text-align:center; padding:40px; color:#94a3b8;">
+                        <div style="font-size:2.5rem; margin-bottom:8px;">✅</div>
+                        <div style="font-weight:800;">${isAr ? 'لا توجد أصناف في هذا التصنيف' : 'No items in this filter'}</div>
+                    </div>
+                `}
+            </div>
+
+            <!-- Footer -->
+            <div style="padding:14px 24px; border-top:1px solid #334155; background:rgba(15,23,42,0.6); display:flex; justify-content:space-between; align-items:center;">
+                <div style="font-size:0.82rem; color:#94a3b8;">
+                    💡 <b>${isAr ? 'ملاحظة:' : 'Note:'}</b> ${isAr ? 'تحديد الصنف كـ (تم الشراء) يظهر لجميع العمال في نفس اللحظة.' : 'Marking an item as purchased syncs across all worker dashboards.'}
+                </div>
+                <button type="button" onclick="closeSallaBatchPrepModal()" style="padding:8px 20px; background:#334155; color:#f8fafc; border:none; border-radius:10px; font-weight:800; cursor:pointer;">
+                    ${isAr ? 'إغلاق' : 'Close'}
+                </button>
+            </div>
+
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+}
+window.openSallaBatchPrepModal = openSallaBatchPrepModal;
+
+function closeSallaBatchPrepModal() {
+    const modal = document.getElementById('modal-salla-batch-prep');
+    if (modal) modal.remove();
+}
+window.closeSallaBatchPrepModal = closeSallaBatchPrepModal;
+
+function setSallaBatchFilter(mode) {
+    sallaBatchFilterMode = mode;
+    openSallaBatchPrepModal();
+}
+window.setSallaBatchFilter = setSallaBatchFilter;
+
+function toggleBatchItemPurchased(productName) {
+    if (!productName) return;
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const comp = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
+
+    if (typeof appData !== 'undefined' && appData[comp]) {
+        if (!appData[comp].sallaBatchPurchases) appData[comp].sallaBatchPurchases = {};
+        const cur = appData[comp].sallaBatchPurchases[productName] === true;
+        appData[comp].sallaBatchPurchases[productName] = !cur;
+
+        if (typeof db !== 'undefined' && db) {
+            db.ref(`companies/${comp}/sallaBatchPurchases/${productName.replace(/[.#$[\]/]/g, '_')}`).set(!cur).catch(() => {});
+        }
+    }
+
+    openSallaBatchPrepModal();
+}
+window.toggleBatchItemPurchased = toggleBatchItemPurchased;
+
+function resetAllSallaBatchChecks() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const comp = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
+    
+    if (!confirm(isAr ? 'هل تريد إعادة ضبط وإلغاء تحديد كل مشتريات الأصناف؟' : 'Reset all batch purchase checks?')) return;
+
+    if (typeof appData !== 'undefined' && appData[comp]) {
+        appData[comp].sallaBatchPurchases = {};
+    }
+
+    if (typeof db !== 'undefined' && db) {
+        db.ref(`companies/${comp}/sallaBatchPurchases`).remove().catch(() => {});
+    }
+
+    openSallaBatchPrepModal();
+}
+window.resetAllSallaBatchChecks = resetAllSallaBatchChecks;
+
+function printSallaBatchPurchases() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const ordersMap = getSallaOrdersMap();
+    const activeOrders = Object.values(ordersMap || {}).filter(o => {
+        if (!o) return false;
+        const st = String(o.status || 'in_progress').toLowerCase();
+        return st !== 'delivered' && st !== 'completed' && st !== 'done' && st !== 'canceled' && st !== 'cancelled';
+    });
+
+    const batchMap = {};
+    activeOrders.forEach(o => {
+        const orderRef = o.order_reference_id || o.reference_id || o.order_id || o.id;
+        (o.items || []).forEach(item => {
+            const name = String(item.name || item.title || '').trim();
+            if (!name || name === 'طلب متجر سلة' || name.includes('ملاحظات العميل') || name.includes('رسوم الشحن')) return;
+            const qty = parseInt(item.quantity || item.qty || 1);
+            if (!batchMap[name]) batchMap[name] = { name: name, totalQty: 0, orders: [] };
+            batchMap[name].totalQty += qty;
+            batchMap[name].orders.push(`#${orderRef} (${qty}x)`);
+        });
+    });
+
+    const items = Object.values(batchMap).sort((a, b) => b.totalQty - a.totalQty);
+    const dateStr = new Date().toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { hour: '2-digit', minute: '2-digit', year: 'numeric', month: 'short', day: 'numeric' });
+
+    const printWin = window.open('', '_blank');
+    if (!printWin) {
+        alert(isAr ? 'يرجى السماح بالنوافذ المنبثقة للطباعة' : 'Please allow popups to print');
+        return;
+    }
+
+    const rowsHtml = items.map((it, idx) => `
+        <tr style="border-bottom: 1px solid #ddd;">
+            <td style="padding: 10px; text-align: center; font-weight: bold;">${idx + 1}</td>
+            <td style="padding: 10px; font-weight: bold; font-size: 1.05rem;">${it.name}</td>
+            <td style="padding: 10px; text-align: center; font-size: 1.2rem; font-weight: 900; color: #16a34a;">${it.totalQty}</td>
+            <td style="padding: 10px; font-size: 0.85rem; color: #555;">${it.orders.join(', ')}</td>
+            <td style="padding: 10px; text-align: center; width: 60px;">[ &nbsp; ]</td>
+        </tr>
+    `).join('');
+
+    printWin.document.write(`
+        <!DOCTYPE html>
+        <html lang="${isAr ? 'ar' : 'en'}" dir="${isAr ? 'rtl' : 'ltr'}">
+        <head>
+            <title>${isAr ? 'قائمة مشتريات وتجهيز أصناف متجر سلة' : 'Salla Batch Purchasing Sheet'}</title>
+            <style>
+                body { font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif; padding: 20px; color: #111; }
+                table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+                th { background: #f1f5f9; padding: 10px; border-bottom: 2px solid #cbd5e1; text-align: ${isAr ? 'right' : 'left'}; font-weight: 900; }
+                th.center { text-align: center; }
+                @media print { button { display: none; } }
+            </style>
+        </head>
+        <body>
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #10b981; padding-bottom: 10px;">
+                <div>
+                    <h2 style="margin: 0; color: #059669;">📦 ${isAr ? 'قائمة مشتريات وتجهيز أصناف متجر سلة' : 'Salla Batch Purchasing & Preparation Sheet'}</h2>
+                    <p style="margin: 4px 0 0 0; color: #64748b; font-size: 0.9rem;">${isAr ? 'التاريخ:' : 'Date:'} ${dateStr} • ${isAr ? 'إجمالي الطلبات النشطة:' : 'Active Orders:'} ${activeOrders.length}</p>
+                </div>
+                <button onclick="window.print()" style="padding: 8px 18px; background: #10b981; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">🖨️ طباعة</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th class="center" style="width: 40px;">#</th>
+                        <th>${isAr ? 'اسم الصنف / المنتج' : 'Product Name'}</th>
+                        <th class="center" style="width: 100px;">${isAr ? 'الكمية الإجمالية' : 'Total Qty'}</th>
+                        <th>${isAr ? 'تفاصيل الطلبات' : 'Order Breakdown'}</th>
+                        <th class="center">${isAr ? 'تم الشراء' : 'Checked'}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHtml}
+                </tbody>
+            </table>
+        </body>
+        </html>
+    `);
+    printWin.document.close();
+}
+window.printSallaBatchPurchases = printSallaBatchPurchases;
 
 /**
  * Toggle Salla Connection & Webhook Settings Drawer

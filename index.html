@@ -4994,17 +4994,11 @@
 
                     <!-- Action Buttons -->
                     <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                        <button type="button" onclick="openSallaApiKeyModal()" class="btn-primary" style="padding: 9px 16px; border-radius: 12px; font-weight: 800; font-size: 0.84rem; background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(245,158,11,0.3);">
-                            <span>🔑</span> <span data-i18n="btn-salla-token">Direct API Token</span>
-                        </button>
-                        <button type="button" onclick="syncSallaOrdersDirect()" class="btn-primary" style="padding: 9px 16px; border-radius: 12px; font-weight: 800; font-size: 0.84rem; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(59,130,246,0.3);">
-                            <span>🔄</span> <span data-i18n="btn-salla-sync">Sync Salla Orders</span>
+                        <button type="button" onclick="openSallaBatchPrepModal()" class="btn-primary" style="padding: 9px 18px; border-radius: 12px; font-weight: 800; font-size: 0.85rem; background: linear-gradient(135deg, #10b981, #059669); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 7px; box-shadow: 0 4px 14px rgba(16,185,129,0.35);">
+                            <span>📦</span> <span data-i18n="btn-salla-batch-prep">Total Batch Preparation & Purchasing</span>
                         </button>
                         <button type="button" onclick="openSallaStatsModal()" class="btn-primary" style="padding: 9px 16px; border-radius: 12px; font-weight: 800; font-size: 0.84rem; background: linear-gradient(135deg, #6366f1, #4f46e5); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(99,102,241,0.3);">
                             <span>📊</span> <span data-i18n="btn-salla-stats">Salla Stats & Analytics</span>
-                        </button>
-                        <button type="button" onclick="generateTestSallaOrder()" class="btn-primary" style="padding: 9px 16px; border-radius: 12px; font-weight: 800; font-size: 0.84rem; background: linear-gradient(135deg, #10b981, #059669); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(16,185,129,0.3);">
-                            <span>🧪</span> <span data-i18n="btn-salla-test-order">Create Test Order</span>
                         </button>
                         <button type="button" onclick="toggleSallaSettingsPanel()" class="btn-neutral" style="padding: 9px 14px; border-radius: 12px; font-weight: 800; font-size: 0.84rem; cursor: pointer; display: flex; align-items: center; gap: 6px;">
                             <span>⚙️</span> <span data-i18n="btn-salla-settings">Webhook Settings</span>

@@ -956,6 +956,7 @@ var uiTranslations = {
 
         // Salla Section
         "tab-salla": "🛍️ Salla",
+        "btn-salla-batch-prep": "📦 Total Batch Preparation",
         "btn-salla-token": "Direct API Token",
         "btn-salla-sync": "Sync Salla Orders",
         "btn-salla-stats": "Salla Stats & Analytics",
@@ -1911,6 +1912,7 @@ var uiTranslations = {
 
         // Salla Section
         "tab-salla": "🛍️ سلة",
+        "btn-salla-batch-prep": "📦 مجمع تجهيز وشراء الأصناف الكلي",
         "btn-salla-token": "🔑 مفتاح الربط المباشر (API Token)",
         "btn-salla-sync": "مزامنة طلبات متجر سلة",
         "btn-salla-stats": "إحصائيات وتحليلات سلة",
