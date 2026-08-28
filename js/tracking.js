@@ -770,16 +770,16 @@ function startWorkerLocationBroadcaster() {
                 workerGpsWatcherId = navigator.geolocation.watchPosition(
                     pos => handleGpsPositionUpdate(pos),
                     err => console.warn("[GPS] Watcher status:", err.message),
-                    { enableHighAccuracy: true, maximumAge: 3000, timeout: 8000 }
+                    { enableHighAccuracy: true, maximumAge: 2000, timeout: 5000 }
                 );
             } catch (e) { }
         }
 
-        // Fast 8s Heartbeat Interval
+        // Fast 4.5s Real-Time Heartbeat Interval
         if (!workerGpsHeartbeatTimer) {
             workerGpsHeartbeatTimer = setInterval(() => {
                 broadcastWorkerGpsHeartbeat();
-            }, 8000);
+            }, 4500);
         }
     }
 }
@@ -791,7 +791,7 @@ function broadcastWorkerGpsHeartbeat(force) {
         navigator.geolocation.getCurrentPosition(
             pos => handleGpsPositionUpdate(pos, force || false),
             err => {},
-            { enableHighAccuracy: true, maximumAge: 0, timeout: 8000 }
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
         );
     } catch (e) { }
 }
@@ -828,8 +828,8 @@ function handleGpsPositionUpdate(position, forceWrite) {
     // 2. Movement delta check
     if (!forceWrite && lastBroadcastCoords) {
         const movedMeters = calculateDistanceMeters(lastBroadcastCoords.lat, lastBroadcastCoords.lng, latitude, longitude);
-        if (movedMeters < 0.5 && (now - lastGpsBroadcastTime) < 6000) {
-            return; // unchanged position within 6 seconds
+        if (movedMeters < 0.5 && (now - lastGpsBroadcastTime) < 4000) {
+            return; // unchanged position within 4 seconds
         }
     }
 

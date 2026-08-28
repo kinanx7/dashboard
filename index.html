@@ -81,7 +81,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=179">
+    <link rel="stylesheet" href="style.css?v=180">
 </head>
 
 <body class="theme-burgeroov">
@@ -496,6 +496,9 @@
                     <button id="tab-tracking" class="dept-tab" onclick="switchTab('tracking')"
                         data-i18n="tab-tracking">📍
                         Live Tracking</button>
+                    <button id="tab-salla" class="dept-tab" onclick="switchTab('salla')"
+                        data-i18n="tab-salla">🛍️
+                        Salla Store</button>
                 </div>
                 <button type="button" class="btn-outline" id="tab-reorder-btn" onclick="toggleTabReorderMode()"
                     style="padding: 8px 16px; border-radius: 100px; font-weight: 700; font-size: 0.85rem;"
@@ -4028,7 +4031,7 @@
                 <div
                     style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom: 20px; background: var(--input-bg); padding: 12px 16px; border-radius: 14px; border: 1px solid var(--border-color);">
                     <div style="flex:1; min-width:220px; position:relative;">
-                        <input type="text" id="vault-search-input" onkeyup="renderVaultNotes()"
+                        <input type="text" id="vault-search-input" onkeyup="renderVaultNotes()" oninput="renderVaultNotes()"
                             placeholder="🔍 Search documents, licenses, plate numbers..."
                             data-i18n="[placeholder]placeholder-vault-search"
                             style="width:100%; padding: 10px 14px 10px 38px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-weight: 700; font-size: 0.9rem;">
@@ -4968,6 +4971,138 @@
                 <div id="tracking-workers-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px;">
                     <!-- Dynamically Populated by renderTrackingSection() -->
                 </div>
+            </div>
+
+        </div>
+
+        <!-- ========================================== -->
+        <!-- VIEW: SALLA STORE REAL-TIME DISPATCH       -->
+        <!-- ========================================== -->
+        <div id="view-salla" class="view-section" style="grid-template-columns: 1fr; max-width: 1400px; width: 100%; margin: 0 auto; padding: 0 20px; box-sizing: border-box;">
+            
+            <!-- Top Header Card & HUD Badges -->
+            <div class="card" style="margin-bottom: 24px; border-top: 4px solid #10b981; background: var(--card-bg);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 18px;">
+                    <div>
+                        <h2 class="card-title" style="margin: 0; display: flex; align-items: center; gap: 8px;" data-i18n="title-salla-main">
+                            <span>🛍️</span> <span>Salla Store Real-Time Orders & Preparation Station</span>
+                        </h2>
+                        <p style="font-size: 0.88rem; color: var(--text-muted); margin: 4px 0 0 0; line-height: 1.5;" data-i18n="desc-salla-main">
+                            Monitor live incoming Salla orders, check item-by-item packaging checklists, dispatch drivers, and analyze delivery fulfillment statistics.
+                        </p>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                        <button type="button" onclick="openSallaStatsModal()" class="btn-primary" style="padding: 9px 16px; border-radius: 12px; font-weight: 800; font-size: 0.84rem; background: linear-gradient(135deg, #6366f1, #4f46e5); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(99,102,241,0.3);">
+                            <span>📊</span> <span data-i18n="btn-salla-stats">Salla Stats & Analytics</span>
+                        </button>
+                        <button type="button" onclick="generateTestSallaOrder()" class="btn-primary" style="padding: 9px 16px; border-radius: 12px; font-weight: 800; font-size: 0.84rem; background: linear-gradient(135deg, #10b981, #059669); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(16,185,129,0.3);">
+                            <span>🧪</span> <span data-i18n="btn-salla-test-order">Create Test Order</span>
+                        </button>
+                        <button type="button" onclick="toggleSallaSettingsPanel()" class="btn-neutral" style="padding: 9px 14px; border-radius: 12px; font-weight: 800; font-size: 0.84rem; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                            <span>⚙️</span> <span data-i18n="btn-salla-settings">Webhook Settings</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 5 Real-Time Metric Badges -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+                    <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(99, 102, 241, 0.15); color: #6366f1; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+                            🛍️
+                        </div>
+                        <div>
+                            <div style="font-size: 0.76rem; font-weight: 800; color: var(--text-muted);" data-i18n="hud-salla-total">Total Salla Orders</div>
+                            <div id="salla-hud-total" style="font-size: 1.35rem; font-weight: 900; color: var(--text-main); line-height: 1.2;">0</div>
+                        </div>
+                    </div>
+
+                    <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(245, 158, 11, 0.15); color: #f59e0b; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+                            👨‍🍳
+                        </div>
+                        <div>
+                            <div style="font-size: 0.76rem; font-weight: 800; color: var(--text-muted);" data-i18n="hud-salla-prep">Under Preparation</div>
+                            <div id="salla-hud-prep" style="font-size: 1.35rem; font-weight: 900; color: #f59e0b; line-height: 1.2;">0</div>
+                        </div>
+                    </div>
+
+                    <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(59, 130, 246, 0.15); color: #3b82f6; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+                            🛵
+                        </div>
+                        <div>
+                            <div style="font-size: 0.76rem; font-weight: 800; color: var(--text-muted);" data-i18n="hud-salla-out">Out for Delivery</div>
+                            <div id="salla-hud-out" style="font-size: 1.35rem; font-weight: 900; color: #3b82f6; line-height: 1.2;">0</div>
+                        </div>
+                    </div>
+
+                    <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(16, 185, 129, 0.15); color: #10b981; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+                            ✅
+                        </div>
+                        <div>
+                            <div style="font-size: 0.76rem; font-weight: 800; color: var(--text-muted);" data-i18n="hud-salla-delivered">Delivered</div>
+                            <div id="salla-hud-delivered" style="font-size: 1.35rem; font-weight: 900; color: #10b981; line-height: 1.2;">0</div>
+                        </div>
+                    </div>
+
+                    <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(34, 197, 94, 0.15); color: #22c55e; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+                            💰
+                        </div>
+                        <div>
+                            <div style="font-size: 0.76rem; font-weight: 800; color: var(--text-muted);" data-i18n="hud-salla-revenue">Salla Revenue</div>
+                            <div id="salla-hud-revenue" style="font-size: 1.25rem; font-weight: 900; color: #22c55e; line-height: 1.2;">0.00 SAR</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Salla Webhook Settings Collapsible Drawer -->
+            <div id="salla-settings-panel" style="display: none; background: var(--input-bg); border: 2px dashed var(--border-color); border-radius: 16px; padding: 20px; margin-bottom: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <div style="font-weight: 900; font-size: 1rem; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                        <span>🔗</span> <span>Salla Webhook Real-Time Connection Details</span>
+                    </div>
+                    <button type="button" onclick="toggleSallaSettingsPanel()" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-muted);">✖</button>
+                </div>
+                <p style="font-size: 0.84rem; color: var(--text-muted); margin: 0 0 14px 0; line-height: 1.5;">
+                    Copy this Webhook URL and paste it into your Salla Partner App or Salla Webhooks App. Every time an order is placed on Salla, it will sync automatically with this station.
+                </p>
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <input type="text" readonly value="https://burgeroov-notify.onrender.com/salla/webhook" style="flex: 1; min-width: 280px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-family: monospace; font-weight: 700; font-size: 0.88rem;">
+                    <button type="button" onclick="copySallaWebhookUrl()" class="btn-primary" style="padding: 10px 18px; border-radius: 10px; font-weight: 800; font-size: 0.85rem; background: #10b981; border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        <span>📋</span> <span>Copy Webhook URL</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filters & Search Toolbar -->
+            <div class="card" style="margin-bottom: 20px; padding: 14px 18px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                    
+                    <!-- Filter Pills -->
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                        <button type="button" class="btn-filter-salla active" onclick="setSallaStatusFilter('ALL', this)" style="padding: 7px 14px; border-radius: 100px; font-weight: 800; font-size: 0.8rem; background: var(--primary); color: white; border: none; cursor: pointer;" data-i18n="filter-salla-all">All Orders</button>
+                        <button type="button" class="btn-filter-salla" onclick="setSallaStatusFilter('prep', this)" style="padding: 7px 14px; border-radius: 100px; font-weight: 800; font-size: 0.8rem; background: var(--input-bg); color: var(--text-main); border: 1px solid var(--border-color); cursor: pointer;" data-i18n="filter-salla-prep">👨‍🍳 In Preparation</button>
+                        <button type="button" class="btn-filter-salla" onclick="setSallaStatusFilter('out', this)" style="padding: 7px 14px; border-radius: 100px; font-weight: 800; font-size: 0.8rem; background: var(--input-bg); color: var(--text-main); border: 1px solid var(--border-color); cursor: pointer;" data-i18n="filter-salla-out">🛵 Out for Delivery</button>
+                        <button type="button" class="btn-filter-salla" onclick="setSallaStatusFilter('delivered', this)" style="padding: 7px 14px; border-radius: 100px; font-weight: 800; font-size: 0.8rem; background: var(--input-bg); color: var(--text-main); border: 1px solid var(--border-color); cursor: pointer;" data-i18n="filter-salla-delivered">✅ Delivered</button>
+                        <button type="button" class="btn-filter-salla" onclick="setSallaStatusFilter('canceled', this)" style="padding: 7px 14px; border-radius: 100px; font-weight: 800; font-size: 0.8rem; background: var(--input-bg); color: var(--text-main); border: 1px solid var(--border-color); cursor: pointer;" data-i18n="filter-salla-canceled">❌ Cancelled</button>
+                    </div>
+
+                    <!-- Search Input -->
+                    <div style="flex: 1; min-width: 220px; max-width: 380px;">
+                        <input type="text" id="salla-orders-search" oninput="filterSallaOrders(this.value)" placeholder="🔍 Search by Order #, customer, mobile, product..." style="width: 100%; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.85rem; font-weight: 700;" data-i18n="[placeholder]placeholder-search-salla">
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Orders Grid Cards -->
+            <div id="salla-orders-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 18px; margin-bottom: 30px;">
+                <!-- Dynamically populated by renderSallaOrdersGrid() -->
             </div>
 
         </div>
@@ -6086,6 +6221,10 @@
                 onclick="switchTab('tracking'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">📍</span><span data-i18n="tab-tracking">Live Radar</span>
             </button>
+            <button class="mob-dept-item mob-sheet-tab" id="mob-tab-salla" data-tab="salla"
+                onclick="switchTab('salla'); closeMobDeptMenu()">
+                <span class="mob-dept-icon">🛍️</span><span data-i18n="tab-salla">Salla Store</span>
+            </button>
         </div>
     </div>
     <!-- 3-Month Attendance Report Modal -->
@@ -6797,10 +6936,33 @@
         </div>
     </div>
 
+    <!-- Salla Stats & Analytics Modal -->
+    <div id="modal-salla-stats" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.75); backdrop-filter:blur(6px); justify-content:center; align-items:center; z-index:999999;">
+        <div class="modal-content" style="max-width: 760px; width: 95%; max-height: 90vh; overflow-y: auto; border-radius: 20px; padding: 24px; background:var(--card-bg); box-shadow:0 20px 50px rgba(0,0,0,0.6); margin:auto; border:1px solid var(--border-color);">
+            <div class="flex-between" style="border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 18px;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div style="width:42px; height:42px; border-radius:12px; background:linear-gradient(135deg, #10b981, #059669); display:flex; align-items:center; justify-content:center; font-size:1.4rem; color:white;">🛍️</div>
+                    <div>
+                        <h2 style="margin:0; font-size:1.25rem; color:var(--text-main); font-weight:900;" data-i18n="title-salla-stats">📊 Salla Store Analytics & Delivery Statistics</h2>
+                        <span style="font-size:0.82rem; color:var(--text-muted);">Real-time performance metrics, delivery fulfillment, and product sales.</span>
+                    </div>
+                </div>
+                <button onclick="closeSallaStatsModal()" class="btn-neutral" style="padding:4px 10px; font-size:1.2rem; border:none; background:transparent; cursor:pointer; color:var(--text-muted);">✖</button>
+            </div>
+
+            <!-- Dynamic Body Populated by openSallaStatsModal() -->
+            <div id="salla-stats-modal-body"></div>
+
+            <div style="text-align:right; margin-top:20px; border-top:1px solid var(--border-color); padding-top:14px;">
+                <button onclick="closeSallaStatsModal()" class="btn-neutral" style="padding:10px 22px; border-radius:10px; font-weight:700;">Close</button>
+            </div>
+        </div>
+    </div>
+
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=227"></script>
-    <script src="app.js?v=227"></script>
+    <script src="translations.js?v=230"></script>
+    <script src="app.js?v=230"></script>
 </body>
 
 </html>

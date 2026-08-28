@@ -1682,7 +1682,8 @@ function markLockedTabs() {
         messaging: isAdmin || document.body.classList.contains('perm-messaging'),
         learning: true,
         contracts: isAdmin,
-        tracking: isAdmin
+        tracking: isAdmin,
+        salla: true
     };
 
     Object.entries(access).forEach(([tabId, hasAccess]) => {
@@ -2347,7 +2348,7 @@ function switchTab(tab) {
         }
     }
 
-    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant', 'vault', 'messaging', 'learning', 'contracts', 'tracking'];
+    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant', 'vault', 'messaging', 'learning', 'contracts', 'tracking', 'salla'];
 
     allTabs.forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
@@ -2383,6 +2384,9 @@ function switchTab(tab) {
         if (typeof renderTrackingSection === 'function') renderTrackingSection();
         if (typeof zoomToActiveCompanyWorkZone === 'function') zoomToActiveCompanyWorkZone();
     }
+    if (tab === 'salla') {
+        if (typeof renderSallaSection === 'function') renderSallaSection();
+    }
     if (tab === 'ops' && typeof renderWorkerOperationsContractBanner === 'function') {
         renderWorkerOperationsContractBanner();
     }
@@ -2413,7 +2417,8 @@ function switchTab(tab) {
         messaging: { icon: '💬', label: 'Messaging' },
         learning: { icon: '🎓', label: 'Learning' },
         contracts: { icon: '📜', label: 'Contracts' },
-        tracking: { icon: '📍', label: 'Live Radar' }
+        tracking: { icon: '📍', label: 'Live Radar' },
+        salla: { icon: '🛍️', label: 'Salla' }
     };
     const meta = tabMeta[tab] || { icon: '⚙️', label: tab };
     const iconEl = document.getElementById('mob-active-icon');
@@ -2786,6 +2791,7 @@ function renderAll() {
     else if (currentTab === 'learning') { if (typeof renderLearningProgram === 'function') renderLearningProgram(); }
     else if (currentTab === 'contracts') { if (typeof renderContractsSection === 'function') renderContractsSection(); }
     else if (currentTab === 'tracking') { if (typeof renderTrackingSection === 'function') renderTrackingSection(); }
+    else if (currentTab === 'salla') { if (typeof renderSallaSection === 'function') renderSallaSection(); }
 
     if (typeof renderPaymentRequests === 'function') renderPaymentRequests();
     if (typeof renderWorkerCustodyRequests === 'function') renderWorkerCustodyRequests();

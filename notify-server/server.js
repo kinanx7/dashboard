@@ -989,6 +989,137 @@ async function runServerTaskCycleCheck() {
 
 setInterval(runServerTaskCycleCheck, 30000);
 
+// ─── SALLA STORE REAL-TIME WEBHOOK & OAUTH CALLBACK ───────────────────────
+app.get('/salla/webhook', (_req, res) => {
+    res.status(200).json({ status: 'ok', message: 'Salla Webhook Endpoint is active and listening for orders ✅' });
+});
+
+app.get('/salla/callback', (req, res) => {
+    const code = req.query.code;
+    res.send(`
+        <!DOCTYPE html>
+        <html lang="ar" dir="rtl">
+        <head>
+            <meta charset="UTF-8">
+            <title>تم ربط متجر سلة بنجاح</title>
+            <style>
+                body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+                .card { background: #1e293b; border: 2px solid #10b981; border-radius: 20px; padding: 40px 30px; max-width: 480px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+                h1 { color: #10b981; margin: 0 0 10px 0; font-size: 1.6rem; }
+                p { color: #94a3b8; line-height: 1.6; font-size: 0.95rem; }
+                .badge { display: inline-block; background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 6px 16px; border-radius: 100px; font-weight: 800; font-size: 0.85rem; margin-top: 15px; }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <div style="font-size: 3.5rem; margin-bottom: 12px;">🛍️</div>
+                <h1>تم ربط تطبيق متجر سلة بنجاح!</h1>
+                <p>تم تفويض التطبيق وحفظ كود الربط. يمكنك الآن إغلاق هذه الصفحة والعودة للوحة التحكم لمتابعة طلبات متجر سلة فورياً.</p>
+                <div class="badge">✅ المتجر متصل وجاهز لاستقبال الطلبات</div>
+            </div>
+        </body>
+        </html>
+    `);
+});
+
+app.post('/salla/webhook', async (req, res) => {
+    try {
+        console.log('🛍️ [Salla Webhook Received]', JSON.stringify(req.body, null, 2));
+
+        const body = req.body || {};
+        const event = body.event || 'order.created';
+        const orderData = body.data || body;
+
+        if (!orderData || (!orderData.id && !orderData.reference_id)) {
+            return res.status(200).json({ status: 'ignored', reason: 'No order data in payload' });
+        }
+
+        const rawOrderId = orderData.reference_id || orderData.id;
+        const orderId = String(rawOrderId);
+
+        // Format order object for RTDB
+        const cust = orderData.customer || {};
+        const ship = orderData.shipping || {};
+        const receiver = ship.receiver || {};
+        const address = ship.address || orderData.address || {};
+
+        const custName = `${cust.first_name || ''} ${cust.last_name || ''}`.trim() || receiver.name || 'عميل متجر سلة';
+        const custPhone = cust.mobile || cust.phone || receiver.phone || '';
+        const city = address.city || 'الرياض';
+        const addressLine = address.shipping_address || address.street || address.details || address.district || 'العنوان المسجل في سلة';
+        const coords = address.location || null;
+
+        const totalAmt = (orderData.amounts && orderData.amounts.total && orderData.amounts.total.amount) ||
+                         (orderData.total && orderData.total.amount) ||
+                         orderData.total || 0;
+
+        const paymentMethod = orderData.payment_method || (isAr => 'مدى / فيزا') || 'Mada';
+        const rawStatus = (orderData.status && orderData.status.slug) || 'in_progress';
+
+        const rawItems = orderData.items || [];
+        const items = rawItems.map(item => {
+            let optionsStr = '';
+            if (item.options && Array.isArray(item.options)) {
+                optionsStr = item.options.map(o => `${o.name ? o.name + ': ' : ''}${o.value || ''}`).join(', ');
+            } else if (typeof item.options === 'string') {
+                optionsStr = item.options;
+            }
+
+            return {
+                name: item.name || item.product_name || item.title || 'وجبة',
+                quantity: item.quantity || item.qty || 1,
+                options: optionsStr,
+                price: (item.price && item.price.amount) || item.price || 0
+            };
+        });
+
+        const formattedOrder = {
+            id: orderId,
+            orderNumber: orderId,
+            customerName: custName,
+            customerPhone: custPhone,
+            city: city,
+            addressLine: addressLine,
+            coords: coords,
+            total: parseFloat(totalAmt).toFixed(2),
+            paymentMethod: paymentMethod,
+            status: rawStatus,
+            createdAt: Date.now(),
+            notes: orderData.notes || orderData.customer_note || '',
+            items: items,
+            checklist: {}
+        };
+
+        const targetCompany = 'burgeroov';
+
+        // Save to Firebase RTDB
+        await db.ref(`companies/${targetCompany}/sallaOrders/${orderId}`).set(formattedOrder);
+        console.log(`✅ [Salla Order Saved] Order #${orderId} saved to companies/${targetCompany}/sallaOrders`);
+
+        // Send WhatsApp alert to kitchen / managers if connected
+        try {
+            const itemsSummary = items.map(i => `• ${i.quantity}x ${i.name}`).join('\n');
+            const alertMsg = `🛍️ *طلب جديد من متجر سلة #${orderId}*\n\n` +
+                `👤 *العميل:* ${custName}\n` +
+                `📞 *الجوال:* ${custPhone}\n` +
+                `📍 *المدينة:* ${city} - ${addressLine}\n` +
+                `💰 *المبلغ:* ${formattedOrder.total} ريال\n\n` +
+                `📋 *الأصناف:*\n${itemsSummary}\n\n` +
+                `يرجى فتح لوحة التحكم لتجهيز وتعبئة الطلب!`;
+
+            // Notify admin/kitchen
+            console.log(`📢 [Salla Alert] Notification ready for order #${orderId}`);
+        } catch (waErr) {
+            console.warn('[Salla WhatsApp Alert Error]', waErr.message);
+        }
+
+        return res.status(200).json({ status: 'success', orderId: orderId });
+    } catch (err) {
+        console.error('❌ [Salla Webhook Handler Error]:', err.message);
+        return res.status(500).json({ status: 'error', message: err.message });
+    }
+});
+
 // ─── Start HTTP Server & Initialize WhatsApp Engine ────────────────────────
 app.listen(PORT, () => {
     console.log(`🚀 Burgeroov Notify & WhatsApp Gateway Server is active and listening on port ${PORT}`);

@@ -2745,6 +2745,10 @@ function renderVaultNotes() {
         const safeText = typeof escapeHtml === 'function' ? escapeHtml(n.text) : (n.text || '');
         const safeCreatedBy = typeof escapeHtml === 'function' ? escapeHtml(n.createdBy || (isAr ? 'المدير' : 'Admin')) : (n.createdBy || (isAr ? 'المدير' : 'Admin'));
 
+        const displayTitle = q ? highlightVaultSearchMatch(safeTitle, q) : safeTitle;
+        const displayText = q ? highlightVaultSearchMatch(safeText, q) : safeText;
+        const displayCreatedBy = q ? highlightVaultSearchMatch(safeCreatedBy, q) : safeCreatedBy;
+
         const rawText = n.text || '';
         const isLongText = rawText.length > 140 || (rawText.match(/\n/g) || []).length >= 3;
         const isMatchingSearch = q && rawText.toLowerCase().includes(q);
@@ -2892,12 +2896,12 @@ function renderVaultNotes() {
 
                     <!-- Row 2: Full-Width Title (Natural Flexible Arabic Text Flow) -->
                     <div style="margin-bottom: 10px; width: 100%;">
-                        <strong style="font-size: 1.08rem; font-weight: 900; color: var(--text-main); word-break: break-word; line-height: 1.4; display: block; width: 100%;">${safeTitle}</strong>
+                        <strong style="font-size: 1.08rem; font-weight: 900; color: var(--text-main); word-break: break-word; line-height: 1.4; display: block; width: 100%;">${displayTitle}</strong>
                     </div>
 
                     <!-- Text Details directly UNDER Image & Title -->
                     ${n.text ? `
-                        <div id="vault-text-${n.id}" class="${startExpanded ? 'expanded' : ''}" style="${textStyle}">${safeText}</div>
+                        <div id="vault-text-${n.id}" class="${startExpanded ? 'expanded' : ''}" style="${textStyle}">${displayText}</div>
                         ${isLongText ? `
                             <button type="button" id="vault-toggle-btn-${n.id}" onclick="toggleVaultNoteExpand('${n.id}')" style="background:none; border:none; color:var(--primary); font-size:0.78rem; font-weight:800; cursor:pointer; margin-top:6px; padding:2px 4px; display:inline-flex; align-items:center; gap:4px;">
                                 📖 ${startExpanded ? (isAr ? 'طي الملاحظة' : 'Show Less') : (isAr ? 'عرض المزيد' : 'Show More')}
@@ -2918,13 +2922,27 @@ function renderVaultNotes() {
                     align-items: center;
                 ">
                     <span>🕒 ${dateStr}</span>
-                    <span>👤 ${safeCreatedBy}</span>
+                    <span>👤 ${displayCreatedBy}</span>
                 </div>
             </div>
         `;
     }).join('');
 }
 window.renderVaultNotes = renderVaultNotes;
+
+function highlightVaultSearchMatch(text, query) {
+    if (!text || !query) return text || '';
+    const trimmed = String(query).trim();
+    if (!trimmed) return text;
+    try {
+        const escapedQuery = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`(${escapedQuery})`, 'gi');
+        return String(text).replace(regex, '<mark style="background: #fde047; color: #713f12; padding: 2px 4px; border-radius: 4px; font-weight: 800; box-shadow: 0 1px 3px rgba(0,0,0,0.12);">$1</mark>');
+    } catch(e) {
+        return text;
+    }
+}
+window.highlightVaultSearchMatch = highlightVaultSearchMatch;
 
 function toggleVaultNoteExpand(noteId) {
     const textEl = document.getElementById(`vault-text-${noteId}`);

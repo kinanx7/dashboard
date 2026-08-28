@@ -789,7 +789,8 @@ body {
 #view-messaging.active-view,
 #view-learning.active-view,
 #view-contracts.active-view,
-#view-tracking.active-view {
+#view-tracking.active-view,
+#view-salla.active-view {
     grid-template-columns: 1fr;
 }
 
@@ -3808,4 +3809,23 @@ body:not(.role-admin) .task-grid {
     resize: vertical !important;
     font-family: inherit !important;
 }
+
+#view-salla.active-view {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 20px;
+    box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+    #view-salla.active-view {
+        padding: 0 10px !important;
+    }
+    #salla-orders-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
 
