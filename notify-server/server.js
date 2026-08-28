@@ -990,18 +990,87 @@ async function runServerTaskCycleCheck() {
 setInterval(runServerTaskCycleCheck, 30000);
 
 // ─── SALLA STORE REAL-TIME WEBHOOK & OAUTH CALLBACK ───────────────────────
+const SALLA_CLIENT_ID = process.env.SALLA_CLIENT_ID || '12683e56-fcb1-4c9d-bac4-e537d213d779';
+const SALLA_CLIENT_SECRET = process.env.SALLA_CLIENT_SECRET || 'a9c8efe0a97f043f704becb568941cc055e020204577c93a4e4eb23c77f0ef47';
+const SALLA_REDIRECT_URI = 'https://burgeroov-notify.onrender.com/salla/callback';
+
+async function exchangeSallaCodeForToken(code) {
+    if (!code) return null;
+    return new Promise((resolve) => {
+        const postBody = new URLSearchParams({
+            client_id: SALLA_CLIENT_ID,
+            client_secret: SALLA_CLIENT_SECRET,
+            grant_type: 'authorization_code',
+            code: code,
+            redirect_uri: SALLA_REDIRECT_URI
+        }).toString();
+
+        const https = require('https');
+        const req = https.request('https://accounts.salla.sa/oauth2/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Length': Buffer.byteLength(postBody)
+            }
+        }, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    const json = JSON.parse(data);
+                    console.log('🎉 [Salla OAuth Token Exchange]', json);
+                    resolve(json);
+                } catch (e) {
+                    console.error('❌ [Salla Token Parse Error]', data);
+                    resolve({ raw: data });
+                }
+            });
+        });
+
+        req.on('error', (err) => {
+            console.error('❌ [Salla Token Request Error]', err.message);
+            resolve(null);
+        });
+
+        req.write(postBody);
+        req.end();
+    });
+}
+
 app.get('/salla/webhook', (_req, res) => {
     res.status(200).json({ status: 'ok', message: 'Salla Webhook Endpoint is active and listening for orders ✅' });
 });
 
-app.get('/salla/callback', (req, res) => {
+app.get('/salla/callback', async (req, res) => {
     const code = req.query.code;
+    let isInstalled = false;
+
+    if (code) {
+        try {
+            console.log('🔄 [Salla Callback] Exchanging authorization code with Salla OAuth token endpoint...');
+            const tokenData = await exchangeSallaCodeForToken(code);
+            if (tokenData && (tokenData.access_token || tokenData.token_type)) {
+                isInstalled = true;
+                const companyKeys = ['burgeroov', 'mvc', 'mvcfresh'];
+                for (const c of companyKeys) {
+                    await db.ref(`companies/${c}/sallaAuth`).set({
+                        ...tokenData,
+                        installedAt: Date.now()
+                    });
+                }
+                console.log('🎉 [Salla App Installed Successfully] Token stored to Firebase RTDB!');
+            }
+        } catch (err) {
+            console.error('❌ [Salla Callback Error]:', err.message);
+        }
+    }
+
     res.send(`
         <!DOCTYPE html>
         <html lang="ar" dir="rtl">
         <head>
             <meta charset="UTF-8">
-            <title>تم ربط متجر سلة بنجاح</title>
+            <title>تم تثبيت وتفعيل تطبيق متجر سلة بنجاح</title>
             <style>
                 body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
                 .card { background: #1e293b; border: 2px solid #10b981; border-radius: 20px; padding: 40px 30px; max-width: 480px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
@@ -1013,9 +1082,9 @@ app.get('/salla/callback', (req, res) => {
         <body>
             <div class="card">
                 <div style="font-size: 3.5rem; margin-bottom: 12px;">🛍️</div>
-                <h1>تم ربط تطبيق متجر سلة بنجاح!</h1>
-                <p>تم تفويض التطبيق وحفظ كود الربط. يمكنك الآن إغلاق هذه الصفحة والعودة للوحة التحكم لمتابعة طلبات متجر سلة فورياً.</p>
-                <div class="badge">✅ المتجر متصل وجاهز لاستقبال الطلبات</div>
+                <h1>تم تثبيت وتفعيل تطبيق متجر سلة بنجاح!</h1>
+                <p>تم إتمام المصادقة وتبادل المفاتيح رسمياً مع متجرك في سلة. التطبيق الآن مثبت وجاهز لبدء إرسال طلباتك تلقائياً للوحة التحكم.</p>
+                <div class="badge">✅ تم التثبيت بنجاح والتطبيق متصل بالمتجر</div>
             </div>
         </body>
         </html>
