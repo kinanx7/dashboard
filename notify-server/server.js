@@ -1068,7 +1068,7 @@ app.get('/salla/auth-debug', async (_req, res) => {
     }
 });
 
-app.get('/salla/webhook', (_req, res) => {
+app.get(['/salla/webhook', '/salla', '/salla/'], (_req, res) => {
     res.status(200).json({ status: 'ok', message: 'Salla Webhook Endpoint is active and listening for orders ✅' });
 });
 
@@ -1246,7 +1246,7 @@ app.get('/salla/logs', (_req, res) => {
     });
 });
 
-app.post('/salla/webhook', async (req, res) => {
+app.post(['/salla*', '/salla/webhook', '/salla/webhcook', '/salla/webhcoo', '/salla', '/salla/'], async (req, res) => {
     try {
         console.log('🛍️ [Salla Webhook Received]', JSON.stringify(req.body, null, 2));
 
