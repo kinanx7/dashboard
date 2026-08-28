@@ -1275,7 +1275,7 @@ app.post(['/salla*', '/salla/webhook', '/salla/webhcook', '/salla/webhcoo', '/sa
         }
 
         const baseOrder = (orderData && orderData.order) ? orderData.order : (orderData || {});
-        const rawOrderId = baseOrder.reference_id || baseOrder.id || orderData.reference_id || orderData.id || (orderData.invoice && orderData.invoice.order_id);
+        const rawOrderId = body.orderId || body.order_id || baseOrder.reference_id || baseOrder.id || orderData.reference_id || orderData.id || (orderData.invoice && orderData.invoice.order_id);
 
         if (!rawOrderId) {
             return res.status(200).json({ status: 'ignored', reason: 'No order id in payload' });
@@ -1289,35 +1289,50 @@ app.post(['/salla*', '/salla/webhook', '/salla/webhcook', '/salla/webhcoo', '/sa
         const receiver = ship.receiver || {};
         const address = ship.address || baseOrder.address || orderData.address || {};
 
-        const custName = `${cust.first_name || ''} ${cust.last_name || ''}`.trim() || receiver.name || cust.name || 'عميل متجر سلة';
-        const custPhone = cust.mobile || cust.phone || receiver.phone || '';
-        const city = address.city || 'الرياض';
-        const addressLine = address.shipping_address || address.street || address.details || address.district || 'العنوان المسجل في سلة';
-        const coords = address.location || null;
+        const custName = body.customerName || body.customer_name || `${cust.first_name || ''} ${cust.last_name || ''}`.trim() || receiver.name || cust.name || 'عميل متجر سلة';
+        const custPhone = body.customerPhone || body.customer_phone || cust.mobile || cust.phone || receiver.phone || '';
+        const city = body.city || address.city || 'الرياض';
+        const addressLine = body.addressLine || body.address || address.shipping_address || address.street || address.details || address.district || 'العنوان المسجل في سلة';
+        const coords = body.coords || address.location || null;
 
-        const totalAmt = (baseOrder.amounts && baseOrder.amounts.total && baseOrder.amounts.total.amount) ||
+        const totalAmt = body.total || body.amount ||
+                         (baseOrder.amounts && baseOrder.amounts.total && baseOrder.amounts.total.amount) ||
                          (orderData.amounts && orderData.amounts.total && orderData.amounts.total.amount) ||
                          baseOrder.total || orderData.total || 0;
 
-        const paymentMethod = baseOrder.payment_method || orderData.payment_method || 'Mada';
+        const paymentMethod = body.paymentMethod || body.payment_method || baseOrder.payment_method || orderData.payment_method || 'Mada';
         const rawStatus = (baseOrder.status && (baseOrder.status.slug || baseOrder.status.name)) || (orderData.status && (orderData.status.slug || orderData.status.name)) || 'in_progress';
 
-        const rawItems = baseOrder.items || orderData.items || [];
-        const items = rawItems.map(item => {
-            let optionsStr = '';
-            if (item.options && Array.isArray(item.options)) {
-                optionsStr = item.options.map(o => `${o.name ? o.name + ': ' : ''}${o.value || ''}`).join(', ');
-            } else if (typeof item.options === 'string') {
-                optionsStr = item.options;
-            }
+        let items = [];
+        if (body.items && typeof body.items === 'string') {
+            items = body.items.split(',').map(s => ({
+                name: s.trim() || 'منتج',
+                quantity: 1,
+                options: '',
+                price: 0
+            }));
+        } else {
+            const rawItems = baseOrder.items || orderData.items || (Array.isArray(body.items) ? body.items : []);
+            items = rawItems.map(item => {
+                let optionsStr = '';
+                if (item.options && Array.isArray(item.options)) {
+                    optionsStr = item.options.map(o => `${o.name ? o.name + ': ' : ''}${o.value || ''}`).join(', ');
+                } else if (typeof item.options === 'string') {
+                    optionsStr = item.options;
+                }
 
-            return {
-                name: item.name || item.product_name || item.title || 'وجبة',
-                quantity: item.quantity || item.qty || 1,
-                options: optionsStr,
-                price: (item.price && item.price.amount) || item.price || 0
-            };
-        });
+                return {
+                    name: item.name || item.product_name || item.title || 'وجبة',
+                    quantity: item.quantity || item.qty || 1,
+                    options: optionsStr,
+                    price: (item.price && item.price.amount) || item.price || 0
+                };
+            });
+        }
+
+        if (items.length === 0) {
+            items = [{ name: 'طلب متجر سلة', quantity: 1, options: '', price: parseFloat(totalAmt) || 0 }];
+        }
 
         const formattedOrder = {
             id: orderId,
@@ -1331,7 +1346,7 @@ app.post(['/salla*', '/salla/webhook', '/salla/webhcook', '/salla/webhcoo', '/sa
             paymentMethod: paymentMethod,
             status: rawStatus,
             createdAt: Date.now(),
-            notes: baseOrder.notes || orderData.notes || orderData.customer_note || '',
+            notes: body.notes || baseOrder.notes || orderData.notes || orderData.customer_note || '',
             items: items,
             checklist: {}
         };
