@@ -1257,38 +1257,38 @@ app.post('/salla/webhook', async (req, res) => {
             orderId: (body.data && (body.data.reference_id || body.data.id)) || body.id,
             raw: body
         });
-        if (lastSallaWebhooks.length > 50) lastSallaWebhooks.shift();
-
         const event = body.event || 'order.created';
         const orderData = body.data || body;
 
-        if (!orderData || (!orderData.id && !orderData.reference_id)) {
-            return res.status(200).json({ status: 'ignored', reason: 'No order data in payload' });
+        const baseOrder = (orderData && orderData.order) ? orderData.order : (orderData || {});
+        const rawOrderId = baseOrder.reference_id || baseOrder.id || orderData.reference_id || orderData.id || (orderData.invoice && orderData.invoice.order_id);
+
+        if (!rawOrderId) {
+            return res.status(200).json({ status: 'ignored', reason: 'No order id in payload' });
         }
 
-        const rawOrderId = orderData.reference_id || orderData.id;
         const orderId = String(rawOrderId);
 
         // Format order object for RTDB
-        const cust = orderData.customer || {};
-        const ship = orderData.shipping || {};
+        const cust = baseOrder.customer || orderData.customer || {};
+        const ship = baseOrder.shipping || orderData.shipping || {};
         const receiver = ship.receiver || {};
-        const address = ship.address || orderData.address || {};
+        const address = ship.address || baseOrder.address || orderData.address || {};
 
-        const custName = `${cust.first_name || ''} ${cust.last_name || ''}`.trim() || receiver.name || 'عميل متجر سلة';
+        const custName = `${cust.first_name || ''} ${cust.last_name || ''}`.trim() || receiver.name || cust.name || 'عميل متجر سلة';
         const custPhone = cust.mobile || cust.phone || receiver.phone || '';
         const city = address.city || 'الرياض';
         const addressLine = address.shipping_address || address.street || address.details || address.district || 'العنوان المسجل في سلة';
         const coords = address.location || null;
 
-        const totalAmt = (orderData.amounts && orderData.amounts.total && orderData.amounts.total.amount) ||
-                         (orderData.total && orderData.total.amount) ||
-                         orderData.total || 0;
+        const totalAmt = (baseOrder.amounts && baseOrder.amounts.total && baseOrder.amounts.total.amount) ||
+                         (orderData.amounts && orderData.amounts.total && orderData.amounts.total.amount) ||
+                         baseOrder.total || orderData.total || 0;
 
-        const paymentMethod = orderData.payment_method || 'Mada';
-        const rawStatus = (orderData.status && orderData.status.slug) || 'in_progress';
+        const paymentMethod = baseOrder.payment_method || orderData.payment_method || 'Mada';
+        const rawStatus = (baseOrder.status && (baseOrder.status.slug || baseOrder.status.name)) || (orderData.status && (orderData.status.slug || orderData.status.name)) || 'in_progress';
 
-        const rawItems = orderData.items || [];
+        const rawItems = baseOrder.items || orderData.items || [];
         const items = rawItems.map(item => {
             let optionsStr = '';
             if (item.options && Array.isArray(item.options)) {
@@ -1317,7 +1317,7 @@ app.post('/salla/webhook', async (req, res) => {
             paymentMethod: paymentMethod,
             status: rawStatus,
             createdAt: Date.now(),
-            notes: orderData.notes || orderData.customer_note || '',
+            notes: baseOrder.notes || orderData.notes || orderData.customer_note || '',
             items: items,
             checklist: {}
         };
