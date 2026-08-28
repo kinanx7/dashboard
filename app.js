@@ -31847,7 +31847,7 @@ function renderSallaOrdersGrid() {
         }
 
         // WhatsApp Customer Link
-        const cleanPhone = custPhone.replace(/[^0-9]/g, '');
+        const cleanPhone = String(custPhone || '').replace(/[^0-9]/g, '');
         const waLink = cleanPhone ? `https://wa.me/${cleanPhone.startsWith('966') ? cleanPhone : '966' + cleanPhone.replace(/^0+/, '')}` : '#';
 
         // Google Maps Link
