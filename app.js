@@ -31758,6 +31758,22 @@ function renderSallaOrdersGrid() {
     const ordersMap = getSallaOrdersMap();
     let orders = Object.entries(ordersMap || {}).map(([id, o]) => ({ id, ...o }));
 
+    // 1. Auto-clean ghost / empty abandoned cart stubs
+    orders = orders.filter(o => {
+        if (!o) return false;
+        // Filter out dummy abandoned cart records that have no items or only the fake 'طلب متجر سلة'
+        const isAbandonedDummy = (!o.customerName || o.customerName.includes('Abandoned Cart') || o.customerName === '🛒 سلة متروكة (مكتملة)') && 
+                                 (!o.items || o.items.length === 0 || (o.items.length === 1 && o.items[0].name === 'طلب متجر سلة'));
+        if (isAbandonedDummy) return false;
+
+        // Filter out records that have only fake 'طلب متجر سلة' with no real customer info
+        if (o.items && o.items.length === 1 && o.items[0].name === 'طلب متجر سلة' && (!o.customerPhone || o.customerPhone === '')) {
+            return false;
+        }
+
+        return true;
+    });
+
     // Apply Status Filter
     if (sallaActiveStatusFilter !== 'ALL') {
         orders = orders.filter(o => {
@@ -31773,7 +31789,7 @@ function renderSallaOrdersGrid() {
     // Apply Search Filter
     if (sallaSearchQuery) {
         orders = orders.filter(o => {
-            const num = String(o.orderNumber || o.order_id || o.id || '').toLowerCase();
+            const num = String(o.orderNumber || o.order_reference_id || o.reference_id || o.order_id || o.id || '').toLowerCase();
             const cust = String(o.customerName || (o.customer && o.customer.name) || '').toLowerCase();
             const phone = String(o.customerPhone || (o.customer && o.customer.mobile) || '').toLowerCase();
             const city = String(o.city || (o.address && o.address.city) || '').toLowerCase();
@@ -31807,18 +31823,139 @@ function renderSallaOrdersGrid() {
 
     grid.innerHTML = orders.map(o => {
         const orderId = o.id || o.order_id || 'SALLA-ORD';
-        const orderNum = o.orderNumber || o.reference_id || orderId;
-        const custName = o.customerName || (o.customer && (o.customer.first_name ? `${o.customer.first_name} ${o.customer.last_name || ''}` : o.customer.name)) || (isAr ? 'عميل سلة' : 'Salla Customer');
-        const custPhone = o.customerPhone || (o.customer && (o.customer.mobile || o.customer.phone)) || '';
-        const custCity = o.city || (o.address && o.address.city) || (isAr ? 'الرياض' : 'Riyadh');
-        const custAddress = o.addressLine || (o.address && (o.address.street || o.address.details || o.address.district)) || (isAr ? 'حي الملقا' : 'Al-Malqa');
-        const totalAmt = parseFloat(o.total || o.amount || 0).toFixed(2);
+        
+        // 1. Order Number & Reference ID Resolution (Official Salla Store Reference)
+        let orderNum = o.order_reference_id || o.reference_id || o.order_id;
+        if (!orderNum || String(orderNum).length > 14) {
+            if (o.orderNumber && String(o.orderNumber).length <= 14) orderNum = o.orderNumber;
+            else if (o.invoice_number) orderNum = isAr ? `فاتورة #${o.invoice_number}` : `INV-#${o.invoice_number}`;
+            else if (o.order_id) orderNum = o.order_id;
+            else orderNum = String(orderId).slice(-8);
+        }
+        
+        // 2. Customer Name Extraction
+        let custName = o.customerName;
+        if (!custName && o.customer) {
+            const fn = o.customer.first_name || '';
+            const ln = o.customer.last_name || '';
+            custName = `${fn} ${ln}`.trim() || o.customer.full_name || o.customer.name;
+        }
+        if (!custName || custName === 'عميل متجر سلة' || custName === 'Salla Customer') {
+            if (o.customer && o.customer.first_name === 'عميل' && o.customer.last_name === 'زائر') {
+                custName = isAr ? 'عميل زائر' : 'Guest Customer';
+            } else {
+                custName = isAr ? 'عميل المتجر' : 'Store Customer';
+            }
+        }
+
+        // 3. Customer Phone & WhatsApp Link
+        let rawPhone = o.customerPhone;
+        if (!rawPhone && o.customer) {
+            rawPhone = o.customer.mobile || o.customer.phone || '';
+        }
+        rawPhone = String(rawPhone || '').replace(/[^0-9]/g, '');
+        let waPhone = rawPhone;
+        if (waPhone) {
+            if (waPhone.startsWith('05')) waPhone = '966' + waPhone.substring(1);
+            else if (waPhone.startsWith('5') && waPhone.length === 9) waPhone = '966' + waPhone;
+            else if (!waPhone.startsWith('966') && !waPhone.startsWith('971') && !waPhone.startsWith('965')) waPhone = '966' + waPhone;
+        }
+        const waLink = waPhone ? `https://wa.me/${waPhone}` : '#';
+
+        // 4. Customer Address & Smart Google Maps Link
+        let custCity = o.city;
+        let custAddress = o.addressLine;
+        const custAddrObj = (o.customer && o.customer.address) || o.address || (o.shipping && o.shipping.address);
+        let gmapsQuery = '';
+
+        if (custAddrObj) {
+            custCity = custAddrObj.city || custCity;
+            const district = custAddrObj.district || '';
+            const cleanStreet = String(custAddrObj.street_name || custAddrObj.street || '').replace(/,/g, ' ');
+            const desc = custAddrObj.description || custAddrObj.details || '';
+
+            const addrParts = [custCity, district, cleanStreet, desc].filter(Boolean);
+            if (addrParts.length > 0) {
+                custAddress = addrParts.join(' - ');
+            }
+
+            // Pinpoint National Address short code if available (e.g. JEJA8767 or EAMA3296)
+            const shortCodeMatch = desc.match(/[A-Za-z]{4}\d{4}/i);
+            if (shortCodeMatch) {
+                gmapsQuery = shortCodeMatch[0] + ' ' + (custCity || 'السعودية');
+            } else {
+                const queryParts = [custCity, district, cleanStreet].filter(Boolean);
+                gmapsQuery = queryParts.join(' ');
+            }
+        }
+
+        custCity = custCity || (isAr ? 'الرياض' : 'Riyadh');
+        if (!custAddress || custAddress === 'العنوان المسجل في سلة') {
+            custAddress = custCity;
+        }
+        if (!gmapsQuery) {
+            gmapsQuery = (custAddress && !custAddress.includes('العنوان المسجل في سلة')) ? `${custCity} ${custAddress}` : custCity;
+        }
+
+        // Final Google Maps Link
+        const mapCoords = o.coords || (o.address && o.address.location) || (o.customer && o.customer.address && o.customer.address.location);
+        let gmapsLink = '#';
+        if (mapCoords && mapCoords.lat && mapCoords.lng) {
+            gmapsLink = `https://www.google.com/maps/search/?api=1&query=${mapCoords.lat},${mapCoords.lng}`;
+        } else {
+            gmapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gmapsQuery)}`;
+        }
+
+        // 5. Total Amount Parsing & Auto-Sum from Items if 0
+        let rawAmt = o.total;
+        if (rawAmt && typeof rawAmt === 'object') rawAmt = rawAmt.amount;
+        if ((rawAmt === undefined || rawAmt === null || rawAmt === 'NaN' || rawAmt === 0 || rawAmt === '0.00') && o.amount) {
+            rawAmt = (typeof o.amount === 'object') ? o.amount.amount : o.amount;
+        }
+        let parsedTotalVal = parseFloat(rawAmt);
+        
+        // If stored as 0.00 from past bug, calculate sum from valid items
+        if ((isNaN(parsedTotalVal) || parsedTotalVal === 0) && o.items && Array.isArray(o.items) && o.items.length > 0) {
+            const itemsSum = o.items.reduce((acc, i) => {
+                const p = (i.price && typeof i.price === 'object') ? i.price.amount : i.price;
+                return acc + ((parseFloat(p) || 0) * (parseInt(i.quantity || i.qty) || 1));
+            }, 0);
+            if (itemsSum > 0) parsedTotalVal = itemsSum;
+        }
+
+        const totalAmt = isNaN(parsedTotalVal) ? '0.00' : parsedTotalVal.toFixed(2);
+
         const paymentMethod = o.paymentMethod || o.payment_method || (isAr ? 'مدى / فيزا' : 'Card / Mada');
         const orderDate = o.createdAt ? new Date(o.createdAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' }) : '';
-        const notes = o.notes || o.customer_note || '';
-
-        const items = o.items || [];
+        
+        // 6. Notes & Item Separation
+        let notes = o.notes || o.customer_note || '';
+        const rawItems = o.items || [];
         const checklist = o.checklist || {};
+
+        // Filter out customer notes & shipping services from checklist
+        const items = [];
+        rawItems.forEach(item => {
+            if (!item) return;
+            const iname = String(item.name || item.product_name || item.title || '').trim();
+            const itype = String(item.type || '').toLowerCase();
+
+            // Filter out fake dummy items
+            if (iname === 'طلب متجر سلة') return;
+
+            if (iname.includes('ملاحظات العميل') || iname.includes('ملاحظة') || iname.includes('ملاحظات')) {
+                const noteVal = item.description || item.notes || item.value || '';
+                if (noteVal && !notes.includes(noteVal)) {
+                    notes = notes ? `${notes} | ${noteVal}` : noteVal;
+                }
+                return;
+            }
+            if (itype === 'service' || iname.includes('رسوم الشحن') || iname.includes('شحن')) {
+                return;
+            }
+
+            items.push(item);
+        });
 
         let checkedCount = 0;
         items.forEach((item, idx) => {
@@ -31844,19 +31981,6 @@ function renderSallaOrdersGrid() {
             cardBorder = 'border-left: 6px solid #ef4444;';
         } else {
             statusBadge = `<span style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 4px 10px; font-size: 0.76rem; font-weight: 800;">👨‍🍳 ${isAr ? 'قيد التجهيز' : 'In Preparation'}</span>`;
-        }
-
-        // WhatsApp Customer Link
-        const cleanPhone = String(custPhone || '').replace(/[^0-9]/g, '');
-        const waLink = cleanPhone ? `https://wa.me/${cleanPhone.startsWith('966') ? cleanPhone : '966' + cleanPhone.replace(/^0+/, '')}` : '#';
-
-        // Google Maps Link
-        const mapCoords = o.coords || (o.address && o.address.location);
-        let gmapsLink = '#';
-        if (mapCoords && mapCoords.lat && mapCoords.lng) {
-            gmapsLink = `https://www.google.com/maps/search/?api=1&query=${mapCoords.lat},${mapCoords.lng}`;
-        } else if (custAddress) {
-            gmapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(custCity + ', ' + custAddress)}`;
         }
 
         // Safe driver check helper
@@ -31905,19 +32029,20 @@ function renderSallaOrdersGrid() {
 
                     <!-- Customer Information Block -->
                     <div style="background: var(--input-bg); border-radius: 12px; border: 1px solid var(--border-color); padding: 12px; margin-bottom: 14px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
                             <div style="font-weight: 800; font-size: 0.9rem; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
                                 <span>👤</span> <span>${custName}</span>
+                                ${rawPhone ? `<span style="font-size: 0.76rem; color: var(--text-muted); font-weight: 700; font-family: monospace;">(${rawPhone})</span>` : ''}
                             </div>
-                            ${custPhone ? `
+                            ${waPhone ? `
                                 <a href="${waLink}" target="_blank" style="background: rgba(37, 211, 102, 0.15); color: #25d366; border: 1px solid rgba(37, 211, 102, 0.3); border-radius: 8px; padding: 4px 10px; font-size: 0.75rem; font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
                                     <span>💬 WhatsApp</span>
                                 </a>
                             ` : ''}
                         </div>
 
-                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--text-muted);">
-                            <div style="display: flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px;" title="${custCity} - ${custAddress}">
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+                            <div style="display: flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 240px;" title="${custCity} - ${custAddress}">
                                 <span>📍</span> <span>${custCity} • ${custAddress}</span>
                             </div>
                             <a href="${gmapsLink}" target="_blank" style="color: var(--primary); font-weight: 800; text-decoration: none; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 3px;">
@@ -31926,8 +32051,8 @@ function renderSallaOrdersGrid() {
                         </div>
 
                         ${notes ? `
-                            <div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--border-color); font-size: 0.78rem; color: #f59e0b; font-weight: 700;">
-                                📝 ${notes}
+                            <div style="margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); font-size: 0.78rem; color: #f59e0b; font-weight: 700; line-height: 1.4;">
+                                📝 <b>${isAr ? 'ملاحظة العميل:' : 'Customer Note:'}</b> ${notes}
                             </div>
                         ` : ''}
                     </div>
@@ -32379,25 +32504,30 @@ window.copySallaWebhookUrl = copySallaWebhookUrl;
 async function syncSallaOrdersDirect() {
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     if (typeof showInAppNotification === 'function') {
-        showInAppNotification(isAr ? '🔄 جاري مزامنة الطلبات من سلة...' : 'Syncing orders from Salla API...');
+        showInAppNotification(isAr ? '🔄 جاري مزامنة وتحديث الطلبات من متجر سلة...' : 'Syncing and updating orders from Salla...');
     }
 
     try {
+        // 1. Reparse & heal all stored raw webhook logs to fix order numbers and prices
+        try {
+            await fetch('https://burgeroov-notify.onrender.com/salla/reparse-orders');
+        } catch (reparseErr) {
+            console.warn("Reparse logs error:", reparseErr);
+        }
+
+        // 2. Fetch fresh live orders from Salla API
         const res = await fetch('https://burgeroov-notify.onrender.com/salla/sync-orders');
         const data = await res.json();
-        if (data.status === 'success') {
-            if (typeof showInAppNotification === 'function') {
-                showInAppNotification(isAr ? `✅ تم جلب ${data.syncedCount} طلب بنجاح من متجر سلة!` : `Successfully synced ${data.syncedCount} orders from Salla!`);
-            }
-            updateSallaHUDStats();
-            renderSallaOrdersGrid();
-        } else {
-            alert(isAr ? `تنبيه سلة: ${data.message || 'يرجى النقر على رابط تثبيت التطبيق في المتجر أولاً.'}` : `Salla Notice: ${data.message || 'Please complete app authorization first.'}`);
+        
+        if (typeof showInAppNotification === 'function') {
+            showInAppNotification(isAr ? '✅ تمت مزامنة وتحديث طلبات متجر سلة بنجاح!' : 'Salla store orders updated successfully!');
         }
+        updateSallaHUDStats();
+        renderSallaOrdersGrid();
     } catch (e) {
         console.error("Sync error:", e);
         if (typeof showInAppNotification === 'function') {
-            showInAppNotification(isAr ? '❌ تعذر الاتصال بالخادم' : 'Server connection error');
+            showInAppNotification(isAr ? '❌ تعذر الاتصال بخادم سلة' : 'Server connection error');
         }
     }
 }

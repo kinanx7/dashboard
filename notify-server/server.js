@@ -1140,6 +1140,175 @@ app.get(['/salla/webhook', '/salla', '/salla/'], (_req, res) => {
     res.status(200).json({ status: 'ok', message: 'Salla Webhook Endpoint is active and listening for orders ✅' });
 });
 
+function formatSallaOrderHelper(item, extraBody) {
+    if (!item) return null;
+    const body = extraBody || {};
+    const baseOrder = item.order || item.data || item;
+    
+    // 1. Order ID & Reference Resolution (Prioritize merchant-facing order number)
+    const rawOrderId = baseOrder.order_reference_id || baseOrder.reference_id || (baseOrder.order && baseOrder.order.reference_id) || baseOrder.order_id || baseOrder.invoice_number || baseOrder.id || body.orderId || body.order_id;
+    if (!rawOrderId) return null;
+    const orderId = String(rawOrderId);
+    const orderNumber = String(baseOrder.order_reference_id || baseOrder.reference_id || (baseOrder.order && baseOrder.order.reference_id) || baseOrder.order_id || baseOrder.invoice_number || orderId);
+    const invoiceNum = baseOrder.invoice_number ? String(baseOrder.invoice_number) : '';
+
+    // 2. Customer
+    const cust = baseOrder.customer || item.customer || {};
+    const ship = baseOrder.shipping || item.shipping || {};
+    const receiver = ship.receiver || {};
+    const address = ship.address || baseOrder.address || item.address || cust.address || {};
+
+    let custName = `${cust.first_name || ''} ${cust.last_name || ''}`.trim() || receiver.name || cust.full_name || cust.name || body.customerName || '';
+    if (!custName || custName === 'عميل متجر سلة') {
+        custName = 'عميل متجر سلة';
+    }
+
+    // 3. Phone
+    let rawPhone = String(cust.mobile || cust.phone || receiver.phone || body.customerPhone || '');
+    let cleanMobile = rawPhone.replace(/[^0-9]/g, '');
+    if (cleanMobile) {
+        if (cleanMobile.startsWith('05')) cleanMobile = '966' + cleanMobile.substring(1);
+        else if (cleanMobile.startsWith('5') && cleanMobile.length === 9) cleanMobile = '966' + cleanMobile;
+        else if (!cleanMobile.startsWith('966') && !cleanMobile.startsWith('971') && !cleanMobile.startsWith('965')) cleanMobile = '966' + cleanMobile;
+    }
+
+    // 4. Address & Pinpoint Location
+    const city = address.city || cust.address?.city || 'الرياض';
+    const district = address.district || cust.address?.district || '';
+    const street = address.street_name || address.street || address.shipping_address || cust.address?.street_name || '';
+    const desc = address.description || address.details || cust.address?.description || '';
+    const fullAddressParts = [city, district, street, desc].filter(Boolean);
+    const addressLine = fullAddressParts.length > 0 ? fullAddressParts.join(' - ') : (body.addressLine || 'العنوان المسجل في سلة');
+    const coords = address.location || cust.address?.location || baseOrder.coords || null;
+
+    // 5. Total Amount (Handling nested object vs number vs subtotal)
+    let rawTotal = 0;
+    if (baseOrder.total !== undefined && baseOrder.total !== null) {
+        rawTotal = (typeof baseOrder.total === 'object') ? (baseOrder.total.amount || baseOrder.total.sub_total || 0) : baseOrder.total;
+    } else if (item.total !== undefined && item.total !== null) {
+        rawTotal = (typeof item.total === 'object') ? (item.total.amount || item.total.sub_total || 0) : item.total;
+    } else if (baseOrder.sub_total !== undefined && baseOrder.sub_total !== null) {
+        rawTotal = (typeof baseOrder.sub_total === 'object') ? baseOrder.sub_total.amount : baseOrder.sub_total;
+    } else if (baseOrder.amounts && baseOrder.amounts.total) {
+        rawTotal = (typeof baseOrder.amounts.total === 'object') ? baseOrder.amounts.total.amount : baseOrder.amounts.total;
+    } else if (body.total || body.amount) {
+        rawTotal = body.total || body.amount;
+    }
+    const parsedTotal = isNaN(parseFloat(rawTotal)) ? '0.00' : parseFloat(rawTotal).toFixed(2);
+
+    const paymentMethod = baseOrder.payment_method || item.payment_method || body.paymentMethod || 'Mada';
+    const rawStatus = (baseOrder.status && (baseOrder.status.slug || baseOrder.status.name)) || (item.status && (item.status.slug || item.status.name)) || 'in_progress';
+    const createdAt = baseOrder.date && baseOrder.date.date ? new Date(baseOrder.date.date).getTime() : (baseOrder.created_at ? new Date(baseOrder.created_at).getTime() : Date.now());
+
+    // 6. Notes & Clean Items (Excluding service fees & notes from checklist)
+    let extractedNotes = [];
+    if (baseOrder.notes) extractedNotes.push(baseOrder.notes);
+    if (baseOrder.customer_note) extractedNotes.push(baseOrder.customer_note);
+    if (item.notes) extractedNotes.push(item.notes);
+    if (body.notes) extractedNotes.push(body.notes);
+
+    const rawItems = baseOrder.items || item.items || (Array.isArray(body.items) ? body.items : []);
+    const items = [];
+
+    rawItems.forEach(i => {
+        if (!i) return;
+        const iname = String(i.name || i.product_name || i.title || '').trim();
+        const itype = String(i.type || '').toLowerCase();
+
+        // Separate customer notes
+        if (iname.includes('ملاحظات العميل') || iname.includes('ملاحظة') || iname.includes('ملاحظات') || iname.includes('customer note')) {
+            const noteVal = i.description || i.notes || i.value || '';
+            if (noteVal) extractedNotes.push(`${iname}: ${noteVal}`);
+            return;
+        }
+        // Exclude shipping and delivery fees
+        if (itype === 'service' || iname.includes('رسوم الشحن') || iname.includes('توصيل') || iname.includes('شحن')) {
+            return;
+        }
+
+        let optionsStr = '';
+        if (i.options && Array.isArray(i.options)) {
+            optionsStr = i.options.map(o => `${o.name ? o.name + ': ' : ''}${o.value || ''}`).join(', ');
+        } else if (typeof i.options === 'string') {
+            optionsStr = i.options;
+        }
+
+        const itemPrice = (i.price && typeof i.price === 'object' ? i.price.amount : i.price) || 0;
+
+        items.push({
+            name: iname || 'منتج',
+            quantity: i.quantity || i.qty || 1,
+            options: optionsStr,
+            price: parseFloat(itemPrice) || 0
+        });
+    });
+
+    return {
+        id: orderId,
+        orderNumber: orderNumber,
+        order_reference_id: baseOrder.order_reference_id || baseOrder.reference_id || null,
+        invoice_number: invoiceNum,
+        customerName: custName,
+        customerPhone: cleanMobile,
+        city: city,
+        addressLine: addressLine,
+        coords: coords,
+        total: parsedTotal,
+        paymentMethod: paymentMethod,
+        status: rawStatus,
+        createdAt: createdAt,
+        notes: extractedNotes.filter(Boolean).join(' | '),
+        items: items,
+        checklist: {}
+    };
+}
+
+app.get('/salla/reparse-orders', async (_req, res) => {
+    try {
+        if (!lastSallaWebhooks || lastSallaWebhooks.length === 0) {
+            return res.json({ status: 'ok', message: 'No stored webhook logs to reparse' });
+        }
+
+        const companyKeys = ['burgeroov', 'mvc', 'mvcfresh'];
+        let updatedCount = 0;
+
+        for (const log of lastSallaWebhooks) {
+            const rawData = (log.raw && log.raw.data) || log.raw;
+            if (!rawData) continue;
+            
+            // Skip empty abandoned carts
+            if (log.event === 'abandoned.cart.purchased' && !rawData.customer && (!rawData.items || rawData.items.length === 0)) {
+                // If it was stored previously, remove it from Firebase
+                const ghostId = String(rawData.id || log.orderId);
+                if (ghostId) {
+                    for (const c of companyKeys) {
+                        await db.ref(`companies/${c}/sallaOrders/${ghostId}`).remove().catch(() => {});
+                    }
+                }
+                continue;
+            }
+
+            const formatted = formatSallaOrderHelper(rawData, log.raw);
+            if (!formatted || !formatted.id) continue;
+
+            for (const c of companyKeys) {
+                // If old record was stored under invoice ID, remove old key if different from reference ID
+                const oldInvoiceId = String(rawData.id);
+                if (oldInvoiceId && oldInvoiceId !== formatted.id) {
+                    await db.ref(`companies/${c}/sallaOrders/${oldInvoiceId}`).remove().catch(() => {});
+                }
+                await db.ref(`companies/${c}/sallaOrders/${formatted.id}`).set(formatted);
+            }
+            updatedCount++;
+        }
+
+        return res.json({ status: 'success', message: `Reparsed and healed ${updatedCount} orders! ✅` });
+    } catch (e) {
+        console.error('❌ [Reparse Error]:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.get('/salla/sync-orders', async (_req, res) => {
     try {
         const snap = await db.ref('companies/burgeroov/sallaAuth').once('value');
@@ -1178,36 +1347,11 @@ app.get('/salla/sync-orders', async (_req, res) => {
             const companyKeys = ['burgeroov', 'mvc', 'mvcfresh'];
             let count = 0;
             for (const item of sallaResponse.data) {
-                const orderId = String(item.reference_id || item.id);
-                const cust = item.customer || {};
-                const ship = item.shipping || {};
-                const receiver = ship.receiver || {};
-                const address = ship.address || item.address || {};
-
-                const formattedOrder = {
-                    id: orderId,
-                    orderNumber: orderId,
-                    customerName: `${cust.first_name || ''} ${cust.last_name || ''}`.trim() || receiver.name || 'عميل متجر سلة',
-                    customerPhone: cust.mobile || cust.phone || receiver.phone || '',
-                    city: address.city || 'الرياض',
-                    addressLine: address.shipping_address || address.street || address.details || 'العنوان المسجل في سلة',
-                    coords: address.location || null,
-                    total: parseFloat((item.amounts && item.amounts.total && item.amounts.total.amount) || item.total || 0).toFixed(2),
-                    paymentMethod: item.payment_method || 'Mada',
-                    status: (item.status && item.status.slug) || 'in_progress',
-                    createdAt: item.date && item.date.date ? new Date(item.date.date).getTime() : Date.now(),
-                    notes: item.notes || item.customer_note || '',
-                    items: (item.items || []).map(i => ({
-                        name: i.name || i.product_name || i.title || 'وجبة',
-                        quantity: i.quantity || i.qty || 1,
-                        options: i.options && Array.isArray(i.options) ? i.options.map(o => `${o.name}: ${o.value}`).join(', ') : '',
-                        price: (i.price && i.price.amount) || i.price || 0
-                    })),
-                    checklist: {}
-                };
+                const formattedOrder = formatSallaOrderHelper(item);
+                if (!formattedOrder) continue;
 
                 for (const c of companyKeys) {
-                    await db.ref(`companies/${c}/sallaOrders/${orderId}`).set(formattedOrder);
+                    await db.ref(`companies/${c}/sallaOrders/${formattedOrder.id}`).set(formattedOrder);
                 }
                 count++;
             }
@@ -1342,82 +1486,20 @@ app.post(['/salla*', '/salla/webhook', '/salla/webhcook', '/salla/webhcoo', '/sa
             return res.status(200).json({ status: 'success', message: 'App authorized successfully via Easy Mode' });
         }
 
-        const baseOrder = (orderData && orderData.order) ? orderData.order : (orderData || {});
-        const rawOrderId = body.orderId || body.order_id || baseOrder.reference_id || baseOrder.id || orderData.reference_id || orderData.id || (orderData.invoice && orderData.invoice.order_id);
+        // Ignore empty abandoned cart notification stubs that have no customer and no items
+        if (event === 'abandoned.cart.purchased' || event === 'abandoned.cart') {
+            if (!orderData.customer && (!orderData.items || orderData.items.length === 0)) {
+                console.log('ℹ️ [Salla Webhook] Ignored empty abandoned cart notification (no customer/items). Real order will follow via invoice/order event.');
+                return res.status(200).json({ status: 'ignored', reason: 'Empty abandoned cart stub' });
+            }
+        }
 
-        if (!rawOrderId) {
+        const formattedOrder = formatSallaOrderHelper(orderData, body);
+        if (!formattedOrder || !formattedOrder.id) {
             return res.status(200).json({ status: 'ignored', reason: 'No order id in payload' });
         }
 
-        const orderId = String(rawOrderId);
-
-        // Format order object for RTDB
-        const cust = baseOrder.customer || orderData.customer || {};
-        const ship = baseOrder.shipping || orderData.shipping || {};
-        const receiver = ship.receiver || {};
-        const address = ship.address || baseOrder.address || orderData.address || {};
-
-        const custName = body.customerName || body.customer_name || `${cust.first_name || ''} ${cust.last_name || ''}`.trim() || receiver.name || cust.name || 'عميل متجر سلة';
-        const custPhone = body.customerPhone || body.customer_phone || cust.mobile || cust.phone || receiver.phone || '';
-        const city = body.city || address.city || 'الرياض';
-        const addressLine = body.addressLine || body.address || address.shipping_address || address.street || address.details || address.district || 'العنوان المسجل في سلة';
-        const coords = body.coords || address.location || null;
-
-        const totalAmt = body.total || body.amount ||
-                         (baseOrder.amounts && baseOrder.amounts.total && baseOrder.amounts.total.amount) ||
-                         (orderData.amounts && orderData.amounts.total && orderData.amounts.total.amount) ||
-                         baseOrder.total || orderData.total || 0;
-
-        const paymentMethod = body.paymentMethod || body.payment_method || baseOrder.payment_method || orderData.payment_method || 'Mada';
-        const rawStatus = (baseOrder.status && (baseOrder.status.slug || baseOrder.status.name)) || (orderData.status && (orderData.status.slug || orderData.status.name)) || 'in_progress';
-
-        let items = [];
-        if (body.items && typeof body.items === 'string') {
-            items = body.items.split(',').map(s => ({
-                name: s.trim() || 'منتج',
-                quantity: 1,
-                options: '',
-                price: 0
-            }));
-        } else {
-            const rawItems = baseOrder.items || orderData.items || (Array.isArray(body.items) ? body.items : []);
-            items = rawItems.map(item => {
-                let optionsStr = '';
-                if (item.options && Array.isArray(item.options)) {
-                    optionsStr = item.options.map(o => `${o.name ? o.name + ': ' : ''}${o.value || ''}`).join(', ');
-                } else if (typeof item.options === 'string') {
-                    optionsStr = item.options;
-                }
-
-                return {
-                    name: item.name || item.product_name || item.title || 'وجبة',
-                    quantity: item.quantity || item.qty || 1,
-                    options: optionsStr,
-                    price: (item.price && item.price.amount) || item.price || 0
-                };
-            });
-        }
-
-        if (items.length === 0) {
-            items = [{ name: 'طلب متجر سلة', quantity: 1, options: '', price: parseFloat(totalAmt) || 0 }];
-        }
-
-        const formattedOrder = {
-            id: orderId,
-            orderNumber: orderId,
-            customerName: custName,
-            customerPhone: custPhone,
-            city: city,
-            addressLine: addressLine,
-            coords: coords,
-            total: parseFloat(totalAmt).toFixed(2),
-            paymentMethod: paymentMethod,
-            status: rawStatus,
-            createdAt: Date.now(),
-            notes: body.notes || baseOrder.notes || orderData.notes || orderData.customer_note || '',
-            items: items,
-            checklist: {}
-        };
+        const orderId = formattedOrder.id;
 
         // Save to all active companies so it appears in any company view
         const companyKeys = ['burgeroov', 'mvc', 'mvcfresh'];
@@ -1428,11 +1510,11 @@ app.post(['/salla*', '/salla/webhook', '/salla/webhcook', '/salla/webhcoo', '/sa
 
         // Send WhatsApp alert to kitchen / managers if connected
         try {
-            const itemsSummary = items.map(i => `• ${i.quantity}x ${i.name}`).join('\n');
+            const itemsSummary = (formattedOrder.items || []).map(i => `• ${i.quantity}x ${i.name}`).join('\n');
             const alertMsg = `🛍️ *طلب جديد من متجر سلة #${orderId}*\n\n` +
-                `👤 *العميل:* ${custName}\n` +
-                `📞 *الجوال:* ${custPhone}\n` +
-                `📍 *المدينة:* ${city} - ${addressLine}\n` +
+                `👤 *العميل:* ${formattedOrder.customerName}\n` +
+                `📞 *الجوال:* ${formattedOrder.customerPhone}\n` +
+                `📍 *المدينة:* ${formattedOrder.city} - ${formattedOrder.addressLine}\n` +
                 `💰 *المبلغ:* ${formattedOrder.total} ريال\n\n` +
                 `📋 *الأصناف:*\n${itemsSummary}\n\n` +
                 `يرجى فتح لوحة التحكم لتجهيز وتعبئة الطلب!`;
