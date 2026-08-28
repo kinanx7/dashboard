@@ -1022,11 +1022,28 @@ app.get('/salla/callback', (req, res) => {
     `);
 });
 
+let lastSallaWebhooks = [];
+
+app.get('/salla/logs', (_req, res) => {
+    res.json({
+        totalReceived: lastSallaWebhooks.length,
+        logs: lastSallaWebhooks.slice(-10).reverse()
+    });
+});
+
 app.post('/salla/webhook', async (req, res) => {
     try {
         console.log('🛍️ [Salla Webhook Received]', JSON.stringify(req.body, null, 2));
 
         const body = req.body || {};
+        lastSallaWebhooks.push({
+            timestamp: new Date().toISOString(),
+            event: body.event,
+            orderId: (body.data && (body.data.reference_id || body.data.id)) || body.id,
+            raw: body
+        });
+        if (lastSallaWebhooks.length > 50) lastSallaWebhooks.shift();
+
         const event = body.event || 'order.created';
         const orderData = body.data || body;
 
@@ -1053,7 +1070,7 @@ app.post('/salla/webhook', async (req, res) => {
                          (orderData.total && orderData.total.amount) ||
                          orderData.total || 0;
 
-        const paymentMethod = orderData.payment_method || (isAr => 'مدى / فيزا') || 'Mada';
+        const paymentMethod = orderData.payment_method || 'Mada';
         const rawStatus = (orderData.status && orderData.status.slug) || 'in_progress';
 
         const rawItems = orderData.items || [];
@@ -1090,11 +1107,12 @@ app.post('/salla/webhook', async (req, res) => {
             checklist: {}
         };
 
-        const targetCompany = 'burgeroov';
-
-        // Save to Firebase RTDB
-        await db.ref(`companies/${targetCompany}/sallaOrders/${orderId}`).set(formattedOrder);
-        console.log(`✅ [Salla Order Saved] Order #${orderId} saved to companies/${targetCompany}/sallaOrders`);
+        // Save to all active companies so it appears in any company view
+        const companyKeys = ['burgeroov', 'mvc', 'mvcfresh'];
+        for (const c of companyKeys) {
+            await db.ref(`companies/${c}/sallaOrders/${orderId}`).set(formattedOrder);
+        }
+        console.log(`✅ [Salla Order Saved] Order #${orderId} saved to companies/sallaOrders`);
 
         // Send WhatsApp alert to kitchen / managers if connected
         try {
