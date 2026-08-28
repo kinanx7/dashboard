@@ -32474,3 +32474,93 @@ function generateTestSallaOrder() {
     }
 }
 window.generateTestSallaOrder = generateTestSallaOrder;
+
+// ─── SALLA DIRECT API TOKEN MODAL & MANAGEMENT ─────────────────────────────
+function openSallaApiKeyModal() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    
+    // Remove existing modal if any
+    const existing = document.getElementById('salla-api-key-modal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'salla-api-key-modal';
+    modal.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.75); backdrop-filter:blur(6px); z-index:99999; display:flex; align-items:center; justify-content:center; padding:15px;';
+    
+    modal.innerHTML = `
+        <div style="background:#1e293b; border:2px solid #3b82f6; border-radius:20px; max-width:540px; width:100%; padding:28px; box-shadow:0 25px 60px rgba(0,0,0,0.6); color:#f8fafc; text-align:${isAr ? 'right' : 'left'}; direction:${isAr ? 'rtl' : 'ltr'}; position:relative;">
+            <button onclick="document.getElementById('salla-api-key-modal').remove()" style="position:absolute; top:16px; ${isAr ? 'left:16px;' : 'right:16px;'} background:rgba(255,255,255,0.1); border:none; color:#94a3b8; font-size:1.2rem; border-radius:50%; width:34px; height:34px; cursor:pointer; display:flex; align-items:center; justify-content:center;">✕</button>
+            
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+                <div style="font-size:2rem; background:rgba(59,130,246,0.15); width:50px; height:50px; border-radius:14px; display:flex; align-items:center; justify-content:center; border:1px solid rgba(59,130,246,0.3);">🔑</div>
+                <div>
+                    <h3 style="margin:0; font-size:1.25rem; color:#60a5fa; font-weight:800;">${isAr ? 'ربط متجر سلة عبر مفتاح API' : 'Direct Salla API Token Connection'}</h3>
+                    <p style="margin:4px 0 0 0; font-size:0.82rem; color:#94a3b8;">${isAr ? 'الربط المباشر الرسمي لجلب وتحديث الطلبات لحظياً' : 'Official direct connection to sync live store orders in real-time'}</p>
+                </div>
+            </div>
+
+            <div style="background:rgba(15,23,42,0.6); border:1px solid #334155; border-radius:12px; padding:14px; margin-bottom:18px;">
+                <label style="display:block; font-size:0.85rem; font-weight:700; margin-bottom:8px; color:#e2e8f0;">
+                    ${isAr ? 'ألصق توكن / مفتاح الربط (Access Token / API Key):' : 'Paste Salla Access Token / API Key:'}
+                </label>
+                <input id="input-salla-direct-token" type="password" placeholder="${isAr ? 'ألصق التوكن هنا (يبدأ بـ ...)' : 'Paste your token here...'}" style="width:100%; box-sizing:border-box; background:#0f172a; border:1px solid #475569; border-radius:8px; padding:12px; color:#38bdf8; font-family:monospace; font-size:0.9rem;" />
+            </div>
+
+            <div style="font-size:0.8rem; color:#94a3b8; line-height:1.6; margin-bottom:20px; background:rgba(59,130,246,0.06); border-right:4px solid #3b82f6; padding:10px 14px; border-radius:6px;">
+                💡 <b>${isAr ? 'أين أجد التوكن؟' : 'Where to find the token?'}</b><br>
+                ${isAr ? '1. من منصة شركاء سلة (partners.salla.com) ➔ أدوات الدعم (Support Tools) ➔ Tokens.<br>2. أو من إعدادات متجرك ➔ مفاتيح API.' : '1. From Salla Partners ➔ Support Tools ➔ Tokens.<br>2. Or from your Store Settings ➔ API Keys.'}
+            </div>
+
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button onclick="document.getElementById('salla-api-key-modal').remove()" style="padding:10px 18px; background:#334155; color:#f1f5f9; border:none; border-radius:10px; font-weight:700; cursor:pointer;">${isAr ? 'إلغاء' : 'Cancel'}</button>
+                <button id="btn-save-salla-token-action" onclick="saveSallaDirectToken()" style="padding:10px 22px; background:linear-gradient(135deg, #2563eb, #1d4ed8); color:#fff; border:none; border-radius:10px; font-weight:800; cursor:pointer; box-shadow:0 4px 14px rgba(37,99,235,0.4);">${isAr ? '💾 حفظ وتفعيل الربط الفوري' : '💾 Save & Connect'}</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+}
+window.openSallaApiKeyModal = openSallaApiKeyModal;
+
+async function saveSallaDirectToken() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const tokenInput = document.getElementById('input-salla-direct-token');
+    const saveBtn = document.getElementById('btn-save-salla-token-action');
+    const token = tokenInput ? tokenInput.value.trim() : '';
+
+    if (!token) {
+        alert(isAr ? '⚠️ الرجاء إدخال التوكن أولاً!' : 'Please enter the token first!');
+        return;
+    }
+
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerText = isAr ? '⏳ جاري الحفظ وتفعيل الربط...' : '⏳ Saving & Connecting...';
+    }
+
+    try {
+        const response = await fetch('https://burgeroov-notify.onrender.com/salla/save-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: token })
+        });
+        const result = await response.json();
+        
+        // Also trigger sync orders right away
+        await syncSallaOrdersDirect();
+
+        const modal = document.getElementById('salla-api-key-modal');
+        if (modal) modal.remove();
+
+        alert(isAr ? '🎉 تم حفظ المفتاح بنجاح وتفعيل مزامنة متجر سلة مع لوحة التحكم!' : '🎉 Salla API Token saved successfully! Live store sync is active!');
+    } catch (e) {
+        console.error('Error saving Salla token:', e);
+        alert(isAr ? '❌ حدث خطأ أثناء الاتصال بالخادم: ' + e.message : 'Error connecting to server: ' + e.message);
+    } finally {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerText = isAr ? '💾 حفظ وتفعيل الربط الفوري' : '💾 Save & Connect';
+        }
+    }
+}
+window.saveSallaDirectToken = saveSallaDirectToken;

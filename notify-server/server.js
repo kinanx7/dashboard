@@ -1068,6 +1068,74 @@ app.get('/salla/auth-debug', async (_req, res) => {
     }
 });
 
+async function subscribeSallaWebhooks(token) {
+    if (!token) return { status: 'error', reason: 'No token provided' };
+    const events = ['order.created', 'order.updated', 'order.status.updated', 'order.cancelled', 'order.shipment.created'];
+    const results = [];
+    const https = require('https');
+
+    for (const ev of events) {
+        const payload = JSON.stringify({
+            name: `MVC Dashboard - ${ev}`,
+            event: ev,
+            url: 'https://burgeroov-notify.onrender.com/salla/webhook',
+            version: '2',
+            rule: 'ALL'
+        });
+
+        const res = await new Promise((resolve) => {
+            const req = https.request('https://api.salla.dev/admin/v2/webhooks/subscribe', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(payload)
+                }
+            }, (apiRes) => {
+                let d = '';
+                apiRes.on('data', c => d += c);
+                apiRes.on('end', () => {
+                    try { resolve({ event: ev, status: apiRes.statusCode, data: JSON.parse(d) }); }
+                    catch (e) { resolve({ event: ev, status: apiRes.statusCode, raw: d }); }
+                });
+            });
+            req.on('error', (err) => resolve({ event: ev, error: err.message }));
+            req.write(payload);
+            req.end();
+        });
+        results.push(res);
+    }
+    console.log('📡 [Salla Webhook Auto-Subscription Results]:', results);
+    return results;
+}
+
+app.post('/salla/save-token', async (req, res) => {
+    try {
+        const token = (req.body && req.body.token) || req.query.token;
+        if (!token) return res.status(400).json({ status: 'error', message: 'Token is required' });
+
+        const companyKeys = ['burgeroov', 'mvc', 'mvcfresh'];
+        for (const c of companyKeys) {
+            await db.ref(`companies/${c}/sallaAuth`).set({
+                access_token: token.trim(),
+                token_type: 'bearer',
+                installedAt: Date.now()
+            });
+        }
+
+        // Try subscribing webhooks automatically using this token
+        const webhookResults = await subscribeSallaWebhooks(token.trim());
+
+        return res.json({
+            status: 'success',
+            message: 'Token saved and webhooks registered successfully! ✅',
+            webhooks: webhookResults
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.get(['/salla/webhook', '/salla', '/salla/'], (_req, res) => {
     res.status(200).json({ status: 'ok', message: 'Salla Webhook Endpoint is active and listening for orders ✅' });
 });
