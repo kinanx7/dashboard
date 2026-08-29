@@ -1652,6 +1652,7 @@ function applyUserRoles() {
         if (wPerms.activity) document.body.classList.add('perm-activity');
         if (wPerms.market) document.body.classList.add('perm-market');
         if (wPerms.summary) document.body.classList.add('perm-summary');
+        if (wPerms.salla) document.body.classList.add('perm-salla');
 
         if (isDriver) document.body.classList.add('is-driver');
         if (typeof checkWorkerSystemViolationAlerts === 'function') {
@@ -1700,7 +1701,7 @@ function markLockedTabs() {
         learning: true,
         contracts: isAdmin,
         tracking: isAdmin,
-        salla: true
+        salla: isAdmin || document.body.classList.contains('perm-salla')
     };
 
     Object.entries(access).forEach(([tabId, hasAccess]) => {

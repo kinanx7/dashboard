@@ -601,6 +601,11 @@
                                 <input type="checkbox" id="perm-market" style="width:auto;"> <span
                                     data-i18n="tab-market">Market</span>
                             </label>
+                            <label
+                                style="text-transform:none; font-weight:500; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+                                <input type="checkbox" id="perm-salla" style="width:auto;"> <span
+                                    data-i18n="tab-salla">Salla Store</span>
+                            </label>
                         </div>
                         <button onclick="saveWorkerPerms()" style="width: 100%;" data-i18n="btn-save-worker-perms">Save
                             Worker Permissions</button>
@@ -4994,6 +4999,9 @@
 
                     <!-- Action Buttons -->
                     <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                        <button type="button" onclick="syncSallaOrdersDirectly()" class="btn-primary" style="padding: 9px 16px; border-radius: 12px; font-weight: 800; font-size: 0.84rem; background: linear-gradient(135deg, #0ea5e9, #0284c7); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(14,165,233,0.35);">
+                            <span>🔄</span> <span data-i18n="btn-salla-sync-orders">Sync Salla Orders</span>
+                        </button>
                         <button type="button" onclick="openSallaBatchPrepModal()" class="btn-primary" style="padding: 9px 18px; border-radius: 12px; font-weight: 800; font-size: 0.85rem; background: linear-gradient(135deg, #10b981, #059669); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 7px; box-shadow: 0 4px 14px rgba(16,185,129,0.35);">
                             <span>📦</span> <span data-i18n="btn-salla-batch-prep">Total Batch Preparation & Purchasing</span>
                         </button>
@@ -5094,7 +5102,7 @@
 
                     <!-- Search Input -->
                     <div style="flex: 1; min-width: 220px; max-width: 380px;">
-                        <input type="text" id="salla-orders-search" oninput="filterSallaOrders(this.value)" placeholder="🔍 Search by Order #, customer, mobile, product..." style="width: 100%; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.85rem; font-weight: 700;" data-i18n="[placeholder]placeholder-search-salla">
+                        <input type="text" id="salla-orders-search" class="search-input" oninput="filterSallaOrders(this.value)" placeholder="🔍 Search by Order #, customer, mobile, product..." style="width: 100%; padding: 9px 14px; border-radius: 10px; border: 2px solid #8b5cf6 !important; box-shadow: 0 0 10px rgba(139, 92, 246, 0.25) !important; background: var(--input-bg); color: var(--text-main); font-size: 0.85rem; font-weight: 700;" data-i18n="[placeholder]placeholder-search-salla">
                     </div>
 
                 </div>

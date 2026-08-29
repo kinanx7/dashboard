@@ -1198,7 +1198,23 @@ function formatSallaOrderHelper(item, extraBody) {
 
     const paymentMethod = baseOrder.payment_method || item.payment_method || body.paymentMethod || 'Mada';
     const rawStatus = (baseOrder.status && (baseOrder.status.slug || baseOrder.status.name)) || (item.status && (item.status.slug || item.status.name)) || 'in_progress';
-    const createdAt = baseOrder.date && baseOrder.date.date ? new Date(baseOrder.date.date).getTime() : (baseOrder.created_at ? new Date(baseOrder.created_at).getTime() : Date.now());
+    
+    // Robust date parsing guaranteed to NEVER produce NaN
+    let parsedTime = Date.now();
+    try {
+        if (baseOrder.date) {
+            if (typeof baseOrder.date === 'string') parsedTime = new Date(baseOrder.date).getTime();
+            else if (baseOrder.date.date) parsedTime = new Date(baseOrder.date.date).getTime();
+        } else if (baseOrder.created_at) {
+            if (typeof baseOrder.created_at === 'string' || typeof baseOrder.created_at === 'number') parsedTime = new Date(baseOrder.created_at).getTime();
+            else if (baseOrder.created_at.date) parsedTime = new Date(baseOrder.created_at.date).getTime();
+        } else if (body.created_at) {
+            parsedTime = new Date(body.created_at).getTime();
+        }
+    } catch (e) {
+        parsedTime = Date.now();
+    }
+    const createdAt = (parsedTime && !isNaN(parsedTime)) ? parsedTime : Date.now();
 
     // 6. Notes & Clean Items (Excluding service fees & notes from checklist)
     let extractedNotes = [];
@@ -1237,9 +1253,9 @@ function formatSallaOrderHelper(item, extraBody) {
 
         items.push({
             name: iname || 'منتج',
-            quantity: i.quantity || i.qty || 1,
+            quantity: parseInt(i.quantity || i.qty || 1) || 1,
             options: optionsStr,
-            price: parseFloat(itemPrice) || 0
+            price: isNaN(parseFloat(itemPrice)) ? 0 : parseFloat(itemPrice)
         });
     });
 
@@ -1344,9 +1360,18 @@ app.get('/salla/sync-orders', async (_req, res) => {
         console.log('📦 [Salla Orders API Sync Response]', sallaResponse);
 
         if (sallaResponse && sallaResponse.data && Array.isArray(sallaResponse.data)) {
-            const companyKeys = ['burgeroov', 'mvc', 'mvcfresh'];
+            const companyKeys = ['burgeroov', 'mvc', 'mvcfresh', 'salla_shared'];
             let count = 0;
             for (const item of sallaResponse.data) {
+                // Skip sandbox demo store items (e.g. demostore.salla.sa / "فستان" / "abc def")
+                const isDemo = String(item.urls?.customer || '').includes('demostore.salla.sa') || 
+                               item.customer?.first_name === 'abc' || 
+                               (item.items && item.items.some(i => i.name === 'فستان'));
+                if (isDemo) {
+                    console.log('ℹ️ [Sync Salla] Skipped sandbox demo order:', item.id);
+                    continue;
+                }
+
                 const formattedOrder = formatSallaOrderHelper(item);
                 if (!formattedOrder) continue;
 
@@ -1356,7 +1381,7 @@ app.get('/salla/sync-orders', async (_req, res) => {
                 count++;
             }
 
-            return res.json({ status: 'success', syncedCount: count, data: sallaResponse.data });
+            return res.json({ status: 'success', syncedCount: count, message: count > 0 ? `Synced ${count} live store orders!` : 'No new production orders found from demo token.' });
         }
 
         return res.json({ status: 'ok', response: sallaResponse });
@@ -1475,7 +1500,7 @@ app.post(['/salla*', '/salla/webhook', '/salla/webhcook', '/salla/webhcoo', '/sa
         // Handle Easy Mode Automatic Authorization
         if (event === 'app.store.authorize' || event === 'app.installed' || event === 'app.trial.started') {
             const authData = body.data || body;
-            const companyKeys = ['burgeroov', 'mvc', 'mvcfresh'];
+            const companyKeys = ['burgeroov', 'mvc', 'mvcfresh', 'salla_shared'];
             for (const c of companyKeys) {
                 await db.ref(`companies/${c}/sallaAuth`).set({
                     ...authData,
@@ -1486,11 +1511,21 @@ app.post(['/salla*', '/salla/webhook', '/salla/webhcook', '/salla/webhcoo', '/sa
             return res.status(200).json({ status: 'success', message: 'App authorized successfully via Easy Mode' });
         }
 
-        // Ignore empty abandoned cart notification stubs that have no customer and no items
+        // For abandoned cart purchases without items, provide clean fallback so order is NEVER dropped
         if (event === 'abandoned.cart.purchased' || event === 'abandoned.cart') {
-            if (!orderData.customer && (!orderData.items || orderData.items.length === 0)) {
-                console.log('ℹ️ [Salla Webhook] Ignored empty abandoned cart notification (no customer/items). Real order will follow via invoice/order event.');
-                return res.status(200).json({ status: 'ignored', reason: 'Empty abandoned cart stub' });
+            if (!orderData.items || orderData.items.length === 0) {
+                orderData.items = [{
+                    name: 'طلب متجر سلة (مكتمل)',
+                    quantity: 1,
+                    price: orderData.total || orderData.subtotal || 0
+                }];
+            }
+            if (!orderData.customer) {
+                orderData.customer = {
+                    name: 'عميل متجر سلة',
+                    first_name: 'عميل',
+                    last_name: 'متجر سلة'
+                };
             }
         }
 
@@ -1501,12 +1536,12 @@ app.post(['/salla*', '/salla/webhook', '/salla/webhcook', '/salla/webhcoo', '/sa
 
         const orderId = formattedOrder.id;
 
-        // Save to all active companies so it appears in any company view
-        const companyKeys = ['burgeroov', 'mvc', 'mvcfresh'];
+        // Save to all active companies so it appears in any company view (MVC FRESH, Burgeroov, etc.)
+        const companyKeys = ['burgeroov', 'mvc', 'mvcfresh', 'salla_shared'];
         for (const c of companyKeys) {
             await db.ref(`companies/${c}/sallaOrders/${orderId}`).set(formattedOrder);
         }
-        console.log(`✅ [Salla Order Saved] Order #${orderId} saved to companies/sallaOrders`);
+        console.log(`✅ [Salla Order Saved] Order #${orderId} saved to companies/sallaOrders across all companies`);
 
         // Send WhatsApp alert to kitchen / managers if connected
         try {

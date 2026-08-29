@@ -308,7 +308,7 @@ function deleteManager(email) {
 
 function loadWorkerPerms() {
     const wId = document.getElementById('perm-worker-select').value;
-    const permKeys = ['wh', 'drv', 'fin', 'sales', 'costs', 'adverts', 'attendance', 'tasks', 'prepare', 'vault', 'reminders', 'messaging', 'activity', 'market'];
+    const permKeys = ['wh', 'drv', 'fin', 'sales', 'costs', 'adverts', 'attendance', 'tasks', 'prepare', 'vault', 'reminders', 'messaging', 'activity', 'market', 'salla'];
     
     if (!wId) {
         permKeys.forEach(k => {
@@ -335,7 +335,8 @@ function loadWorkerPerms() {
         reminders: 'reminders',
         messaging: 'messaging',
         activity: 'activity',
-        market: 'market'
+        market: 'market',
+        salla: 'salla'
     };
 
     Object.entries(keyMap).forEach(([domKey, dataKey]) => {
@@ -370,7 +371,8 @@ function saveWorkerPerms() {
         reminders: getVal('perm-reminders'),
         messaging: getVal('perm-messaging'),
         activity: getVal('perm-activity'),
-        market: getVal('perm-market')
+        market: getVal('perm-market'),
+        salla: getVal('perm-salla')
     };
 
     // Targeted write to worker permissions path

@@ -8,15 +8,41 @@ let currentSallaListenerCompany = null;
 let sallaOrdersCache = {};
 let sallaSearchQuery = '';
 
+// Salla Official Known Orders Self-Healing Directory (Top-Level Global Definition)
+const SALLA_KNOWN_ORDERS_MAP = {
+    '410389010': { refId: '280899452', inv: '5792', total: '1654.65', name: 'غالب القدسي' },
+    '1802807301': { refId: '280871361', inv: '5791', total: '123.52', name: 'فاضل حسن' },
+    '333294779': { refId: '280833823', inv: '5790', total: '127.01', name: 'عبدالكريم العنزي' },
+    '508423680': { refId: '280813672', inv: '5789', total: '461.04', name: 'Maha Alkhaldi' },
+    '1467471414': { refId: '280811215', inv: '5788', total: '113.85', name: 'رفعان القحطاني' },
+    '632944151': { refId: '280786208', inv: '5787', total: '447.35', name: 'عميل زائر' },
+    '1943180797': { refId: '280763957', inv: '5786', total: '364.55', name: 'محمود إسماعيل' }
+};
+
 /**
- * Get all Salla orders combining cache and Firebase appData
+ * Get all Salla orders combining cache and Firebase appData across all company slots
  */
 function getSallaOrdersMap() {
     const comp = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
     const compData = typeof getCompanyData === 'function' ? getCompanyData() : {};
     const fromComp = compData.sallaOrders || {};
     const fromAppData = (typeof appData !== 'undefined' && appData[comp] && appData[comp].sallaOrders) || {};
-    return { ...fromAppData, ...fromComp, ...(sallaOrdersCache || {}) };
+    
+    // Multi-company fallback so orders are NEVER lost if company key varies
+    const fromBurgeroov = (typeof appData !== 'undefined' && appData['burgeroov'] && appData['burgeroov'].sallaOrders) || {};
+    const fromMvc = (typeof appData !== 'undefined' && appData['mvc'] && appData['mvc'].sallaOrders) || {};
+    const fromMvcFresh = (typeof appData !== 'undefined' && appData['mvcfresh'] && appData['mvcfresh'].sallaOrders) || {};
+
+    return { ...fromBurgeroov, ...fromMvc, ...fromMvcFresh, ...fromAppData, ...fromComp, ...(sallaOrdersCache || {}) };
+}
+
+let sallaRenderDebounceTimer = null;
+function scheduleSallaRender() {
+    if (sallaRenderDebounceTimer) clearTimeout(sallaRenderDebounceTimer);
+    sallaRenderDebounceTimer = setTimeout(() => {
+        updateSallaHUDStats();
+        renderSallaOrdersGrid();
+    }, 40);
 }
 
 /**
@@ -26,11 +52,8 @@ function renderSallaSection() {
     // 1. Attach Firebase real-time listener if needed
     attachSallaOrdersListener();
 
-    // 2. Render HUD Statistics
-    updateSallaHUDStats();
-
-    // 3. Render Orders List with Filters
-    renderSallaOrdersGrid();
+    // 2. Render HUD Statistics & Grid
+    scheduleSallaRender();
 }
 window.renderSallaSection = renderSallaSection;
 
@@ -41,7 +64,7 @@ function attachSallaOrdersListener() {
     const comp = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
     if (typeof db === 'undefined' || !db) return;
 
-    if (currentSallaListenerCompany === comp && sallaOrdersListenerAttached) {
+    if (sallaOrdersListenerAttached && currentSallaListenerCompany === comp) {
         return;
     }
 
@@ -52,23 +75,114 @@ function attachSallaOrdersListener() {
     currentSallaListenerCompany = comp;
     window.sallaOrdersFirebaseRef = db.ref(`companies/${comp}/sallaOrders`);
     window.sallaOrdersFirebaseRef.on('value', snapshot => {
-        sallaOrdersCache = snapshot.val() || {};
+        const val = snapshot.val() || {};
+        sallaOrdersCache = val;
         if (typeof appData !== 'undefined' && appData[comp]) {
             appData[comp].sallaOrders = sallaOrdersCache;
         }
-        updateSallaHUDStats();
-        renderSallaOrdersGrid();
+        scheduleSallaRender();
     });
 
     sallaOrdersListenerAttached = true;
 }
 
 /**
+ * Direct Live Synchronization with Salla API via OAuth
+ */
+async function syncSallaOrdersDirectly() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    if (typeof showInAppNotification === 'function') {
+        showInAppNotification(isAr ? '⏳ جاري مزامنة وسحب الطلبات من متجر سلة...' : 'Syncing orders from Salla store...');
+    }
+
+    try {
+        const res = await fetch('https://burgeroov-notify.onrender.com/salla/sync-orders');
+        const data = await res.json();
+        if (data && data.status === 'success') {
+            if (typeof showInAppNotification === 'function') {
+                showInAppNotification(isAr ? `✅ تم مزامنة ${data.syncedCount || 0} طلب من سلة بنجاح!` : `Synced ${data.syncedCount || 0} orders from Salla!`);
+            }
+        }
+        await fetch('https://burgeroov-notify.onrender.com/salla/reparse-orders').catch(() => {});
+        scheduleSallaRender();
+    } catch(err) {
+        console.warn('Sync orders error:', err.message);
+        scheduleSallaRender();
+    }
+}
+window.syncSallaOrdersDirectly = syncSallaOrdersDirectly;
+
+/**
+ * Get cleaned, deduplicated Salla orders list (Pure in-memory, ultra-fast, zero-lag)
+ */
+function getCleanSallaOrdersList() {
+    const ordersMap = getSallaOrdersMap();
+    let orders = Object.entries(ordersMap || {}).map(([id, o]) => ({ id, ...o }));
+
+    // 1. Filter out demo/sandbox orders and dummy 0-item checkout stubs
+    orders = orders.filter(o => {
+        if (!o || !o.id) return false;
+        
+        // Exclude sandbox demo store test orders (like "فستان" / "abc def" / "280660780")
+        if (o.id === '280660780' || o.order_id === '280660780') return false;
+        if (o.customerName === 'abc def' || (o.customer && (o.customer.first_name === 'abc' || o.customer.name === 'abc def'))) return false;
+
+        const rawItems = o.items || [];
+        const hasDemoItem = rawItems.some(i => i && (i.name === 'فستان' || String(i.thumbnail || '').includes('dev-xu6fkistdycsefaw')));
+        if (hasDemoItem && rawItems.length === 1) return false;
+
+        // Filter out empty ghost / placeholder stubs with 0 valid products
+        const validItems = rawItems.filter(item => {
+            if (!item) return false;
+            const iname = String(item.name || item.product_name || item.title || '').trim();
+            const itype = String(item.type || '').toLowerCase();
+            if (iname === 'طلب متجر سلة' || iname === 'طلب متجر سلة (مكتمل)') return false;
+            if (iname.includes('ملاحظات العميل') || iname.includes('ملاحظة') || iname.includes('ملاحظات')) return false;
+            if (itype === 'service' || iname.includes('رسوم الشحن') || iname.includes('شحن')) return false;
+            return true;
+        });
+
+        if (validItems.length === 0) {
+            const cname = String(o.customerName || (o.customer && o.customer.name) || '');
+            if (!o.customerPhone || cname === 'Store Customer' || cname === 'عميل متجر سلة' || cname.includes('Abandoned Cart') || cname.includes('سلة متروكة')) {
+                return false;
+            }
+        }
+        return true;
+    });
+
+    // 2. Pure in-memory deduplication
+    const dedupMap = new Map();
+    orders.forEach(o => {
+        const knownFix = SALLA_KNOWN_ORDERS_MAP[o.id] || SALLA_KNOWN_ORDERS_MAP[o.orderNumber];
+        const refId = String(o.order_reference_id || (knownFix ? knownFix.refId : null) || o.reference_id || o.orderNumber || o.order_id || o.id);
+        const totalAmt = parseFloat(o.total || o.amount || 0).toFixed(2);
+        const custName = String(o.customerName || '').trim();
+
+        // Primary key: refId if available, or name_total
+        const key = (refId && refId !== 'undefined' && refId !== 'null') ? refId : `${custName}_${totalAmt}`;
+
+        if (!dedupMap.has(key)) {
+            dedupMap.set(key, o);
+        } else {
+            const existing = dedupMap.get(key);
+            const existingItems = (existing.items || []).length;
+            const newItems = (o.items || []).length;
+            if (newItems > existingItems || (!existing.customerPhone && o.customerPhone)) {
+                dedupMap.set(key, o);
+            }
+        }
+    });
+
+    return Array.from(dedupMap.values());
+}
+window.getCleanSallaOrdersList = getCleanSallaOrdersList;
+
+/**
  * Update the 5 HUD Statistic Badges
  */
 function updateSallaHUDStats() {
-    const ordersMap = getSallaOrdersMap();
-    const orders = Object.values(ordersMap || {});
+    const orders = getCleanSallaOrdersList();
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
 
     const totalOrders = orders.length;
@@ -136,24 +250,7 @@ function renderSallaOrdersGrid() {
     const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
     const workers = data.workers || [];
 
-    const ordersMap = getSallaOrdersMap();
-    let orders = Object.entries(ordersMap || {}).map(([id, o]) => ({ id, ...o }));
-
-    // 1. Auto-clean ghost / empty abandoned cart stubs
-    orders = orders.filter(o => {
-        if (!o) return false;
-        // Filter out dummy abandoned cart records that have no items or only the fake 'طلب متجر سلة'
-        const isAbandonedDummy = (!o.customerName || o.customerName.includes('Abandoned Cart') || o.customerName === '🛒 سلة متروكة (مكتملة)') && 
-                                 (!o.items || o.items.length === 0 || (o.items.length === 1 && o.items[0].name === 'طلب متجر سلة'));
-        if (isAbandonedDummy) return false;
-
-        // Filter out records that have only fake 'طلب متجر سلة' with no real customer info
-        if (o.items && o.items.length === 1 && o.items[0].name === 'طلب متجر سلة' && (!o.customerPhone || o.customerPhone === '')) {
-            return false;
-        }
-
-        return true;
-    });
+    let orders = getCleanSallaOrdersList();
 
     // Apply Status Filter
     if (sallaActiveStatusFilter !== 'ALL') {
@@ -169,13 +266,15 @@ function renderSallaOrdersGrid() {
 
     // Apply Search Filter
     if (sallaSearchQuery) {
+        const cleanQ = sallaSearchQuery.replace(/^#/, '').toLowerCase().trim();
         orders = orders.filter(o => {
-            const num = String(o.orderNumber || o.order_reference_id || o.reference_id || o.order_id || o.id || '').toLowerCase();
-            const cust = String(o.customerName || (o.customer && o.customer.name) || '').toLowerCase();
+            const knownFix = SALLA_KNOWN_ORDERS_MAP[o.id] || SALLA_KNOWN_ORDERS_MAP[o.orderNumber];
+            const num = String(o.order_reference_id || (knownFix ? knownFix.refId : null) || o.reference_id || o.orderNumber || o.order_id || o.id || '').toLowerCase();
+            const cust = String((knownFix && knownFix.name) ? knownFix.name : (o.customerName || (o.customer && o.customer.name) || '')).toLowerCase();
             const phone = String(o.customerPhone || (o.customer && o.customer.mobile) || '').toLowerCase();
             const city = String(o.city || (o.address && o.address.city) || '').toLowerCase();
             const itemsStr = (o.items || []).map(i => String(i.name || i.title || '').toLowerCase()).join(' ');
-            return num.includes(sallaSearchQuery) || cust.includes(sallaSearchQuery) || phone.includes(sallaSearchQuery) || city.includes(sallaSearchQuery) || itemsStr.includes(sallaSearchQuery);
+            return num.includes(cleanQ) || ('#' + num).includes(sallaSearchQuery.toLowerCase()) || cust.includes(sallaSearchQuery.toLowerCase()) || phone.includes(cleanQ) || city.includes(sallaSearchQuery.toLowerCase()) || itemsStr.includes(sallaSearchQuery.toLowerCase());
         });
     }
 
@@ -201,17 +300,6 @@ function renderSallaOrdersGrid() {
         `;
         return;
     }
-
-    // Salla Official Known Orders Self-Healing Directory
-    const SALLA_KNOWN_ORDERS_MAP = {
-        '410389010': { refId: '280899452', inv: '5792', total: '1654.65', name: 'غالب القدسي' },
-        '1802807301': { refId: '280871361', inv: '5791', total: '123.52', name: 'فاضل حسن' },
-        '333294779': { refId: '280833823', inv: '5790', total: '127.01', name: 'عبدالكريم العنزي' },
-        '508423680': { refId: '280813672', inv: '5789', total: '461.04', name: 'Maha Alkhaldi' },
-        '1467471414': { refId: '280811215', inv: '5788', total: '113.85', name: 'رفعان القحطاني' },
-        '632944151': { refId: '280786208', inv: '5787', total: '447.35', name: 'عميل زائر' },
-        '1943180797': { refId: '280763957', inv: '5786', total: '364.55', name: 'محمود إسماعيل' }
-    };
 
     grid.innerHTML = orders.map(o => {
         const orderId = o.id || o.order_id || 'SALLA-ORD';
@@ -258,14 +346,14 @@ function renderSallaOrdersGrid() {
 
         // 4. Customer Address & Smart Google Maps Link
         let custCity = o.city;
-        let custAddress = o.addressLine;
+        let custAddress = o.addressLine || '';
         const custAddrObj = (o.customer && o.customer.address) || o.address || (o.shipping && o.shipping.address);
         let gmapsQuery = '';
 
         if (custAddrObj) {
             custCity = custAddrObj.city || custCity;
             const district = custAddrObj.district || '';
-            const cleanStreet = String(custAddrObj.street_name || custAddrObj.street || '').replace(/,/g, ' ');
+            const cleanStreet = String(custAddrObj.street_name || custAddrObj.street || '').replace(/,/g, ' ').trim();
             const desc = custAddrObj.description || custAddrObj.details || '';
 
             const addrParts = [custCity, district, cleanStreet, desc].filter(Boolean);
@@ -284,20 +372,34 @@ function renderSallaOrdersGrid() {
         }
 
         custCity = custCity || (isAr ? 'الرياض' : 'Riyadh');
-        if (!custAddress || custAddress === 'العنوان المسجل في سلة') {
-            custAddress = custCity;
-        }
-        if (!gmapsQuery) {
-            gmapsQuery = (custAddress && !custAddress.includes('العنوان المسجل في سلة')) ? `${custCity} ${custAddress}` : custCity;
+        
+        // Clean displayLocation: prevent "الرياض • الرياض"
+        let displayLocation = custCity;
+        if (custAddress && custAddress !== 'العنوان المسجل في سلة' && custAddress.trim() !== custCity.trim()) {
+            if (custAddress.startsWith(custCity)) {
+                displayLocation = custAddress;
+            } else {
+                displayLocation = `${custCity} - ${custAddress}`;
+            }
         }
 
-        // Final Google Maps Link
-        const mapCoords = o.coords || (o.address && o.address.location) || (o.customer && o.customer.address && o.customer.address.location);
-        let gmapsLink = '#';
-        if (mapCoords && mapCoords.lat && mapCoords.lng) {
-            gmapsLink = `https://www.google.com/maps/search/?api=1&query=${mapCoords.lat},${mapCoords.lng}`;
+        if (!gmapsQuery) {
+            gmapsQuery = displayLocation;
+        }
+
+        // Check if notes or address contains direct google maps link
+        let notes = o.notes || o.customer_note || '';
+        let gmapsLink = '';
+        const mapLinkMatch = String(notes + ' ' + custAddress + ' ' + (o.customer_note || '')).match(/https?:\/\/(maps\.google\.com|goo\.gl\/maps|maps\.app\.goo\.gl)[^\s]+/i);
+        if (mapLinkMatch) {
+            gmapsLink = mapLinkMatch[0];
         } else {
-            gmapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gmapsQuery)}`;
+            const mapCoords = o.coords || (o.address && o.address.location) || (o.customer && o.customer.address && o.customer.address.location);
+            if (mapCoords && mapCoords.lat && mapCoords.lng) {
+                gmapsLink = `https://www.google.com/maps?q=${mapCoords.lat},${mapCoords.lng}`;
+            } else {
+                gmapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gmapsQuery)}`;
+            }
         }
 
         // 5. Total Amount Parsing (Official Total with VAT & Delivery)
@@ -327,7 +429,6 @@ function renderSallaOrdersGrid() {
         const orderDate = o.createdAt ? new Date(o.createdAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' }) : '';
         
         // 6. Notes & Item Separation
-        let notes = o.notes || o.customer_note || '';
         const rawItems = o.items || [];
         const checklist = o.checklist || {};
 
@@ -443,8 +544,8 @@ function renderSallaOrdersGrid() {
                         </div>
 
                         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
-                            <div style="display: flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 240px;" title="${custCity} - ${custAddress}">
-                                <span>📍</span> <span>${sallaSearchQuery ? highlightSearchMatch(custCity + ' • ' + custAddress, sallaSearchQuery) : custCity + ' • ' + custAddress}</span>
+                            <div style="display: flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 240px;" title="${displayLocation}">
+                                <span>📍</span> <span>${sallaSearchQuery ? highlightSearchMatch(displayLocation, sallaSearchQuery) : displayLocation}</span>
                             </div>
                             <a href="${gmapsLink}" target="_blank" style="color: var(--primary); font-weight: 800; text-decoration: none; font-size: 0.76rem; display: inline-flex; align-items: center; gap: 3px;">
                                 <span>🗺️ ${isAr ? 'الخريطة' : 'Maps'}</span>
@@ -504,7 +605,6 @@ function renderSallaOrdersGrid() {
                                                 </div>
                                             </div>
                                         </div>
-                                        <span style="font-size: 1.1rem; flex-shrink: 0;">${isChecked ? '✅' : '⬜'}</span>
                                     </div>
                                 `;
                             }).join('')}
@@ -547,27 +647,81 @@ function renderSallaOrdersGrid() {
 }
 
 /**
+ * Get all company keys for global Salla synchronization
+ */
+function getSallaAllCompanyKeys() {
+    const list = ['burgeroov', 'mvc', 'mvcfresh', 'salla_shared'];
+    if (typeof currentCompany !== 'undefined' && currentCompany && !list.includes(currentCompany)) {
+        list.push(currentCompany);
+    }
+    return list;
+}
+
+/**
  * Toggle Item Checkbox in Salla Order Packaging Checklist
  */
 function toggleSallaItemCheck(orderId, itemIndex) {
-    const comp = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
     const ordersMap = getSallaOrdersMap();
     const order = ordersMap[orderId] || {};
     const checklist = { ...(order.checklist || {}) };
     checklist[itemIndex] = !checklist[itemIndex];
+    const isNowChecked = checklist[itemIndex] === true;
 
-    // Update locally in cache and appData immediately
+    // Update locally in cache immediately
     if (!sallaOrdersCache[orderId]) sallaOrdersCache[orderId] = order;
     sallaOrdersCache[orderId].checklist = checklist;
 
-    if (typeof appData !== 'undefined' && appData[comp] && appData[comp].sallaOrders && appData[comp].sallaOrders[orderId]) {
-        appData[comp].sallaOrders[orderId].checklist = checklist;
+    // Update in all company appData slots
+    const allComps = getSallaAllCompanyKeys();
+    allComps.forEach(c => {
+        if (typeof appData !== 'undefined' && appData[c]) {
+            if (!appData[c].sallaOrders) appData[c].sallaOrders = {};
+            if (appData[c].sallaOrders[orderId]) {
+                appData[c].sallaOrders[orderId].checklist = checklist;
+            }
+        }
+    });
+
+    // Find the item name for this itemIndex to sync with Batch Preparation Hub
+    const rawItems = order.items || [];
+    const filteredItems = [];
+    rawItems.forEach(item => {
+        if (!item) return;
+        const iname = String(item.name || item.product_name || item.title || '').trim();
+        const itype = String(item.type || '').toLowerCase();
+        if (iname === 'طلب متجر سلة' || iname.includes('ملاحظات العميل') || iname.includes('ملاحظة') || iname.includes('ملاحظات') || itype === 'service' || iname.includes('رسوم الشحن') || iname.includes('شحن')) return;
+        filteredItems.push(item);
+    });
+
+    const targetItem = filteredItems[itemIndex];
+    let cleanProdKey = '';
+    let cleanOrdKey = '';
+    if (targetItem) {
+        const productName = String(targetItem.name || targetItem.product_name || targetItem.title || '').trim();
+        cleanProdKey = productName.replace(/[.#$[\]/]/g, '_');
+        cleanOrdKey = String(orderId).replace(/[.#$[\]/]/g, '_');
+
+        allComps.forEach(c => {
+            const compData = (typeof appData !== 'undefined' && appData[c]) || {};
+            if (!compData.sallaBatchPurchases) compData.sallaBatchPurchases = {};
+            if (!compData.sallaBatchCustomerChecks) compData.sallaBatchCustomerChecks = {};
+            if (!compData.sallaBatchCustomerChecks[productName]) compData.sallaBatchCustomerChecks[productName] = {};
+            if (!compData.sallaBatchCustomerChecks[cleanProdKey]) compData.sallaBatchCustomerChecks[cleanProdKey] = {};
+
+            compData.sallaBatchCustomerChecks[productName][orderId] = isNowChecked;
+            compData.sallaBatchCustomerChecks[cleanProdKey][cleanOrdKey] = isNowChecked;
+        });
     }
 
     renderSallaOrdersGrid();
 
     if (typeof db !== 'undefined' && db) {
-        db.ref(`companies/${comp}/sallaOrders/${orderId}/checklist`).set(checklist).catch(() => {});
+        allComps.forEach(c => {
+            db.ref(`companies/${c}/sallaOrders/${orderId}/checklist`).set(checklist).catch(() => {});
+            if (cleanProdKey && cleanOrdKey) {
+                db.ref(`companies/${c}/sallaBatchCustomerChecks/${cleanProdKey}/${cleanOrdKey}`).set(isNowChecked).catch(() => {});
+            }
+        });
     }
 
     if (typeof showInAppNotification === 'function') {
@@ -581,7 +735,6 @@ window.toggleSallaItemCheck = toggleSallaItemCheck;
  * Update Salla Order Status
  */
 function updateSallaOrderStatus(orderId, newStatus) {
-    const comp = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
     const ordersMap = getSallaOrdersMap();
     const order = ordersMap[orderId] || {};
     order.status = newStatus;
@@ -589,15 +742,23 @@ function updateSallaOrderStatus(orderId, newStatus) {
     if (!sallaOrdersCache[orderId]) sallaOrdersCache[orderId] = order;
     sallaOrdersCache[orderId].status = newStatus;
 
-    if (typeof appData !== 'undefined' && appData[comp] && appData[comp].sallaOrders && appData[comp].sallaOrders[orderId]) {
-        appData[comp].sallaOrders[orderId].status = newStatus;
-    }
+    const allComps = getSallaAllCompanyKeys();
+    allComps.forEach(c => {
+        if (typeof appData !== 'undefined' && appData[c]) {
+            if (!appData[c].sallaOrders) appData[c].sallaOrders = {};
+            if (appData[c].sallaOrders[orderId]) {
+                appData[c].sallaOrders[orderId].status = newStatus;
+            }
+        }
+    });
 
     updateSallaHUDStats();
     renderSallaOrdersGrid();
 
     if (typeof db !== 'undefined' && db) {
-        db.ref(`companies/${comp}/sallaOrders/${orderId}/status`).set(newStatus).catch(() => {});
+        allComps.forEach(c => {
+            db.ref(`companies/${c}/sallaOrders/${orderId}/status`).set(newStatus).catch(() => {});
+        });
     }
 
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
@@ -608,12 +769,42 @@ function updateSallaOrderStatus(orderId, newStatus) {
 window.updateSallaOrderStatus = updateSallaOrderStatus;
 
 /**
+ * Assign Driver to Salla Order
+ */
+function assignSallaOrderDriver(orderId, driverId) {
+    const ordersMap = getSallaOrdersMap();
+    const order = ordersMap[orderId] || {};
+    order.driverId = driverId;
+
+    if (!sallaOrdersCache[orderId]) sallaOrdersCache[orderId] = order;
+    sallaOrdersCache[orderId].driverId = driverId;
+
+    const allComps = getSallaAllCompanyKeys();
+    allComps.forEach(c => {
+        if (typeof appData !== 'undefined' && appData[c]?.sallaOrders?.[orderId]) {
+            appData[c].sallaOrders[orderId].driverId = driverId;
+        }
+    });
+
+    if (typeof db !== 'undefined' && db) {
+        allComps.forEach(c => {
+            db.ref(`companies/${c}/sallaOrders/${orderId}/driverId`).set(driverId).catch(() => {});
+        });
+    }
+
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    if (typeof showInAppNotification === 'function') {
+        showInAppNotification(isAr ? '🛵 تم تعيين السائق للطلب بنجاح' : 'Driver assigned successfully');
+    }
+}
+window.assignSallaOrderDriver = assignSallaOrderDriver;
+
+/**
  * Delete a Salla Order with confirmation
  */
 function deleteSallaOrder(orderId) {
     if (!orderId) return;
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
-    const comp = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
 
     const confirmMsg = isAr 
         ? `هل أنت متأكد من حذف هذا الطلب #${orderId} نهائياً؟` 
@@ -626,9 +817,12 @@ function deleteSallaOrder(orderId) {
         delete sallaOrdersCache[orderId];
     }
 
-    if (typeof appData !== 'undefined' && appData[comp] && appData[comp].sallaOrders) {
-        delete appData[comp].sallaOrders[orderId];
-    }
+    const allComps = getSallaAllCompanyKeys();
+    allComps.forEach(c => {
+        if (typeof appData !== 'undefined' && appData[c]?.sallaOrders?.[orderId]) {
+            delete appData[c].sallaOrders[orderId];
+        }
+    });
 
     const compData = typeof getCompanyData === 'function' ? getCompanyData() : {};
     if (compData.sallaOrders && compData.sallaOrders[orderId]) {
@@ -639,10 +833,11 @@ function deleteSallaOrder(orderId) {
     updateSallaHUDStats();
     renderSallaOrdersGrid();
 
-    // 3. Delete from Firebase
+    // 3. Delete across all company slots in Firebase
     if (typeof db !== 'undefined' && db) {
-        db.ref(`companies/${comp}/sallaOrders/${orderId}`).remove()
-            .catch(err => console.error("Error deleting salla order from Firebase:", err));
+        allComps.forEach(c => {
+            db.ref(`companies/${c}/sallaOrders/${orderId}`).remove().catch(() => {});
+        });
     }
 
     if (typeof showInAppNotification === 'function') {
@@ -658,18 +853,6 @@ function editSallaOrderDetails(orderId) {
     if (!orderId) return;
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     const comp = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
-    const ordersMap = getSallaOrdersMap();
-    const order = ordersMap[orderId] || {};
-
-    const SALLA_KNOWN_ORDERS_MAP = {
-        '410389010': { refId: '280899452', total: '1654.65' },
-        '1802807301': { refId: '280871361', total: '123.52' },
-        '333294779': { refId: '280833823', total: '127.01' },
-        '508423680': { refId: '280813672', total: '461.04' },
-        '1467471414': { refId: '280811215', total: '113.85' },
-        '632944151': { refId: '280786208', total: '447.35' },
-        '1943180797': { refId: '280763957', total: '364.55' }
-    };
     const knownFix = SALLA_KNOWN_ORDERS_MAP[orderId];
 
     const curNum = order.order_reference_id || (knownFix ? knownFix.refId : null) || order.orderNumber || order.id || '';
@@ -993,6 +1176,156 @@ function resetSallaExcludedProducts() {
 }
 window.resetSallaExcludedProducts = resetSallaExcludedProducts;
 
+/**
+ * Open Salla Webhook & Live Store Settings Panel
+ */
+function toggleSallaSettingsPanel() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    
+    let modal = document.getElementById('modal-salla-settings-panel');
+    if (modal) modal.remove();
+
+    modal = document.createElement('div');
+    modal.id = 'modal-salla-settings-panel';
+    modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); z-index:99999; display:flex; align-items:center; justify-content:center; padding:15px;';
+
+    modal.innerHTML = `
+        <div style="background:#1e293b; border:2px solid #38bdf8; border-radius:20px; max-width:680px; width:100%; max-height:90vh; display:flex; flex-direction:column; box-shadow:0 25px 60px rgba(0,0,0,0.7); color:#f8fafc; text-align:${isAr ? 'right' : 'left'}; direction:${isAr ? 'rtl' : 'ltr'}; overflow:hidden;">
+            
+            <!-- Header -->
+            <div style="padding:18px 24px; border-bottom:1px solid #334155; display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="width:40px; height:40px; border-radius:12px; background:rgba(56,189,248,0.15); display:flex; align-items:center; justify-content:center; font-size:1.4rem;">
+                        ⚙️
+                    </div>
+                    <div>
+                        <h3 style="margin:0; font-size:1.15rem; color:#38bdf8; font-weight:900;">
+                            ${isAr ? 'إعدادات ربط متجر سلة المباشر (Webhook & API)' : 'Salla Live Store Connection Settings'}
+                        </h3>
+                        <p style="margin:2px 0 0 0; font-size:0.8rem; color:#94a3b8;">
+                            ${isAr ? 'ربط متجر MVC Fresh المباشر وتفعيل الويب هوك لمزامنة كل الطلبات فوراً' : 'Connect your live MVC Fresh store and enable Webhooks for instant sync'}
+                        </p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeSallaSettingsPanel()" style="width:34px; height:34px; border-radius:50%; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#ef4444; font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                    ✕
+                </button>
+            </div>
+
+            <!-- Body -->
+            <div style="flex:1; overflow-y:auto; padding:20px 24px; display:flex; flex-direction:column; gap:16px;">
+                
+                <!-- Webhook URL Box -->
+                <div style="background:#0f172a; border:1px solid #334155; border-radius:14px; padding:14px 16px;">
+                    <div style="font-size:0.82rem; font-weight:800; color:#38bdf8; margin-bottom:6px;">
+                        🔗 ${isAr ? 'رابط الويب هوك الرسمي (Webhook URL):' : 'Official Webhook Endpoint URL:'}
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <input type="text" readonly value="https://burgeroov-notify.onrender.com/salla/webhook" id="salla-webhook-url-input" style="flex:1; background:#1e293b; border:1px solid #475569; color:#f8fafc; padding:8px 12px; border-radius:8px; font-family:monospace; font-size:0.82rem; direction:ltr;">
+                        <button type="button" onclick="navigator.clipboard.writeText('https://burgeroov-notify.onrender.com/salla/webhook'); alert('${isAr ? 'تم نسخ الرابط بنجاح!' : 'Copied Webhook URL!'}');" style="padding:8px 14px; background:#38bdf8; color:#0f172a; border:none; border-radius:8px; font-weight:800; font-size:0.8rem; cursor:pointer;">
+                            📋 ${isAr ? 'نسخ' : 'Copy'}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Webhook Events Checklist in Salla -->
+                <div style="background:#0f172a; border:1px solid #334155; border-radius:14px; padding:14px 16px;">
+                    <div style="font-size:0.82rem; font-weight:800; color:#10b981; margin-bottom:6px;">
+                        ✅ ${isAr ? 'الأحداث المطلوبة في إعدادات سلة (Events to Check in Salla):' : 'Required Webhook Events in Salla:'}
+                    </div>
+                    <p style="font-size:0.78rem; color:#94a3b8; margin:0 0 10px 0; line-height:1.5;">
+                        ${isAr ? 'تأكد من تحديد هذه الأحداث في لوحة شركاء سلة (Webhooks) لتصل جميع الطلبات فوراً:' : 'Ensure these events are checked in Salla Partner Dashboard for real-time delivery:'}
+                    </p>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:0.78rem; color:#cbd5e1; font-weight:700;">
+                        <div>• <code>order.created</code> (إنشاء طلب جديد)</div>
+                        <div>• <code>order.updated</code> (تحديث طلب)</div>
+                        <div>• <code>order.status.updated</code> (تحديث الحالة)</div>
+                        <div>• <code>invoice.created</code> (إنشاء فاتورة)</div>
+                        <div>• <code>shipment.created</code> (إنشاء شحنة)</div>
+                        <div>• <code>abandoned.cart.purchased</code> (شراء سلة)</div>
+                    </div>
+                </div>
+
+                <!-- Live Store Authorization / Token -->
+                <div style="background:#0f172a; border:1.5px solid #10b981; border-radius:14px; padding:16px;">
+                    <div style="font-size:0.88rem; font-weight:800; color:#10b981; margin-bottom:6px;">
+                        🔐 ${isAr ? 'تحديث مفتاح الربط الرسمي للمتجر المباشر (Live Store Access Token):' : 'Update Live Store API Access Token:'}
+                    </div>
+                    <p style="font-size:0.78rem; color:#94a3b8; margin:0 0 12px 0; line-height:1.5;">
+                        ${isAr ? 'إذا كان الربط الحالي يقرأ من المتجر التجريبي، أدخل رمز الوصول (Access Token) الخاص بمتجرك الحقيقي MVC Fresh من لوحة شركاء سلة، أو اضغط زر التثبيت:' : 'Paste your live store Access Token or click to install/authorize your live MVC Fresh store directly:'}
+                    </p>
+                    
+                    <div style="display:flex; gap:8px; margin-bottom:12px;">
+                        <input type="text" id="custom-salla-token-input" placeholder="ory_at_..." style="flex:1; background:#1e293b; border:1px solid #475569; color:#f8fafc; padding:9px 12px; border-radius:10px; font-size:0.8rem; font-family:monospace; direction:ltr;">
+                        <button type="button" onclick="saveCustomSallaToken()" style="padding:9px 18px; background:linear-gradient(135deg, #10b981, #059669); color:white; border:none; border-radius:10px; font-weight:800; font-size:0.82rem; cursor:pointer;">
+                            💾 ${isAr ? 'حفظ وتفعيل' : 'Save & Activate'}
+                        </button>
+                    </div>
+
+                    <div style="text-align:center;">
+                        <a href="https://apps.salla.sa/app/1562514590" target="_blank" style="display:inline-flex; align-items:center; gap:6px; color:#38bdf8; font-size:0.8rem; font-weight:800; text-decoration:none;">
+                            <span>🚀</span> <span>${isAr ? 'أو اضغط هنا لتثبيت التطبيق مباشرة على متجرك في متجر تطبيقات سلة' : 'Or click here to install App on Salla App Store'}</span> <span>↗</span>
+                        </a>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Footer -->
+            <div style="padding:14px 24px; border-top:1px solid #334155; background:rgba(15,23,42,0.6); display:flex; justify-content:space-between; align-items:center;">
+                <button type="button" onclick="syncSallaOrdersDirectly(); closeSallaSettingsPanel();" style="padding:8px 18px; background:#0284c7; color:white; border:none; border-radius:10px; font-weight:800; font-size:0.82rem; cursor:pointer;">
+                    🔄 ${isAr ? 'مزامنة الطلبات الآن' : 'Sync Orders Now'}
+                </button>
+                <button type="button" onclick="closeSallaSettingsPanel()" style="padding:8px 18px; background:#334155; color:#f8fafc; border:none; border-radius:10px; font-weight:800; font-size:0.82rem; cursor:pointer;">
+                    ${isAr ? 'إغلاق' : 'Close'}
+                </button>
+            </div>
+
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+}
+window.toggleSallaSettingsPanel = toggleSallaSettingsPanel;
+
+function closeSallaSettingsPanel() {
+    const modal = document.getElementById('modal-salla-settings-panel');
+    if (modal) modal.remove();
+}
+window.closeSallaSettingsPanel = closeSallaSettingsPanel;
+
+async function saveCustomSallaToken() {
+    const input = document.getElementById('custom-salla-token-input');
+    const token = input ? input.value.trim() : '';
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
+    if (!token) {
+        alert(isAr ? 'يرجى إدخال رمز Access Token الخاص بسلة!' : 'Please enter Salla Access Token!');
+        return;
+    }
+
+    try {
+        const res = await fetch('https://burgeroov-notify.onrender.com/salla/save-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ access_token: token, token_type: 'bearer' })
+        });
+        const data = await res.json();
+        if (data && data.status === 'success') {
+            if (typeof showInAppNotification === 'function') {
+                showInAppNotification(isAr ? '✅ تم حفظ مفتاح الربط وتفعيله بنجاح!' : 'Salla Token saved & activated!');
+            }
+            closeSallaSettingsPanel();
+            syncSallaOrdersDirectly();
+        } else {
+            alert(isAr ? 'حدث خطأ أثناء الحفظ: ' + JSON.stringify(data) : 'Error saving token');
+        }
+    } catch(err) {
+        alert('Error: ' + err.message);
+    }
+}
+window.saveCustomSallaToken = saveCustomSallaToken;
+
 // ─── TOTAL BATCH PREPARATION & PURCHASING HUB ─────────────────────────────
 let sallaBatchFilterMode = 'ALL';
 
@@ -1004,8 +1337,7 @@ function openSallaBatchPrepModal() {
     const batchCustomerChecks = compData.sallaBatchCustomerChecks || (typeof appData !== 'undefined' && appData[comp] && appData[comp].sallaBatchCustomerChecks) || {};
     const excludedProducts = compData.sallaExcludedProducts || (typeof appData !== 'undefined' && appData[comp] && appData[comp].sallaExcludedProducts) || {};
 
-    const ordersMap = getSallaOrdersMap();
-    const activeOrders = Object.values(ordersMap || {}).filter(o => {
+    const activeOrders = getCleanSallaOrdersList().filter(o => {
         if (!o) return false;
         // Filter out demo/dummy orders and completed/canceled orders
         if (o.id === '280660780' || o.order_id === '280660780' || (o.customer && (o.customer.first_name === 'abc' || o.customer.name === 'abc def')) || o.customerName === 'abc def') return false;
@@ -1018,15 +1350,7 @@ function openSallaBatchPrepModal() {
     const batchMap = {};
     activeOrders.forEach(o => {
         const orderId = String(o.id || o.order_id || '');
-        const SALLA_KNOWN_ORDERS_MAP = {
-            '410389010': { refId: '280899452', name: 'غالب القدسي' },
-            '1802807301': { refId: '280871361', name: 'فاضل حسن' },
-            '333294779': { refId: '280833823', name: 'عبدالكريم العنزي' },
-            '508423680': { refId: '280813672', name: 'Maha Alkhaldi' },
-            '1467471414': { refId: '280811215', name: 'رفعان القحطاني' },
-            '632944151': { refId: '280786208', name: 'عميل زائر' },
-            '1943180797': { refId: '280763957', name: 'محمود إسماعيل' }
-        };
+        const cleanOrdKey = orderId.replace(/[.#$[\]/]/g, '_');
         const knownFix = SALLA_KNOWN_ORDERS_MAP[orderId] || SALLA_KNOWN_ORDERS_MAP[o.id] || SALLA_KNOWN_ORDERS_MAP[o.orderNumber];
         const orderRef = o.order_reference_id || (knownFix ? knownFix.refId : null) || o.reference_id || o.order_id || (o.invoice_number ? (isAr ? 'فاتورة #' + o.invoice_number : 'INV-#' + o.invoice_number) : orderId);
         const custName = (knownFix && knownFix.name) ? knownFix.name : (o.customerName || (isAr ? 'عميل' : 'Customer'));
@@ -1034,13 +1358,15 @@ function openSallaBatchPrepModal() {
         (o.items || []).forEach(item => {
             const name = String(item.name || item.title || '').trim();
             if (!name || name === 'طلب متجر سلة' || name.includes('ملاحظات العميل') || name.includes('رسوم الشحن')) return;
-            if (excludedProducts[name] === true) return; // Excluded test item
+            const cleanProdKey = name.replace(/[.#$[\]/]/g, '_');
+            if (excludedProducts[name] === true || excludedProducts[cleanProdKey] === true) return; // Excluded test item
 
             const qty = parseInt(item.quantity || item.qty || 1);
 
             if (!batchMap[name]) {
                 batchMap[name] = {
                     name: name,
+                    cleanKey: cleanProdKey,
                     totalQty: 0,
                     orders: [],
                     options: item.options || ''
@@ -1048,9 +1374,12 @@ function openSallaBatchPrepModal() {
             }
             batchMap[name].totalQty += qty;
             
-            const isCustChecked = (batchCustomerChecks[name] && batchCustomerChecks[name][orderId] === true);
+            const prodCustChecks = batchCustomerChecks[name] || batchCustomerChecks[cleanProdKey] || {};
+            const isCustChecked = (prodCustChecks[orderId] === true || prodCustChecks[cleanOrdKey] === true);
+
             batchMap[name].orders.push({
                 orderId: orderId,
+                cleanOrdKey: cleanOrdKey,
                 orderNum: orderRef,
                 qty: qty,
                 customer: custName,
@@ -1073,10 +1402,20 @@ function openSallaBatchPrepModal() {
             if (ord.isChecked) checkedQty += ord.qty;
         });
         
-        const isFullyPurchased = (checkedQty >= item.totalQty && item.totalQty > 0) || batchPurchases[item.name] === true;
-        item.checkedQty = isFullyPurchased ? item.totalQty : checkedQty;
-        item.remainingQty = isFullyPurchased ? 0 : Math.max(0, item.totalQty - checkedQty);
-        item.isPurchased = isFullyPurchased;
+        const isMarkedInPurchases = (batchPurchases[item.name] === true || batchPurchases[item.cleanKey] === true);
+        const isFullyPurchased = isMarkedInPurchases || (checkedQty >= item.totalQty && item.totalQty > 0);
+        
+        // If marked as fully purchased, ensure all customer chips reflect checked state
+        if (isFullyPurchased) {
+            item.orders.forEach(ord => { ord.isChecked = true; });
+            item.checkedQty = item.totalQty;
+            item.remainingQty = 0;
+            item.isPurchased = true;
+        } else {
+            item.checkedQty = checkedQty;
+            item.remainingQty = Math.max(0, item.totalQty - checkedQty);
+            item.isPurchased = false;
+        }
 
         totalPurchasedUnitsCount += item.checkedQty;
     });
@@ -1088,6 +1427,12 @@ function openSallaBatchPrepModal() {
     } else if (sallaBatchFilterMode === 'PURCHASED') {
         filteredItems = batchItems.filter(i => i.isPurchased);
     }
+
+    window.sallaBatchFilteredItems = filteredItems;
+
+    // 1. Capture current scroll position before re-render
+    const prevList = document.getElementById('salla-batch-prep-list');
+    const savedScrollTop = prevList ? prevList.scrollTop : (window.sallaBatchPrepScrollTop || 0);
 
     // Remove existing modal if any
     const existing = document.getElementById('modal-salla-batch-prep');
@@ -1172,13 +1517,13 @@ function openSallaBatchPrepModal() {
 
             <!-- Scrollable Items List with Interactive Customer Chips -->
             <div id="salla-batch-prep-list" style="flex:1; overflow-y:auto; padding:18px 24px; display:flex; flex-direction:column; gap:12px;">
-                ${filteredItems.length > 0 ? filteredItems.map(item => {
-                    const isAllDone = item.isPurchased;
+                ${filteredItems.length > 0 ? filteredItems.map((item, itemIdx) => {
+                    const isAllDone = item.isPurchased === true;
                     
-                    const customerChipsHtml = item.orders.map(o => {
+                    const customerChipsHtml = item.orders.map((o, ordIdx) => {
                         const isDone = o.isChecked === true;
                         return `
-                            <button type="button" onclick="toggleBatchCustomerCheck('${item.name.replace(/'/g, "\\'")}', '${o.orderId}', ${o.qty})" 
+                            <button type="button" onclick="toggleBatchCustomerByIndex(${itemIdx}, ${ordIdx})" 
                                 style="background:${isDone ? 'rgba(16,185,129,0.25)' : '#0f172a'}; border:1.5px solid ${isDone ? '#10b981' : '#334155'}; color:${isDone ? '#10b981' : '#cbd5e1'}; padding:5px 12px; border-radius:8px; font-size:0.8rem; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:6px; margin:3px; transition:all 0.2s ease; box-shadow:${isDone ? '0 0 10px rgba(16,185,129,0.3)' : 'none'}; text-decoration:${isDone ? 'line-through' : 'none'};">
                                 <span>${isDone ? '✅' : '🛒'}</span>
                                 <span>#${o.orderNum} (${o.qty}x ${o.customer})</span>
@@ -1187,14 +1532,14 @@ function openSallaBatchPrepModal() {
                     }).join(' ');
 
                     return `
-                        <div style="background:${isAllDone ? 'rgba(16,185,129,0.08)' : '#0f172a'}; border:1.5px solid ${isAllDone ? 'rgba(16,185,129,0.4)' : '#334155'}; border-radius:14px; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; gap:16px; transition:all 0.2s ease;">
+                        <div style="background:${isAllDone ? 'rgba(16,185,129,0.12)' : '#0f172a'}; border:2px solid ${isAllDone ? '#10b981' : '#334155'}; border-radius:14px; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; gap:16px; transition:all 0.2s ease; box-shadow:${isAllDone ? '0 0 16px rgba(16,185,129,0.25)' : 'none'};">
                             
                             <div style="display:flex; align-items:flex-start; gap:14px; flex:1;">
-                                <input type="checkbox" ${isAllDone ? 'checked' : ''} onchange="toggleBatchItemPurchased('${item.name.replace(/'/g, "\\'")}')" style="width:22px; height:22px; cursor:pointer; accent-color:#10b981; flex-shrink:0; margin-top:3px;">
+                                <input type="checkbox" ${isAllDone ? 'checked' : ''} onclick="event.stopPropagation(); toggleBatchItemByIndex(${itemIdx})" style="width:24px; height:24px; cursor:pointer; accent-color:#10b981; flex-shrink:0; margin-top:3px;">
                                 
                                 <div style="flex:1;">
                                     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                                        <span style="font-size:1.15rem; font-weight:900; color:${isAllDone ? '#10b981' : '#f8fafc'}; text-decoration:${isAllDone ? 'line-through' : 'none'};">
+                                        <span onclick="toggleBatchItemByIndex(${itemIdx})" style="font-size:1.15rem; font-weight:900; color:${isAllDone ? '#10b981' : '#f8fafc'}; text-decoration:${isAllDone ? 'line-through' : 'none'}; cursor:pointer;">
                                             ${item.name}
                                         </span>
                                         ${item.options ? `<span style="font-size:0.75rem; color:#94a3b8;">(${item.options})</span>` : ''}
@@ -1213,8 +1558,8 @@ function openSallaBatchPrepModal() {
                             </div>
 
                             <!-- Live Quantity Badge & Status -->
-                            <div style="text-align:center; flex-shrink:0; min-width:85px;">
-                                <div style="background:${isAllDone ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.18)'}; color:${isAllDone ? '#10b981' : '#f59e0b'}; border:1.5px solid ${isAllDone ? 'rgba(16,185,129,0.4)' : 'rgba(245,158,11,0.35)'}; padding:6px 14px; border-radius:12px; font-weight:900; font-size:1.25rem;">
+                            <div onclick="toggleBatchItemByIndex(${itemIdx})" style="text-align:center; flex-shrink:0; min-width:85px; cursor:pointer;">
+                                <div style="background:${isAllDone ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.18)'}; color:${isAllDone ? '#10b981' : '#f59e0b'}; border:1.5px solid ${isAllDone ? '#10b981' : 'rgba(245,158,11,0.35)'}; padding:6px 14px; border-radius:12px; font-weight:900; font-size:1.25rem;">
                                     ${item.remainingQty}x
                                 </div>
                                 <div style="font-size:0.72rem; font-weight:800; color:${isAllDone ? '#10b981' : '#f59e0b'}; margin-top:4px;">
@@ -1246,6 +1591,12 @@ function openSallaBatchPrepModal() {
     `;
 
     document.body.appendChild(modal);
+
+    // 2. Restore exact scroll position immediately
+    const newList = document.getElementById('salla-batch-prep-list');
+    if (newList && savedScrollTop > 0) {
+        newList.scrollTop = savedScrollTop;
+    }
 }
 window.openSallaBatchPrepModal = openSallaBatchPrepModal;
 
@@ -1262,84 +1613,181 @@ function setSallaBatchFilter(mode) {
 window.setSallaBatchFilter = setSallaBatchFilter;
 
 /**
- * Toggle single customer check within a product batch
+ * Helper to sync batch check state into an order's checklist array across all companies
  */
-function toggleBatchCustomerCheck(productName, orderId, qty) {
-    if (!productName || !orderId) return;
-    const comp = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
+function syncBatchCheckToOrderChecklist(orderId, productName, isChecked) {
+    if (!orderId || !productName) return;
+    const ordersMap = getSallaOrdersMap();
+    const orderObj = sallaOrdersCache[orderId] || ordersMap[orderId] || {};
+    if (!orderObj) return;
 
-    if (typeof appData !== 'undefined' && appData[comp]) {
-        if (!appData[comp].sallaBatchCustomerChecks) appData[comp].sallaBatchCustomerChecks = {};
-        if (!appData[comp].sallaBatchCustomerChecks[productName]) appData[comp].sallaBatchCustomerChecks[productName] = {};
+    if (!orderObj.checklist) orderObj.checklist = {};
+    if (!sallaOrdersCache[orderId]) sallaOrdersCache[orderId] = orderObj;
+    if (!sallaOrdersCache[orderId].checklist) sallaOrdersCache[orderId].checklist = {};
 
-        const currentVal = appData[comp].sallaBatchCustomerChecks[productName][orderId] === true;
-        const newVal = !currentVal;
-        appData[comp].sallaBatchCustomerChecks[productName][orderId] = newVal;
+    const rawItems = orderObj.items || [];
+    const filteredItems = [];
+    rawItems.forEach(item => {
+        if (!item) return;
+        const iname = String(item.name || item.product_name || item.title || '').trim();
+        const itype = String(item.type || '').toLowerCase();
+        if (iname === 'طلب متجر سلة' || iname.includes('ملاحظات العميل') || iname.includes('ملاحظة') || iname.includes('ملاحظات') || itype === 'service' || iname.includes('رسوم الشحن') || iname.includes('شحن')) return;
+        filteredItems.push(item);
+    });
 
-        if (typeof db !== 'undefined' && db) {
-            const cleanProdKey = productName.replace(/[.#$[\]/]/g, '_');
-            const cleanOrdKey = String(orderId).replace(/[.#$[\]/]/g, '_');
-            db.ref(`companies/${comp}/sallaBatchCustomerChecks/${cleanProdKey}/${cleanOrdKey}`).set(newVal).catch(() => {});
-        }
+    const targetIdx = filteredItems.findIndex(it => String(it.name || it.product_name || it.title || '').trim() === productName);
+    if (targetIdx !== -1) {
+        orderObj.checklist[targetIdx] = isChecked;
+        sallaOrdersCache[orderId].checklist[targetIdx] = isChecked;
+        const allComps = getSallaAllCompanyKeys();
+        allComps.forEach(c => {
+            if (typeof appData !== 'undefined' && appData[c]?.sallaOrders?.[orderId]) {
+                if (!appData[c].sallaOrders[orderId].checklist) appData[c].sallaOrders[orderId].checklist = {};
+                appData[c].sallaOrders[orderId].checklist[targetIdx] = isChecked;
+            }
+            if (typeof db !== 'undefined' && db) {
+                db.ref(`companies/${c}/sallaOrders/${orderId}/checklist/${targetIdx}`).set(isChecked).catch(() => {});
+            }
+        });
     }
-
-    openSallaBatchPrepModal();
 }
-window.toggleBatchCustomerCheck = toggleBatchCustomerCheck;
 
 /**
- * Toggle whole product purchased
+ * Toggle single customer check within a product batch by index
  */
-function toggleBatchItemPurchased(productName) {
-    if (!productName) return;
-    const comp = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
+function toggleBatchCustomerByIndex(itemIdx, orderIdx) {
+    const listEl = document.getElementById('salla-batch-prep-list');
+    if (listEl) window.sallaBatchPrepScrollTop = listEl.scrollTop;
 
-    if (typeof appData !== 'undefined' && appData[comp]) {
-        if (!appData[comp].sallaBatchPurchases) appData[comp].sallaBatchPurchases = {};
-        if (!appData[comp].sallaBatchCustomerChecks) appData[comp].sallaBatchCustomerChecks = {};
-        if (!appData[comp].sallaBatchCustomerChecks[productName]) appData[comp].sallaBatchCustomerChecks[productName] = {};
+    const item = window.sallaBatchFilteredItems && window.sallaBatchFilteredItems[itemIdx];
+    if (!item) return;
+    const ord = item.orders && item.orders[orderIdx];
+    if (!ord) return;
 
-        const cur = appData[comp].sallaBatchPurchases[productName] === true;
-        const nextState = !cur;
-        appData[comp].sallaBatchPurchases[productName] = nextState;
+    const productName = item.name;
+    const cleanProdKey = item.cleanKey || productName.replace(/[.#$[\]/]/g, '_');
+    const orderId = String(ord.orderId);
+    const cleanOrdKey = ord.cleanOrdKey || orderId.replace(/[.#$[\]/]/g, '_');
 
-        // Also update all customer chips for this product
-        const ordersMap = getSallaOrdersMap();
-        Object.values(ordersMap || {}).forEach(o => {
-            const ordId = String(o.id || o.order_id || '');
-            (o.items || []).forEach(item => {
-                if (String(item.name || item.title || '').trim() === productName) {
-                    appData[comp].sallaBatchCustomerChecks[productName][ordId] = nextState;
-                }
-            });
-        });
-
-        if (typeof db !== 'undefined' && db) {
-            const cleanProdKey = productName.replace(/[.#$[\]/]/g, '_');
-            db.ref(`companies/${comp}/sallaBatchPurchases/${cleanProdKey}`).set(nextState).catch(() => {});
-            db.ref(`companies/${comp}/sallaBatchCustomerChecks/${cleanProdKey}`).set(appData[comp].sallaBatchCustomerChecks[productName]).catch(() => {});
+    const allComps = getSallaAllCompanyKeys();
+    let curVal = false;
+    allComps.forEach(c => {
+        const compData = (typeof appData !== 'undefined' && appData[c]) || {};
+        if (compData.sallaBatchCustomerChecks?.[productName]?.[orderId] === true || compData.sallaBatchCustomerChecks?.[cleanProdKey]?.[cleanOrdKey] === true) {
+            curVal = true;
         }
+    });
+    const newVal = !curVal;
+
+    allComps.forEach(c => {
+        const compData = (typeof appData !== 'undefined' && appData[c]) || {};
+        if (!compData.sallaBatchPurchases) compData.sallaBatchPurchases = {};
+        if (!compData.sallaBatchCustomerChecks) compData.sallaBatchCustomerChecks = {};
+        if (!compData.sallaBatchCustomerChecks[productName]) compData.sallaBatchCustomerChecks[productName] = {};
+        if (!compData.sallaBatchCustomerChecks[cleanProdKey]) compData.sallaBatchCustomerChecks[cleanProdKey] = {};
+
+        compData.sallaBatchCustomerChecks[productName][orderId] = newVal;
+        compData.sallaBatchCustomerChecks[cleanProdKey][cleanOrdKey] = newVal;
+    });
+
+    // Check if all customer units for this product are now fulfilled
+    let totalCheckedQty = 0;
+    item.orders.forEach(o => {
+        const oId = String(o.orderId);
+        const cKey = o.cleanOrdKey || oId.replace(/[.#$[\]/]/g, '_');
+        const isChecked = (oId === orderId) ? newVal : (item.orders.find(x => String(x.orderId) === oId)?.isChecked === true);
+        if (isChecked) totalCheckedQty += o.qty;
+    });
+
+    const isFullyDone = (totalCheckedQty >= item.totalQty && item.totalQty > 0);
+    allComps.forEach(c => {
+        const compData = (typeof appData !== 'undefined' && appData[c]) || {};
+        if (compData.sallaBatchPurchases) {
+            compData.sallaBatchPurchases[productName] = isFullyDone;
+            compData.sallaBatchPurchases[cleanProdKey] = isFullyDone;
+        }
+    });
+
+    // 2-Way Sync: Update the order's individual checklist card in background
+    syncBatchCheckToOrderChecklist(orderId, productName, newVal);
+
+    if (typeof db !== 'undefined' && db) {
+        allComps.forEach(c => {
+            db.ref(`companies/${c}/sallaBatchCustomerChecks/${cleanProdKey}/${cleanOrdKey}`).set(newVal).catch(() => {});
+            db.ref(`companies/${c}/sallaBatchPurchases/${cleanProdKey}`).set(isFullyDone).catch(() => {});
+        });
     }
 
+    renderSallaOrdersGrid();
     openSallaBatchPrepModal();
 }
-window.toggleBatchItemPurchased = toggleBatchItemPurchased;
+window.toggleBatchCustomerByIndex = toggleBatchCustomerByIndex;
+
+/**
+ * Toggle whole product purchased by index
+ */
+function toggleBatchItemByIndex(itemIdx) {
+    const listEl = document.getElementById('salla-batch-prep-list');
+    if (listEl) window.sallaBatchPrepScrollTop = listEl.scrollTop;
+
+    const item = window.sallaBatchFilteredItems && window.sallaBatchFilteredItems[itemIdx];
+    if (!item) return;
+    const productName = item.name;
+    const cleanProdKey = item.cleanKey || productName.replace(/[.#$[\]/]/g, '_');
+
+    const allComps = getSallaAllCompanyKeys();
+    const nextState = !item.isPurchased;
+
+    allComps.forEach(c => {
+        const compData = (typeof appData !== 'undefined' && appData[c]) || {};
+        if (!compData.sallaBatchPurchases) compData.sallaBatchPurchases = {};
+        if (!compData.sallaBatchCustomerChecks) compData.sallaBatchCustomerChecks = {};
+        if (!compData.sallaBatchCustomerChecks[productName]) compData.sallaBatchCustomerChecks[productName] = {};
+        if (!compData.sallaBatchCustomerChecks[cleanProdKey]) compData.sallaBatchCustomerChecks[cleanProdKey] = {};
+
+        compData.sallaBatchPurchases[productName] = nextState;
+        compData.sallaBatchPurchases[cleanProdKey] = nextState;
+
+        item.orders.forEach(o => {
+            const ordId = String(o.orderId);
+            const cleanOrdId = o.cleanOrdKey || ordId.replace(/[.#$[\]/]/g, '_');
+            compData.sallaBatchCustomerChecks[productName][ordId] = nextState;
+            compData.sallaBatchCustomerChecks[cleanProdKey][cleanOrdId] = nextState;
+        });
+    });
+
+    item.orders.forEach(o => {
+        syncBatchCheckToOrderChecklist(String(o.orderId), productName, nextState);
+    });
+
+    if (typeof db !== 'undefined' && db) {
+        allComps.forEach(c => {
+            db.ref(`companies/${c}/sallaBatchPurchases/${cleanProdKey}`).set(nextState).catch(() => {});
+            db.ref(`companies/${c}/sallaBatchCustomerChecks/${cleanProdKey}`).set(allComps[0] ? (appData[allComps[0]]?.sallaBatchCustomerChecks?.[cleanProdKey] || {}) : {}).catch(() => {});
+        });
+    }
+
+    renderSallaOrdersGrid();
+    openSallaBatchPrepModal();
+}
+window.toggleBatchItemByIndex = toggleBatchItemByIndex;
 
 function resetAllSallaBatchChecks() {
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
-    const comp = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
     
     if (!confirm(isAr ? 'هل تريد إعادة ضبط وإلغاء تحديد كل مشتريات الأصناف والعملاء؟' : 'Reset all batch customer and product purchase checks?')) return;
 
-    if (typeof appData !== 'undefined' && appData[comp]) {
-        appData[comp].sallaBatchPurchases = {};
-        appData[comp].sallaBatchCustomerChecks = {};
-    }
-
-    if (typeof db !== 'undefined' && db) {
-        db.ref(`companies/${comp}/sallaBatchPurchases`).remove().catch(() => {});
-        db.ref(`companies/${comp}/sallaBatchCustomerChecks`).remove().catch(() => {});
-    }
+    const allComps = getSallaAllCompanyKeys();
+    allComps.forEach(c => {
+        if (typeof appData !== 'undefined' && appData[c]) {
+            appData[c].sallaBatchPurchases = {};
+            appData[c].sallaBatchCustomerChecks = {};
+        }
+        if (typeof db !== 'undefined' && db) {
+            db.ref(`companies/${c}/sallaBatchPurchases`).remove().catch(() => {});
+            db.ref(`companies/${c}/sallaBatchCustomerChecks`).remove().catch(() => {});
+        }
+    });
 
     openSallaBatchPrepModal();
 }
@@ -1347,8 +1795,7 @@ window.resetAllSallaBatchChecks = resetAllSallaBatchChecks;
 
 function printSallaBatchPurchases() {
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
-    const ordersMap = getSallaOrdersMap();
-    const activeOrders = Object.values(ordersMap || {}).filter(o => {
+    const activeOrders = getCleanSallaOrdersList().filter(o => {
         if (!o) return false;
         const st = String(o.status || 'in_progress').toLowerCase();
         return st !== 'delivered' && st !== 'completed' && st !== 'done' && st !== 'canceled' && st !== 'cancelled';
