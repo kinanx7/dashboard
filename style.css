@@ -3828,4 +3828,51 @@ body:not(.role-admin) .task-grid {
     }
 }
 
+/* UNIVERSAL GLOWING PURPLE SEARCH BAR STYLING ACROSS ALL SECTIONS */
+input[type="text"][placeholder*="Search" i],
+input[type="text"][placeholder*="بحث" i],
+input[type="text"][id*="search" i],
+input[type="search"],
+.search-input,
+.search-bar,
+#salla-order-search,
+#notes-search,
+#note-search-input,
+#market-search-input,
+#warehouse-search,
+#tasks-search,
+#driver-search,
+#ops-search-input,
+#contracts-search-input,
+#tracking-search-input {
+    border: 2px solid #8b5cf6 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.25) !important;
+    transition: all 0.25s ease !important;
+}
+
+input[type="text"][placeholder*="Search" i]:focus,
+input[type="text"][placeholder*="بحث" i]:focus,
+input[type="text"][id*="search" i]:focus,
+input[type="search"]:focus,
+.search-input:focus,
+.search-bar:focus {
+    border-color: #a855f7 !important;
+    box-shadow: 0 0 16px rgba(168, 85, 247, 0.5) !important;
+    outline: none !important;
+}
+
+/* UNIVERSAL YELLOW SEARCH HIGHLIGHT */
+mark.search-highlight,
+.search-highlight {
+    background: #fde047 !important;
+    color: #713f12 !important;
+    padding: 1px 4px !important;
+    border-radius: 4px !important;
+    font-weight: 800 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15) !important;
+    display: inline-block !important;
+}
+
+
 

@@ -13,6 +13,23 @@ function escapeHtml(str) {
 }
 window.escapeHtml = escapeHtml;
 
+/**
+ * Universal Yellow Search Highlight Helper
+ */
+function highlightSearchMatch(text, query) {
+    if (!text || !query) return text || '';
+    const trimmed = String(query).trim();
+    if (!trimmed) return text;
+    try {
+        const escapedQuery = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`(${escapedQuery})`, 'gi');
+        return String(text).replace(regex, '<mark class="search-highlight" style="background:#fde047; color:#713f12; padding:1px 4px; border-radius:4px; font-weight:800; box-shadow:0 1px 3px rgba(0,0,0,0.15);">$1</mark>');
+    } catch(e) {
+        return text;
+    }
+}
+window.highlightSearchMatch = highlightSearchMatch;
+
 function openImageModal(src) {
     if (!src) return;
     const modal = document.getElementById('image-modal');
