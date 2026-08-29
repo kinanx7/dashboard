@@ -1146,25 +1146,26 @@ function formatSallaOrderHelper(item, extraBody) {
     const baseOrder = item.order || item.data || item;
     
     // 1. Order ID & Reference Resolution (Prioritize merchant-facing order number)
-    const rawOrderId = baseOrder.order_reference_id || baseOrder.reference_id || (baseOrder.order && baseOrder.order.reference_id) || baseOrder.order_id || baseOrder.invoice_number || baseOrder.id || body.orderId || body.order_id;
+    const rawOrderId = baseOrder.order_id || baseOrder.order_reference_id || baseOrder.reference_id || (baseOrder.order && (baseOrder.order.reference_id || baseOrder.order.id)) || baseOrder.invoice_number || baseOrder.id || body.orderId || body.order_id;
     if (!rawOrderId) return null;
     const orderId = String(rawOrderId);
-    const orderNumber = String(baseOrder.order_reference_id || baseOrder.reference_id || (baseOrder.order && baseOrder.order.reference_id) || baseOrder.order_id || baseOrder.invoice_number || orderId);
+    const orderNumber = String(baseOrder.order_reference_id || baseOrder.reference_id || (baseOrder.order && (baseOrder.order.reference_id || baseOrder.order.id)) || baseOrder.order_id || baseOrder.invoice_number || orderId);
     const invoiceNum = baseOrder.invoice_number ? String(baseOrder.invoice_number) : '';
 
-    // 2. Customer
+    // 2. Customer details (Support standard customer, shipping receiver, and ship_to)
     const cust = baseOrder.customer || item.customer || {};
     const ship = baseOrder.shipping || item.shipping || {};
     const receiver = ship.receiver || {};
+    const shipTo = baseOrder.ship_to || item.ship_to || {};
     const address = ship.address || baseOrder.address || item.address || cust.address || {};
 
-    let custName = `${cust.first_name || ''} ${cust.last_name || ''}`.trim() || receiver.name || cust.full_name || cust.name || body.customerName || '';
+    let custName = (shipTo.name || `${cust.first_name || ''} ${cust.last_name || ''}`.trim() || receiver.name || cust.full_name || cust.name || body.customerName || '').trim();
     if (!custName || custName === 'عميل متجر سلة') {
         custName = 'عميل متجر سلة';
     }
 
     // 3. Phone
-    let rawPhone = String(cust.mobile || cust.phone || receiver.phone || body.customerPhone || '');
+    let rawPhone = String(shipTo.phone || cust.mobile || cust.phone || receiver.phone || body.customerPhone || '');
     let cleanMobile = rawPhone.replace(/[^0-9]/g, '');
     if (cleanMobile) {
         if (cleanMobile.startsWith('05')) cleanMobile = '966' + cleanMobile.substring(1);
@@ -1173,30 +1174,36 @@ function formatSallaOrderHelper(item, extraBody) {
     }
 
     // 4. Address & Pinpoint Location
-    const city = address.city || cust.address?.city || 'الرياض';
-    const district = address.district || cust.address?.district || '';
-    const street = address.street_name || address.street || address.shipping_address || cust.address?.street_name || '';
+    const city = shipTo.city || (shipTo.region && shipTo.region.name) || address.city || cust.address?.city || 'الرياض';
+    const district = (shipTo.district && (shipTo.district.name || shipTo.district)) || address.district || cust.address?.district || '';
+    const street = shipTo.address_line_two || shipTo.address_line || address.street_name || address.street || address.shipping_address || cust.address?.street_name || '';
     const desc = address.description || address.details || cust.address?.description || '';
     const fullAddressParts = [city, district, street, desc].filter(Boolean);
     const addressLine = fullAddressParts.length > 0 ? fullAddressParts.join(' - ') : (body.addressLine || 'العنوان المسجل في سلة');
-    const coords = address.location || cust.address?.location || baseOrder.coords || null;
+    
+    let coords = null;
+    if (shipTo.latitude && shipTo.longitude) {
+        coords = { lat: parseFloat(shipTo.latitude), lng: parseFloat(shipTo.longitude) };
+    } else if (address.location || cust.address?.location || baseOrder.coords) {
+        coords = address.location || cust.address?.location || baseOrder.coords;
+    }
 
-    // 5. Total Amount (Handling nested object vs number vs subtotal)
+    // 5. Total Amount (Handling nested objects, amounts.total, packages sum)
     let rawTotal = 0;
-    if (baseOrder.total !== undefined && baseOrder.total !== null) {
+    if (baseOrder.amounts && baseOrder.amounts.total) {
+        rawTotal = (typeof baseOrder.amounts.total === 'object') ? (baseOrder.amounts.total.amount || baseOrder.amounts.total.sub_total || 0) : baseOrder.amounts.total;
+    } else if (baseOrder.total !== undefined && baseOrder.total !== null) {
         rawTotal = (typeof baseOrder.total === 'object') ? (baseOrder.total.amount || baseOrder.total.sub_total || 0) : baseOrder.total;
     } else if (item.total !== undefined && item.total !== null) {
         rawTotal = (typeof item.total === 'object') ? (item.total.amount || item.total.sub_total || 0) : item.total;
     } else if (baseOrder.sub_total !== undefined && baseOrder.sub_total !== null) {
         rawTotal = (typeof baseOrder.sub_total === 'object') ? baseOrder.sub_total.amount : baseOrder.sub_total;
-    } else if (baseOrder.amounts && baseOrder.amounts.total) {
-        rawTotal = (typeof baseOrder.amounts.total === 'object') ? baseOrder.amounts.total.amount : baseOrder.amounts.total;
     } else if (body.total || body.amount) {
         rawTotal = body.total || body.amount;
     }
     const parsedTotal = isNaN(parseFloat(rawTotal)) ? '0.00' : parseFloat(rawTotal).toFixed(2);
 
-    const paymentMethod = baseOrder.payment_method || item.payment_method || body.paymentMethod || 'Mada';
+    const paymentMethod = baseOrder.payment_method || item.payment_method || body.paymentMethod || (baseOrder.cash_on_delivery ? 'Cash On Delivery' : 'Mada');
     const rawStatus = (baseOrder.status && (baseOrder.status.slug || baseOrder.status.name)) || (item.status && (item.status.slug || item.status.name)) || 'in_progress';
     
     // Robust date parsing guaranteed to NEVER produce NaN
@@ -1216,14 +1223,14 @@ function formatSallaOrderHelper(item, extraBody) {
     }
     const createdAt = (parsedTime && !isNaN(parsedTime)) ? parsedTime : Date.now();
 
-    // 6. Notes & Clean Items (Excluding service fees & notes from checklist)
+    // 6. Notes & Clean Items (Supporting both standard items and packages)
     let extractedNotes = [];
     if (baseOrder.notes) extractedNotes.push(baseOrder.notes);
     if (baseOrder.customer_note) extractedNotes.push(baseOrder.customer_note);
     if (item.notes) extractedNotes.push(item.notes);
     if (body.notes) extractedNotes.push(body.notes);
 
-    const rawItems = baseOrder.items || item.items || (Array.isArray(body.items) ? body.items : []);
+    const rawItems = baseOrder.items || item.items || baseOrder.packages || item.packages || (Array.isArray(body.items) ? body.items : []) || (Array.isArray(body.packages) ? body.packages : []);
     const items = [];
 
     rawItems.forEach(i => {
@@ -1249,7 +1256,7 @@ function formatSallaOrderHelper(item, extraBody) {
             optionsStr = i.options;
         }
 
-        const itemPrice = (i.price && typeof i.price === 'object' ? i.price.amount : i.price) || 0;
+        const itemPrice = (i.price && typeof i.price === 'object' ? (i.price.amount || i.price.value) : i.price) || 0;
 
         items.push({
             name: iname || 'منتج',
@@ -1262,7 +1269,7 @@ function formatSallaOrderHelper(item, extraBody) {
     return {
         id: orderId,
         orderNumber: orderNumber,
-        order_reference_id: baseOrder.order_reference_id || baseOrder.reference_id || null,
+        order_reference_id: baseOrder.order_reference_id || baseOrder.reference_id || (baseOrder.order_id ? String(baseOrder.order_id) : null),
         invoice_number: invoiceNum,
         customerName: custName,
         customerPhone: cleanMobile,
@@ -1285,7 +1292,7 @@ app.get('/salla/reparse-orders', async (_req, res) => {
             return res.json({ status: 'ok', message: 'No stored webhook logs to reparse' });
         }
 
-        const companyKeys = ['burgeroov', 'mvc', 'mvcfresh'];
+        const companyKeys = ['burgeroov', 'mvc', 'mvcfresh', 'salla_shared'];
         let updatedCount = 0;
 
         for (const log of lastSallaWebhooks) {
