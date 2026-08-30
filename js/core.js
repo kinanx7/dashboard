@@ -2048,7 +2048,14 @@ function listenToCloudData() {
             { key: 'taskAlerts', render: () => { if (typeof renderTaskAlerts === 'function') renderTaskAlerts(); } },
             { key: 'trackedTasks', render: () => { if (typeof renderTrackedTasks === 'function') renderTrackedTasks(); } },
             { key: 'marketFeedback', render: () => { if (typeof renderMarketFeedback === 'function') renderMarketFeedback(); } },
-            { key: 'jobCatalog', render: () => { if (typeof renderJobCatalog === 'function') renderJobCatalog(); } }
+            { key: 'jobCatalog', render: () => { if (typeof renderJobCatalog === 'function') renderJobCatalog(); } },
+            { key: 'activeAnnouncement', render: () => { 
+                if (typeof renderActiveAnnouncementHUD === 'function') renderActiveAnnouncementHUD(); 
+                if (typeof checkAndShowWorkerAnnouncementPopup === 'function') checkAndShowWorkerAnnouncementPopup(); 
+            } },
+            { key: 'announcementTemplates', render: () => { 
+                if (typeof renderAnnouncementTemplates === 'function') renderAnnouncementTemplates(); 
+            } }
         ];
 
         subNodes.forEach(node => {
@@ -2335,7 +2342,57 @@ function compressImage(file, callback) {
     };
 }
 
-function showImage(src) { document.getElementById('image-modal-content').src = src; document.getElementById('image-modal').style.display = 'flex'; }
+let currentImageZoomScale = 1;
+
+function showImage(src) {
+    if (!src) return;
+    const modal = document.getElementById('image-modal');
+    const img = document.getElementById('image-modal-content');
+    if (modal && img) {
+        img.src = src;
+        currentImageZoomScale = 1;
+        img.style.transform = `scale(1)`;
+        modal.style.display = 'flex';
+    }
+}
+window.showImage = showImage;
+
+function closeImageModal() {
+    const modal = document.getElementById('image-modal');
+    if (modal) modal.style.display = 'none';
+    const img = document.getElementById('image-modal-content');
+    if (img) {
+        currentImageZoomScale = 1;
+        img.style.transform = `scale(1)`;
+    }
+}
+window.closeImageModal = closeImageModal;
+
+function zoomImage(delta) {
+    const img = document.getElementById('image-modal-content');
+    if (!img) return;
+    currentImageZoomScale += delta;
+    if (currentImageZoomScale < 0.5) currentImageZoomScale = 0.5;
+    if (currentImageZoomScale > 4.0) currentImageZoomScale = 4.0;
+    img.style.transform = `scale(${currentImageZoomScale})`;
+}
+window.zoomImage = zoomImage;
+
+function resetImageZoom() {
+    const img = document.getElementById('image-modal-content');
+    if (!img) return;
+    currentImageZoomScale = 1;
+    img.style.transform = `scale(1)`;
+}
+window.resetImageZoom = resetImageZoom;
+
+function showAnnouncementFullImage() {
+    const img = document.getElementById('worker-popup-img');
+    if (img && img.src) {
+        showImage(img.src);
+    }
+}
+window.showAnnouncementFullImage = showAnnouncementFullImage;
 
 function toggleDetails(id) {
     const el = document.getElementById(id);
@@ -2435,6 +2492,9 @@ function switchTab(tab) {
     }
     if (tab === 'salla') {
         if (typeof renderSallaSection === 'function') renderSallaSection();
+    }
+    if (tab === 'adverts') {
+        if (typeof renderAnnouncementsSection === 'function') renderAnnouncementsSection();
     }
     if (tab === 'ops' && typeof renderWorkerOperationsContractBanner === 'function') {
         renderWorkerOperationsContractBanner();
@@ -2829,7 +2889,7 @@ function renderAll() {
         if (typeof renderDriverPanel === 'function') renderDriverPanel();
         if (typeof renderDriverVolumeRewards === 'function') renderDriverVolumeRewards();
     }
-    else if (currentTab === 'adverts') { if (typeof renderAdverts === 'function') renderAdverts(); }
+    else if (currentTab === 'adverts') { if (typeof renderAnnouncementsSection === 'function') renderAnnouncementsSection(); else if (typeof renderAdverts === 'function') renderAdverts(); }
     else if (currentTab === 'notes') { if (typeof renderNotes === 'function') renderNotes(); }
     else if (currentTab === 'activity') { if (typeof renderActivityLog === 'function') renderActivityLog(); }
     else if (currentTab === 'managing') { if (typeof renderManaging === 'function') renderManaging(); }
@@ -2847,6 +2907,7 @@ function renderAll() {
     if (typeof renderPendingCustodyRequests === 'function') renderPendingCustodyRequests();
     if (typeof renderAcceptedCustodyReleases === 'function') renderAcceptedCustodyReleases();
     if (typeof applyUserTabOrder === 'function') applyUserTabOrder();
+    if (typeof checkAndShowWorkerAnnouncementPopup === 'function') checkAndShowWorkerAnnouncementPopup();
 }
 
 

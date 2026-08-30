@@ -2,7 +2,7 @@
 // SALLA STORE REAL-TIME ORDERS, CHECKLIST & DISPATCH MODULE
 // =========================================================
 
-let sallaActiveStatusFilter = 'ALL';
+let sallaActiveStatusFilter = 'active';
 let sallaOrdersListenerAttached = false;
 let currentSallaListenerCompany = null;
 let sallaOrdersCache = {};
@@ -290,13 +290,18 @@ function renderSallaOrdersGrid() {
     let orders = getCleanSallaOrdersList();
 
     // Apply Status Filter
-    if (sallaActiveStatusFilter !== 'ALL') {
+    if (sallaActiveStatusFilter === 'active') {
         orders = orders.filter(o => {
             const st = String(o.status || 'in_progress').toLowerCase();
-            if (sallaActiveStatusFilter === 'prep') return (st === 'in_progress' || st === 'pending' || st === 'under_preparing' || st === 'new' || st === 'created');
-            if (sallaActiveStatusFilter === 'out') return (st === 'delivering' || st === 'out_for_delivery' || st === 'dispatched');
+            return (st !== 'delivered' && st !== 'completed' && st !== 'done' && st !== 'canceled' && st !== 'cancelled' && st !== 'refunded' && st !== 'restored');
+        });
+    } else if (sallaActiveStatusFilter !== 'ALL') {
+        orders = orders.filter(o => {
+            const st = String(o.status || 'in_progress').toLowerCase();
+            if (sallaActiveStatusFilter === 'prep') return (st === 'in_progress' || st === 'pending' || st === 'under_preparing' || st === 'under_review' || st === 'new' || st === 'created');
+            if (sallaActiveStatusFilter === 'out') return (st === 'delivering' || st === 'out_for_delivery' || st === 'dispatched' || st === 'shipped');
             if (sallaActiveStatusFilter === 'delivered') return (st === 'delivered' || st === 'completed' || st === 'done');
-            if (sallaActiveStatusFilter === 'canceled') return (st === 'canceled' || st === 'cancelled');
+            if (sallaActiveStatusFilter === 'canceled') return (st === 'canceled' || st === 'cancelled' || st === 'refunded');
             return true;
         });
     }

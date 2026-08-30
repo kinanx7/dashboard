@@ -1372,13 +1372,19 @@ app.all('/salla/clear-orders', async (_req, res) => {
 
 app.get('/salla/sync-orders', async (_req, res) => {
     try {
-        const snap = await db.ref('companies/burgeroov/sallaAuth').once('value');
-        const auth = snap.val();
+        let auth = null;
+        for (const c of ['burgeroov', 'mvcfresh', 'mvc', 'salla_shared']) {
+            const snap = await db.ref(`companies/${c}/sallaAuth`).once('value');
+            if (snap.val() && snap.val().access_token) {
+                auth = snap.val();
+                break;
+            }
+        }
         
         let syncedCount = 0;
         const companyKeys = ['burgeroov', 'mvc', 'mvcfresh', 'salla_shared'];
 
-        // 1. If OAuth token exists, fetch up to 3 pages (150 orders) from Salla Orders API
+        // 1. If OAuth token exists, fetch up to 4 pages (200 orders) from Salla Orders API
         if (auth && auth.access_token) {
             const https = require('https');
             const fetchPage = (page) => new Promise((resolve) => {
@@ -1400,7 +1406,7 @@ app.get('/salla/sync-orders', async (_req, res) => {
                 req.end();
             });
 
-            for (let page = 1; page <= 3; page++) {
+            for (let page = 1; page <= 4; page++) {
                 const pageRes = await fetchPage(page);
                 if (pageRes && pageRes.data && Array.isArray(pageRes.data) && pageRes.data.length > 0) {
                     for (const item of pageRes.data) {

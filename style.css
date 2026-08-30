@@ -1826,6 +1826,173 @@ body:not(.role-admin) .task-grid {
 
 #view-adverts.active-view {
     grid-template-columns: 1fr;
+    max-width: 1400px;
+    width: calc(100% - 40px);
+    margin: 0 auto;
+}
+
+/* Salla Status Filter Pills */
+.btn-filter-salla {
+    padding: 8px 16px;
+    border-radius: 100px;
+    font-weight: 800;
+    font-size: 0.82rem;
+    background: var(--input-bg);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+}
+.btn-filter-salla:hover {
+    background: var(--card-bg);
+    border-color: var(--primary);
+}
+.btn-filter-salla.active {
+    background: linear-gradient(135deg, #10b981, #059669) !important;
+    color: #ffffff !important;
+    border-color: #10b981 !important;
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35) !important;
+    transform: translateY(-1px);
+}
+
+/* Announcement Cards & Badges */
+.announcement-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 18px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.announcement-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+.announcement-badge-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    padding: 4px 12px;
+    border-radius: 100px;
+    font-weight: 800;
+    font-size: 0.75rem;
+}
+
+/* Luxury Executive Enterprise Announcement System (Clean & Professional) */
+.exec-announcement-card {
+    position: relative;
+    background: linear-gradient(180deg, #111827 0%, #0b0f19 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 1px rgba(255, 255, 255, 0.2) !important;
+    border-radius: 18px !important;
+    overflow: hidden;
+}
+
+.exec-card-accent-line {
+    height: 3px;
+    background: linear-gradient(90deg, #10b981 0%, #3b82f6 100%);
+    width: 100%;
+}
+
+.exec-pulse-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #10b981;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    animation: execPulse 2s infinite;
+}
+
+@keyframes execPulse {
+    0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    }
+    70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+    }
+    100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    }
+}
+
+.exec-content-box {
+    background: rgba(255, 255, 255, 0.035) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 12px;
+}
+
+.exec-confirm-btn {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    box-shadow: 0 4px 18px rgba(16, 185, 129, 0.35) !important;
+    transition: all 0.2s ease !important;
+}
+
+.exec-confirm-btn:hover {
+    box-shadow: 0 6px 24px rgba(16, 185, 129, 0.5) !important;
+    transform: translateY(-1px);
+}
+
+/* Inline Interactive Zoom Engine */
+.inline-zoom-box {
+    position: relative;
+    overflow: hidden;
+    border-radius: 12px;
+    background: #000;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    touch-action: none;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+}
+
+.inline-zoom-box:active {
+    cursor: grabbing;
+}
+
+.inline-zoom-controls {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(8px);
+    padding: 4px 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    z-index: 5;
+}
+
+.inline-zoom-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    border-radius: 6px;
+    padding: 3px 7px;
+    font-size: 0.76rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.inline-zoom-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
 }
 
 /* =============================================
