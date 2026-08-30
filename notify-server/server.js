@@ -918,14 +918,31 @@ async function runServerTaskCycleCheck() {
 
     for (const cKey of companyKeys) {
         try {
-            const [cyclesSnap, workersSnap] = await Promise.all([
-                db.ref(`companies/${cKey}/taskCycles`).once('value'),
-                db.ref(`companies/${cKey}/workers`).once('value')
-            ]);
-
+            const cyclesSnap = await db.ref(`companies/${cKey}/taskCycles`).once('value');
             const cyclesObj = cyclesSnap.val();
             if (!cyclesObj) continue;
 
+            const dueTasks = [];
+            Object.keys(cyclesObj).forEach(workerId => {
+                const cycle = cyclesObj[workerId];
+                if (!cycle || !cycle.items) return;
+                const items = Array.isArray(cycle.items) ? cycle.items : Object.values(cycle.items);
+
+                items.forEach((item, itemIdx) => {
+                    if (!item || !item.time || !item.title) return;
+
+                    const daysArr = Array.isArray(item.days) ? item.days : ['every'];
+                    const isTodayScheduled = daysArr.includes('every') || daysArr.length === 0 || daysArr.includes(dayCode);
+
+                    if (isTodayScheduled && item.time === timeStr && item.lastDispatchedDate !== dateStr) {
+                        dueTasks.push({ workerId, itemIdx, item });
+                    }
+                });
+            });
+
+            if (dueTasks.length === 0) continue;
+
+            const workersSnap = await db.ref(`companies/${cKey}/workers`).once('value');
             const rawWorkers = workersSnap.val();
             let workers = [];
             if (Array.isArray(rawWorkers)) {
@@ -934,60 +951,46 @@ async function runServerTaskCycleCheck() {
                 workers = Object.values(rawWorkers);
             }
 
-            Object.keys(cyclesObj).forEach(workerId => {
-                const cycle = cyclesObj[workerId];
-                if (!cycle || !cycle.items) return;
-                const items = Array.isArray(cycle.items) ? cycle.items : Object.values(cycle.items);
+            for (const { workerId, itemIdx, item } of dueTasks) {
+                console.log(`⏰ [Server Task Cycle GMT+3] Dispatching scheduled task for worker ${workerId} on ${dayCode} at ${timeStr}: "${item.title}"`);
 
-                items.forEach(async (item, itemIdx) => {
-                    if (!item || !item.time || !item.title) return;
+                await db.ref(`companies/${cKey}/taskCycles/${workerId}/items/${itemIdx}/lastDispatchedDate`).set(dateStr);
 
-                    // Check day recurrence
-                    const daysArr = Array.isArray(item.days) ? item.days : ['every'];
-                    const isTodayScheduled = daysArr.includes('every') || daysArr.length === 0 || daysArr.includes(dayCode);
+                const wIndex = workers.findIndex(w => w && String(w.id) === String(workerId));
+                if (wIndex !== -1) {
+                    const worker = workers[wIndex];
+                    const existingJobs = Array.isArray(worker.jobs) ? worker.jobs : [];
+                    const newJob = {
+                        id: Date.now(),
+                        title: `🔁 [Daily Cycle ${timeStr}] ${item.title}`,
+                        status: 'pending',
+                        createdAt: Date.now(),
+                        assignedBy: 'Task Cycle System'
+                    };
+                    existingJobs.push(newJob);
+                    await db.ref(`companies/${cKey}/workers/${wIndex}/jobs`).set(existingJobs);
 
-                    if (isTodayScheduled && item.time === timeStr && item.lastDispatchedDate !== dateStr) {
-                        console.log(`⏰ [Server Task Cycle GMT+3] Dispatching scheduled task for worker ${workerId} on ${dayCode} at ${timeStr}: "${item.title}"`);
-
-                        await db.ref(`companies/${cKey}/taskCycles/${workerId}/items/${itemIdx}/lastDispatchedDate`).set(dateStr);
-
-                        const wIndex = workers.findIndex(w => w && String(w.id) === String(workerId));
-                        if (wIndex !== -1) {
-                            const worker = workers[wIndex];
-                            const existingJobs = Array.isArray(worker.jobs) ? worker.jobs : [];
-                            const newJob = {
-                                id: Date.now(),
-                                title: `🔁 [Daily Cycle ${timeStr}] ${item.title}`,
-                                status: 'pending',
-                                createdAt: Date.now(),
-                                assignedBy: 'Task Cycle System'
-                            };
-                            existingJobs.push(newJob);
-                            await db.ref(`companies/${cKey}/workers/${wIndex}/jobs`).set(existingJobs);
-
-                            if (worker.phone && worker.waAlertsEnabled !== false) {
-                                const companyLabel = cKey === 'mvcfresh' ? 'MVC Fresh' : (cKey === 'mvc' ? 'MVC' : 'Burgeroov');
-                                const tpls = companyTemplates[cKey] || {};
-                                const rawTpl = tpls.cycle || '🔁 *تنبيه مهمة دورية مجدولة [{company_name}]*\n\nالمهمة: {task_title}\nالموظف: {worker_name}\n\nيرجى فتح اللوحة والمتابعة!';
-                                const waMsg = formatCustomTemplate(rawTpl, {
-                                    workerName: worker.name || 'الموظف',
-                                    taskTitle: item.title,
-                                    orderId: timeStr,
-                                    companyName: companyLabel
-                                });
-                                sendWhatsAppDirect(worker.phone, waMsg);
-                            }
-                        }
+                    if (worker.phone && worker.waAlertsEnabled !== false) {
+                        const companyLabel = cKey === 'mvcfresh' ? 'MVC Fresh' : (cKey === 'mvc' ? 'MVC' : 'Burgeroov');
+                        const tpls = companyTemplates[cKey] || {};
+                        const rawTpl = tpls.cycle || '🔁 *تنبيه مهمة دورية مجدولة [{company_name}]*\n\nالمهمة: {task_title}\nالموظف: {worker_name}\n\nيرجى فتح اللوحة والمتابعة!';
+                        const waMsg = formatCustomTemplate(rawTpl, {
+                            workerName: worker.name || 'الموظف',
+                            taskTitle: item.title,
+                            orderId: timeStr,
+                            companyName: companyLabel
+                        });
+                        sendWhatsAppDirect(worker.phone, waMsg);
                     }
-                });
-            });
+                }
+            }
         } catch (e) {
             console.error(`[Server Task Cycle Error] ${cKey}:`, e.message);
         }
     }
 }
 
-setInterval(runServerTaskCycleCheck, 30000);
+setInterval(runServerTaskCycleCheck, 60000);
 
 // ─── SALLA STORE REAL-TIME WEBHOOK & OAUTH CALLBACK ───────────────────────
 const SALLA_CLIENT_ID = process.env.SALLA_CLIENT_ID || '12683e56-fcb1-4c9d-bac4-e537d213d779';
@@ -1310,44 +1313,42 @@ function formatSallaOrderHelper(item, extraBody) {
 
 app.get('/salla/reparse-orders', async (_req, res) => {
     try {
-        if (!lastSallaWebhooks || lastSallaWebhooks.length === 0) {
+        const companyKeys = ['burgeroov', 'mvc', 'mvcfresh', 'salla_shared'];
+        let allLogs = [...(lastSallaWebhooks || [])];
+
+        // Pull persistent webhook history from Firebase RTDB
+        try {
+            const historySnap = await db.ref('sallaWebhookHistory').once('value');
+            const historyVal = historySnap.val() || {};
+            Object.values(historyVal).forEach(h => {
+                if (h && h.raw) {
+                    allLogs.push(h);
+                }
+            });
+        } catch(e) {}
+
+        if (!allLogs || allLogs.length === 0) {
             return res.json({ status: 'ok', message: 'No stored webhook logs to reparse' });
         }
 
-        const companyKeys = ['burgeroov', 'mvc', 'mvcfresh', 'salla_shared'];
         let updatedCount = 0;
+        const seenIds = new Set();
 
-        for (const log of lastSallaWebhooks) {
+        for (const log of allLogs) {
             const rawData = (log.raw && log.raw.data) || log.raw;
             if (!rawData) continue;
-            
-            // Skip empty abandoned carts
-            if (log.event === 'abandoned.cart.purchased' && !rawData.customer && (!rawData.items || rawData.items.length === 0)) {
-                // If it was stored previously, remove it from Firebase
-                const ghostId = String(rawData.id || log.orderId);
-                if (ghostId) {
-                    for (const c of companyKeys) {
-                        await db.ref(`companies/${c}/sallaOrders/${ghostId}`).remove().catch(() => {});
-                    }
-                }
-                continue;
-            }
 
             const formatted = formatSallaOrderHelper(rawData, log.raw);
-            if (!formatted || !formatted.id) continue;
+            if (!formatted || !formatted.id || seenIds.has(formatted.id)) continue;
+            seenIds.add(formatted.id);
 
             for (const c of companyKeys) {
-                // If old record was stored under invoice ID, remove old key if different from reference ID
-                const oldInvoiceId = String(rawData.id);
-                if (oldInvoiceId && oldInvoiceId !== formatted.id) {
-                    await db.ref(`companies/${c}/sallaOrders/${oldInvoiceId}`).remove().catch(() => {});
-                }
                 await db.ref(`companies/${c}/sallaOrders/${formatted.id}`).set(formatted);
             }
             updatedCount++;
         }
 
-        return res.json({ status: 'success', message: `Reparsed and healed ${updatedCount} orders! ✅` });
+        return res.json({ status: 'success', message: `Reparsed and restored ${updatedCount} orders! ✅` });
     } catch (e) {
         console.error('❌ [Reparse Error]:', e.message);
         res.status(500).json({ error: e.message });
@@ -1373,62 +1374,78 @@ app.get('/salla/sync-orders', async (_req, res) => {
     try {
         const snap = await db.ref('companies/burgeroov/sallaAuth').once('value');
         const auth = snap.val();
-        if (!auth || !auth.access_token) {
-            return res.status(400).json({ status: 'error', message: 'No Salla access token found yet.' });
-        }
+        
+        let syncedCount = 0;
+        const companyKeys = ['burgeroov', 'mvc', 'mvcfresh', 'salla_shared'];
 
-        const https = require('https');
-        const fetchOrders = () => new Promise((resolve, reject) => {
-            const req = https.request('https://api.salla.dev/admin/v2/orders?page=1&per_page=20', {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${auth.access_token}`,
-                    'Accept': 'application/json'
-                }
-            }, (apiRes) => {
-                let d = '';
-                apiRes.on('data', c => d += c);
-                apiRes.on('end', () => {
-                    try {
-                        resolve(JSON.parse(d));
-                    } catch (e) {
-                        resolve({ raw: d });
+        // 1. If OAuth token exists, fetch up to 3 pages (150 orders) from Salla Orders API
+        if (auth && auth.access_token) {
+            const https = require('https');
+            const fetchPage = (page) => new Promise((resolve) => {
+                const req = https.request(`https://api.salla.dev/admin/v2/orders?page=${page}&per_page=50`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${auth.access_token}`,
+                        'Accept': 'application/json'
                     }
+                }, (apiRes) => {
+                    let d = '';
+                    apiRes.on('data', c => d += c);
+                    apiRes.on('end', () => {
+                        try { resolve(JSON.parse(d)); }
+                        catch (e) { resolve({ raw: d }); }
+                    });
                 });
+                req.on('error', () => resolve(null));
+                req.end();
             });
-            req.on('error', reject);
-            req.end();
-        });
 
-        const sallaResponse = await fetchOrders();
-        console.log('📦 [Salla Orders API Sync Response]', sallaResponse);
+            for (let page = 1; page <= 3; page++) {
+                const pageRes = await fetchPage(page);
+                if (pageRes && pageRes.data && Array.isArray(pageRes.data) && pageRes.data.length > 0) {
+                    for (const item of pageRes.data) {
+                        const isDemo = String(item.urls?.customer || '').includes('demostore.salla.sa') || 
+                                       item.customer?.first_name === 'abc' || 
+                                       (item.items && item.items.some(i => i.name === 'فستان'));
+                        if (isDemo) continue;
 
-        if (sallaResponse && sallaResponse.data && Array.isArray(sallaResponse.data)) {
-            const companyKeys = ['burgeroov', 'mvc', 'mvcfresh', 'salla_shared'];
-            let count = 0;
-            for (const item of sallaResponse.data) {
-                // Skip sandbox demo store items (e.g. demostore.salla.sa / "فستان" / "abc def")
-                const isDemo = String(item.urls?.customer || '').includes('demostore.salla.sa') || 
-                               item.customer?.first_name === 'abc' || 
-                               (item.items && item.items.some(i => i.name === 'فستان'));
-                if (isDemo) {
-                    console.log('ℹ️ [Sync Salla] Skipped sandbox demo order:', item.id);
-                    continue;
+                        const formattedOrder = formatSallaOrderHelper(item);
+                        if (!formattedOrder || !formattedOrder.id) continue;
+
+                        for (const c of companyKeys) {
+                            await db.ref(`companies/${c}/sallaOrders/${formattedOrder.id}`).set(formattedOrder);
+                        }
+                        syncedCount++;
+                    }
+                } else {
+                    break;
                 }
-
-                const formattedOrder = formatSallaOrderHelper(item);
-                if (!formattedOrder) continue;
-
-                for (const c of companyKeys) {
-                    await db.ref(`companies/${c}/sallaOrders/${formattedOrder.id}`).set(formattedOrder);
-                }
-                count++;
             }
-
-            return res.json({ status: 'success', syncedCount: count, message: count > 0 ? `Synced ${count} live store orders!` : 'No new production orders found from demo token.' });
         }
 
-        return res.json({ status: 'ok', response: sallaResponse });
+        // 2. Also reparse persistent webhook history
+        try {
+            const historySnap = await db.ref('sallaWebhookHistory').once('value');
+            const historyVal = historySnap.val() || {};
+            for (const h of Object.values(historyVal)) {
+                if (h && h.raw) {
+                    const rawData = (h.raw && h.raw.data) || h.raw;
+                    const formattedOrder = formatSallaOrderHelper(rawData, h.raw);
+                    if (formattedOrder && formattedOrder.id) {
+                        for (const c of companyKeys) {
+                            await db.ref(`companies/${c}/sallaOrders/${formattedOrder.id}`).set(formattedOrder);
+                        }
+                        syncedCount++;
+                    }
+                }
+            }
+        } catch(e) {}
+
+        return res.json({ 
+            status: 'success', 
+            syncedCount: syncedCount, 
+            message: `Synced and updated ${syncedCount} orders from Salla! ✅` 
+        });
     } catch (e) {
         console.error('❌ [Sync Orders Error]:', e.message);
         res.status(500).json({ error: e.message });
@@ -1447,12 +1464,15 @@ app.get('/salla/callback', async (req, res) => {
             tokenData = await exchangeSallaCodeForToken(code);
             if (tokenData && (tokenData.access_token || tokenData.token_type)) {
                 isInstalled = true;
-                const companyKeys = ['burgeroov', 'mvc', 'mvcfresh'];
+                const companyKeys = ['burgeroov', 'mvc', 'mvcfresh', 'salla_shared'];
                 for (const c of companyKeys) {
                     await db.ref(`companies/${c}/sallaAuth`).set({
                         ...tokenData,
                         installedAt: Date.now()
                     });
+                }
+                if (tokenData.access_token) {
+                    await subscribeSallaWebhooks(tokenData.access_token).catch(() => {});
                 }
                 console.log('🎉 [Salla App Installed Successfully] Token stored to Firebase RTDB!');
             } else if (tokenData && (tokenData.error || tokenData.message)) {
@@ -1548,12 +1568,26 @@ app.post(['/salla*', '/salla/webhook', '/salla/webhcook', '/salla/webhcoo', '/sa
         console.log('🛍️ [Salla Webhook Received]', JSON.stringify(req.body, null, 2));
 
         const body = req.body || {};
+        const rawOrderId = (body.data && (body.data.reference_id || body.data.order_reference_id || body.data.id)) || body.id || Date.now();
         lastSallaWebhooks.push({
             timestamp: new Date().toISOString(),
             event: body.event,
-            orderId: (body.data && (body.data.reference_id || body.data.id)) || body.id,
+            orderId: rawOrderId,
             raw: body
         });
+
+        try {
+            const cleanKey = String(rawOrderId).replace(/[.#$[\]/]/g, '_');
+            await db.ref(`sallaWebhookHistory/${cleanKey}`).set({
+                timestamp: Date.now(),
+                event: body.event || 'order.created',
+                orderId: String(rawOrderId),
+                raw: body
+            });
+        } catch(hErr) {
+            console.warn('Webhook history save error:', hErr.message);
+        }
+
         const event = body.event || 'order.created';
         const orderData = body.data || body;
 

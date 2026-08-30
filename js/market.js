@@ -2951,23 +2951,22 @@ function applyCustomerModeUI() {
         currentCompany = currentCustomerSession.company;
     }
 
-    // Fetch and listen to market data & market orders across ALL companies
+    // Fetch and listen to market data & market orders across ALL companies without duplicating
     if (typeof db !== 'undefined') {
-        const companyList = ['mvc', 'mvcfresh', 'burgeroov'];
-        companyList.forEach(cKey => {
-            db.ref(`companies/${cKey}/marketProducts`).on('value', snapshot => {
-                if (!appData[cKey]) appData[cKey] = {};
-                appData[cKey].marketProducts = snapshot.val() || {};
-                renderMarket();
+        if (!window._hasMarketProductsListeners) {
+            window._hasMarketProductsListeners = true;
+            const companyList = ['mvc', 'mvcfresh', 'burgeroov'];
+            companyList.forEach(cKey => {
+                db.ref(`companies/${cKey}/marketProducts`).on('value', snapshot => {
+                    if (!appData[cKey]) appData[cKey] = {};
+                    appData[cKey].marketProducts = snapshot.val() || {};
+                    renderMarket();
+                });
             });
-            db.ref(`companies/${cKey}/marketOrders`).on('value', snapshot => {
-                if (!appData[cKey]) appData[cKey] = {};
-                appData[cKey].marketOrders = snapshot.val() || {};
-                renderAdminMarketOrders();
-                renderCustomerOrders();
-                renderPrepareSection();
-            });
-        });
+        }
+        if (typeof initGlobalMarketListeners === 'function') {
+            initGlobalMarketListeners();
+        }
     }
 
     switchTab('market');

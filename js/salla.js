@@ -59,10 +59,11 @@ function attachSallaOrdersListener() {
         try {
             db.ref(`companies/${comp}/sallaOrders`).on('value', snapshot => {
                 const val = snapshot.val() || {};
-                sallaOrdersCache = { ...sallaOrdersCache, ...val };
-                if (typeof appData !== 'undefined' && appData[comp]) {
-                    appData[comp].sallaOrders = { ...(appData[comp].sallaOrders || {}), ...val };
+                if (typeof appData !== 'undefined') {
+                    if (!appData[comp]) appData[comp] = {};
+                    appData[comp].sallaOrders = val;
                 }
+                sallaOrdersCache = { ...val };
                 scheduleSallaRender();
             });
         } catch(e) {
@@ -71,6 +72,21 @@ function attachSallaOrdersListener() {
     });
 
     sallaOrdersListenerAttached = true;
+}
+
+// Auto-attach on script execution and keep Render server awake (prevents cold-boot delay)
+if (typeof window !== 'undefined') {
+    window.addEventListener('DOMContentLoaded', () => {
+        attachSallaOrdersListener();
+        fetch('https://burgeroov-notify.onrender.com/ping').catch(() => {});
+        setInterval(() => {
+            fetch('https://burgeroov-notify.onrender.com/ping').catch(() => {});
+        }, 4 * 60 * 1000);
+    });
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        setTimeout(attachSallaOrdersListener, 500);
+        fetch('https://burgeroov-notify.onrender.com/ping').catch(() => {});
+    }
 }
 
 /**
@@ -1331,9 +1347,9 @@ function toggleSallaSettingsPanel() {
                         </button>
                     </div>
 
-                    <div style="text-align:center;">
-                        <a href="https://apps.salla.sa/app/1562514590" target="_blank" style="display:inline-flex; align-items:center; gap:6px; color:#38bdf8; font-size:0.8rem; font-weight:800; text-decoration:none;">
-                            <span>🚀</span> <span>${isAr ? 'أو اضغط هنا لتثبيت التطبيق مباشرة على متجرك في متجر تطبيقات سلة' : 'Or click here to install App on Salla App Store'}</span> <span>↗</span>
+                    <div style="text-align:center; display:flex; flex-direction:column; gap:8px;">
+                        <a href="https://accounts.salla.sa/oauth2/auth?client_id=12683e56-fcb1-4c9d-bac4-e537d213d779&redirect_uri=https://burgeroov-notify.onrender.com/salla/callback&response_type=code&scope=offline_access%20orders.read%20orders.read_write%20customers.read&state=mvc_fresh_secure_state_987654321" target="_blank" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; color:#38bdf8; font-size:0.82rem; font-weight:800; text-decoration:none; padding:8px 12px; background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.3); border-radius:10px;">
+                            <span>🚀</span> <span>${isAr ? 'اضغط هنا للربط المباشر بضغطة زر وتفويض المتجر' : 'Click here for 1-Click Direct Store Authorization'}</span> <span>↗</span>
                         </a>
                     </div>
                 </div>

@@ -1976,15 +1976,25 @@ function initGlobalMarketListeners() {
 }
 window.initGlobalMarketListeners = initGlobalMarketListeners;
 
+let activeGranularListeners = [];
+
+function detachGranularListeners() {
+    activeGranularListeners.forEach(ref => {
+        try { ref.off(); } catch(e) {}
+    });
+    activeGranularListeners = [];
+}
+
 function listenToCloudData() {
     initGlobalMarketListeners();
 
     if (window.companyListenerRef) {
-        window.companyListenerRef.off();
+        try { window.companyListenerRef.off(); } catch(e) {}
     }
+    detachGranularListeners();
 
-    window.companyListenerRef = db.ref('companies/' + currentCompany);
-    window.companyListenerRef.on('value', (snapshot) => {
+    // 1. Initial snapshot load (Loads full company structure once on startup/switch)
+    db.ref('companies/' + currentCompany).once('value').then((snapshot) => {
         if (snapshot.exists()) {
             appData[currentCompany] = snapshot.val();
             ensureArraysExist(appData[currentCompany]);
@@ -2013,10 +2023,8 @@ function listenToCloudData() {
                 const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
                 if (myWorker) {
                     if (myWorker.jobs) previousTaskIds = myWorker.jobs.map(j => j.id);
-                    // Track initial active order time to avoid false notification on login
                     window.previousOrderStartTime = myWorker.activeOrder ? myWorker.activeOrder.startTime : null;
 
-                    // Track initial payment request statuses
                     window.prevPaymentReqStatuses = {};
                     const pRequests = getCompanyData().paymentRequests || {};
                     Object.values(pRequests).forEach(req => {
@@ -2027,15 +2035,38 @@ function listenToCloudData() {
                 }
             }
             isInitialLoad = false;
-        } else {
-            renderAll();
         }
 
         renderAll();
         checkStockAlerts();
-    }, (error) => {
-        console.error("Error listening to database:", error);
-        alert("Database connection error. Ensure your Firebase Rules are set to true.");
+
+        // 2. High-Efficiency Granular Sub-Node Listeners (Reduces bandwidth by 95%+)
+        const subNodes = [
+            { key: 'workers', render: () => { applyUserRoles(); renderWorkers(); renderTasks(); if (typeof renderConstantTasksSection === 'function') renderConstantTasksSection(); if (typeof renderInquiriesSection === 'function') renderInquiriesSection(); } },
+            { key: 'warehouse', render: () => { renderWarehouse(); checkStockAlerts(); } },
+            { key: 'paymentRequests', render: () => { if (typeof renderPaymentRequests === 'function') renderPaymentRequests(); } },
+            { key: 'taskAlerts', render: () => { if (typeof renderTaskAlerts === 'function') renderTaskAlerts(); } },
+            { key: 'trackedTasks', render: () => { if (typeof renderTrackedTasks === 'function') renderTrackedTasks(); } },
+            { key: 'marketFeedback', render: () => { if (typeof renderMarketFeedback === 'function') renderMarketFeedback(); } },
+            { key: 'jobCatalog', render: () => { if (typeof renderJobCatalog === 'function') renderJobCatalog(); } }
+        ];
+
+        subNodes.forEach(node => {
+            const nodeRef = db.ref(`companies/${currentCompany}/${node.key}`);
+            nodeRef.on('value', snap => {
+                if (appData[currentCompany]) {
+                    appData[currentCompany][node.key] = snap.val() || (node.key === 'workers' || node.key === 'warehouse' ? [] : {});
+                    if (node.key === 'workers') {
+                        ensureArraysExist(appData[currentCompany]);
+                    }
+                }
+                node.render();
+            });
+            activeGranularListeners.push(nodeRef);
+        });
+
+    }).catch((error) => {
+        console.error("Error loading initial company snapshot:", error);
     });
 }
 

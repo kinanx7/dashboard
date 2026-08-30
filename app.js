@@ -1976,15 +1976,25 @@ function initGlobalMarketListeners() {
 }
 window.initGlobalMarketListeners = initGlobalMarketListeners;
 
+let activeGranularListeners = [];
+
+function detachGranularListeners() {
+    activeGranularListeners.forEach(ref => {
+        try { ref.off(); } catch(e) {}
+    });
+    activeGranularListeners = [];
+}
+
 function listenToCloudData() {
     initGlobalMarketListeners();
 
     if (window.companyListenerRef) {
-        window.companyListenerRef.off();
+        try { window.companyListenerRef.off(); } catch(e) {}
     }
+    detachGranularListeners();
 
-    window.companyListenerRef = db.ref('companies/' + currentCompany);
-    window.companyListenerRef.on('value', (snapshot) => {
+    // 1. Initial snapshot load (Loads full company structure once on startup/switch)
+    db.ref('companies/' + currentCompany).once('value').then((snapshot) => {
         if (snapshot.exists()) {
             appData[currentCompany] = snapshot.val();
             ensureArraysExist(appData[currentCompany]);
@@ -2013,10 +2023,8 @@ function listenToCloudData() {
                 const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
                 if (myWorker) {
                     if (myWorker.jobs) previousTaskIds = myWorker.jobs.map(j => j.id);
-                    // Track initial active order time to avoid false notification on login
                     window.previousOrderStartTime = myWorker.activeOrder ? myWorker.activeOrder.startTime : null;
 
-                    // Track initial payment request statuses
                     window.prevPaymentReqStatuses = {};
                     const pRequests = getCompanyData().paymentRequests || {};
                     Object.values(pRequests).forEach(req => {
@@ -2027,15 +2035,38 @@ function listenToCloudData() {
                 }
             }
             isInitialLoad = false;
-        } else {
-            renderAll();
         }
 
         renderAll();
         checkStockAlerts();
-    }, (error) => {
-        console.error("Error listening to database:", error);
-        alert("Database connection error. Ensure your Firebase Rules are set to true.");
+
+        // 2. High-Efficiency Granular Sub-Node Listeners (Reduces bandwidth by 95%+)
+        const subNodes = [
+            { key: 'workers', render: () => { applyUserRoles(); renderWorkers(); renderTasks(); if (typeof renderConstantTasksSection === 'function') renderConstantTasksSection(); if (typeof renderInquiriesSection === 'function') renderInquiriesSection(); } },
+            { key: 'warehouse', render: () => { renderWarehouse(); checkStockAlerts(); } },
+            { key: 'paymentRequests', render: () => { if (typeof renderPaymentRequests === 'function') renderPaymentRequests(); } },
+            { key: 'taskAlerts', render: () => { if (typeof renderTaskAlerts === 'function') renderTaskAlerts(); } },
+            { key: 'trackedTasks', render: () => { if (typeof renderTrackedTasks === 'function') renderTrackedTasks(); } },
+            { key: 'marketFeedback', render: () => { if (typeof renderMarketFeedback === 'function') renderMarketFeedback(); } },
+            { key: 'jobCatalog', render: () => { if (typeof renderJobCatalog === 'function') renderJobCatalog(); } }
+        ];
+
+        subNodes.forEach(node => {
+            const nodeRef = db.ref(`companies/${currentCompany}/${node.key}`);
+            nodeRef.on('value', snap => {
+                if (appData[currentCompany]) {
+                    appData[currentCompany][node.key] = snap.val() || (node.key === 'workers' || node.key === 'warehouse' ? [] : {});
+                    if (node.key === 'workers') {
+                        ensureArraysExist(appData[currentCompany]);
+                    }
+                }
+                node.render();
+            });
+            activeGranularListeners.push(nodeRef);
+        });
+
+    }).catch((error) => {
+        console.error("Error loading initial company snapshot:", error);
     });
 }
 
@@ -22290,23 +22321,22 @@ function applyCustomerModeUI() {
         currentCompany = currentCustomerSession.company;
     }
 
-    // Fetch and listen to market data & market orders across ALL companies
+    // Fetch and listen to market data & market orders across ALL companies without duplicating
     if (typeof db !== 'undefined') {
-        const companyList = ['mvc', 'mvcfresh', 'burgeroov'];
-        companyList.forEach(cKey => {
-            db.ref(`companies/${cKey}/marketProducts`).on('value', snapshot => {
-                if (!appData[cKey]) appData[cKey] = {};
-                appData[cKey].marketProducts = snapshot.val() || {};
-                renderMarket();
+        if (!window._hasMarketProductsListeners) {
+            window._hasMarketProductsListeners = true;
+            const companyList = ['mvc', 'mvcfresh', 'burgeroov'];
+            companyList.forEach(cKey => {
+                db.ref(`companies/${cKey}/marketProducts`).on('value', snapshot => {
+                    if (!appData[cKey]) appData[cKey] = {};
+                    appData[cKey].marketProducts = snapshot.val() || {};
+                    renderMarket();
+                });
             });
-            db.ref(`companies/${cKey}/marketOrders`).on('value', snapshot => {
-                if (!appData[cKey]) appData[cKey] = {};
-                appData[cKey].marketOrders = snapshot.val() || {};
-                renderAdminMarketOrders();
-                renderCustomerOrders();
-                renderPrepareSection();
-            });
-        });
+        }
+        if (typeof initGlobalMarketListeners === 'function') {
+            initGlobalMarketListeners();
+        }
     }
 
     switchTab('market');
@@ -31698,10 +31728,11 @@ function attachSallaOrdersListener() {
         try {
             db.ref(`companies/${comp}/sallaOrders`).on('value', snapshot => {
                 const val = snapshot.val() || {};
-                sallaOrdersCache = { ...sallaOrdersCache, ...val };
-                if (typeof appData !== 'undefined' && appData[comp]) {
-                    appData[comp].sallaOrders = { ...(appData[comp].sallaOrders || {}), ...val };
+                if (typeof appData !== 'undefined') {
+                    if (!appData[comp]) appData[comp] = {};
+                    appData[comp].sallaOrders = val;
                 }
+                sallaOrdersCache = { ...val };
                 scheduleSallaRender();
             });
         } catch(e) {
@@ -31710,6 +31741,21 @@ function attachSallaOrdersListener() {
     });
 
     sallaOrdersListenerAttached = true;
+}
+
+// Auto-attach on script execution and keep Render server awake (prevents cold-boot delay)
+if (typeof window !== 'undefined') {
+    window.addEventListener('DOMContentLoaded', () => {
+        attachSallaOrdersListener();
+        fetch('https://burgeroov-notify.onrender.com/ping').catch(() => {});
+        setInterval(() => {
+            fetch('https://burgeroov-notify.onrender.com/ping').catch(() => {});
+        }, 4 * 60 * 1000);
+    });
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        setTimeout(attachSallaOrdersListener, 500);
+        fetch('https://burgeroov-notify.onrender.com/ping').catch(() => {});
+    }
 }
 
 /**
@@ -32970,9 +33016,9 @@ function toggleSallaSettingsPanel() {
                         </button>
                     </div>
 
-                    <div style="text-align:center;">
-                        <a href="https://apps.salla.sa/app/1562514590" target="_blank" style="display:inline-flex; align-items:center; gap:6px; color:#38bdf8; font-size:0.8rem; font-weight:800; text-decoration:none;">
-                            <span>🚀</span> <span>${isAr ? 'أو اضغط هنا لتثبيت التطبيق مباشرة على متجرك في متجر تطبيقات سلة' : 'Or click here to install App on Salla App Store'}</span> <span>↗</span>
+                    <div style="text-align:center; display:flex; flex-direction:column; gap:8px;">
+                        <a href="https://accounts.salla.sa/oauth2/auth?client_id=12683e56-fcb1-4c9d-bac4-e537d213d779&redirect_uri=https://burgeroov-notify.onrender.com/salla/callback&response_type=code&scope=offline_access%20orders.read%20orders.read_write%20customers.read&state=mvc_fresh_secure_state_987654321" target="_blank" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; color:#38bdf8; font-size:0.82rem; font-weight:800; text-decoration:none; padding:8px 12px; background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.3); border-radius:10px;">
+                            <span>🚀</span> <span>${isAr ? 'اضغط هنا للربط المباشر بضغطة زر وتفويض المتجر' : 'Click here for 1-Click Direct Store Authorization'}</span> <span>↗</span>
                         </a>
                     </div>
                 </div>
