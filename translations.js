@@ -962,6 +962,7 @@ var uiTranslations = {
         "btn-salla-stats": "Salla Stats & Analytics",
         "btn-salla-test-order": "Create Test Order",
         "btn-salla-settings": "Webhook Settings",
+        "btn-salla-clear-all": "Clear All Orders",
 
         // Market Section Translations
         "tab-market": "🏪 Market",
@@ -1917,6 +1918,7 @@ var uiTranslations = {
         "btn-salla-sync": "مزامنة طلبات متجر سلة",
         "btn-salla-stats": "إحصائيات وتحليلات سلة",
         "btn-salla-test-order": "إنشاء طلب تجريبي",
-        "btn-salla-settings": "إعدادات الربط والويب هوك"
+        "btn-salla-settings": "إعدادات الربط والويب هوك",
+        "btn-salla-clear-all": "تصفير وحذف جميع الطلبات"
     }
 };

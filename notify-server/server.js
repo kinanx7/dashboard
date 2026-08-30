@@ -1145,11 +1145,11 @@ function formatSallaOrderHelper(item, extraBody) {
     const body = extraBody || {};
     const baseOrder = item.order || item.data || item;
     
-    // 1. Order ID & Reference Resolution (Prioritize merchant-facing order number)
-    const rawOrderId = baseOrder.order_id || baseOrder.order_reference_id || baseOrder.reference_id || (baseOrder.order && (baseOrder.order.reference_id || baseOrder.order.id)) || baseOrder.invoice_number || baseOrder.id || body.orderId || body.order_id;
-    if (!rawOrderId) return null;
-    const orderId = String(rawOrderId);
-    const orderNumber = String(baseOrder.order_reference_id || baseOrder.reference_id || (baseOrder.order && (baseOrder.order.reference_id || baseOrder.order.id)) || baseOrder.order_id || baseOrder.invoice_number || orderId);
+    // 1. Order ID & Reference Resolution (Prioritize official Salla merchant Reference ID)
+    const rawRefId = baseOrder.order_reference_id || baseOrder.reference_id || (baseOrder.order && (baseOrder.order.reference_id || baseOrder.order.order_reference_id || baseOrder.order.id)) || baseOrder.order_id || baseOrder.invoice_number || baseOrder.id || body.orderId || body.order_id;
+    if (!rawRefId) return null;
+    const orderId = String(rawRefId);
+    const orderNumber = String(rawRefId);
     const invoiceNum = baseOrder.invoice_number ? String(baseOrder.invoice_number) : '';
 
     // 2. Customer details (Support standard customer, shipping receiver, and ship_to)
@@ -1159,8 +1159,8 @@ function formatSallaOrderHelper(item, extraBody) {
     const shipTo = baseOrder.ship_to || item.ship_to || {};
     const address = ship.address || baseOrder.address || item.address || cust.address || {};
 
-    let custName = (shipTo.name || `${cust.first_name || ''} ${cust.last_name || ''}`.trim() || receiver.name || cust.full_name || cust.name || body.customerName || '').trim();
-    if (!custName || custName === 'عميل متجر سلة') {
+    let custName = (shipTo.name || `${cust.first_name || ''} ${cust.last_name || ''}`.trim() || cust.full_name || cust.name || receiver.name || body.customerName || '').trim();
+    if (!custName) {
         custName = 'عميل متجر سلة';
     }
 
@@ -1188,16 +1188,22 @@ function formatSallaOrderHelper(item, extraBody) {
         coords = address.location || cust.address?.location || baseOrder.coords;
     }
 
-    // 5. Total Amount (Handling nested objects, amounts.total, packages sum)
+    // 5. Total Amount (Handling nested objects, amounts.total, 15% VAT, packages sum)
     let rawTotal = 0;
     if (baseOrder.amounts && baseOrder.amounts.total) {
-        rawTotal = (typeof baseOrder.amounts.total === 'object') ? (baseOrder.amounts.total.amount || baseOrder.amounts.total.sub_total || 0) : baseOrder.amounts.total;
+        rawTotal = (typeof baseOrder.amounts.total === 'object') ? (baseOrder.amounts.total.amount || baseOrder.amounts.total.total || 0) : baseOrder.amounts.total;
     } else if (baseOrder.total !== undefined && baseOrder.total !== null) {
-        rawTotal = (typeof baseOrder.total === 'object') ? (baseOrder.total.amount || baseOrder.total.sub_total || 0) : baseOrder.total;
+        rawTotal = (typeof baseOrder.total === 'object') ? (baseOrder.total.amount || baseOrder.total.total || 0) : baseOrder.total;
     } else if (item.total !== undefined && item.total !== null) {
-        rawTotal = (typeof item.total === 'object') ? (item.total.amount || item.total.sub_total || 0) : item.total;
+        rawTotal = (typeof item.total === 'object') ? (item.total.amount || item.total.total || 0) : item.total;
+    } else if (baseOrder.amounts && baseOrder.amounts.sub_total && baseOrder.amounts.tax) {
+        const sub = (typeof baseOrder.amounts.sub_total === 'object') ? (baseOrder.amounts.sub_total.amount || 0) : parseFloat(baseOrder.amounts.sub_total || 0);
+        const tax = (typeof baseOrder.amounts.tax === 'object') ? (baseOrder.amounts.tax.amount ? (baseOrder.amounts.tax.amount.amount || baseOrder.amounts.tax.amount) : 0) : parseFloat(baseOrder.amounts.tax || 0);
+        const shipCost = (baseOrder.amounts.shipping_cost && typeof baseOrder.amounts.shipping_cost === 'object') ? (baseOrder.amounts.shipping_cost.amount || 0) : parseFloat(baseOrder.amounts.shipping_cost || 0);
+        rawTotal = sub + tax + shipCost;
     } else if (baseOrder.sub_total !== undefined && baseOrder.sub_total !== null) {
-        rawTotal = (typeof baseOrder.sub_total === 'object') ? baseOrder.sub_total.amount : baseOrder.sub_total;
+        const sub = (typeof baseOrder.sub_total === 'object') ? baseOrder.sub_total.amount : parseFloat(baseOrder.sub_total || 0);
+        rawTotal = sub * 1.15;
     } else if (body.total || body.amount) {
         rawTotal = body.total || body.amount;
     }
@@ -1206,22 +1212,38 @@ function formatSallaOrderHelper(item, extraBody) {
     const paymentMethod = baseOrder.payment_method || item.payment_method || body.paymentMethod || (baseOrder.cash_on_delivery ? 'Cash On Delivery' : 'Mada');
     const rawStatus = (baseOrder.status && (baseOrder.status.slug || baseOrder.status.name)) || (item.status && (item.status.slug || item.status.name)) || 'in_progress';
     
-    // Robust date parsing guaranteed to NEVER produce NaN
-    let parsedTime = Date.now();
-    try {
-        if (baseOrder.date) {
-            if (typeof baseOrder.date === 'string') parsedTime = new Date(baseOrder.date).getTime();
-            else if (baseOrder.date.date) parsedTime = new Date(baseOrder.date.date).getTime();
-        } else if (baseOrder.created_at) {
-            if (typeof baseOrder.created_at === 'string' || typeof baseOrder.created_at === 'number') parsedTime = new Date(baseOrder.created_at).getTime();
-            else if (baseOrder.created_at.date) parsedTime = new Date(baseOrder.created_at.date).getTime();
-        } else if (body.created_at) {
-            parsedTime = new Date(body.created_at).getTime();
-        }
-    } catch (e) {
-        parsedTime = Date.now();
+    // Robust date parsing for all Salla date formats (including MySQL datetime, { date, timezone }, and ISO strings)
+    function parseSallaDateHelper(rawDate) {
+        if (!rawDate) return null;
+        try {
+            if (typeof rawDate === 'number') {
+                return rawDate < 10000000000 ? rawDate * 1000 : rawDate;
+            }
+            if (typeof rawDate === 'object') {
+                if (rawDate.date) rawDate = rawDate.date;
+                else if (rawDate.created_at) rawDate = rawDate.created_at;
+            }
+            if (typeof rawDate === 'string') {
+                rawDate = rawDate.trim();
+                if (rawDate.includes('T') || rawDate.includes('Z') || /[+-]\d{2}:\d{2}$/.test(rawDate) || rawDate.includes('GMT')) {
+                    const t = new Date(rawDate).getTime();
+                    if (!isNaN(t)) return t;
+                }
+                if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(rawDate)) {
+                    const isoStr = rawDate.split('.')[0].replace(' ', 'T') + '+03:00';
+                    const t = new Date(isoStr).getTime();
+                    if (!isNaN(t)) return t;
+                }
+                const t = new Date(rawDate).getTime();
+                if (!isNaN(t)) return t;
+            }
+        } catch(e) {}
+        return null;
     }
-    const createdAt = (parsedTime && !isNaN(parsedTime)) ? parsedTime : Date.now();
+
+    const rawDateCandidate = baseOrder.date || baseOrder.created_at || item.date || item.created_at || body.created_at || body.date;
+    const parsedTime = parseSallaDateHelper(rawDateCandidate);
+    const createdAt = (parsedTime && !isNaN(parsedTime) && parsedTime > 1000000000000) ? parsedTime : Date.now();
 
     // 6. Notes & Clean Items (Supporting both standard items and packages)
     let extractedNotes = [];
@@ -1328,6 +1350,21 @@ app.get('/salla/reparse-orders', async (_req, res) => {
         return res.json({ status: 'success', message: `Reparsed and healed ${updatedCount} orders! ✅` });
     } catch (e) {
         console.error('❌ [Reparse Error]:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.all('/salla/clear-orders', async (_req, res) => {
+    try {
+        const companyKeys = ['burgeroov', 'mvc', 'mvcfresh', 'salla_shared'];
+        for (const c of companyKeys) {
+            await db.ref(`companies/${c}/sallaOrders`).remove().catch(() => {});
+            await db.ref(`companies/${c}/sallaBatchCustomerChecks`).remove().catch(() => {});
+            await db.ref(`companies/${c}/sallaBatchPurchases`).remove().catch(() => {});
+        }
+        return res.json({ status: 'success', message: 'All Salla orders and batch items cleared from Firebase RTDB ✅' });
+    } catch (e) {
+        console.error('❌ [Clear Orders Error]:', e.message);
         res.status(500).json({ error: e.message });
     }
 });
@@ -1488,6 +1525,22 @@ app.get('/salla/logs', (_req, res) => {
         totalReceived: lastSallaWebhooks.length,
         logs: lastSallaWebhooks.slice(-10).reverse()
     });
+});
+
+app.get('/salla/current-orders', async (_req, res) => {
+    try {
+        const snap = await db.ref('companies').once('value');
+        const companies = snap.val() || {};
+        const resData = {};
+        for (const [k, v] of Object.entries(companies)) {
+            if (v && v.sallaOrders) {
+                resData[k] = v.sallaOrders;
+            }
+        }
+        res.json(resData);
+    } catch(e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 app.post(['/salla*', '/salla/webhook', '/salla/webhcook', '/salla/webhcoo', '/salla', '/salla/'], async (req, res) => {

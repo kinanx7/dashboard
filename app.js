@@ -31647,17 +31647,6 @@ let currentSallaListenerCompany = null;
 let sallaOrdersCache = {};
 let sallaSearchQuery = '';
 
-// Salla Official Known Orders Self-Healing Directory (Top-Level Global Definition)
-const SALLA_KNOWN_ORDERS_MAP = {
-    '410389010': { refId: '280899452', inv: '5792', total: '1654.65', name: 'غالب القدسي' },
-    '1802807301': { refId: '280871361', inv: '5791', total: '123.52', name: 'فاضل حسن' },
-    '333294779': { refId: '280833823', inv: '5790', total: '127.01', name: 'عبدالكريم العنزي' },
-    '508423680': { refId: '280813672', inv: '5789', total: '461.04', name: 'Maha Alkhaldi' },
-    '1467471414': { refId: '280811215', inv: '5788', total: '113.85', name: 'رفعان القحطاني' },
-    '632944151': { refId: '280786208', inv: '5787', total: '447.35', name: 'عميل زائر' },
-    '1943180797': { refId: '280763957', inv: '5786', total: '364.55', name: 'محمود إسماعيل' }
-};
-
 /**
  * Get all Salla orders combining cache and Firebase appData across all company slots
  */
@@ -31671,8 +31660,9 @@ function getSallaOrdersMap() {
     const fromBurgeroov = (typeof appData !== 'undefined' && appData['burgeroov'] && appData['burgeroov'].sallaOrders) || {};
     const fromMvc = (typeof appData !== 'undefined' && appData['mvc'] && appData['mvc'].sallaOrders) || {};
     const fromMvcFresh = (typeof appData !== 'undefined' && appData['mvcfresh'] && appData['mvcfresh'].sallaOrders) || {};
+    const fromShared = (typeof appData !== 'undefined' && appData['salla_shared'] && appData['salla_shared'].sallaOrders) || {};
 
-    return { ...fromBurgeroov, ...fromMvc, ...fromMvcFresh, ...fromAppData, ...fromComp, ...(sallaOrdersCache || {}) };
+    return { ...fromBurgeroov, ...fromMvc, ...fromMvcFresh, ...fromShared, ...fromAppData, ...fromComp, ...(sallaOrdersCache || {}) };
 }
 
 let sallaRenderDebounceTimer = null;
@@ -31697,29 +31687,26 @@ function renderSallaSection() {
 window.renderSallaSection = renderSallaSection;
 
 /**
- * Attach real-time listener to companies/{companyId}/sallaOrders
+ * Attach real-time listener across all company paths in Firebase RTDB
  */
 function attachSallaOrdersListener() {
-    const comp = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
     if (typeof db === 'undefined' || !db) return;
+    if (sallaOrdersListenerAttached) return;
 
-    if (sallaOrdersListenerAttached && currentSallaListenerCompany === comp) {
-        return;
-    }
-
-    if (window.sallaOrdersFirebaseRef) {
-        try { window.sallaOrdersFirebaseRef.off(); } catch (e) { }
-    }
-
-    currentSallaListenerCompany = comp;
-    window.sallaOrdersFirebaseRef = db.ref(`companies/${comp}/sallaOrders`);
-    window.sallaOrdersFirebaseRef.on('value', snapshot => {
-        const val = snapshot.val() || {};
-        sallaOrdersCache = val;
-        if (typeof appData !== 'undefined' && appData[comp]) {
-            appData[comp].sallaOrders = sallaOrdersCache;
+    const companyKeys = ['burgeroov', 'mvc', 'mvcfresh', 'salla_shared'];
+    companyKeys.forEach(comp => {
+        try {
+            db.ref(`companies/${comp}/sallaOrders`).on('value', snapshot => {
+                const val = snapshot.val() || {};
+                sallaOrdersCache = { ...sallaOrdersCache, ...val };
+                if (typeof appData !== 'undefined' && appData[comp]) {
+                    appData[comp].sallaOrders = { ...(appData[comp].sallaOrders || {}), ...val };
+                }
+                scheduleSallaRender();
+            });
+        } catch(e) {
+            console.warn(`Listener error for ${comp}:`, e);
         }
-        scheduleSallaRender();
     });
 
     sallaOrdersListenerAttached = true;
@@ -31752,68 +31739,102 @@ async function syncSallaOrdersDirectly() {
 window.syncSallaOrdersDirectly = syncSallaOrdersDirectly;
 
 /**
+ * Clear / Delete All Salla Orders from Database & Cache
+ */
+async function clearAllSallaOrders() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const msg = isAr 
+        ? '⚠️ هل أنت متأكد من رغبتك في حذف وتصفير جميع طلبات سلة من لوحة التحكم؟\n\nستتمكن بعد ذلك من الضغط على (Sync Salla Orders) لإعادة سحب ومزامنة الطلبات نظيفة ومحدثة من سلة بالتواريخ والأسماء الصحيحة.' 
+        : '⚠️ Are you sure you want to delete all Salla orders from the dashboard?\n\nYou can then click "Sync Salla Orders" to re-sync fresh, updated orders from Salla with accurate dates and names.';
+
+    if (!confirm(msg)) return;
+
+    if (typeof showInAppNotification === 'function') {
+        showInAppNotification(isAr ? '⏳ جاري تصفير وحذف جميع طلبات سلة...' : 'Clearing all Salla orders...');
+    }
+
+    // 1. Clear local memory cache
+    sallaOrdersCache = {};
+    const allComps = getSallaAllCompanyKeys();
+    allComps.forEach(c => {
+        if (typeof appData !== 'undefined' && appData[c]) {
+            appData[c].sallaOrders = {};
+            appData[c].sallaBatchCustomerChecks = {};
+            appData[c].sallaBatchPurchases = {};
+        }
+    });
+
+    // 2. Clear Firebase RTDB
+    if (typeof db !== 'undefined' && db) {
+        allComps.forEach(c => {
+            db.ref(`companies/${c}/sallaOrders`).remove().catch(() => {});
+            db.ref(`companies/${c}/sallaBatchCustomerChecks`).remove().catch(() => {});
+            db.ref(`companies/${c}/sallaBatchPurchases`).remove().catch(() => {});
+        });
+    }
+
+    // 3. Clear on backend server
+    try {
+        await fetch('https://burgeroov-notify.onrender.com/salla/clear-orders', { method: 'POST' }).catch(() => {});
+    } catch(e) {}
+
+    // 4. Re-render UI
+    updateSallaHUDStats();
+    renderSallaOrdersGrid();
+
+    if (typeof showInAppNotification === 'function') {
+        showInAppNotification(isAr ? '✅ تم تصفير وحذف جميع طلبات سلة بنجاح. يمكنك الآن الضغط على زر المزامنة (Sync Salla Orders)' : '✅ All Salla orders cleared! You can now click "Sync Salla Orders" to re-sync.');
+    }
+}
+window.clearAllSallaOrders = clearAllSallaOrders;
+
+/**
  * Get cleaned, deduplicated Salla orders list (Pure in-memory, ultra-fast, zero-lag)
  */
 function getCleanSallaOrdersList() {
     const ordersMap = getSallaOrdersMap();
     let orders = Object.entries(ordersMap || {}).map(([id, o]) => ({ id, ...o }));
 
-    // 1. Filter out demo/sandbox orders and dummy 0-item checkout stubs
+    // 1. Filter out demo sandbox orders and pure empty anonymous stubs
     orders = orders.filter(o => {
         if (!o || !o.id) return false;
-        
-        // Exclude sandbox demo store test orders (like "فستان" / "abc def" / "280660780")
         if (o.id === '280660780' || o.order_id === '280660780') return false;
         if (o.customerName === 'abc def' || (o.customer && (o.customer.first_name === 'abc' || o.customer.name === 'abc def'))) return false;
 
-        const rawItems = o.items || [];
-        const hasDemoItem = rawItems.some(i => i && (i.name === 'فستان' || String(i.thumbnail || '').includes('dev-xu6fkistdycsefaw')));
-        if (hasDemoItem && rawItems.length === 1) return false;
+        const cust = String(o.customerName || (o.customer && (o.customer.name || `${o.customer.first_name || ''} ${o.customer.last_name || ''}`)) || (o.ship_to && o.ship_to.name) || '').trim();
+        const phone = String(o.customerPhone || (o.customer && (o.customer.mobile || o.customer.phone)) || (o.ship_to && o.ship_to.phone) || '').replace(/[^0-9]/g, '').trim();
+        const rawItems = o.items || o.packages || [];
+        const isAnonymous = !cust || cust === 'Store Customer' || cust === 'عميل متجر سلة' || cust === 'عميل المتجر' || cust === 'Salla Customer';
 
-        // Filter out empty ghost / placeholder stubs with 0 valid products
-        const validItems = rawItems.filter(item => {
-            if (!item) return false;
-            const iname = String(item.name || item.product_name || item.title || '').trim();
-            const itype = String(item.type || '').toLowerCase();
-            if (iname === 'طلب متجر سلة' || iname === 'طلب متجر سلة (مكتمل)') return false;
-            if (iname.includes('ملاحظات العميل') || iname.includes('ملاحظة') || iname.includes('ملاحظات')) return false;
-            if (itype === 'service' || iname.includes('رسوم الشحن') || iname.includes('شحن')) return false;
-            return true;
-        });
-
-        if (validItems.length === 0) {
-            const cname = String(o.customerName || (o.customer && o.customer.name) || '');
-            if (!o.customerPhone || cname === 'Store Customer' || cname === 'عميل متجر سلة' || cname.includes('Abandoned Cart') || cname.includes('سلة متروكة')) {
-                return false;
-            }
+        // Discard only if completely anonymous, has no phone, and has 0 items
+        if (isAnonymous && !phone && rawItems.length === 0) {
+            return false;
         }
+
         return true;
     });
 
-    // 2. Pure in-memory deduplication
+    // 2. Safe Deduplication by unique Reference ID (never drop real customer orders)
     const dedupMap = new Map();
     orders.forEach(o => {
-        const knownFix = SALLA_KNOWN_ORDERS_MAP[o.id] || SALLA_KNOWN_ORDERS_MAP[o.orderNumber];
-        const refId = String(o.order_reference_id || (knownFix ? knownFix.refId : null) || o.reference_id || o.orderNumber || o.order_id || o.id);
-        const totalAmt = parseFloat(o.total || o.amount || 0).toFixed(2);
-        const custName = String(o.customerName || '').trim();
-
-        // Primary key: refId if available, or name_total
-        const key = (refId && refId !== 'undefined' && refId !== 'null') ? refId : `${custName}_${totalAmt}`;
+        const refId = String(o.order_reference_id || o.reference_id || o.orderNumber || o.order_id || o.id);
+        const key = (refId && refId !== 'undefined' && refId !== 'null') ? refId : String(o.id);
 
         if (!dedupMap.has(key)) {
             dedupMap.set(key, o);
         } else {
             const existing = dedupMap.get(key);
-            const existingItems = (existing.items || []).length;
-            const newItems = (o.items || []).length;
-            if (newItems > existingItems || (!existing.customerPhone && o.customerPhone)) {
+            const existingItems = (existing.items || existing.packages || []).length;
+            const newItems = (o.items || o.packages || []).length;
+            if (newItems >= existingItems || (!existing.customerPhone && o.customerPhone)) {
                 dedupMap.set(key, o);
             }
         }
     });
 
-    return Array.from(dedupMap.values());
+    const list = Array.from(dedupMap.values());
+    list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    return list;
 }
 window.getCleanSallaOrdersList = getCleanSallaOrdersList;
 
@@ -31907,12 +31928,11 @@ function renderSallaOrdersGrid() {
     if (sallaSearchQuery) {
         const cleanQ = sallaSearchQuery.replace(/^#/, '').toLowerCase().trim();
         orders = orders.filter(o => {
-            const knownFix = SALLA_KNOWN_ORDERS_MAP[o.id] || SALLA_KNOWN_ORDERS_MAP[o.orderNumber];
-            const num = String(o.order_reference_id || (knownFix ? knownFix.refId : null) || o.reference_id || o.orderNumber || o.order_id || o.id || '').toLowerCase();
-            const cust = String((knownFix && knownFix.name) ? knownFix.name : (o.customerName || (o.customer && o.customer.name) || '')).toLowerCase();
-            const phone = String(o.customerPhone || (o.customer && o.customer.mobile) || '').toLowerCase();
-            const city = String(o.city || (o.address && o.address.city) || '').toLowerCase();
-            const itemsStr = (o.items || []).map(i => String(i.name || i.title || '').toLowerCase()).join(' ');
+            const num = String(o.order_reference_id || o.reference_id || o.orderNumber || o.order_id || o.id || '').toLowerCase();
+            const cust = String(o.customerName || (o.customer && o.customer.name) || (o.ship_to && o.ship_to.name) || '').toLowerCase();
+            const phone = String(o.customerPhone || (o.customer && o.customer.mobile) || (o.ship_to && o.ship_to.phone) || '').toLowerCase();
+            const city = String(o.city || (o.address && o.address.city) || (o.ship_to && o.ship_to.city) || '').toLowerCase();
+            const itemsStr = (o.items || o.packages || []).map(i => String(i.name || i.title || '').toLowerCase()).join(' ');
             return num.includes(cleanQ) || ('#' + num).includes(sallaSearchQuery.toLowerCase()) || cust.includes(sallaSearchQuery.toLowerCase()) || phone.includes(cleanQ) || city.includes(sallaSearchQuery.toLowerCase()) || itemsStr.includes(sallaSearchQuery.toLowerCase());
         });
     }
@@ -31942,24 +31962,19 @@ function renderSallaOrdersGrid() {
 
     grid.innerHTML = orders.map(o => {
         const orderId = o.id || o.order_id || 'SALLA-ORD';
-        const knownFix = SALLA_KNOWN_ORDERS_MAP[orderId] || SALLA_KNOWN_ORDERS_MAP[o.id] || SALLA_KNOWN_ORDERS_MAP[o.orderNumber];
 
         // 1. Order Number & Reference ID Resolution (Official Salla Store Reference)
-        let orderNum = o.order_reference_id || (knownFix ? knownFix.refId : null) || o.reference_id || o.order_id;
-        if (!orderNum || String(orderNum).length > 14) {
-            if (knownFix) orderNum = knownFix.refId;
-            else if (o.orderNumber && String(o.orderNumber).length <= 14) orderNum = o.orderNumber;
-            else if (o.invoice_number) orderNum = isAr ? `فاتورة #${o.invoice_number}` : `INV-#${o.invoice_number}`;
-            else if (o.order_id) orderNum = o.order_id;
-            else orderNum = String(orderId).slice(-8);
-        }
+        let orderNum = o.order_reference_id || o.reference_id || o.orderNumber || o.order_id || (o.invoice_number ? (isAr ? `فاتورة #${o.invoice_number}` : `INV-#${o.invoice_number}`) : String(orderId));
         
         // 2. Customer Name Extraction
-        let custName = (knownFix && knownFix.name) ? knownFix.name : o.customerName;
+        let custName = o.customerName;
         if (!custName && o.customer) {
             const fn = o.customer.first_name || '';
             const ln = o.customer.last_name || '';
             custName = `${fn} ${ln}`.trim() || o.customer.full_name || o.customer.name;
+        }
+        if (!custName && o.ship_to) {
+            custName = o.ship_to.name;
         }
         if (!custName || custName === 'عميل متجر سلة' || custName === 'Salla Customer') {
             if (o.customer && o.customer.first_name === 'عميل' && o.customer.last_name === 'زائر') {
@@ -32041,34 +32056,81 @@ function renderSallaOrdersGrid() {
             }
         }
 
-        // 5. Total Amount Parsing (Official Total with VAT & Delivery)
-        let totalAmt = '0.00';
-        if (knownFix && knownFix.total) {
-            totalAmt = knownFix.total;
-        } else {
-            let rawAmt = o.total;
-            if (rawAmt && typeof rawAmt === 'object') rawAmt = rawAmt.amount;
-            if ((rawAmt === undefined || rawAmt === null || rawAmt === 'NaN' || rawAmt === 0 || rawAmt === '0.00') && o.amount) {
-                rawAmt = (typeof o.amount === 'object') ? o.amount.amount : o.amount;
-            }
-            let parsedTotalVal = parseFloat(rawAmt);
-            
-            if ((isNaN(parsedTotalVal) || parsedTotalVal === 0) && o.items && Array.isArray(o.items) && o.items.length > 0) {
-                const itemsSum = o.items.reduce((acc, i) => {
-                    const p = (i.price && typeof i.price === 'object') ? i.price.amount : i.price;
-                    return acc + ((parseFloat(p) || 0) * (parseInt(i.quantity || i.qty) || 1));
-                }, 0);
-                if (itemsSum > 0) parsedTotalVal = itemsSum;
-            }
-
-            totalAmt = isNaN(parsedTotalVal) ? '0.00' : parsedTotalVal.toFixed(2);
+        // 5. Total Amount Parsing (Official Total with 15% VAT & Delivery)
+        let rawAmt = o.total;
+        if (rawAmt && typeof rawAmt === 'object') rawAmt = rawAmt.amount || rawAmt.total || rawAmt.sub_total || 0;
+        if ((rawAmt === undefined || rawAmt === null || rawAmt === 'NaN' || rawAmt === 0 || rawAmt === '0.00') && o.amount) {
+            rawAmt = (typeof o.amount === 'object') ? (o.amount.amount || o.amount.total) : o.amount;
+        }
+        if ((rawAmt === undefined || rawAmt === null || rawAmt === 'NaN' || rawAmt === 0 || rawAmt === '0.00') && o.amounts && o.amounts.total) {
+            rawAmt = (typeof o.amounts.total === 'object') ? (o.amounts.total.amount || o.amounts.total.total) : o.amounts.total;
+        }
+        let parsedTotalVal = parseFloat(rawAmt);
+        
+        if ((isNaN(parsedTotalVal) || parsedTotalVal === 0) && o.items && Array.isArray(o.items) && o.items.length > 0) {
+            const itemsSum = o.items.reduce((acc, i) => {
+                const p = (i.price && typeof i.price === 'object') ? (i.price.amount || i.price.value) : i.price;
+                return acc + ((parseFloat(p) || 0) * (parseInt(i.quantity || i.qty) || 1));
+            }, 0);
+            if (itemsSum > 0) parsedTotalVal = itemsSum;
         }
 
+        // Ensure 15% VAT is included if amount was stored as pre-tax subtotal
+        if (o.amounts && o.amounts.sub_total && !o.amounts.total) {
+            parsedTotalVal = parsedTotalVal * 1.15;
+        } else if (o.tax && parseFloat(o.tax) > 0) {
+            parsedTotalVal = parsedTotalVal + parseFloat(o.tax);
+        }
+
+        const totalAmt = isNaN(parsedTotalVal) ? '0.00' : parsedTotalVal.toFixed(2);
+
         const paymentMethod = o.paymentMethod || o.payment_method || (isAr ? 'مدى / فيزا' : 'Card / Mada');
-        const orderDate = o.createdAt ? new Date(o.createdAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' }) : '';
+        
+        function parseSallaDateClient(rawDate) {
+            if (!rawDate) return null;
+            try {
+                if (typeof rawDate === 'number') {
+                    return rawDate < 10000000000 ? rawDate * 1000 : rawDate;
+                }
+                if (typeof rawDate === 'object') {
+                    if (rawDate.date) rawDate = rawDate.date;
+                    else if (rawDate.created_at) rawDate = rawDate.created_at;
+                }
+                if (typeof rawDate === 'string') {
+                    rawDate = rawDate.trim();
+                    if (rawDate.includes('T') || rawDate.includes('Z') || /[+-]\d{2}:\d{2}$/.test(rawDate) || rawDate.includes('GMT')) {
+                        const t = new Date(rawDate).getTime();
+                        if (!isNaN(t)) return t;
+                    }
+                    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(rawDate)) {
+                        const isoStr = rawDate.split('.')[0].replace(' ', 'T') + '+03:00';
+                        const t = new Date(isoStr).getTime();
+                        if (!isNaN(t)) return t;
+                    }
+                    const t = new Date(rawDate).getTime();
+                    if (!isNaN(t)) return t;
+                }
+            } catch(e) {}
+            return null;
+        }
+
+        let orderDate = '';
+        const parsedTime = parseSallaDateClient(o.createdAt || o.date || o.created_at);
+        if (parsedTime) {
+            const d = new Date(parsedTime);
+            if (!isNaN(d.getTime())) {
+                orderDate = d.toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { 
+                    timeZone: 'Asia/Riyadh',
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    month: 'short', 
+                    day: 'numeric' 
+                });
+            }
+        }
         
         // 6. Notes & Item Separation
-        const rawItems = o.items || [];
+        const rawItems = o.items || o.packages || [];
         const checklist = o.checklist || {};
 
         // Filter out customer notes & shipping services from checklist
@@ -32077,9 +32139,6 @@ function renderSallaOrdersGrid() {
             if (!item) return;
             const iname = String(item.name || item.product_name || item.title || '').trim();
             const itype = String(item.type || '').toLowerCase();
-
-            // Filter out fake dummy items
-            if (iname === 'طلب متجر سلة') return;
 
             if (iname.includes('ملاحظات العميل') || iname.includes('ملاحظة') || iname.includes('ملاحظات')) {
                 const noteVal = item.description || item.notes || item.value || '';
@@ -32094,6 +32153,15 @@ function renderSallaOrdersGrid() {
 
             items.push(item);
         });
+
+        // Fallback for orders delivered without items array in webhook
+        if (items.length === 0) {
+            items.push({
+                name: isAr ? 'طلب متجر سلة' : 'Salla Store Order',
+                quantity: 1,
+                price: isNaN(parsedTotalVal) ? 0 : parsedTotalVal
+            });
+        }
 
         let checkedCount = 0;
         items.forEach((item, idx) => {
@@ -32492,10 +32560,11 @@ function editSallaOrderDetails(orderId) {
     if (!orderId) return;
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     const comp = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany : 'burgeroov';
-    const knownFix = SALLA_KNOWN_ORDERS_MAP[orderId];
+    const ordersMap = getSallaOrdersMap();
+    const order = ordersMap[orderId] || {};
 
-    const curNum = order.order_reference_id || (knownFix ? knownFix.refId : null) || order.orderNumber || order.id || '';
-    const curTotal = (knownFix ? knownFix.total : null) || order.total || '';
+    const curNum = order.order_reference_id || order.orderNumber || order.id || '';
+    const curTotal = order.total || '';
 
     const newNum = prompt(isAr ? 'أدخل رقم الطلب الرسمي كما هو في متجر سلة (مثال: 280899452):' : 'Enter official Salla Order Reference (e.g. 280899452):', curNum);
     if (newNum === null) return;
@@ -32990,9 +33059,8 @@ function openSallaBatchPrepModal() {
     activeOrders.forEach(o => {
         const orderId = String(o.id || o.order_id || '');
         const cleanOrdKey = orderId.replace(/[.#$[\]/]/g, '_');
-        const knownFix = SALLA_KNOWN_ORDERS_MAP[orderId] || SALLA_KNOWN_ORDERS_MAP[o.id] || SALLA_KNOWN_ORDERS_MAP[o.orderNumber];
-        const orderRef = o.order_reference_id || (knownFix ? knownFix.refId : null) || o.reference_id || o.order_id || (o.invoice_number ? (isAr ? 'فاتورة #' + o.invoice_number : 'INV-#' + o.invoice_number) : orderId);
-        const custName = (knownFix && knownFix.name) ? knownFix.name : (o.customerName || (isAr ? 'عميل' : 'Customer'));
+        const orderRef = o.order_reference_id || o.reference_id || o.order_id || (o.invoice_number ? (isAr ? 'فاتورة #' + o.invoice_number : 'INV-#' + o.invoice_number) : orderId);
+        const custName = o.customerName || (o.customer && o.customer.name) || (o.ship_to && o.ship_to.name) || (isAr ? 'عميل' : 'Customer');
 
         (o.items || []).forEach(item => {
             const name = String(item.name || item.title || '').trim();
@@ -33079,83 +33147,155 @@ function openSallaBatchPrepModal() {
 
     const modal = document.createElement('div');
     modal.id = 'modal-salla-batch-prep';
-    modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); z-index:99999; display:flex; align-items:center; justify-content:center; padding:15px;';
+    modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); z-index:99999; display:flex; align-items:center; justify-content:center; padding:8px;';
 
     const purchasedPct = totalUnitsCount > 0 ? Math.round((totalPurchasedUnitsCount / totalUnitsCount) * 100) : 0;
 
     modal.innerHTML = `
-        <div style="background:#1e293b; border:2px solid #10b981; border-radius:20px; max-width:880px; width:100%; max-height:92vh; display:flex; flex-direction:column; box-shadow:0 25px 60px rgba(0,0,0,0.7); color:#f8fafc; text-align:${isAr ? 'right' : 'left'}; direction:${isAr ? 'rtl' : 'ltr'}; overflow:hidden;">
+        <style>
+            .salla-batch-container {
+                background: #1e293b;
+                border: 2px solid #10b981;
+                border-radius: 18px;
+                max-width: 880px;
+                width: 100%;
+                max-height: 94vh;
+                display: flex;
+                flex-direction: column;
+                box-shadow: 0 25px 60px rgba(0,0,0,0.7);
+                color: #f8fafc;
+                text-align: ${isAr ? 'right' : 'left'};
+                direction: ${isAr ? 'rtl' : 'ltr'};
+                overflow: hidden;
+            }
+            .salla-batch-header {
+                padding: 14px 18px;
+                border-bottom: 1px solid #334155;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 10px;
+            }
+            .salla-batch-stats {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 8px;
+                margin-bottom: 10px;
+            }
+            .salla-batch-stat-box {
+                background: #1e293b;
+                border: 1px solid #334155;
+                border-radius: 10px;
+                padding: 8px 6px;
+                text-align: center;
+            }
+            .salla-batch-item {
+                background: #0f172a;
+                border: 1.5px solid #334155;
+                border-radius: 12px;
+                padding: 12px 14px;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                transition: all 0.2s ease;
+            }
+            @media (min-width: 641px) {
+                .salla-batch-header {
+                    padding: 18px 24px;
+                }
+                .salla-batch-item {
+                    flex-direction: row;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 16px;
+                    padding: 14px 16px;
+                }
+            }
+            @media (max-width: 640px) {
+                .salla-batch-container {
+                    border-radius: 14px;
+                    max-height: 96vh;
+                }
+                .salla-batch-stats {
+                    gap: 5px;
+                }
+                .salla-batch-stat-box {
+                    padding: 6px 4px;
+                }
+            }
+        </style>
+        <div class="salla-batch-container">
             
             <!-- Modal Header -->
-            <div style="padding:20px 24px; border-bottom:1px solid #334155; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-                <div style="display:flex; align-items:center; gap:12px;">
-                    <div style="width:48px; height:48px; border-radius:14px; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); display:flex; align-items:center; justify-content:center; font-size:1.8rem;">
+            <div class="salla-batch-header">
+                <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
+                    <div style="width:38px; height:38px; border-radius:10px; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); display:flex; align-items:center; justify-content:center; font-size:1.3rem; flex-shrink:0;">
                         📦
                     </div>
-                    <div>
-                        <h3 style="margin:0; font-size:1.25rem; color:#10b981; font-weight:900;">
-                            ${isAr ? 'مجمع تجهيز وشراء الأصناف الكلي (سلة)' : 'Total Salla Batch Preparation & Purchasing'}
+                    <div style="min-width:0; flex:1;">
+                        <h3 style="margin:0; font-size:1.05rem; color:#10b981; font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                            ${isAr ? 'مجمع تجهيز وشراء الأصناف' : 'Total Batch Preparation & Purchasing'}
                         </h3>
-                        <p style="margin:4px 0 0 0; font-size:0.82rem; color:#94a3b8;">
-                            ${isAr ? 'انقر على اسم أي عميل لتحديده كـ (تم الشراء) ويتم خصم كميته فوراً من العدد الإجمالي' : 'Click on any customer badge to mark their unit as prepared and automatically deduct from the total'}
+                        <p style="margin:2px 0 0 0; font-size:0.72rem; color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                            ${isAr ? 'اضغط على اسم العميل لتأكيد توفير طلبه وخصمه فوراً' : 'Tap customer chip to mark prepared & deduct'}
                         </p>
                     </div>
                 </div>
 
-                <div style="display:flex; gap:8px; align-items:center;">
-                    <button type="button" onclick="printSallaBatchPurchases()" style="padding:8px 14px; background:#334155; color:#f8fafc; border:1px solid #475569; border-radius:10px; font-weight:800; font-size:0.82rem; cursor:pointer; display:flex; align-items:center; gap:5px;">
-                        <span>🖨️</span> <span>${isAr ? 'طباعة القائمة' : 'Print Sheet'}</span>
+                <div style="display:flex; gap:6px; align-items:center; flex-shrink:0;">
+                    <button type="button" onclick="printSallaBatchPurchases()" title="${isAr ? 'طباعة' : 'Print'}" style="padding:6px 10px; background:#334155; color:#f8fafc; border:1px solid #475569; border-radius:8px; font-weight:800; font-size:0.76rem; cursor:pointer; display:flex; align-items:center; gap:4px;">
+                        <span>🖨️</span> <span class="hide-on-mobile">${isAr ? 'طباعة' : 'Print'}</span>
                     </button>
-                    <button type="button" onclick="closeSallaBatchPrepModal()" style="width:36px; height:36px; border-radius:50%; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#ef4444; font-size:1.2rem; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                    <button type="button" onclick="closeSallaBatchPrepModal()" style="width:32px; height:32px; border-radius:50%; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#ef4444; font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center;">
                         ✕
                     </button>
                 </div>
             </div>
 
             <!-- Top Summary Badges & Progress -->
-            <div style="padding:16px 24px; background:rgba(15,23,42,0.6); border-bottom:1px solid #334155;">
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:10px; margin-bottom:12px;">
-                    <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:10px 14px;">
-                        <div style="font-size:0.75rem; color:#94a3b8; font-weight:700;">${isAr ? 'إجمالي القطع المطلوبة' : 'Total Units to Prepare'}</div>
-                        <div style="font-size:1.4rem; font-weight:900; color:#38bdf8; margin-top:2px;">${totalUnitsCount} ${isAr ? 'قطعة' : 'Units'}</div>
+            <div style="padding:12px 16px; background:rgba(15,23,42,0.6); border-bottom:1px solid #334155;">
+                <div class="salla-batch-stats">
+                    <div class="salla-batch-stat-box">
+                        <div style="font-size:0.68rem; color:#94a3b8; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${isAr ? 'القطع المطلوبة' : 'Total Units'}</div>
+                        <div style="font-size:1.15rem; font-weight:900; color:#38bdf8; margin-top:2px;">${totalUnitsCount} <span style="font-size:0.7rem; font-weight:700;">${isAr ? 'قطعة' : 'Pcs'}</span></div>
                     </div>
-                    <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:10px 14px;">
-                        <div style="font-size:0.75rem; color:#94a3b8; font-weight:700;">${isAr ? 'عدد الأصناف الفريدة' : 'Unique Products'}</div>
-                        <div style="font-size:1.4rem; font-weight:900; color:#f59e0b; margin-top:2px;">${totalUniqueProducts} ${isAr ? 'صنف' : 'Products'}</div>
+                    <div class="salla-batch-stat-box">
+                        <div style="font-size:0.68rem; color:#94a3b8; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${isAr ? 'الأصناف الفريدة' : 'Unique Items'}</div>
+                        <div style="font-size:1.15rem; font-weight:900; color:#f59e0b; margin-top:2px;">${totalUniqueProducts} <span style="font-size:0.7rem; font-weight:700;">${isAr ? 'صنف' : 'Items'}</span></div>
                     </div>
-                    <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:10px 14px;">
-                        <div style="font-size:0.75rem; color:#94a3b8; font-weight:700;">${isAr ? 'تم شراؤها وتجهيزها' : 'Purchased & Ready'}</div>
-                        <div style="font-size:1.4rem; font-weight:900; color:#10b981; margin-top:2px;">${totalPurchasedUnitsCount} / ${totalUnitsCount} (${purchasedPct}%)</div>
+                    <div class="salla-batch-stat-box">
+                        <div style="font-size:0.68rem; color:#94a3b8; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${isAr ? 'تم الشراء' : 'Purchased'}</div>
+                        <div style="font-size:1.15rem; font-weight:900; color:#10b981; margin-top:2px;">${totalPurchasedUnitsCount}/${totalUnitsCount} <span style="font-size:0.7rem; font-weight:700;">(${purchasedPct}%)</span></div>
                     </div>
                 </div>
 
                 <!-- Progress Bar -->
-                <div style="width:100%; height:8px; background:#0f172a; border-radius:10px; overflow:hidden; border:1px solid #334155;">
+                <div style="width:100%; height:6px; background:#0f172a; border-radius:10px; overflow:hidden; border:1px solid #334155;">
                     <div style="width:${purchasedPct}%; height:100%; background:linear-gradient(90deg, #10b981, #059669); transition:width 0.3s ease;"></div>
                 </div>
 
-                <!-- Filter Buttons -->
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; flex-wrap:wrap; gap:8px;">
-                    <div style="display:flex; gap:6px;">
-                        <button type="button" onclick="setSallaBatchFilter('ALL')" style="padding:6px 14px; border-radius:8px; font-weight:800; font-size:0.78rem; cursor:pointer; border:1px solid ${sallaBatchFilterMode === 'ALL' ? '#10b981' : '#475569'}; background:${sallaBatchFilterMode === 'ALL' ? 'rgba(16,185,129,0.2)' : '#1e293b'}; color:${sallaBatchFilterMode === 'ALL' ? '#10b981' : '#94a3b8'};">
-                            ${isAr ? 'الكل' : 'All Items'} (${batchItems.length})
+                <!-- Filter Buttons Row -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; flex-wrap:nowrap; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:2px;">
+                    <div style="display:flex; gap:5px; flex-shrink:0;">
+                        <button type="button" onclick="setSallaBatchFilter('ALL')" style="padding:5px 10px; border-radius:7px; font-weight:800; font-size:0.74rem; cursor:pointer; white-space:nowrap; border:1px solid ${sallaBatchFilterMode === 'ALL' ? '#10b981' : '#475569'}; background:${sallaBatchFilterMode === 'ALL' ? 'rgba(16,185,129,0.2)' : '#1e293b'}; color:${sallaBatchFilterMode === 'ALL' ? '#10b981' : '#94a3b8'};">
+                            ${isAr ? 'الكل' : 'All'} (${batchItems.length})
                         </button>
-                        <button type="button" onclick="setSallaBatchFilter('TO_BUY')" style="padding:6px 14px; border-radius:8px; font-weight:800; font-size:0.78rem; cursor:pointer; border:1px solid ${sallaBatchFilterMode === 'TO_BUY' ? '#f59e0b' : '#475569'}; background:${sallaBatchFilterMode === 'TO_BUY' ? 'rgba(245,158,11,0.2)' : '#1e293b'}; color:${sallaBatchFilterMode === 'TO_BUY' ? '#f59e0b' : '#94a3b8'};">
-                            🛒 ${isAr ? 'مطلوب للشراء' : 'To Buy'} (${batchItems.filter(i => !i.isPurchased).length})
+                        <button type="button" onclick="setSallaBatchFilter('TO_BUY')" style="padding:5px 10px; border-radius:7px; font-weight:800; font-size:0.74rem; cursor:pointer; white-space:nowrap; border:1px solid ${sallaBatchFilterMode === 'TO_BUY' ? '#f59e0b' : '#475569'}; background:${sallaBatchFilterMode === 'TO_BUY' ? 'rgba(245,158,11,0.2)' : '#1e293b'}; color:${sallaBatchFilterMode === 'TO_BUY' ? '#f59e0b' : '#94a3b8'};">
+                            🛒 ${isAr ? 'مطلوب' : 'To Buy'} (${batchItems.filter(i => !i.isPurchased).length})
                         </button>
-                        <button type="button" onclick="setSallaBatchFilter('PURCHASED')" style="padding:6px 14px; border-radius:8px; font-weight:800; font-size:0.78rem; cursor:pointer; border:1px solid ${sallaBatchFilterMode === 'PURCHASED' ? '#10b981' : '#475569'}; background:${sallaBatchFilterMode === 'PURCHASED' ? 'rgba(16,185,129,0.2)' : '#1e293b'}; color:${sallaBatchFilterMode === 'PURCHASED' ? '#10b981' : '#94a3b8'};">
-                            ✅ ${isAr ? 'تم الشراء والتوفير' : 'Purchased'} (${batchItems.filter(i => i.isPurchased).length})
+                        <button type="button" onclick="setSallaBatchFilter('PURCHASED')" style="padding:5px 10px; border-radius:7px; font-weight:800; font-size:0.74rem; cursor:pointer; white-space:nowrap; border:1px solid ${sallaBatchFilterMode === 'PURCHASED' ? '#10b981' : '#475569'}; background:${sallaBatchFilterMode === 'PURCHASED' ? 'rgba(16,185,129,0.2)' : '#1e293b'}; color:${sallaBatchFilterMode === 'PURCHASED' ? '#10b981' : '#94a3b8'};">
+                            ✅ ${isAr ? 'تم' : 'Done'} (${batchItems.filter(i => i.isPurchased).length})
                         </button>
                     </div>
 
-                    <button type="button" onclick="resetAllSallaBatchChecks()" style="padding:6px 12px; background:none; border:none; color:#94a3b8; font-size:0.75rem; font-weight:700; cursor:pointer; text-decoration:underline;">
-                        ${isAr ? 'إعادة ضبط كل التحديدات' : 'Reset All Checks'}
+                    <button type="button" onclick="resetAllSallaBatchChecks()" style="padding:4px 8px; background:none; border:none; color:#94a3b8; font-size:0.72rem; font-weight:700; cursor:pointer; text-decoration:underline; white-space:nowrap; flex-shrink:0;">
+                        ${isAr ? 'إعادة ضبط' : 'Reset'}
                     </button>
                 </div>
             </div>
 
             <!-- Scrollable Items List with Interactive Customer Chips -->
-            <div id="salla-batch-prep-list" style="flex:1; overflow-y:auto; padding:18px 24px; display:flex; flex-direction:column; gap:12px;">
+            <div id="salla-batch-prep-list" style="flex:1; overflow-y:auto; padding:12px 14px; display:flex; flex-direction:column; gap:10px;">
                 ${filteredItems.length > 0 ? filteredItems.map((item, itemIdx) => {
                     const isAllDone = item.isPurchased === true;
                     
@@ -33163,7 +33303,7 @@ function openSallaBatchPrepModal() {
                         const isDone = o.isChecked === true;
                         return `
                             <button type="button" onclick="toggleBatchCustomerByIndex(${itemIdx}, ${ordIdx})" 
-                                style="background:${isDone ? 'rgba(16,185,129,0.25)' : '#0f172a'}; border:1.5px solid ${isDone ? '#10b981' : '#334155'}; color:${isDone ? '#10b981' : '#cbd5e1'}; padding:5px 12px; border-radius:8px; font-size:0.8rem; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:6px; margin:3px; transition:all 0.2s ease; box-shadow:${isDone ? '0 0 10px rgba(16,185,129,0.3)' : 'none'}; text-decoration:${isDone ? 'line-through' : 'none'};">
+                                style="background:${isDone ? 'rgba(16,185,129,0.25)' : '#0f172a'}; border:1.5px solid ${isDone ? '#10b981' : '#334155'}; color:${isDone ? '#10b981' : '#cbd5e1'}; padding:5px 10px; border-radius:8px; font-size:0.76rem; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:5px; margin:2px; transition:all 0.15s ease; box-shadow:${isDone ? '0 0 8px rgba(16,185,129,0.25)' : 'none'}; text-decoration:${isDone ? 'line-through' : 'none'};">
                                 <span>${isDone ? '✅' : '🛒'}</span>
                                 <span>#${o.orderNum} (${o.qty}x ${o.customer})</span>
                             </button>
@@ -33171,57 +33311,60 @@ function openSallaBatchPrepModal() {
                     }).join(' ');
 
                     return `
-                        <div style="background:${isAllDone ? 'rgba(16,185,129,0.12)' : '#0f172a'}; border:2px solid ${isAllDone ? '#10b981' : '#334155'}; border-radius:14px; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; gap:16px; transition:all 0.2s ease; box-shadow:${isAllDone ? '0 0 16px rgba(16,185,129,0.25)' : 'none'};">
+                        <div class="salla-batch-item" style="background:${isAllDone ? 'rgba(16,185,129,0.12)' : '#0f172a'}; border:2px solid ${isAllDone ? '#10b981' : '#334155'}; box-shadow:${isAllDone ? '0 0 14px rgba(16,185,129,0.2)' : 'none'};">
                             
-                            <div style="display:flex; align-items:flex-start; gap:14px; flex:1;">
-                                <input type="checkbox" ${isAllDone ? 'checked' : ''} onclick="event.stopPropagation(); toggleBatchItemByIndex(${itemIdx})" style="width:24px; height:24px; cursor:pointer; accent-color:#10b981; flex-shrink:0; margin-top:3px;">
-                                
-                                <div style="flex:1;">
-                                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                                        <span onclick="toggleBatchItemByIndex(${itemIdx})" style="font-size:1.15rem; font-weight:900; color:${isAllDone ? '#10b981' : '#f8fafc'}; text-decoration:${isAllDone ? 'line-through' : 'none'}; cursor:pointer;">
-                                            ${item.name}
-                                        </span>
-                                        ${item.options ? `<span style="font-size:0.75rem; color:#94a3b8;">(${item.options})</span>` : ''}
-                                        <button type="button" onclick="excludeSallaStatProduct('${item.name.replace(/'/g, "\\'")}')" title="${isAr ? 'استبعاد / حذف من المجمع' : 'Exclude item'}" style="background:none; border:none; color:#ef4444; font-size:0.85rem; cursor:pointer; padding:0 4px;">
-                                            🗑️
-                                        </button>
-                                    </div>
+                            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px; width:100%;">
+                                <div style="display:flex; align-items:flex-start; gap:10px; flex:1; min-width:0;">
+                                    <input type="checkbox" ${isAllDone ? 'checked' : ''} onclick="event.stopPropagation(); toggleBatchItemByIndex(${itemIdx})" style="width:22px; height:22px; cursor:pointer; accent-color:#10b981; flex-shrink:0; margin-top:2px;">
                                     
-                                    <div style="margin-top:8px; font-size:0.78rem; color:#64748b; line-height:1.6;">
-                                        <div style="margin-bottom:4px; font-weight:700; color:#94a3b8;">${isAr ? 'الطلبات والعملاء (اضغط لتأكيد إحضار طلب العميل):' : 'Click customer to mark prepared:'}</div>
-                                        <div style="display:flex; flex-wrap:wrap; gap:4px;">
-                                            ${customerChipsHtml}
+                                    <div style="flex:1; min-width:0;">
+                                        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                            <span onclick="toggleBatchItemByIndex(${itemIdx})" style="font-size:1.05rem; font-weight:900; color:${isAllDone ? '#10b981' : '#f8fafc'}; text-decoration:${isAllDone ? 'line-through' : 'none'}; cursor:pointer; word-break:break-word;">
+                                                ${item.name}
+                                            </span>
+                                            ${item.options ? `<span style="font-size:0.72rem; color:#94a3b8;">(${item.options})</span>` : ''}
+                                            <button type="button" onclick="excludeSallaStatProduct('${item.name.replace(/'/g, "\\'")}')" title="${isAr ? 'استبعاد' : 'Exclude'}" style="background:none; border:none; color:#ef4444; font-size:0.8rem; cursor:pointer; padding:0 3px;">
+                                                🗑️
+                                            </button>
                                         </div>
+                                    </div>
+                                </div>
+
+                                <!-- Live Quantity Badge on Right -->
+                                <div onclick="toggleBatchItemByIndex(${itemIdx})" style="text-align:center; flex-shrink:0; cursor:pointer;">
+                                    <div style="background:${isAllDone ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.18)'}; color:${isAllDone ? '#10b981' : '#f59e0b'}; border:1.5px solid ${isAllDone ? '#10b981' : 'rgba(245,158,11,0.35)'}; padding:4px 10px; border-radius:10px; font-weight:900; font-size:1.15rem; min-width:55px;">
+                                        ${item.remainingQty}x
+                                    </div>
+                                    <div style="font-size:0.68rem; font-weight:800; color:${isAllDone ? '#10b981' : '#f59e0b'}; margin-top:2px;">
+                                        ${isAllDone ? (isAr ? '✅ جاهز' : 'Ready') : (isAr ? `متبقي ${item.remainingQty}` : `${item.remainingQty} Left`)}
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Live Quantity Badge & Status -->
-                            <div onclick="toggleBatchItemByIndex(${itemIdx})" style="text-align:center; flex-shrink:0; min-width:85px; cursor:pointer;">
-                                <div style="background:${isAllDone ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.18)'}; color:${isAllDone ? '#10b981' : '#f59e0b'}; border:1.5px solid ${isAllDone ? '#10b981' : 'rgba(245,158,11,0.35)'}; padding:6px 14px; border-radius:12px; font-weight:900; font-size:1.25rem;">
-                                    ${item.remainingQty}x
-                                </div>
-                                <div style="font-size:0.72rem; font-weight:800; color:${isAllDone ? '#10b981' : '#f59e0b'}; margin-top:4px;">
-                                    ${isAllDone ? (isAr ? '✅ جاهز بالكامل' : 'All Ready') : (isAr ? `🛒 متبقي ${item.remainingQty} من ${item.totalQty}` : `${item.remainingQty} of ${item.totalQty} Left`)}
+                            <!-- Customer Chips Row -->
+                            <div style="margin-top:2px; font-size:0.74rem; color:#64748b; line-height:1.5; width:100%; border-top:1px dashed #1e293b; padding-top:8px;">
+                                <div style="margin-bottom:4px; font-weight:700; color:#94a3b8; font-size:0.72rem;">${isAr ? 'الطلبات والعملاء:' : 'Customers & Orders:'}</div>
+                                <div style="display:flex; flex-wrap:wrap; gap:3px;">
+                                    ${customerChipsHtml}
                                 </div>
                             </div>
 
                         </div>
                     `;
                 }).join('') : `
-                    <div style="text-align:center; padding:40px; color:#94a3b8;">
-                        <div style="font-size:2.5rem; margin-bottom:8px;">✅</div>
-                        <div style="font-weight:800;">${isAr ? 'لا توجد أصناف في هذا التصنيف' : 'No items in this filter'}</div>
+                    <div style="text-align:center; padding:35px 15px; color:#94a3b8;">
+                        <div style="font-size:2.2rem; margin-bottom:6px;">✅</div>
+                        <div style="font-weight:800; font-size:0.9rem;">${isAr ? 'لا توجد أصناف في هذا التصنيف' : 'No items in this filter'}</div>
                     </div>
                 `}
             </div>
 
             <!-- Footer -->
-            <div style="padding:14px 24px; border-top:1px solid #334155; background:rgba(15,23,42,0.6); display:flex; justify-content:space-between; align-items:center;">
-                <div style="font-size:0.82rem; color:#94a3b8;">
-                    💡 <b>${isAr ? 'ملاحظة:' : 'Note:'}</b> ${isAr ? 'الضغط على أي عميل يخصم كميته تلقائياً من المجموع ويحفظ الحالة لجميع العمال.' : 'Clicking a customer chip deducts their quantity from the total and syncs across all workers.'}
+            <div style="padding:10px 16px; border-top:1px solid #334155; background:rgba(15,23,42,0.6); display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <div style="font-size:0.74rem; color:#94a3b8; line-height:1.3; flex:1;">
+                    💡 <b>${isAr ? 'ملاحظة:' : 'Note:'}</b> ${isAr ? 'الضغط على العميل يخصم كميته فوراً ويحفظها للجميع.' : 'Tapping a customer chip deducts qty & syncs for all workers.'}
                 </div>
-                <button type="button" onclick="closeSallaBatchPrepModal()" style="padding:8px 20px; background:#334155; color:#f8fafc; border:none; border-radius:10px; font-weight:800; cursor:pointer;">
+                <button type="button" onclick="closeSallaBatchPrepModal()" style="padding:7px 16px; background:#334155; color:#f8fafc; border:none; border-radius:8px; font-weight:800; font-size:0.8rem; cursor:pointer; flex-shrink:0;">
                     ${isAr ? 'إغلاق' : 'Close'}
                 </button>
             </div>
