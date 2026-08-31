@@ -4908,13 +4908,224 @@ function convertNoteToTask(rawText) {
 window.convertNoteToTask = convertNoteToTask;
 
 // =========================================================================
-// ADMIN REMINDERS ENGINE & CYCLES
+// ADMIN REMINDERS ENGINE & CYCLES & SAVED CONTACTS
 // =========================================================================
+
+function formatSaudiPhone(phone) {
+    if (!phone) return '';
+    let p = String(phone).trim().replace(/[\s\-\(\)]/g, '');
+    if (p.startsWith('+')) return p; // International number manually specified with +
+    if (p.startsWith('00')) return '+' + p.slice(2);
+    if (p.startsWith('05') && p.length === 10) return '+966' + p.slice(1);
+    if (p.startsWith('5') && p.length === 9) return '+966' + p;
+    if (p.startsWith('966')) return '+' + p;
+    if (p.startsWith('0')) return '+966' + p.slice(1);
+    return p;
+}
+window.formatSaudiPhone = formatSaudiPhone;
+
+function normalizeReminderPhoneInput(inputEl) {
+    if (!inputEl || !inputEl.value) return;
+    const formatted = formatSaudiPhone(inputEl.value);
+    if (formatted) inputEl.value = formatted;
+}
+window.normalizeReminderPhoneInput = normalizeReminderPhoneInput;
+
+function renderReminderContactsDropdown() {
+    const select = document.getElementById('reminder-contact-select');
+    const modalList = document.getElementById('reminder-contacts-modal-list');
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const companyData = getCompanyData();
+    const contactsMap = companyData.reminderContacts || {};
+    const contactsList = Object.values(contactsMap).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+    // Populate dropdown in the Add Reminder form
+    if (select) {
+        const currentSelected = select.value;
+        let html = `<option value="">👤 ${isAr ? '-- اختر من الأرقام المحفوظة --' : '-- Choose Saved Contact --'}</option>`;
+        contactsList.forEach(c => {
+            html += `<option value="${c.phone}">${c.name} (${c.phone})</option>`;
+        });
+        select.innerHTML = html;
+        if (currentSelected) select.value = currentSelected;
+    }
+
+    // Populate list in the Contacts Management Modal
+    if (modalList) {
+        if (contactsList.length === 0) {
+            modalList.innerHTML = `
+                <div style="text-align:center; padding:24px; color:var(--text-muted); font-size:0.88rem;">
+                    ${isAr ? 'لا توجد أرقام محفوظة بعد. أضف اسماً ورقماً أعلاه لحفظ جهة اتصال جديدة.' : 'No saved contacts yet. Add a name and phone above to save one.'}
+                </div>
+            `;
+        } else {
+            let html = '';
+            contactsList.forEach(c => {
+                const escapedPhone = (c.phone || '').replace(/'/g, "\\'");
+                html += `
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--input-bg); border-radius:10px; border:1px solid var(--border-color); margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+                        <div>
+                            <strong style="font-size:0.95rem; color:var(--text-main); display:block;">👤 ${c.name}</strong>
+                            <span style="font-size:0.82rem; color:#38bdf8; font-weight:700; font-family:ui-monospace, monospace;">📞 ${c.phone}</span>
+                        </div>
+                        <div style="display:flex; gap:6px;">
+                            <button type="button" onclick="selectReminderContactFromModal('${escapedPhone}')" class="btn-success" style="padding:6px 14px; font-size:0.8rem; font-weight:700;">
+                                ${isAr ? 'اختيار ➔' : 'Select ➔'}
+                            </button>
+                            <button type="button" onclick="deleteReminderContact('${c.id}')" class="btn-outline-danger" style="padding:6px 10px; font-size:0.8rem; font-weight:700;">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            modalList.innerHTML = html;
+        }
+    }
+}
+window.renderReminderContactsDropdown = renderReminderContactsDropdown;
+
+function onSelectReminderContact(phoneVal) {
+    const phoneInput = document.getElementById('reminder-phone-input');
+    if (phoneInput && phoneVal) {
+        phoneInput.value = phoneVal;
+    }
+}
+window.onSelectReminderContact = onSelectReminderContact;
+
+function selectReminderContactFromModal(phoneVal) {
+    const phoneInput = document.getElementById('reminder-phone-input');
+    const select = document.getElementById('reminder-contact-select');
+    if (phoneInput && phoneVal) {
+        phoneInput.value = phoneVal;
+    }
+    if (select) {
+        select.value = phoneVal;
+    }
+    closeReminderContactsModal();
+}
+window.selectReminderContactFromModal = selectReminderContactFromModal;
+
+function openReminderContactsModal() {
+    const modal = document.getElementById('modal-reminder-contacts');
+    if (modal) {
+        renderReminderContactsDropdown();
+        modal.style.display = 'flex';
+    }
+}
+window.openReminderContactsModal = openReminderContactsModal;
+
+function closeReminderContactsModal() {
+    const modal = document.getElementById('modal-reminder-contacts');
+    if (modal) modal.style.display = 'none';
+}
+window.closeReminderContactsModal = closeReminderContactsModal;
+
+function quickSaveCurrentReminderPhone() {
+    const phoneInput = document.getElementById('reminder-phone-input');
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    let phoneVal = phoneInput ? phoneInput.value.trim() : '';
+    if (!phoneVal) {
+        alert(isAr ? 'يرجى كتابة رقم الهاتف أولاً في الخانة لحفظه.' : 'Please enter a phone number in the field first.');
+        if (phoneInput) phoneInput.focus();
+        return;
+    }
+    phoneVal = formatSaudiPhone(phoneVal);
+    if (phoneInput) phoneInput.value = phoneVal;
+
+    const modalNameInput = document.getElementById('new-contact-name-input');
+    const modalPhoneInput = document.getElementById('new-contact-phone-input');
+    if (modalPhoneInput) modalPhoneInput.value = phoneVal;
+    if (modalNameInput) modalNameInput.value = '';
+    
+    openReminderContactsModal();
+    if (modalNameInput) modalNameInput.focus();
+}
+window.quickSaveCurrentReminderPhone = quickSaveCurrentReminderPhone;
+
+function saveReminderContact() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const nameInput = document.getElementById('new-contact-name-input');
+    const phoneInput = document.getElementById('new-contact-phone-input');
+    const nameVal = nameInput ? nameInput.value.trim() : '';
+    let phoneVal = phoneInput ? phoneInput.value.trim() : '';
+
+    if (!nameVal) {
+        alert(isAr ? 'يرجى إدخال اسم جهة الاتصال (مثال: أحمد الصيانة، صاحب العقار).' : 'Please enter a contact name.');
+        if (nameInput) nameInput.focus();
+        return;
+    }
+    if (!phoneVal) {
+        alert(isAr ? 'يرجى إدخال رقم الهاتف.' : 'Please enter a phone number.');
+        if (phoneInput) phoneInput.focus();
+        return;
+    }
+
+    phoneVal = formatSaudiPhone(phoneVal);
+    const contactId = 'ctc-' + Date.now();
+    const contactObj = {
+        id: contactId,
+        name: nameVal,
+        phone: phoneVal,
+        createdAt: Date.now(),
+        createdBy: currentUser ? (currentUser.email || 'Admin') : 'Admin'
+    };
+
+    // Optimistic in-memory update
+    if (appData[currentCompany]) {
+        if (!appData[currentCompany].reminderContacts) appData[currentCompany].reminderContacts = {};
+        appData[currentCompany].reminderContacts[contactId] = contactObj;
+    }
+
+    if (nameInput) nameInput.value = '';
+    if (phoneInput) phoneInput.value = '';
+
+    renderReminderContactsDropdown();
+    
+    // Set in the main reminder form as well
+    const mainPhoneInput = document.getElementById('reminder-phone-input');
+    const mainSelect = document.getElementById('reminder-contact-select');
+    if (mainPhoneInput) mainPhoneInput.value = phoneVal;
+    if (mainSelect) mainSelect.value = phoneVal;
+
+    if (typeof showInAppNotification === 'function') {
+        showInAppNotification(isAr ? `✅ تم حفظ جهة الاتصال "${nameVal}" بنجاح!` : `✅ Saved contact "${nameVal}" successfully!`);
+    }
+
+    // Persist to Firebase
+    db.ref(`companies/${currentCompany}/reminderContacts/${contactId}`).set(contactObj)
+        .catch(err => console.error("Error saving reminder contact:", err));
+}
+window.saveReminderContact = saveReminderContact;
+
+function deleteReminderContact(contactId) {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    if (!confirm(isAr ? 'هل أنت متأكد من حذف جهة الاتصال هذه؟' : 'Are you sure you want to delete this contact?')) {
+        return;
+    }
+
+    // Optimistic in-memory deletion
+    if (appData[currentCompany] && appData[currentCompany].reminderContacts) {
+        delete appData[currentCompany].reminderContacts[contactId];
+    }
+    renderReminderContactsDropdown();
+
+    db.ref(`companies/${currentCompany}/reminderContacts/${contactId}`).remove()
+        .then(() => {
+            if (typeof showInAppNotification === 'function') {
+                showInAppNotification(isAr ? '🗑️ تم حذف جهة الاتصال بنجاح.' : '🗑️ Contact deleted successfully.');
+            }
+        })
+        .catch(err => console.error("Error deleting contact:", err));
+}
+window.deleteReminderContact = deleteReminderContact;
+
 function addReminder() {
     const isAr = currentAppLang === 'ar';
     const titleVal = document.getElementById('reminder-title-input') ? document.getElementById('reminder-title-input').value.trim() : '';
     const deadlineVal = document.getElementById('reminder-deadline-input') ? document.getElementById('reminder-deadline-input').value : '';
-    const phoneVal = document.getElementById('reminder-phone-input') ? document.getElementById('reminder-phone-input').value.trim() : '';
+    const phoneRaw = document.getElementById('reminder-phone-input') ? document.getElementById('reminder-phone-input').value.trim() : '';
+    const phoneVal = formatSaudiPhone(phoneRaw);
     const noteVal = document.getElementById('reminder-note-input') ? document.getElementById('reminder-note-input').value.trim() : '';
     const leadTimes = Array.from(document.querySelectorAll('.rem-lead-cb:checked')).map(cb => cb.value);
 
@@ -5320,6 +5531,10 @@ function renderReminders() {
 
     if (typeof setupRemindersInfiniteScroll === 'function') {
         setupRemindersInfiniteScroll();
+    }
+
+    if (typeof renderReminderContactsDropdown === 'function') {
+        renderReminderContactsDropdown();
     }
 
     const isAr = currentAppLang === 'ar';

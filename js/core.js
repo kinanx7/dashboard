@@ -2057,6 +2057,7 @@ function listenToCloudData() {
                 if (typeof renderAnnouncementTemplates === 'function') renderAnnouncementTemplates(); 
             } },
             { key: 'reminders', render: () => { if (typeof renderReminders === 'function') renderReminders(); } },
+            { key: 'reminderContacts', render: () => { if (typeof renderReminderContactsDropdown === 'function') renderReminderContactsDropdown(); } },
             { key: 'attendance', render: () => { 
                 if (typeof renderAttendance === 'function') renderAttendance(); 
                 if (typeof renderSummaryTable === 'function') renderSummaryTable(); 
