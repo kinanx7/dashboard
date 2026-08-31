@@ -2040,7 +2040,7 @@ function listenToCloudData() {
         renderAll();
         checkStockAlerts();
 
-        // 2. High-Efficiency Granular Sub-Node Listeners (Reduces bandwidth by 95%+)
+        // 2. High-Efficiency Granular Sub-Node Listeners
         const subNodes = [
             { key: 'workers', render: () => { applyUserRoles(); renderWorkers(); renderTasks(); if (typeof renderConstantTasksSection === 'function') renderConstantTasksSection(); if (typeof renderInquiriesSection === 'function') renderInquiriesSection(); } },
             { key: 'warehouse', render: () => { renderWarehouse(); checkStockAlerts(); } },
@@ -2055,7 +2055,31 @@ function listenToCloudData() {
             } },
             { key: 'announcementTemplates', render: () => { 
                 if (typeof renderAnnouncementTemplates === 'function') renderAnnouncementTemplates(); 
-            } }
+            } },
+            { key: 'reminders', render: () => { if (typeof renderReminders === 'function') renderReminders(); } },
+            { key: 'attendance', render: () => { 
+                if (typeof renderAttendance === 'function') renderAttendance(); 
+                if (typeof renderSummaryTable === 'function') renderSummaryTable(); 
+                if (typeof renderFinanceTable === 'function') renderFinanceTable(); 
+            } },
+            { key: 'sales', render: () => { 
+                if (typeof renderSales === 'function') renderSales(); 
+                if (typeof renderSalesHistoryTable === 'function') renderSalesHistoryTable(); 
+                if (typeof renderSalesSummaryTable === 'function') renderSalesSummaryTable(); 
+            } },
+            { key: 'costs', render: () => { if (typeof renderCosts === 'function') renderCosts(); } },
+            { key: 'generalTasks', render: () => { if (typeof renderTasks === 'function') renderTasks(); } },
+            { key: 'constantResponsibilities', render: () => { if (typeof renderConstantTasksSection === 'function') renderConstantTasksSection(); } },
+            { key: 'generalDeliveries', render: () => { if (typeof renderTasks === 'function') renderTasks(); } },
+            { key: 'custodyRequests', render: () => { if (typeof renderCustodyRequests === 'function') renderCustodyRequests(); } },
+            { key: 'salaryAdvances', render: () => { if (typeof renderSalaryAdvancesTable === 'function') renderSalaryAdvancesTable(); } },
+            { key: 'customAllowances', render: () => { if (typeof renderFinanceTable === 'function') renderFinanceTable(); } },
+            { key: 'customDeductions', render: () => { if (typeof renderFinanceTable === 'function') renderFinanceTable(); } },
+            { key: 'dailyLedger', render: () => { if (typeof renderDailyLedger === 'function') renderDailyLedger(); } },
+            { key: 'activityLog', render: () => { if (typeof renderActivityLog === 'function') renderActivityLog(); } },
+            { key: 'lateRules', render: () => { if (typeof renderAttendance === 'function') renderAttendance(); } },
+            { key: 'driverVolumeRewards', render: () => { if (typeof renderFinanceTable === 'function') renderFinanceTable(); } },
+            { key: 'rankSettings', render: () => { if (typeof renderRanks === 'function') renderRanks(); } }
         ];
 
         subNodes.forEach(node => {

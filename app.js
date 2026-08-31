@@ -2040,7 +2040,7 @@ function listenToCloudData() {
         renderAll();
         checkStockAlerts();
 
-        // 2. High-Efficiency Granular Sub-Node Listeners (Reduces bandwidth by 95%+)
+        // 2. High-Efficiency Granular Sub-Node Listeners
         const subNodes = [
             { key: 'workers', render: () => { applyUserRoles(); renderWorkers(); renderTasks(); if (typeof renderConstantTasksSection === 'function') renderConstantTasksSection(); if (typeof renderInquiriesSection === 'function') renderInquiriesSection(); } },
             { key: 'warehouse', render: () => { renderWarehouse(); checkStockAlerts(); } },
@@ -2055,7 +2055,31 @@ function listenToCloudData() {
             } },
             { key: 'announcementTemplates', render: () => { 
                 if (typeof renderAnnouncementTemplates === 'function') renderAnnouncementTemplates(); 
-            } }
+            } },
+            { key: 'reminders', render: () => { if (typeof renderReminders === 'function') renderReminders(); } },
+            { key: 'attendance', render: () => { 
+                if (typeof renderAttendance === 'function') renderAttendance(); 
+                if (typeof renderSummaryTable === 'function') renderSummaryTable(); 
+                if (typeof renderFinanceTable === 'function') renderFinanceTable(); 
+            } },
+            { key: 'sales', render: () => { 
+                if (typeof renderSales === 'function') renderSales(); 
+                if (typeof renderSalesHistoryTable === 'function') renderSalesHistoryTable(); 
+                if (typeof renderSalesSummaryTable === 'function') renderSalesSummaryTable(); 
+            } },
+            { key: 'costs', render: () => { if (typeof renderCosts === 'function') renderCosts(); } },
+            { key: 'generalTasks', render: () => { if (typeof renderTasks === 'function') renderTasks(); } },
+            { key: 'constantResponsibilities', render: () => { if (typeof renderConstantTasksSection === 'function') renderConstantTasksSection(); } },
+            { key: 'generalDeliveries', render: () => { if (typeof renderTasks === 'function') renderTasks(); } },
+            { key: 'custodyRequests', render: () => { if (typeof renderCustodyRequests === 'function') renderCustodyRequests(); } },
+            { key: 'salaryAdvances', render: () => { if (typeof renderSalaryAdvancesTable === 'function') renderSalaryAdvancesTable(); } },
+            { key: 'customAllowances', render: () => { if (typeof renderFinanceTable === 'function') renderFinanceTable(); } },
+            { key: 'customDeductions', render: () => { if (typeof renderFinanceTable === 'function') renderFinanceTable(); } },
+            { key: 'dailyLedger', render: () => { if (typeof renderDailyLedger === 'function') renderDailyLedger(); } },
+            { key: 'activityLog', render: () => { if (typeof renderActivityLog === 'function') renderActivityLog(); } },
+            { key: 'lateRules', render: () => { if (typeof renderAttendance === 'function') renderAttendance(); } },
+            { key: 'driverVolumeRewards', render: () => { if (typeof renderFinanceTable === 'function') renderFinanceTable(); } },
+            { key: 'rankSettings', render: () => { if (typeof renderRanks === 'function') renderRanks(); } }
         ];
 
         subNodes.forEach(node => {
@@ -16653,9 +16677,11 @@ function markWorkerAttendance(workerId, status) {
     const worker = getCompanyData().workers.find(w => w.id === workerId);
     if (!worker) return;
 
+    let checkTime = "";
+    let lateness = "";
+
     if (status === 'present') {
         const timeInput = document.getElementById(`att-time-${workerId}`);
-        let checkTime = "";
         if (timeInput && timeInput.value) {
             checkTime = timeInput.value;
         } else {
@@ -16673,41 +16699,33 @@ function markWorkerAttendance(workerId, status) {
         if (dateOverrideShift) {
             shiftStart = dateOverrideShift.startTime;
         }
-        const lateness = calculateLateness(shiftStart, checkTime);
-
-        db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}`).set({
-            status: 'present',
-            time: checkTime,
-            lateness: lateness || '',
-            timestamp: Date.now()
-        })
-            .then(() => {
-                logActivity('attendance', workerId, worker.name, `Marked attendance as PRESENT for ${worker.name} on ${dateStr} (Check-in: ${checkTime}, Lateness: ${lateness || 'None'})`);
-            })
-            .catch(err => console.error("Error setting attendance present:", err));
-    } else if (status === 'absent') {
-        db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}`).set({
-            status: 'absent',
-            time: '',
-            lateness: '',
-            timestamp: Date.now()
-        })
-            .then(() => {
-                logActivity('attendance', workerId, worker.name, `Marked attendance as ABSENT for ${worker.name} on ${dateStr}`);
-            })
-            .catch(err => console.error("Error setting attendance absent:", err));
-    } else if (status === 'vacation') {
-        db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}`).set({
-            status: 'vacation',
-            time: '',
-            lateness: '',
-            timestamp: Date.now()
-        })
-            .then(() => {
-                logActivity('attendance', workerId, worker.name, `Marked attendance as VACATION for ${worker.name} on ${dateStr}`);
-            })
-            .catch(err => console.error("Error setting attendance vacation:", err));
+        lateness = calculateLateness(shiftStart, checkTime) || '';
     }
+
+    const attRecord = {
+        status: status,
+        time: status === 'present' ? checkTime : '',
+        lateness: lateness,
+        timestamp: Date.now()
+    };
+
+    // 1. Optimistic in-memory update immediately so UI never freezes!
+    if (appData[currentCompany]) {
+        if (!appData[currentCompany].attendance) appData[currentCompany].attendance = {};
+        if (!appData[currentCompany].attendance[dateStr]) appData[currentCompany].attendance[dateStr] = {};
+        appData[currentCompany].attendance[dateStr][workerId] = attRecord;
+    }
+    renderAttendance();
+
+    // 2. Persist to Firebase
+    db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}`).set(attRecord)
+        .then(() => {
+            const actMsg = status === 'present' 
+                ? `Marked attendance as PRESENT for ${worker.name} on ${dateStr} (Check-in: ${checkTime}, Lateness: ${lateness || 'None'})`
+                : `Marked attendance as ${status.toUpperCase()} for ${worker.name} on ${dateStr}`;
+            logActivity('attendance', workerId, worker.name, actMsg);
+        })
+        .catch(err => console.error("Error setting attendance:", err));
 }
 
 function clearWorkerAttendance(workerId) {
@@ -16722,6 +16740,12 @@ function clearWorkerAttendance(workerId) {
     const wName = worker ? worker.name : 'Unknown';
 
     if (confirm(currentAppLang === 'ar' ? 'هل تريد مسح سجل الحضور لهذا اليوم؟' : 'Do you want to clear the attendance record for this day?')) {
+        // Optimistic in-memory deletion
+        if (appData[currentCompany] && appData[currentCompany].attendance && appData[currentCompany].attendance[dateStr]) {
+            delete appData[currentCompany].attendance[dateStr][workerId];
+        }
+        renderAttendance();
+
         db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}`).remove()
             .then(() => {
                 logActivity('attendance_clear', workerId, wName, `Cleared attendance record for ${wName} on ${dateStr}`);
@@ -19628,14 +19652,26 @@ function addReminder() {
         status: 'active'
     };
 
+    // 1. Optimistic in-memory update immediately so UI never freezes!
+    if (appData[currentCompany]) {
+        if (!appData[currentCompany].reminders) appData[currentCompany].reminders = {};
+        appData[currentCompany].reminders[remId] = reminderObj;
+    }
+
+    if (document.getElementById('reminder-title-input')) document.getElementById('reminder-title-input').value = '';
+    if (document.getElementById('reminder-deadline-input')) document.getElementById('reminder-deadline-input').value = '';
+    if (document.getElementById('reminder-phone-input')) document.getElementById('reminder-phone-input').value = '';
+    if (document.getElementById('reminder-note-input')) document.getElementById('reminder-note-input').value = '';
+    if (document.getElementById('reminder-cycle-input')) document.getElementById('reminder-cycle-input').value = 'none';
+
+    if (typeof showInAppNotification === 'function') {
+        showInAppNotification(isAr ? '🔔 تم حفظ وإضافة التذكير بنجاح!' : '🔔 Reminder saved and added successfully!');
+    }
+    renderReminders();
+
+    // 2. Persist to Firebase
     db.ref(`companies/${currentCompany}/reminders/${remId}`).set(reminderObj)
         .then(() => {
-            if (document.getElementById('reminder-title-input')) document.getElementById('reminder-title-input').value = '';
-            if (document.getElementById('reminder-deadline-input')) document.getElementById('reminder-deadline-input').value = '';
-            if (document.getElementById('reminder-phone-input')) document.getElementById('reminder-phone-input').value = '';
-            if (document.getElementById('reminder-note-input')) document.getElementById('reminder-note-input').value = '';
-            if (document.getElementById('reminder-cycle-input')) document.getElementById('reminder-cycle-input').value = 'none';
-
             if (phoneVal) {
                 const tpls = getCompanyData().messagingTemplates || {};
                 const rawTpl = tpls.reminder || (isAr ? '⏰ *تنبيه تذكير هام [{company_name}]*\n\nالتذكير: "{task_title}"\nالموعد النهائي: {reason}' : '⏰ Reminder Alert! Title: "{task_title}". Deadline: {reason}');
@@ -19644,8 +19680,6 @@ function addReminder() {
                                     .replace(/{company_name}/g, currentCompany.toUpperCase());
                 if (typeof sendWhatsAppDirect === 'function') sendWhatsAppDirect(phoneVal, waMsg);
             }
-
-            renderReminders();
         })
         .catch(err => {
             console.error("Error creating reminder:", err);
@@ -19782,17 +19816,23 @@ function savePastAttendanceEdit() {
         updatedBy: currentUser ? (currentUser.email || 'Admin') : 'Admin'
     };
 
+    // 1. Optimistic in-memory update immediately so UI never freezes!
+    if (appData[currentCompany]) {
+        if (!appData[currentCompany].attendance) appData[currentCompany].attendance = {};
+        if (!appData[currentCompany].attendance[dateStr]) appData[currentCompany].attendance[dateStr] = {};
+        appData[currentCompany].attendance[dateStr][workerId] = attObj;
+    }
+    closeEditPastAttendanceModal();
+    if (typeof showInAppNotification === 'function') {
+        showInAppNotification(isAr ? `تم تحديث الحضور ليوم ${dateStr} بنجاح!` : `Attendance updated for ${dateStr}!`);
+    }
+    if (typeof showWorker3MonthAttendanceReport === 'function') showWorker3MonthAttendanceReport(workerId);
+    if (typeof renderAttendance === 'function') renderAttendance();
+    if (typeof renderSummaryTable === 'function') renderSummaryTable();
+    if (typeof renderFinanceTable === 'function') renderFinanceTable();
+
+    // 2. Persist to Firebase
     db.ref(`companies/${currentCompany}/attendance/${dateStr}/${workerId}`).set(attObj)
-        .then(() => {
-            closeEditPastAttendanceModal();
-            if (typeof showInAppNotification === 'function') {
-                showInAppNotification(isAr ? `تم تحديث الحضور ليوم ${dateStr} بنجاح!` : `Attendance updated for ${dateStr}!`);
-            }
-            showWorker3MonthAttendanceReport(workerId);
-            if (typeof renderAttendance === 'function') renderAttendance();
-            if (typeof renderSummaryTable === 'function') renderSummaryTable();
-            if (typeof renderFinanceTable === 'function') renderFinanceTable();
-        })
         .catch(err => alert("Error updating attendance: " + err.message));
 }
 window.savePastAttendanceEdit = savePastAttendanceEdit;
