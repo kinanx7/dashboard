@@ -2851,6 +2851,7 @@ function renderActivityLog() {
     logsList.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
     const filterVal = document.getElementById('activity-filter')?.value || 'all';
+    const workerSearchQuery = document.getElementById('activity-search-worker')?.value.trim().toLowerCase() || '';
     const dateFromVal = document.getElementById('activity-date-from')?.value;
     const dateToVal = document.getElementById('activity-date-to')?.value;
 
@@ -2890,6 +2891,15 @@ function renderActivityLog() {
             return log.type === filterVal;
         });
     }
+    if (workerSearchQuery) {
+        filtered = filtered.filter(log => {
+            const wName = (log.workerName || '').toLowerCase();
+            const wId = (log.workerId || '').toLowerCase();
+            const details = (log.details || '').toLowerCase();
+            const performedBy = (log.performedBy || '').toLowerCase();
+            return wName.includes(workerSearchQuery) || wId.includes(workerSearchQuery) || details.includes(workerSearchQuery) || performedBy.includes(workerSearchQuery);
+        });
+    }
     if (startOfDayMs) {
         filtered = filtered.filter(log => log.timestamp >= startOfDayMs);
     }
@@ -2898,7 +2908,7 @@ function renderActivityLog() {
     }
 
     if (filtered.length === 0) {
-        listDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.9rem; padding: 20px 0;">${isAr ? 'لا توجد أنشطة تطابق هذا التصنيف أو التواريخ المحددة.' : 'No activities matching this category or date range.'}</p>`;
+        listDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.9rem; padding: 20px 0;">${isAr ? 'لا توجد أنشطة تطابق هذا البحث أو التصنيف أو التواريخ المحددة.' : 'No activities matching this search, category, or date range.'}</p>`;
         return;
     }
 

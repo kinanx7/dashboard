@@ -2705,7 +2705,13 @@
                                 <span>🗑️ Empty Log (1-Click)</span>
                             </button>
                         </div>
-                        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <!-- Worker Name Search -->
+                            <div style="position: relative; display: flex; align-items: center;">
+                                <input type="text" id="activity-search-worker" oninput="renderActivityLog()" placeholder="🔍 Search by worker name..."
+                                    data-i18n="[placeholder]placeholder-search-worker-activity"
+                                    style="padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border-color); font-size: 0.85rem; background: var(--input-bg); color: var(--text-main); width: 180px; height: 36px; box-sizing: border-box;">
+                            </div>
                             <label style="margin: 0; font-size: 0.85rem; font-weight: 700; color: var(--text-muted);"
                                 data-i18n="label-filter-by">Filter By:</label>
                             <select id="activity-filter" onchange="renderActivityLog()"
@@ -7122,8 +7128,8 @@
 
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=258"></script>
-    <script src="app.js?v=258"></script>
+    <script src="translations.js?v=259"></script>
+    <script src="app.js?v=259"></script>
 </body>
 
 </html>

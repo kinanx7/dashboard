@@ -201,6 +201,7 @@ var uiTranslations = {
 
         // Activity Log
         "title-activity-log": "📜 Daily Activity Log",
+        "placeholder-search-worker-activity": "🔍 Search by worker name...",
         "label-filter-by": "Filter By:",
         "opt-all-activities": "All Activities",
         "opt-sales-filter": "Sales",
@@ -1234,6 +1235,7 @@ var uiTranslations = {
 
         // سجل الأنشطة
         "title-activity-log": "📜 سجل الأنشطة اليومي",
+        "placeholder-search-worker-activity": "🔍 بحث باسم الموظف...",
         "label-filter-by": "تصنيف حسب:",
         "opt-all-activities": "جميع الأنشطة",
         "opt-sales-filter": "المبيعات",
