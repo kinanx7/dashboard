@@ -505,12 +505,14 @@ function renderDriverVolumeRewards() {
     listDiv.innerHTML = '';
     const isAr = currentAppLang === 'ar';
     const companyData = getCompanyData();
-    const rewards = companyData.driverVolumeRewards || [];
+    const rawRewards = companyData.driverVolumeRewards;
+    const rewards = Array.isArray(rawRewards) ? rawRewards : (rawRewards && typeof rawRewards === 'object' ? Object.values(rawRewards) : []);
     if (rewards.length === 0) {
         listDiv.innerHTML = `<p style="font-size:0.8rem; color:var(--text-muted); text-align:center;">${isAr ? 'لا توجد قواعد مكافآت معينة.' : 'No reward rules configured yet.'}</p>`;
         return;
     }
     rewards.forEach((r, idx) => {
+        if (!r || typeof r !== 'object') return;
         const row = document.createElement('div');
         row.className = 'flex-between';
         row.style.background = 'var(--input-bg)';
@@ -519,7 +521,7 @@ function renderDriverVolumeRewards() {
         row.style.fontSize = '0.85rem';
         row.style.border = '1px solid var(--border-color)';
         row.innerHTML = `
-            <span>🎯 <strong>${r.ordersCount}</strong> ${isAr ? 'طلب' : 'orders'} ➔ <strong style="color:var(--success);">SAR ${parseFloat(r.rewardAmount).toLocaleString()}</strong></span>
+            <span>🎯 <strong>${r.ordersCount}</strong> ${isAr ? 'طلب' : 'orders'} ➔ <strong style="color:var(--success);">SAR ${parseFloat(r.rewardAmount || 0).toLocaleString()}</strong></span>
             <button onclick="deleteDriverVolumeReward(${idx})" class="btn-outline-danger" style="padding:2px 6px; font-size:0.7rem; line-height:1; border:none; background:transparent; cursor:pointer;" title="${isAr ? 'حذف القاعدة' : 'Delete Rule'}">🗑️</button>
         `;
         listDiv.appendChild(row);
@@ -544,10 +546,12 @@ function addDriverVolumeReward() {
     }
 
     const companyData = getCompanyData();
-    if (!companyData.driverVolumeRewards) companyData.driverVolumeRewards = [];
+    const rawRewards = companyData.driverVolumeRewards;
+    const rewardsList = Array.isArray(rawRewards) ? rawRewards : (rawRewards && typeof rawRewards === 'object' ? Object.values(rawRewards) : []);
+    companyData.driverVolumeRewards = rewardsList;
 
     // Check if a rule for this ordersCount already exists
-    const existingIdx = companyData.driverVolumeRewards.findIndex(r => r.ordersCount === ordersCount);
+    const existingIdx = companyData.driverVolumeRewards.findIndex(r => r && r.ordersCount === ordersCount);
     if (existingIdx !== -1) {
         if (!confirm("A rule for this number of orders already exists. Overwrite it?")) return;
         companyData.driverVolumeRewards[existingIdx].rewardAmount = rewardAmount;
@@ -556,7 +560,7 @@ function addDriverVolumeReward() {
     }
 
     // Sort by ordersCount ascending
-    companyData.driverVolumeRewards.sort((a, b) => a.ordersCount - b.ordersCount);
+    companyData.driverVolumeRewards.sort((a, b) => (a.ordersCount || 0) - (b.ordersCount || 0));
 
     db.ref(`companies/${currentCompany}/driverVolumeRewards`).set(companyData.driverVolumeRewards)
         .then(() => {
@@ -570,12 +574,14 @@ function addDriverVolumeReward() {
 
 function deleteDriverVolumeReward(idx) {
     const companyData = getCompanyData();
-    const rewards = companyData.driverVolumeRewards || [];
+    const rawRewards = companyData.driverVolumeRewards;
+    const rewards = Array.isArray(rawRewards) ? rawRewards : (rawRewards && typeof rawRewards === 'object' ? Object.values(rawRewards) : []);
     if (!rewards[idx]) return;
 
     if (!confirm("Are you sure you want to delete this reward rule?")) return;
 
     rewards.splice(idx, 1);
+    companyData.driverVolumeRewards = rewards;
     db.ref(`companies/${currentCompany}/driverVolumeRewards`).set(rewards)
         .then(() => {
             renderDriverVolumeRewards();

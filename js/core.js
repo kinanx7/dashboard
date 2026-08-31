@@ -1759,6 +1759,14 @@ function ensureArraysExist(data) {
     if (!data.violationRules) data.violationRules = [];
     data.violationRules = data.violationRules.filter(r => r);
 
+    if (data.driverVolumeRewards) {
+        if (!Array.isArray(data.driverVolumeRewards)) {
+            data.driverVolumeRewards = Object.values(data.driverVolumeRewards);
+        }
+    } else {
+        data.driverVolumeRewards = [];
+    }
+
     if (!data.vaultNotes) data.vaultNotes = {};
 
     // Contracts dictionary sanitize and absolute null-purging
@@ -2083,12 +2091,20 @@ function listenToCloudData() {
             { key: 'rankSettings', render: () => { if (typeof renderRanks === 'function') renderRanks(); } }
         ];
 
+        const arrayNodeKeys = ['workers', 'warehouse', 'driverVolumeRewards', 'branches', 'violationRules', 'jobCatalog'];
         subNodes.forEach(node => {
             const nodeRef = db.ref(`companies/${currentCompany}/${node.key}`);
             nodeRef.on('value', snap => {
                 if (appData[currentCompany]) {
-                    appData[currentCompany][node.key] = snap.val() || (node.key === 'workers' || node.key === 'warehouse' ? [] : {});
-                    if (node.key === 'workers') {
+                    let val = snap.val();
+                    if (arrayNodeKeys.includes(node.key)) {
+                        if (!val) val = [];
+                        else if (!Array.isArray(val) && typeof val === 'object') val = Object.values(val);
+                    } else {
+                        if (!val) val = {};
+                    }
+                    appData[currentCompany][node.key] = val;
+                    if (node.key === 'workers' || node.key === 'driverVolumeRewards') {
                         ensureArraysExist(appData[currentCompany]);
                     }
                 }

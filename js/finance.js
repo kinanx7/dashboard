@@ -1878,17 +1878,21 @@ function getLateDeductionsForMonth(worker, monthStr) {
 }
 
 function getDriverVolumeRewardsForMonth(worker, monthStr) {
+    if (!worker) return 0;
     const companyData = getCompanyData();
-    const rules = companyData.driverVolumeRewards || [];
-    if (rules.length === 0) return 0;
+    const rawRules = companyData.driverVolumeRewards;
+    const rules = Array.isArray(rawRules) ? rawRules : (rawRules && typeof rawRules === 'object' ? Object.values(rawRules) : []);
+    if (!rules || rules.length === 0) return 0;
 
     const stats = worker.monthlyStats && worker.monthlyStats[monthStr];
-    if (!stats || !stats.deliveriesList || stats.deliveriesList.length === 0) return 0;
+    if (!stats || !stats.deliveriesList) return 0;
+    const delList = Array.isArray(stats.deliveriesList) ? stats.deliveriesList : (typeof stats.deliveriesList === 'object' ? Object.values(stats.deliveriesList) : []);
+    if (delList.length === 0) return 0;
 
     // Group deliveries by local date string
     const dailyCounts = {};
-    stats.deliveriesList.forEach(del => {
-        if (del.endTime) {
+    delList.forEach(del => {
+        if (del && del.endTime) {
             const dateObj = new Date(del.endTime);
             const yyyy = dateObj.getFullYear();
             const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -1901,12 +1905,14 @@ function getDriverVolumeRewardsForMonth(worker, monthStr) {
     });
 
     // Sort rules by ordersCount descending to find the highest milestone hit
-    const sortedRules = [...rules].sort((a, b) => b.ordersCount - a.ordersCount);
+    const validRules = rules.filter(r => r && typeof r === 'object' && !isNaN(r.ordersCount));
+    if (validRules.length === 0) return 0;
+    const sortedRules = [...validRules].sort((a, b) => Number(b.ordersCount) - Number(a.ordersCount));
 
     let totalReward = 0;
     Object.keys(dailyCounts).forEach(dateKey => {
         const count = dailyCounts[dateKey];
-        const match = sortedRules.find(r => count >= r.ordersCount);
+        const match = sortedRules.find(r => count >= Number(r.ordersCount));
         if (match) {
             totalReward += parseFloat(match.rewardAmount || 0);
         }

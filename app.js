@@ -1759,6 +1759,14 @@ function ensureArraysExist(data) {
     if (!data.violationRules) data.violationRules = [];
     data.violationRules = data.violationRules.filter(r => r);
 
+    if (data.driverVolumeRewards) {
+        if (!Array.isArray(data.driverVolumeRewards)) {
+            data.driverVolumeRewards = Object.values(data.driverVolumeRewards);
+        }
+    } else {
+        data.driverVolumeRewards = [];
+    }
+
     if (!data.vaultNotes) data.vaultNotes = {};
 
     // Contracts dictionary sanitize and absolute null-purging
@@ -2083,12 +2091,20 @@ function listenToCloudData() {
             { key: 'rankSettings', render: () => { if (typeof renderRanks === 'function') renderRanks(); } }
         ];
 
+        const arrayNodeKeys = ['workers', 'warehouse', 'driverVolumeRewards', 'branches', 'violationRules', 'jobCatalog'];
         subNodes.forEach(node => {
             const nodeRef = db.ref(`companies/${currentCompany}/${node.key}`);
             nodeRef.on('value', snap => {
                 if (appData[currentCompany]) {
-                    appData[currentCompany][node.key] = snap.val() || (node.key === 'workers' || node.key === 'warehouse' ? [] : {});
-                    if (node.key === 'workers') {
+                    let val = snap.val();
+                    if (arrayNodeKeys.includes(node.key)) {
+                        if (!val) val = [];
+                        else if (!Array.isArray(val) && typeof val === 'object') val = Object.values(val);
+                    } else {
+                        if (!val) val = {};
+                    }
+                    appData[currentCompany][node.key] = val;
+                    if (node.key === 'workers' || node.key === 'driverVolumeRewards') {
                         ensureArraysExist(appData[currentCompany]);
                     }
                 }
@@ -13363,12 +13379,14 @@ function renderDriverVolumeRewards() {
     listDiv.innerHTML = '';
     const isAr = currentAppLang === 'ar';
     const companyData = getCompanyData();
-    const rewards = companyData.driverVolumeRewards || [];
+    const rawRewards = companyData.driverVolumeRewards;
+    const rewards = Array.isArray(rawRewards) ? rawRewards : (rawRewards && typeof rawRewards === 'object' ? Object.values(rawRewards) : []);
     if (rewards.length === 0) {
         listDiv.innerHTML = `<p style="font-size:0.8rem; color:var(--text-muted); text-align:center;">${isAr ? 'لا توجد قواعد مكافآت معينة.' : 'No reward rules configured yet.'}</p>`;
         return;
     }
     rewards.forEach((r, idx) => {
+        if (!r || typeof r !== 'object') return;
         const row = document.createElement('div');
         row.className = 'flex-between';
         row.style.background = 'var(--input-bg)';
@@ -13377,7 +13395,7 @@ function renderDriverVolumeRewards() {
         row.style.fontSize = '0.85rem';
         row.style.border = '1px solid var(--border-color)';
         row.innerHTML = `
-            <span>🎯 <strong>${r.ordersCount}</strong> ${isAr ? 'طلب' : 'orders'} ➔ <strong style="color:var(--success);">SAR ${parseFloat(r.rewardAmount).toLocaleString()}</strong></span>
+            <span>🎯 <strong>${r.ordersCount}</strong> ${isAr ? 'طلب' : 'orders'} ➔ <strong style="color:var(--success);">SAR ${parseFloat(r.rewardAmount || 0).toLocaleString()}</strong></span>
             <button onclick="deleteDriverVolumeReward(${idx})" class="btn-outline-danger" style="padding:2px 6px; font-size:0.7rem; line-height:1; border:none; background:transparent; cursor:pointer;" title="${isAr ? 'حذف القاعدة' : 'Delete Rule'}">🗑️</button>
         `;
         listDiv.appendChild(row);
@@ -13402,10 +13420,12 @@ function addDriverVolumeReward() {
     }
 
     const companyData = getCompanyData();
-    if (!companyData.driverVolumeRewards) companyData.driverVolumeRewards = [];
+    const rawRewards = companyData.driverVolumeRewards;
+    const rewardsList = Array.isArray(rawRewards) ? rawRewards : (rawRewards && typeof rawRewards === 'object' ? Object.values(rawRewards) : []);
+    companyData.driverVolumeRewards = rewardsList;
 
     // Check if a rule for this ordersCount already exists
-    const existingIdx = companyData.driverVolumeRewards.findIndex(r => r.ordersCount === ordersCount);
+    const existingIdx = companyData.driverVolumeRewards.findIndex(r => r && r.ordersCount === ordersCount);
     if (existingIdx !== -1) {
         if (!confirm("A rule for this number of orders already exists. Overwrite it?")) return;
         companyData.driverVolumeRewards[existingIdx].rewardAmount = rewardAmount;
@@ -13414,7 +13434,7 @@ function addDriverVolumeReward() {
     }
 
     // Sort by ordersCount ascending
-    companyData.driverVolumeRewards.sort((a, b) => a.ordersCount - b.ordersCount);
+    companyData.driverVolumeRewards.sort((a, b) => (a.ordersCount || 0) - (b.ordersCount || 0));
 
     db.ref(`companies/${currentCompany}/driverVolumeRewards`).set(companyData.driverVolumeRewards)
         .then(() => {
@@ -13428,12 +13448,14 @@ function addDriverVolumeReward() {
 
 function deleteDriverVolumeReward(idx) {
     const companyData = getCompanyData();
-    const rewards = companyData.driverVolumeRewards || [];
+    const rawRewards = companyData.driverVolumeRewards;
+    const rewards = Array.isArray(rawRewards) ? rawRewards : (rawRewards && typeof rawRewards === 'object' ? Object.values(rawRewards) : []);
     if (!rewards[idx]) return;
 
     if (!confirm("Are you sure you want to delete this reward rule?")) return;
 
     rewards.splice(idx, 1);
+    companyData.driverVolumeRewards = rewards;
     db.ref(`companies/${currentCompany}/driverVolumeRewards`).set(rewards)
         .then(() => {
             renderDriverVolumeRewards();
@@ -16526,17 +16548,21 @@ function getLateDeductionsForMonth(worker, monthStr) {
 }
 
 function getDriverVolumeRewardsForMonth(worker, monthStr) {
+    if (!worker) return 0;
     const companyData = getCompanyData();
-    const rules = companyData.driverVolumeRewards || [];
-    if (rules.length === 0) return 0;
+    const rawRules = companyData.driverVolumeRewards;
+    const rules = Array.isArray(rawRules) ? rawRules : (rawRules && typeof rawRules === 'object' ? Object.values(rawRules) : []);
+    if (!rules || rules.length === 0) return 0;
 
     const stats = worker.monthlyStats && worker.monthlyStats[monthStr];
-    if (!stats || !stats.deliveriesList || stats.deliveriesList.length === 0) return 0;
+    if (!stats || !stats.deliveriesList) return 0;
+    const delList = Array.isArray(stats.deliveriesList) ? stats.deliveriesList : (typeof stats.deliveriesList === 'object' ? Object.values(stats.deliveriesList) : []);
+    if (delList.length === 0) return 0;
 
     // Group deliveries by local date string
     const dailyCounts = {};
-    stats.deliveriesList.forEach(del => {
-        if (del.endTime) {
+    delList.forEach(del => {
+        if (del && del.endTime) {
             const dateObj = new Date(del.endTime);
             const yyyy = dateObj.getFullYear();
             const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -16549,12 +16575,14 @@ function getDriverVolumeRewardsForMonth(worker, monthStr) {
     });
 
     // Sort rules by ordersCount descending to find the highest milestone hit
-    const sortedRules = [...rules].sort((a, b) => b.ordersCount - a.ordersCount);
+    const validRules = rules.filter(r => r && typeof r === 'object' && !isNaN(r.ordersCount));
+    if (validRules.length === 0) return 0;
+    const sortedRules = [...validRules].sort((a, b) => Number(b.ordersCount) - Number(a.ordersCount));
 
     let totalReward = 0;
     Object.keys(dailyCounts).forEach(dateKey => {
         const count = dailyCounts[dateKey];
-        const match = sortedRules.find(r => count >= r.ordersCount);
+        const match = sortedRules.find(r => count >= Number(r.ordersCount));
         if (match) {
             totalReward += parseFloat(match.rewardAmount || 0);
         }
