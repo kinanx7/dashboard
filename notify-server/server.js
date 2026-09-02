@@ -992,6 +992,69 @@ async function runServerTaskCycleCheck() {
 
 setInterval(runServerTaskCycleCheck, 60000);
 
+// ─── SALLA AUTOMATED 60-SECOND BACKGROUND POLLING & KEEP-ALIVE ─────────────
+async function runAutoSallaSync() {
+    try {
+        let auth = null;
+        for (const c of ['burgeroov', 'mvcfresh', 'mvc', 'salla_shared']) {
+            const snap = await db.ref(`companies/${c}/sallaAuth`).once('value');
+            if (snap.val() && snap.val().access_token) {
+                auth = snap.val();
+                break;
+            }
+        }
+        if (!auth || !auth.access_token) return;
+
+        const https = require('https');
+        const companyKeys = ['burgeroov', 'mvc', 'mvcfresh', 'salla_shared'];
+
+        const fetchLatestOrders = () => new Promise((resolve) => {
+            const req = https.request('https://api.salla.dev/admin/v2/orders?page=1&per_page=30', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${auth.access_token}`,
+                    'Accept': 'application/json'
+                }
+            }, (apiRes) => {
+                let d = '';
+                apiRes.on('data', c => d += c);
+                apiRes.on('end', () => {
+                    try { resolve(JSON.parse(d)); }
+                    catch (e) { resolve(null); }
+                });
+            });
+            req.on('error', () => resolve(null));
+            req.setTimeout(8000, () => { req.destroy(); resolve(null); });
+            req.end();
+        });
+
+        const pageRes = await fetchLatestOrders();
+        if (pageRes && pageRes.data && Array.isArray(pageRes.data)) {
+            for (const item of pageRes.data) {
+                const formattedOrder = formatSallaOrderHelper(item);
+                if (!formattedOrder || !formattedOrder.id) continue;
+                for (const c of companyKeys) {
+                    await db.ref(`companies/${c}/sallaOrders/${formattedOrder.id}`).set(formattedOrder);
+                }
+            }
+        }
+    } catch (e) {
+        // silent catch
+    }
+}
+
+// Background auto-sync every 60 seconds (1 min) so orders appear immediately without delay
+setInterval(runAutoSallaSync, 60000);
+setTimeout(runAutoSallaSync, 10000);
+
+// Keep-alive ping every 3 minutes so Render never sleeps or cold-boots
+setInterval(() => {
+    try {
+        const https = require('https');
+        https.get('https://burgeroov-notify.onrender.com/ping', () => {}).on('error', () => {});
+    } catch(e) {}
+}, 3 * 60 * 1000);
+
 // ─── SALLA STORE REAL-TIME WEBHOOK & OAUTH CALLBACK ───────────────────────
 const SALLA_CLIENT_ID = process.env.SALLA_CLIENT_ID || '12683e56-fcb1-4c9d-bac4-e537d213d779';
 const SALLA_CLIENT_SECRET = process.env.SALLA_CLIENT_SECRET || 'a9c8efe0a97f043f704becb568941cc055e020204577c93a4e4eb23c77f0ef47';
@@ -1611,22 +1674,9 @@ app.post(['/salla*', '/salla/webhook', '/salla/webhcook', '/salla/webhcoo', '/sa
             return res.status(200).json({ status: 'success', message: 'App authorized successfully via Easy Mode' });
         }
 
-        // For abandoned cart purchases without items, provide clean fallback so order is NEVER dropped
-        if (event === 'abandoned.cart.purchased' || event === 'abandoned.cart') {
-            if (!orderData.items || orderData.items.length === 0) {
-                orderData.items = [{
-                    name: 'طلب متجر سلة (مكتمل)',
-                    quantity: 1,
-                    price: orderData.total || orderData.subtotal || 0
-                }];
-            }
-            if (!orderData.customer) {
-                orderData.customer = {
-                    name: 'عميل متجر سلة',
-                    first_name: 'عميل',
-                    last_name: 'متجر سلة'
-                };
-            }
+        // Ignore draft cart events that lack finalized order data (real orders arrive via order.created / order.updated)
+        if (event.startsWith('abandoned.cart') || event.startsWith('cart.') || event.startsWith('checkout.')) {
+            return res.status(200).json({ status: 'ignored', reason: 'Cart draft event is not a finalized order' });
         }
 
         const formattedOrder = formatSallaOrderHelper(orderData, body);

@@ -33092,7 +33092,7 @@ function getCleanSallaOrdersList() {
     const ordersMap = getSallaOrdersMap();
     let orders = Object.entries(ordersMap || {}).map(([id, o]) => ({ id, ...o }));
 
-    // 1. Filter out demo sandbox orders and pure empty anonymous stubs
+    // 1. Filter out demo sandbox orders, phantom cart drafts, and anonymous stubs
     orders = orders.filter(o => {
         if (!o || !o.id) return false;
         if (o.id === '280660780' || o.order_id === '280660780') return false;
@@ -33102,9 +33102,18 @@ function getCleanSallaOrdersList() {
         const phone = String(o.customerPhone || (o.customer && (o.customer.mobile || o.customer.phone)) || (o.ship_to && o.ship_to.phone) || '').replace(/[^0-9]/g, '').trim();
         const rawItems = o.items || o.packages || [];
         const isAnonymous = !cust || cust === 'Store Customer' || cust === 'عميل متجر سلة' || cust === 'عميل المتجر' || cust === 'Salla Customer';
+        const isDummyItem = rawItems.length === 0 || (rawItems.length === 1 && (
+            rawItems[0].name === 'طلب متجر سلة (مكتمل)' || 
+            rawItems[0].name === 'طلب متجر سلة' ||
+            rawItems[0].name === 'منتج'
+        ));
+        const isVeryLongId = String(o.id).length >= 15; // Cart / Webhook token IDs are 18-20 digits (real Salla orders are 8-9 digits)
 
-        // Discard only if completely anonymous, has no phone, and has 0 items
-        if (isAnonymous && !phone && rawItems.length === 0) {
+        // Filter out ghost cart cards that have no items or dummy placeholder item + anonymous customer / long cart ID
+        if (isAnonymous && (isDummyItem || !phone || isVeryLongId)) {
+            return false;
+        }
+        if (isDummyItem && isVeryLongId) {
             return false;
         }
 
