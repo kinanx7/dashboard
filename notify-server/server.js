@@ -992,35 +992,83 @@ async function runServerTaskCycleCheck() {
 
 setInterval(runServerTaskCycleCheck, 60000);
 
-// ─── SALLA AUTOMATED 60-SECOND BACKGROUND POLLING & KEEP-ALIVE ─────────────
+// ─── SALLA AUTOMATED 60-SECOND BACKGROUND POLLING & AUTO-REFRESH ─────────
+async function refreshSallaToken(refreshToken) {
+    if (!refreshToken) return null;
+    return new Promise((resolve) => {
+        const postBody = new URLSearchParams({
+            client_id: SALLA_CLIENT_ID,
+            client_secret: SALLA_CLIENT_SECRET,
+            grant_type: 'refresh_token',
+            refresh_token: refreshToken
+        }).toString();
+
+        console.log('🔄 [Salla Refresh Token Requesting New Access Token]');
+        const https = require('https');
+        const req = https.request('https://accounts.salla.sa/oauth2/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Length': Buffer.byteLength(postBody)
+            }
+        }, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', async () => {
+                try {
+                    const json = JSON.parse(data);
+                    if (json && json.access_token) {
+                        const companyKeys = ['burgeroov', 'mvc', 'mvcfresh', 'salla_shared'];
+                        for (const c of companyKeys) {
+                            await db.ref(`companies/${c}/sallaAuth`).update({
+                                access_token: json.access_token,
+                                refresh_token: json.refresh_token || refreshToken,
+                                expires_in: json.expires_in,
+                                refreshedAt: Date.now()
+                            });
+                        }
+                        console.log('🎉 [Salla Token Auto-Refreshed & Stored to Firebase Successfully!]');
+                    }
+                    resolve(json);
+                } catch(e) {
+                    resolve(null);
+                }
+            });
+        });
+        req.on('error', () => resolve(null));
+        req.write(postBody);
+        req.end();
+    });
+}
+
 async function runAutoSallaSync() {
     try {
         let auth = null;
         for (const c of ['burgeroov', 'mvcfresh', 'mvc', 'salla_shared']) {
             const snap = await db.ref(`companies/${c}/sallaAuth`).once('value');
-            if (snap.val() && snap.val().access_token) {
+            if (snap.val() && (snap.val().access_token || snap.val().refresh_token)) {
                 auth = snap.val();
                 break;
             }
         }
-        if (!auth || !auth.access_token) return;
+        if (!auth) return;
 
         const https = require('https');
         const companyKeys = ['burgeroov', 'mvc', 'mvcfresh', 'salla_shared'];
 
-        const fetchLatestOrders = () => new Promise((resolve) => {
-            const req = https.request('https://api.salla.dev/admin/v2/orders?page=1&per_page=30', {
+        const fetchPage = (token, page) => new Promise((resolve) => {
+            const req = https.request(`https://api.salla.dev/admin/v2/orders?page=${page}&per_page=40`, {
                 method: 'GET',
                 headers: {
-                    'Authorization': `Bearer ${auth.access_token}`,
+                    'Authorization': `Bearer ${token}`,
                     'Accept': 'application/json'
                 }
             }, (apiRes) => {
                 let d = '';
                 apiRes.on('data', c => d += c);
                 apiRes.on('end', () => {
-                    try { resolve(JSON.parse(d)); }
-                    catch (e) { resolve(null); }
+                    try { resolve({ statusCode: apiRes.statusCode, data: JSON.parse(d) }); }
+                    catch (e) { resolve({ statusCode: apiRes.statusCode, raw: d }); }
                 });
             });
             req.on('error', () => resolve(null));
@@ -1028,18 +1076,36 @@ async function runAutoSallaSync() {
             req.end();
         });
 
-        const pageRes = await fetchLatestOrders();
-        if (pageRes && pageRes.data && Array.isArray(pageRes.data)) {
-            for (const item of pageRes.data) {
+        let currentToken = auth.access_token;
+        let firstPageRes = await fetchPage(currentToken, 1);
+
+        // If token is expired (401), automatically refresh it using refresh_token and retry!
+        if ((!firstPageRes || firstPageRes.statusCode === 401) && auth.refresh_token) {
+            console.warn('⚠️ [Salla Access Token Expired 401] Auto-refreshing via refresh_token...');
+            const refreshRes = await refreshSallaToken(auth.refresh_token);
+            if (refreshRes && refreshRes.access_token) {
+                currentToken = refreshRes.access_token;
+                firstPageRes = await fetchPage(currentToken, 1);
+            }
+        }
+
+        if (firstPageRes && firstPageRes.data && Array.isArray(firstPageRes.data.data)) {
+            for (const item of firstPageRes.data.data) {
+                const isDemo = String(item.urls?.customer || '').includes('demostore.salla.sa') || 
+                               item.customer?.first_name === 'abc' || 
+                               (item.items && item.items.some(i => i.name === 'فستان'));
+                if (isDemo) continue;
+
                 const formattedOrder = formatSallaOrderHelper(item);
                 if (!formattedOrder || !formattedOrder.id) continue;
+
                 for (const c of companyKeys) {
                     await db.ref(`companies/${c}/sallaOrders/${formattedOrder.id}`).set(formattedOrder);
                 }
             }
         }
     } catch (e) {
-        // silent catch
+        console.warn('[Auto Salla Sync Error]:', e.message);
     }
 }
 
@@ -1218,25 +1284,55 @@ function formatSallaOrderHelper(item, extraBody) {
     const orderNumber = String(rawRefId);
     const invoiceNum = baseOrder.invoice_number ? String(baseOrder.invoice_number) : '';
 
-    // 2. Customer details (Support standard customer, shipping receiver, and ship_to)
-    const cust = baseOrder.customer || item.customer || {};
-    const ship = baseOrder.shipping || item.shipping || {};
-    const receiver = ship.receiver || {};
-    const shipTo = baseOrder.ship_to || item.ship_to || {};
-    const address = ship.address || baseOrder.address || item.address || cust.address || {};
+    // 2. Customer details (Support standard customer, shipping receiver, ship_to, and root objects)
+    const cust = baseOrder.customer || item.customer || body.customer || {};
+    const ship = baseOrder.shipping || item.shipping || body.shipping || {};
+    const receiver = ship.receiver || baseOrder.receiver || {};
+    const shipTo = baseOrder.ship_to || item.ship_to || body.ship_to || {};
+    const address = ship.address || baseOrder.address || item.address || cust.address || body.address || {};
 
-    let custName = (shipTo.name || `${cust.first_name || ''} ${cust.last_name || ''}`.trim() || cust.full_name || cust.name || receiver.name || body.customerName || '').trim();
-    if (!custName) {
-        custName = 'عميل متجر سلة';
-    }
+    let custName = (
+        shipTo.name || 
+        `${shipTo.first_name || ''} ${shipTo.last_name || ''}`.trim() ||
+        `${cust.first_name || ''} ${cust.last_name || ''}`.trim() || 
+        cust.full_name || 
+        cust.name || 
+        receiver.name || 
+        `${receiver.first_name || ''} ${receiver.last_name || ''}`.trim() ||
+        baseOrder.customer_name ||
+        baseOrder.customer_first_name ||
+        body.customerName || 
+        ''
+    ).trim();
 
     // 3. Phone
-    let rawPhone = String(shipTo.phone || cust.mobile || cust.phone || receiver.phone || body.customerPhone || '');
+    let rawPhone = String(
+        shipTo.phone || 
+        shipTo.mobile || 
+        cust.mobile || 
+        cust.phone || 
+        receiver.phone || 
+        receiver.mobile || 
+        baseOrder.customer_mobile || 
+        baseOrder.customer_phone || 
+        body.customerPhone || 
+        ''
+    );
     let cleanMobile = rawPhone.replace(/[^0-9]/g, '');
     if (cleanMobile) {
         if (cleanMobile.startsWith('05')) cleanMobile = '966' + cleanMobile.substring(1);
         else if (cleanMobile.startsWith('5') && cleanMobile.length === 9) cleanMobile = '966' + cleanMobile;
         else if (!cleanMobile.startsWith('966') && !cleanMobile.startsWith('971') && !cleanMobile.startsWith('965')) cleanMobile = '966' + cleanMobile;
+    }
+
+    if (!custName || custName === 'عميل متجر سلة' || custName === 'عميل المتجر' || custName === 'Store Customer' || custName === 'Salla Customer') {
+        if (cust.first_name || cust.last_name) {
+            custName = `${cust.first_name || ''} ${cust.last_name || ''}`.trim();
+        } else if (cleanMobile) {
+            custName = `عميل (${cleanMobile})`;
+        } else {
+            custName = 'عميل المتجر';
+        }
     }
 
     // 4. Address & Pinpoint Location

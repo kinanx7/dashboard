@@ -172,28 +172,22 @@ function getCleanSallaOrdersList() {
     const ordersMap = getSallaOrdersMap();
     let orders = Object.entries(ordersMap || {}).map(([id, o]) => ({ id, ...o }));
 
-    // 1. Filter out demo sandbox orders, phantom cart drafts, and anonymous stubs
+    // 1. Filter out demo sandbox orders and 18-digit phantom cart drafts
     orders = orders.filter(o => {
         if (!o || !o.id) return false;
-        if (o.id === '280660780' || o.order_id === '280660780') return false;
+        const idStr = String(o.order_reference_id || o.reference_id || o.orderNumber || o.order_id || o.id || '');
+        if (idStr === '280660780') return false;
         if (o.customerName === 'abc def' || (o.customer && (o.customer.first_name === 'abc' || o.customer.name === 'abc def'))) return false;
 
-        const cust = String(o.customerName || (o.customer && (o.customer.name || `${o.customer.first_name || ''} ${o.customer.last_name || ''}`)) || (o.ship_to && o.ship_to.name) || '').trim();
-        const phone = String(o.customerPhone || (o.customer && (o.customer.mobile || o.customer.phone)) || (o.ship_to && o.ship_to.phone) || '').replace(/[^0-9]/g, '').trim();
         const rawItems = o.items || o.packages || [];
-        const isAnonymous = !cust || cust === 'Store Customer' || cust === 'عميل متجر سلة' || cust === 'عميل المتجر' || cust === 'Salla Customer';
-        const isDummyItem = rawItems.length === 0 || (rawItems.length === 1 && (
+        const isDummyItem = rawItems.length === 1 && (
             rawItems[0].name === 'طلب متجر سلة (مكتمل)' || 
-            rawItems[0].name === 'طلب متجر سلة' ||
-            rawItems[0].name === 'منتج'
-        ));
-        const isVeryLongId = String(o.id).length >= 15; // Cart / Webhook token IDs are 18-20 digits (real Salla orders are 8-9 digits)
+            rawItems[0].name === 'طلب متجر سلة'
+        );
+        const isCartToken = String(o.id).length >= 16; // Cart tokens are 18-20 digits
 
-        // Filter out ghost cart cards that have no items or dummy placeholder item + anonymous customer / long cart ID
-        if (isAnonymous && (isDummyItem || !phone || isVeryLongId)) {
-            return false;
-        }
-        if (isDummyItem && isVeryLongId) {
+        // Only drop phantom ghost cart drafts (18+ digit token with dummy placeholder item)
+        if (isCartToken && isDummyItem) {
             return false;
         }
 
@@ -219,7 +213,7 @@ function getCleanSallaOrdersList() {
     });
 
     const list = Array.from(dedupMap.values());
-    list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    list.sort((a, b) => (b.createdAt || b.date || 0) - (a.createdAt || a.date || 0));
     return list;
 }
 window.getCleanSallaOrdersList = getCleanSallaOrdersList;
@@ -358,29 +352,35 @@ function renderSallaOrdersGrid() {
         let orderNum = o.order_reference_id || o.reference_id || o.orderNumber || o.order_id || (o.invoice_number ? (isAr ? `فاتورة #${o.invoice_number}` : `INV-#${o.invoice_number}`) : String(orderId));
         
         // 2. Customer Name Extraction
-        let custName = o.customerName;
-        if (!custName && o.customer) {
-            const fn = o.customer.first_name || '';
-            const ln = o.customer.last_name || '';
-            custName = `${fn} ${ln}`.trim() || o.customer.full_name || o.customer.name;
-        }
-        if (!custName && o.ship_to) {
-            custName = o.ship_to.name;
-        }
-        if (!custName || custName === 'عميل متجر سلة' || custName === 'Salla Customer') {
-            if (o.customer && o.customer.first_name === 'عميل' && o.customer.last_name === 'زائر') {
-                custName = isAr ? 'عميل زائر' : 'Guest Customer';
+        let custName = (
+            o.customerName ||
+            (o.ship_to && o.ship_to.name) ||
+            (o.ship_to && `${o.ship_to.first_name || ''} ${o.ship_to.last_name || ''}`.trim()) ||
+            (o.customer && `${o.customer.first_name || ''} ${o.customer.last_name || ''}`.trim()) ||
+            (o.customer && (o.customer.full_name || o.customer.name)) ||
+            (o.shipping && o.shipping.receiver && o.shipping.receiver.name) ||
+            ''
+        ).trim();
+
+        // 3. Customer Phone & WhatsApp Link
+        let rawPhone = String(
+            o.customerPhone || 
+            (o.customer && (o.customer.mobile || o.customer.phone)) || 
+            (o.ship_to && (o.ship_to.phone || o.ship_to.mobile)) || 
+            (o.shipping && o.shipping.receiver && (o.shipping.receiver.phone || o.shipping.receiver.mobile)) || 
+            ''
+        ).replace(/[^0-9]/g, '');
+
+        if (!custName || custName === 'عميل متجر سلة' || custName === 'Salla Customer' || custName === 'Store Customer' || custName === 'عميل المتجر') {
+            if (o.customer && o.customer.first_name && o.customer.first_name !== 'عميل') {
+                custName = `${o.customer.first_name} ${o.customer.last_name || ''}`.trim();
+            } else if (rawPhone) {
+                custName = isAr ? `عميل (${rawPhone})` : `Customer (${rawPhone})`;
             } else {
                 custName = isAr ? 'عميل المتجر' : 'Store Customer';
             }
         }
 
-        // 3. Customer Phone & WhatsApp Link
-        let rawPhone = o.customerPhone;
-        if (!rawPhone && o.customer) {
-            rawPhone = o.customer.mobile || o.customer.phone || '';
-        }
-        rawPhone = String(rawPhone || '').replace(/[^0-9]/g, '');
         let waPhone = rawPhone;
         if (waPhone) {
             if (waPhone.startsWith('05')) waPhone = '966' + waPhone.substring(1);
