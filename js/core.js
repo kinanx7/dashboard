@@ -46,7 +46,38 @@ window.openImageModal = openImageModal;
 // =============================================
 function translateDynamicTerm(term) {
     if (!term) return '';
-    const lang = (typeof currentAppLang !== 'undefined' ? currentAppLang : localStorage.getItem("burgeroov_lang")) || 'en';
+    const lang = (typeof currentAppLang !== 'undefined' ? currentAppLang : localStorage.getItem("burgeroov_lang")) || 'ar';
+    if (lang === 'bn') {
+        const bnTermDict = {
+            'Cash': 'নগদ (Cash)',
+            'Credit Card': 'ক্রেডিট কার্ড / ব্যাংক',
+            'Electric Bill': 'বিদ্যুৎ বিল',
+            'Meat Supplier': 'মাংস সরবরাহকারী',
+            'Packaging': 'প্যাকেজিং ও বক্স',
+            'Uncategorized': 'শ্রেণিবিহীন',
+            'Unpaid': 'অপরিশোধিত',
+            'Paid': 'পরিশোধিত',
+            'Pending': 'অপেক্ষমাণ',
+            'Accepted': 'অনুমোদিত',
+            'Rejected': 'বাতিলকৃত',
+            'Released': 'পরিশোধ সম্পন্ন',
+            'present': 'উপস্থিত',
+            'absent': 'অনুপস্থিত',
+            'day-off': 'ছুটি',
+            'sick-leave': 'অসুস্থতাজনিত ছুটি',
+            'public': 'সার্বজনীন',
+            'private': 'ব্যক্তিগত',
+            'normal': 'সাধারণ',
+            'urgent': 'জরুরি',
+            'active': 'সক্রিয়',
+            'completed': 'সম্পন্ন',
+            'cancelled': 'বাতিল',
+            'ready': 'প্রস্তুত',
+            'preparing': 'প্রস্তুতি চলছে',
+            'delivered': 'ডেলিভার সম্পন্ন'
+        };
+        return bnTermDict[term] || term;
+    }
     if (lang !== 'ar') return term;
 
     const dict = {
@@ -823,7 +854,21 @@ function setTodayDisplay() {
     const todayDateDisplay = document.getElementById('today-date-display');
     if (todayDateDisplay) {
         const options = { year: 'numeric', month: 'long', day: 'numeric' };
-        todayDateDisplay.textContent = "(Today: " + new Date().toLocaleDateString('en-US', options) + ")";
+        const lang = (typeof currentAppLang !== 'undefined') ? currentAppLang : 'ar';
+        let locale = 'ar-SA';
+        let prefix = '(اليوم: ';
+        if (lang === 'bn') {
+            locale = 'bn-BD';
+            prefix = '(আজ: ';
+        } else if (lang === 'en') {
+            locale = 'en-US';
+            prefix = '(Today: ';
+        }
+        try {
+            todayDateDisplay.textContent = prefix + new Date().toLocaleDateString(locale, options) + ")";
+        } catch (e) {
+            todayDateDisplay.textContent = prefix + new Date().toLocaleDateString('en-US', options) + ")";
+        }
     }
 }
 
@@ -1661,8 +1706,26 @@ function applyUserRoles() {
     }
 
     const roleBadge = document.getElementById('display-user-role');
-    roleBadge.textContent = isAdmin ? 'Manager' : 'Worker';
-    roleBadge.style.backgroundColor = isAdmin ? 'var(--secondary)' : 'rgba(255,255,255,0.15)';
+    if (roleBadge) {
+        roleBadge.textContent = isAdmin ? 'Manager' : 'Worker';
+        roleBadge.style.backgroundColor = isAdmin ? 'var(--secondary)' : 'rgba(255,255,255,0.15)';
+    }
+
+    const nameEl = document.getElementById('display-user-name');
+    const avatarInitEl = document.getElementById('display-user-avatar-initial');
+    let userDisplayName = '';
+    if (worker && worker.name) {
+        userDisplayName = worker.name;
+    } else if (isKinan) {
+        userDisplayName = 'Kinan Rahal';
+    } else if (currentUser && currentUser.email) {
+        userDisplayName = currentUser.email.split('@')[0];
+    }
+    if (nameEl) nameEl.textContent = userDisplayName || (isAdmin ? 'Manager' : 'Worker');
+    if (avatarInitEl) {
+        const firstLetter = (userDisplayName ? userDisplayName.trim().charAt(0) : (isAdmin ? 'M' : 'W')).toUpperCase();
+        avatarInitEl.textContent = firstLetter || '👤';
+    }
 
     // Always run after body classes are set
     markLockedTabs();
@@ -1756,8 +1819,26 @@ function ensureArraysExist(data) {
     if (!data.generalTasks) data.generalTasks = [];
     data.generalTasks = data.generalTasks.filter(gt => gt && gt.id);
 
-    if (!data.violationRules) data.violationRules = [];
-    data.violationRules = data.violationRules.filter(r => r);
+    if (data.violationRules) {
+        if (!Array.isArray(data.violationRules) && typeof data.violationRules === 'object') {
+            data.violationRules = Object.values(data.violationRules);
+        }
+        if (Array.isArray(data.violationRules)) {
+            data.violationRules = data.violationRules
+                .filter(r => r && typeof r === 'object' && r.name)
+                .map((r, idx) => {
+                    if (!r.id) {
+                        r.id = 'vrule_' + idx + '_' + (r.name || '').replace(/\s+/g, '_');
+                    }
+                    r.amount = parseFloat(r.amount) || 0;
+                    return r;
+                });
+        } else {
+            data.violationRules = [];
+        }
+    } else {
+        data.violationRules = [];
+    }
 
     if (data.driverVolumeRewards) {
         if (!Array.isArray(data.driverVolumeRewards)) {
@@ -2088,7 +2169,8 @@ function listenToCloudData() {
             { key: 'activityLog', render: () => { if (typeof renderActivityLog === 'function') renderActivityLog(); } },
             { key: 'lateRules', render: () => { if (typeof renderAttendance === 'function') renderAttendance(); } },
             { key: 'driverVolumeRewards', render: () => { if (typeof renderFinanceTable === 'function') renderFinanceTable(); } },
-            { key: 'rankSettings', render: () => { if (typeof renderRanks === 'function') renderRanks(); } }
+            { key: 'rankSettings', render: () => { if (typeof renderRanks === 'function') renderRanks(); } },
+            { key: 'violationRules', render: () => { if (typeof renderViolationRules === 'function') renderViolationRules(); } }
         ];
 
         const arrayNodeKeys = ['workers', 'warehouse', 'driverVolumeRewards', 'branches', 'violationRules', 'jobCatalog'];
@@ -2104,7 +2186,7 @@ function listenToCloudData() {
                         if (!val) val = {};
                     }
                     appData[currentCompany][node.key] = val;
-                    if (node.key === 'workers' || node.key === 'driverVolumeRewards') {
+                    if (node.key === 'workers' || node.key === 'driverVolumeRewards' || node.key === 'violationRules') {
                         ensureArraysExist(appData[currentCompany]);
                     }
                 }
@@ -2252,44 +2334,71 @@ function saveTokenForCompany(companyId, email, token) {
 
 
 
-var currentAppLang = localStorage.getItem("burgeroov_lang") || "en";
+var currentAppLang = localStorage.getItem("burgeroov_lang") || "ar";
 
 function t(key) {
-    return (uiTranslations[currentAppLang] && uiTranslations[currentAppLang][key]) || key;
+    return (uiTranslations[currentAppLang] && uiTranslations[currentAppLang][key]) || 
+           (uiTranslations['ar'] && uiTranslations['ar'][key]) || 
+           (uiTranslations['en'] && uiTranslations['en'][key]) || 
+           key;
+}
+
+function setAppLanguage(lang) {
+    if (lang !== "ar" && lang !== "en" && lang !== "bn") {
+        lang = "ar";
+    }
+    currentAppLang = lang;
+    localStorage.setItem("burgeroov_lang", currentAppLang);
+
+    if (typeof renderAll === "function") renderAll();
+    applyTranslations();
+    if (typeof applyDarkMode === "function") applyDarkMode();
 }
 
 function applyTranslations() {
-    if (currentAppLang !== "en" && currentAppLang !== "ar") {
-        currentAppLang = "en";
+    if (currentAppLang !== "en" && currentAppLang !== "ar" && currentAppLang !== "bn") {
+        currentAppLang = "ar";
     }
     document.documentElement.dir = currentAppLang === "ar" ? "rtl" : "ltr";
 
+    // Update single active language badge in header
+    updateLangCurrentBadge();
+
+    // Update today's date display to current language
+    if (typeof setTodayDisplay === "function") {
+        setTodayDisplay();
+    }
+
+    const langLabelMap = {
+        'ar': '🌐 عربي',
+        'bn': '🇧🇩 বাংলা',
+        'en': '🌐 English'
+    };
+
     const langBtn = document.getElementById("lang-toggle-btn");
     if (langBtn) {
-        langBtn.innerText = currentAppLang === "ar" ? "🌐 English" : "🌐 عربي";
+        langBtn.innerText = langLabelMap[currentAppLang] || '🌐 ' + currentAppLang;
     }
     const langBtnMob = document.getElementById("lang-toggle-btn-mob");
     if (langBtnMob) {
-        langBtnMob.innerText = currentAppLang === "ar" ? "🌐 English" : "🌐 عربي";
+        langBtnMob.innerText = langLabelMap[currentAppLang] || '🌐 ' + currentAppLang;
     }
 
-    const langDict = { ...(uiTranslations[currentAppLang] || uiTranslations["en"] || {}) };
+    const langDict = { 
+        ...(uiTranslations[currentAppLang] || uiTranslations["ar"] || uiTranslations["en"] || {}) 
+    };
 
     // Dynamic translations based on selected company
     if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession) {
-        langDict['app-title'] = currentAppLang === 'ar' ? 'سوق عملاء MVC' : 'MVC Customer Market';
+        langDict['app-title'] = currentAppLang === 'ar' ? 'سوق عملاء MVC' : (currentAppLang === 'bn' ? 'এমভিসি গ্রাহক বাজার' : 'MVC Customer Market');
         document.title = 'MVC Customer Market';
-    } else if (currentCompany === 'mvc') {
-        langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات إم في سي فريش' : 'MVC Fresh Operations Portal';
-        langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة تحكم إم في سي فريش' : 'Login to MVC Fresh Dashboard';
-        document.title = 'MVC Fresh Management Portal';
-    } else if (currentCompany === 'mvcfresh') {
-        langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات إم في سي فريش' : 'MVC Fresh Operations Portal';
-        langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة تحكم إم في سي فريش' : 'Login to MVC Fresh Dashboard';
+    } else if (currentCompany === 'mvc' || currentCompany === 'mvcfresh') {
+        langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات إم في سي فريش' : (currentAppLang === 'bn' ? 'এমভিসি ফ্রেশ অপারেশন পোর্টাল' : 'MVC Fresh Operations Portal');
+        langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة تحكم إم في سي فريش' : (currentAppLang === 'bn' ? 'এমভিসি ফ্রেশ ড্যাশবোর্ডে লগইন' : 'Login to MVC Fresh Dashboard');
         document.title = 'MVC Fresh Management Portal';
     } else {
-        langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات برجروف' : 'Burgeroov Operations Portal';
-        langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة التحكم' : 'Login to Dashboard';
+        langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات برجروف' : (currentAppLang === 'bn' ? 'বারগারুভ অপারেশন পোর্টাল' : 'Burgeroov Operations Portal');
+        langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة التحكم' : (currentAppLang === 'bn' ? 'ড্যাশবোর্ডে লগইন করুন' : 'Login to Dashboard');
         document.title = 'Burgeroov Management Portal';
     }
 
@@ -2318,13 +2427,92 @@ function applyTranslations() {
 
 function toggleLanguage(event) {
     if (event) event.stopPropagation();
-    currentAppLang = currentAppLang === "en" ? "ar" : "en";
+    if (currentAppLang === "ar") currentAppLang = "bn";
+    else if (currentAppLang === "bn") currentAppLang = "en";
+    else currentAppLang = "ar";
+
     localStorage.setItem("burgeroov_lang", currentAppLang);
 
     if (typeof renderAll === "function") renderAll();
     applyTranslations();
     if (typeof applyDarkMode === "function") applyDarkMode();
 }
+
+function updateLangCurrentBadge() {
+    const flagEl = document.getElementById('lang-current-flag');
+    const labelEl = document.getElementById('lang-current-label');
+    const map = {
+        'ar': { flag: '🇸🇦', name: 'عربي' },
+        'bn': { flag: '🇧🇩', name: 'বাংলা' },
+        'en': { flag: '🇺🇸', name: 'English' }
+    };
+    const info = map[currentAppLang] || map['ar'];
+    if (flagEl) flagEl.textContent = info.flag;
+    if (labelEl) labelEl.textContent = info.name;
+
+    // Highlight active option in dropdown menu
+    document.querySelectorAll('.lang-dropdown-opt').forEach(opt => {
+        const lang = opt.getAttribute('data-lang');
+        if (lang === currentAppLang) {
+            opt.classList.add('active');
+        } else {
+            opt.classList.remove('active');
+        }
+    });
+}
+
+window.toggleLangDropdown = function(event) {
+    if (event) {
+        if (typeof event.preventDefault === 'function') event.preventDefault();
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
+    }
+    const userMenu = document.getElementById('user-dropdown-menu');
+    if (userMenu) userMenu.classList.remove('show-dropdown');
+    const sheet = document.getElementById('lang-dropdown-sheet');
+    if (sheet) {
+        sheet.classList.toggle('show');
+    }
+};
+
+window.closeLangDropdown = function() {
+    const sheet = document.getElementById('lang-dropdown-sheet');
+    if (sheet) {
+        sheet.classList.remove('show');
+    }
+};
+
+window.toggleUserDropdown = function(event) {
+    if (event) {
+        if (typeof event.preventDefault === 'function') event.preventDefault();
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
+    }
+    const sheet = document.getElementById('lang-dropdown-sheet');
+    if (sheet) sheet.classList.remove('show');
+    const userMenu = document.getElementById('user-dropdown-menu');
+    if (userMenu) {
+        userMenu.classList.toggle('show-dropdown');
+    }
+};
+
+window.closeUserDropdown = function() {
+    const userMenu = document.getElementById('user-dropdown-menu');
+    if (userMenu) {
+        userMenu.classList.remove('show-dropdown');
+    }
+};
+
+// Global click listener to close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+    const langContainer = document.getElementById('lang-selector-container');
+    if (langContainer && !langContainer.contains(e.target)) {
+        window.closeLangDropdown();
+    }
+    const userContainer = document.getElementById('user-menu-container') || document.querySelector('.user-menu-container');
+    if (userContainer && !userContainer.contains(e.target)) {
+        window.closeUserDropdown();
+    }
+});
+
 
 
 function getVisibleWorkers() {
@@ -2551,18 +2739,21 @@ function switchTab(tab) {
     const tabMeta = {
         ops: { icon: '⚙️', label: 'Operations' },
         ranks: { icon: '🏆', label: 'Ranks' },
+        attendance: { icon: '📅', label: 'Attendance' },
         tasks: { icon: '📋', label: 'Tasks' },
         warehouse: { icon: '📦', label: 'Warehouse' },
         drivers: { icon: '🚚', label: 'Drivers' },
         finance: { icon: '💰', label: 'Finance' },
         summary: { icon: '📊', label: 'Summary' },
-        managing: { icon: '💵', label: 'Sales' },
-        costs: { icon: '📉', label: 'Costs' },
         adverts: { icon: '📢', label: 'Ads' },
         notes: { icon: '📝', label: 'Notes' },
+        activity: { icon: '📜', label: 'Activity' },
+        managing: { icon: '💵', label: 'Sales' },
+        costs: { icon: '📉', label: 'Costs' },
         reminders: { icon: '⏰', label: 'Reminders' },
         market: { icon: '🏪', label: 'Market' },
         prepare: { icon: '👨‍🍳', label: 'Prepare' },
+        'ai-assistant': { icon: '🤖', label: 'AI Assistant' },
         vault: { icon: '📁', label: 'Informations' },
         messaging: { icon: '💬', label: 'Messaging' },
         learning: { icon: '🎓', label: 'Learning' },
@@ -2574,7 +2765,29 @@ function switchTab(tab) {
     const iconEl = document.getElementById('mob-active-icon');
     const labelEl = document.getElementById('mob-active-label');
     if (iconEl) iconEl.textContent = meta.icon;
-    if (labelEl) labelEl.textContent = meta.label;
+    const tabI18nKeys = {
+        ops: 'tab-ops', ranks: 'tab-ranks', tasks: 'tab-tasks', warehouse: 'tab-warehouse',
+        drivers: 'tab-drivers', finance: 'tab-finance', summary: 'tab-summary', adverts: 'tab-ads',
+        notes: 'tab-notes', activity: 'tab-activity', managing: 'tab-sales', costs: 'tab-costs',
+        attendance: 'tab-attendance', reminders: 'tab-reminders', market: 'tab-market', prepare: 'tab-prepare',
+        'ai-assistant': 'tab-ai-assistant', vault: 'tab-vault', messaging: 'tab-messaging',
+        learning: 'tab-learning', contracts: 'tab-contracts', tracking: 'tab-tracking', salla: 'tab-salla'
+    };
+    const tabKey = tabI18nKeys[tab];
+    const localizedLabel = (tabKey && typeof t === 'function') ? t(tabKey) : meta.label;
+    if (labelEl) labelEl.textContent = localizedLabel;
+
+    // On tab switch, scroll instantly to top so the selected section is immediately visible
+    try {
+        window.scrollTo({ top: 0, behavior: 'instant' });
+    } catch (e) {
+        window.scrollTo(0, 0);
+    }
+
+    // Synchronize active state on mobile bottom quick buttons
+    document.querySelectorAll('.mob-quick-btn').forEach(btn => btn.classList.remove('active-tab'));
+    const activeMobBtn = document.getElementById(`mob-tab-${tab}`);
+    if (activeMobBtn) activeMobBtn.classList.add('active-tab');
 
     // Show or hide the locked overlay
     const lockedView = document.getElementById('view-locked');

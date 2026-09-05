@@ -46,7 +46,38 @@ window.openImageModal = openImageModal;
 // =============================================
 function translateDynamicTerm(term) {
     if (!term) return '';
-    const lang = (typeof currentAppLang !== 'undefined' ? currentAppLang : localStorage.getItem("burgeroov_lang")) || 'en';
+    const lang = (typeof currentAppLang !== 'undefined' ? currentAppLang : localStorage.getItem("burgeroov_lang")) || 'ar';
+    if (lang === 'bn') {
+        const bnTermDict = {
+            'Cash': 'নগদ (Cash)',
+            'Credit Card': 'ক্রেডিট কার্ড / ব্যাংক',
+            'Electric Bill': 'বিদ্যুৎ বিল',
+            'Meat Supplier': 'মাংস সরবরাহকারী',
+            'Packaging': 'প্যাকেজিং ও বক্স',
+            'Uncategorized': 'শ্রেণিবিহীন',
+            'Unpaid': 'অপরিশোধিত',
+            'Paid': 'পরিশোধিত',
+            'Pending': 'অপেক্ষমাণ',
+            'Accepted': 'অনুমোদিত',
+            'Rejected': 'বাতিলকৃত',
+            'Released': 'পরিশোধ সম্পন্ন',
+            'present': 'উপস্থিত',
+            'absent': 'অনুপস্থিত',
+            'day-off': 'ছুটি',
+            'sick-leave': 'অসুস্থতাজনিত ছুটি',
+            'public': 'সার্বজনীন',
+            'private': 'ব্যক্তিগত',
+            'normal': 'সাধারণ',
+            'urgent': 'জরুরি',
+            'active': 'সক্রিয়',
+            'completed': 'সম্পন্ন',
+            'cancelled': 'বাতিল',
+            'ready': 'প্রস্তুত',
+            'preparing': 'প্রস্তুতি চলছে',
+            'delivered': 'ডেলিভার সম্পন্ন'
+        };
+        return bnTermDict[term] || term;
+    }
     if (lang !== 'ar') return term;
 
     const dict = {
@@ -823,7 +854,21 @@ function setTodayDisplay() {
     const todayDateDisplay = document.getElementById('today-date-display');
     if (todayDateDisplay) {
         const options = { year: 'numeric', month: 'long', day: 'numeric' };
-        todayDateDisplay.textContent = "(Today: " + new Date().toLocaleDateString('en-US', options) + ")";
+        const lang = (typeof currentAppLang !== 'undefined') ? currentAppLang : 'ar';
+        let locale = 'ar-SA';
+        let prefix = '(اليوم: ';
+        if (lang === 'bn') {
+            locale = 'bn-BD';
+            prefix = '(আজ: ';
+        } else if (lang === 'en') {
+            locale = 'en-US';
+            prefix = '(Today: ';
+        }
+        try {
+            todayDateDisplay.textContent = prefix + new Date().toLocaleDateString(locale, options) + ")";
+        } catch (e) {
+            todayDateDisplay.textContent = prefix + new Date().toLocaleDateString('en-US', options) + ")";
+        }
     }
 }
 
@@ -1661,8 +1706,26 @@ function applyUserRoles() {
     }
 
     const roleBadge = document.getElementById('display-user-role');
-    roleBadge.textContent = isAdmin ? 'Manager' : 'Worker';
-    roleBadge.style.backgroundColor = isAdmin ? 'var(--secondary)' : 'rgba(255,255,255,0.15)';
+    if (roleBadge) {
+        roleBadge.textContent = isAdmin ? 'Manager' : 'Worker';
+        roleBadge.style.backgroundColor = isAdmin ? 'var(--secondary)' : 'rgba(255,255,255,0.15)';
+    }
+
+    const nameEl = document.getElementById('display-user-name');
+    const avatarInitEl = document.getElementById('display-user-avatar-initial');
+    let userDisplayName = '';
+    if (worker && worker.name) {
+        userDisplayName = worker.name;
+    } else if (isKinan) {
+        userDisplayName = 'Kinan Rahal';
+    } else if (currentUser && currentUser.email) {
+        userDisplayName = currentUser.email.split('@')[0];
+    }
+    if (nameEl) nameEl.textContent = userDisplayName || (isAdmin ? 'Manager' : 'Worker');
+    if (avatarInitEl) {
+        const firstLetter = (userDisplayName ? userDisplayName.trim().charAt(0) : (isAdmin ? 'M' : 'W')).toUpperCase();
+        avatarInitEl.textContent = firstLetter || '👤';
+    }
 
     // Always run after body classes are set
     markLockedTabs();
@@ -1756,8 +1819,26 @@ function ensureArraysExist(data) {
     if (!data.generalTasks) data.generalTasks = [];
     data.generalTasks = data.generalTasks.filter(gt => gt && gt.id);
 
-    if (!data.violationRules) data.violationRules = [];
-    data.violationRules = data.violationRules.filter(r => r);
+    if (data.violationRules) {
+        if (!Array.isArray(data.violationRules) && typeof data.violationRules === 'object') {
+            data.violationRules = Object.values(data.violationRules);
+        }
+        if (Array.isArray(data.violationRules)) {
+            data.violationRules = data.violationRules
+                .filter(r => r && typeof r === 'object' && r.name)
+                .map((r, idx) => {
+                    if (!r.id) {
+                        r.id = 'vrule_' + idx + '_' + (r.name || '').replace(/\s+/g, '_');
+                    }
+                    r.amount = parseFloat(r.amount) || 0;
+                    return r;
+                });
+        } else {
+            data.violationRules = [];
+        }
+    } else {
+        data.violationRules = [];
+    }
 
     if (data.driverVolumeRewards) {
         if (!Array.isArray(data.driverVolumeRewards)) {
@@ -2088,7 +2169,8 @@ function listenToCloudData() {
             { key: 'activityLog', render: () => { if (typeof renderActivityLog === 'function') renderActivityLog(); } },
             { key: 'lateRules', render: () => { if (typeof renderAttendance === 'function') renderAttendance(); } },
             { key: 'driverVolumeRewards', render: () => { if (typeof renderFinanceTable === 'function') renderFinanceTable(); } },
-            { key: 'rankSettings', render: () => { if (typeof renderRanks === 'function') renderRanks(); } }
+            { key: 'rankSettings', render: () => { if (typeof renderRanks === 'function') renderRanks(); } },
+            { key: 'violationRules', render: () => { if (typeof renderViolationRules === 'function') renderViolationRules(); } }
         ];
 
         const arrayNodeKeys = ['workers', 'warehouse', 'driverVolumeRewards', 'branches', 'violationRules', 'jobCatalog'];
@@ -2104,7 +2186,7 @@ function listenToCloudData() {
                         if (!val) val = {};
                     }
                     appData[currentCompany][node.key] = val;
-                    if (node.key === 'workers' || node.key === 'driverVolumeRewards') {
+                    if (node.key === 'workers' || node.key === 'driverVolumeRewards' || node.key === 'violationRules') {
                         ensureArraysExist(appData[currentCompany]);
                     }
                 }
@@ -2252,44 +2334,71 @@ function saveTokenForCompany(companyId, email, token) {
 
 
 
-var currentAppLang = localStorage.getItem("burgeroov_lang") || "en";
+var currentAppLang = localStorage.getItem("burgeroov_lang") || "ar";
 
 function t(key) {
-    return (uiTranslations[currentAppLang] && uiTranslations[currentAppLang][key]) || key;
+    return (uiTranslations[currentAppLang] && uiTranslations[currentAppLang][key]) || 
+           (uiTranslations['ar'] && uiTranslations['ar'][key]) || 
+           (uiTranslations['en'] && uiTranslations['en'][key]) || 
+           key;
+}
+
+function setAppLanguage(lang) {
+    if (lang !== "ar" && lang !== "en" && lang !== "bn") {
+        lang = "ar";
+    }
+    currentAppLang = lang;
+    localStorage.setItem("burgeroov_lang", currentAppLang);
+
+    if (typeof renderAll === "function") renderAll();
+    applyTranslations();
+    if (typeof applyDarkMode === "function") applyDarkMode();
 }
 
 function applyTranslations() {
-    if (currentAppLang !== "en" && currentAppLang !== "ar") {
-        currentAppLang = "en";
+    if (currentAppLang !== "en" && currentAppLang !== "ar" && currentAppLang !== "bn") {
+        currentAppLang = "ar";
     }
     document.documentElement.dir = currentAppLang === "ar" ? "rtl" : "ltr";
 
+    // Update single active language badge in header
+    updateLangCurrentBadge();
+
+    // Update today's date display to current language
+    if (typeof setTodayDisplay === "function") {
+        setTodayDisplay();
+    }
+
+    const langLabelMap = {
+        'ar': '🌐 عربي',
+        'bn': '🇧🇩 বাংলা',
+        'en': '🌐 English'
+    };
+
     const langBtn = document.getElementById("lang-toggle-btn");
     if (langBtn) {
-        langBtn.innerText = currentAppLang === "ar" ? "🌐 English" : "🌐 عربي";
+        langBtn.innerText = langLabelMap[currentAppLang] || '🌐 ' + currentAppLang;
     }
     const langBtnMob = document.getElementById("lang-toggle-btn-mob");
     if (langBtnMob) {
-        langBtnMob.innerText = currentAppLang === "ar" ? "🌐 English" : "🌐 عربي";
+        langBtnMob.innerText = langLabelMap[currentAppLang] || '🌐 ' + currentAppLang;
     }
 
-    const langDict = { ...(uiTranslations[currentAppLang] || uiTranslations["en"] || {}) };
+    const langDict = { 
+        ...(uiTranslations[currentAppLang] || uiTranslations["ar"] || uiTranslations["en"] || {}) 
+    };
 
     // Dynamic translations based on selected company
     if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession) {
-        langDict['app-title'] = currentAppLang === 'ar' ? 'سوق عملاء MVC' : 'MVC Customer Market';
+        langDict['app-title'] = currentAppLang === 'ar' ? 'سوق عملاء MVC' : (currentAppLang === 'bn' ? 'এমভিসি গ্রাহক বাজার' : 'MVC Customer Market');
         document.title = 'MVC Customer Market';
-    } else if (currentCompany === 'mvc') {
-        langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات إم في سي فريش' : 'MVC Fresh Operations Portal';
-        langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة تحكم إم في سي فريش' : 'Login to MVC Fresh Dashboard';
-        document.title = 'MVC Fresh Management Portal';
-    } else if (currentCompany === 'mvcfresh') {
-        langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات إم في سي فريش' : 'MVC Fresh Operations Portal';
-        langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة تحكم إم في سي فريش' : 'Login to MVC Fresh Dashboard';
+    } else if (currentCompany === 'mvc' || currentCompany === 'mvcfresh') {
+        langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات إم في سي فريش' : (currentAppLang === 'bn' ? 'এমভিসি ফ্রেশ অপারেশন পোর্টাল' : 'MVC Fresh Operations Portal');
+        langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة تحكم إم في سي فريش' : (currentAppLang === 'bn' ? 'এমভিসি ফ্রেশ ড্যাশবোর্ডে লগইন' : 'Login to MVC Fresh Dashboard');
         document.title = 'MVC Fresh Management Portal';
     } else {
-        langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات برجروف' : 'Burgeroov Operations Portal';
-        langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة التحكم' : 'Login to Dashboard';
+        langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات برجروف' : (currentAppLang === 'bn' ? 'বারগারুভ অপারেশন পোর্টাল' : 'Burgeroov Operations Portal');
+        langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة التحكم' : (currentAppLang === 'bn' ? 'ড্যাশবোর্ডে লগইন করুন' : 'Login to Dashboard');
         document.title = 'Burgeroov Management Portal';
     }
 
@@ -2318,13 +2427,92 @@ function applyTranslations() {
 
 function toggleLanguage(event) {
     if (event) event.stopPropagation();
-    currentAppLang = currentAppLang === "en" ? "ar" : "en";
+    if (currentAppLang === "ar") currentAppLang = "bn";
+    else if (currentAppLang === "bn") currentAppLang = "en";
+    else currentAppLang = "ar";
+
     localStorage.setItem("burgeroov_lang", currentAppLang);
 
     if (typeof renderAll === "function") renderAll();
     applyTranslations();
     if (typeof applyDarkMode === "function") applyDarkMode();
 }
+
+function updateLangCurrentBadge() {
+    const flagEl = document.getElementById('lang-current-flag');
+    const labelEl = document.getElementById('lang-current-label');
+    const map = {
+        'ar': { flag: '🇸🇦', name: 'عربي' },
+        'bn': { flag: '🇧🇩', name: 'বাংলা' },
+        'en': { flag: '🇺🇸', name: 'English' }
+    };
+    const info = map[currentAppLang] || map['ar'];
+    if (flagEl) flagEl.textContent = info.flag;
+    if (labelEl) labelEl.textContent = info.name;
+
+    // Highlight active option in dropdown menu
+    document.querySelectorAll('.lang-dropdown-opt').forEach(opt => {
+        const lang = opt.getAttribute('data-lang');
+        if (lang === currentAppLang) {
+            opt.classList.add('active');
+        } else {
+            opt.classList.remove('active');
+        }
+    });
+}
+
+window.toggleLangDropdown = function(event) {
+    if (event) {
+        if (typeof event.preventDefault === 'function') event.preventDefault();
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
+    }
+    const userMenu = document.getElementById('user-dropdown-menu');
+    if (userMenu) userMenu.classList.remove('show-dropdown');
+    const sheet = document.getElementById('lang-dropdown-sheet');
+    if (sheet) {
+        sheet.classList.toggle('show');
+    }
+};
+
+window.closeLangDropdown = function() {
+    const sheet = document.getElementById('lang-dropdown-sheet');
+    if (sheet) {
+        sheet.classList.remove('show');
+    }
+};
+
+window.toggleUserDropdown = function(event) {
+    if (event) {
+        if (typeof event.preventDefault === 'function') event.preventDefault();
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
+    }
+    const sheet = document.getElementById('lang-dropdown-sheet');
+    if (sheet) sheet.classList.remove('show');
+    const userMenu = document.getElementById('user-dropdown-menu');
+    if (userMenu) {
+        userMenu.classList.toggle('show-dropdown');
+    }
+};
+
+window.closeUserDropdown = function() {
+    const userMenu = document.getElementById('user-dropdown-menu');
+    if (userMenu) {
+        userMenu.classList.remove('show-dropdown');
+    }
+};
+
+// Global click listener to close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+    const langContainer = document.getElementById('lang-selector-container');
+    if (langContainer && !langContainer.contains(e.target)) {
+        window.closeLangDropdown();
+    }
+    const userContainer = document.getElementById('user-menu-container') || document.querySelector('.user-menu-container');
+    if (userContainer && !userContainer.contains(e.target)) {
+        window.closeUserDropdown();
+    }
+});
+
 
 
 function getVisibleWorkers() {
@@ -2551,18 +2739,21 @@ function switchTab(tab) {
     const tabMeta = {
         ops: { icon: '⚙️', label: 'Operations' },
         ranks: { icon: '🏆', label: 'Ranks' },
+        attendance: { icon: '📅', label: 'Attendance' },
         tasks: { icon: '📋', label: 'Tasks' },
         warehouse: { icon: '📦', label: 'Warehouse' },
         drivers: { icon: '🚚', label: 'Drivers' },
         finance: { icon: '💰', label: 'Finance' },
         summary: { icon: '📊', label: 'Summary' },
-        managing: { icon: '💵', label: 'Sales' },
-        costs: { icon: '📉', label: 'Costs' },
         adverts: { icon: '📢', label: 'Ads' },
         notes: { icon: '📝', label: 'Notes' },
+        activity: { icon: '📜', label: 'Activity' },
+        managing: { icon: '💵', label: 'Sales' },
+        costs: { icon: '📉', label: 'Costs' },
         reminders: { icon: '⏰', label: 'Reminders' },
         market: { icon: '🏪', label: 'Market' },
         prepare: { icon: '👨‍🍳', label: 'Prepare' },
+        'ai-assistant': { icon: '🤖', label: 'AI Assistant' },
         vault: { icon: '📁', label: 'Informations' },
         messaging: { icon: '💬', label: 'Messaging' },
         learning: { icon: '🎓', label: 'Learning' },
@@ -2574,7 +2765,29 @@ function switchTab(tab) {
     const iconEl = document.getElementById('mob-active-icon');
     const labelEl = document.getElementById('mob-active-label');
     if (iconEl) iconEl.textContent = meta.icon;
-    if (labelEl) labelEl.textContent = meta.label;
+    const tabI18nKeys = {
+        ops: 'tab-ops', ranks: 'tab-ranks', tasks: 'tab-tasks', warehouse: 'tab-warehouse',
+        drivers: 'tab-drivers', finance: 'tab-finance', summary: 'tab-summary', adverts: 'tab-ads',
+        notes: 'tab-notes', activity: 'tab-activity', managing: 'tab-sales', costs: 'tab-costs',
+        attendance: 'tab-attendance', reminders: 'tab-reminders', market: 'tab-market', prepare: 'tab-prepare',
+        'ai-assistant': 'tab-ai-assistant', vault: 'tab-vault', messaging: 'tab-messaging',
+        learning: 'tab-learning', contracts: 'tab-contracts', tracking: 'tab-tracking', salla: 'tab-salla'
+    };
+    const tabKey = tabI18nKeys[tab];
+    const localizedLabel = (tabKey && typeof t === 'function') ? t(tabKey) : meta.label;
+    if (labelEl) labelEl.textContent = localizedLabel;
+
+    // On tab switch, scroll instantly to top so the selected section is immediately visible
+    try {
+        window.scrollTo({ top: 0, behavior: 'instant' });
+    } catch (e) {
+        window.scrollTo(0, 0);
+    }
+
+    // Synchronize active state on mobile bottom quick buttons
+    document.querySelectorAll('.mob-quick-btn').forEach(btn => btn.classList.remove('active-tab'));
+    const activeMobBtn = document.getElementById(`mob-tab-${tab}`);
+    if (activeMobBtn) activeMobBtn.classList.add('active-tab');
 
     // Show or hide the locked overlay
     const lockedView = document.getElementById('view-locked');
@@ -5280,6 +5493,63 @@ var currentSalesTimeframe = 'day';
 var currentSalesChartType = 'bar'; // 'bar' | 'line' | 'doughnut'
 var _salesChartInstance = null;  // Chart.js instance handle
 
+function parseLogDate(l) {
+    if (!l) return null;
+    if (l.timestamp) {
+        let ts = Number(l.timestamp);
+        if (ts > 0 && ts < 10000000000) ts *= 1000;
+        if (!isNaN(ts) && ts > 0) {
+            const d = new Date(ts);
+            if (!isNaN(d.getTime())) return d;
+        }
+    }
+    if (l.createdAt) {
+        let ts = Number(l.createdAt);
+        if (ts > 0 && ts < 10000000000) ts *= 1000;
+        if (!isNaN(ts) && ts > 0) {
+            const d = new Date(ts);
+            if (!isNaN(d.getTime())) return d;
+        }
+    }
+    if (l.dateStr && typeof l.dateStr === 'string') {
+        const p = l.dateStr.trim().split(/[-\/]/);
+        if (p.length === 3) {
+            const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]), 12, 0, 0);
+            if (!isNaN(d.getTime())) return d;
+        }
+    }
+    if (l.date && typeof l.date === 'string') {
+        const m = l.date.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+        if (m) {
+            const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0);
+            if (!isNaN(d.getTime())) return d;
+        }
+        const d = new Date(l.date);
+        if (!isNaN(d.getTime())) return d;
+    }
+    if (l.id) {
+        const idNum = Number(String(l.id).replace(/\D/g, ''));
+        if (idNum > 1600000000000 && idNum < 2500000000000) {
+            const d = new Date(idNum);
+            if (!isNaN(d.getTime())) return d;
+        }
+    }
+    return null;
+}
+
+function getSelectedSalesMonth() {
+    const monthPicker = document.getElementById('sales-month-picker');
+    if (monthPicker && monthPicker.value) return monthPicker.value;
+    const yearUptoPicker = document.getElementById('sales-year-upto-picker');
+    if (yearUptoPicker && yearUptoPicker.value) return yearUptoPicker.value;
+    const datePicker = document.getElementById('sales-date-picker');
+    if (datePicker && datePicker.value) return datePicker.value.slice(0, 7);
+    if (typeof currentGlobalMonth !== 'undefined' && currentGlobalMonth) return currentGlobalMonth;
+    const now = new Date();
+    const tzOffset = now.getTimezoneOffset() * 60000;
+    return (new Date(Date.now() - tzOffset)).toISOString().slice(0, 7);
+}
+
 function setSalesTimeframe(tf) {
     currentSalesTimeframe = tf;
     ['day', 'week', 'month', 'year', 'custom'].forEach(id => {
@@ -5290,11 +5560,45 @@ function setSalesTimeframe(tf) {
         }
     });
 
+    const now = new Date();
+    const tzOffset = now.getTimezoneOffset() * 60000;
+    const todayStr = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 10);
+    const currentMonthStr = todayStr.slice(0, 7);
+
     const datePicker = document.getElementById('sales-date-picker');
-    if (datePicker) datePicker.style.display = tf === 'day' ? 'inline-block' : 'none';
+    if (datePicker) {
+        datePicker.style.display = (tf === 'day' || tf === 'week') ? 'inline-block' : 'none';
+        if (!datePicker.value) datePicker.value = todayStr;
+    }
+
+    const monthPicker = document.getElementById('sales-month-picker');
+    if (monthPicker) {
+        monthPicker.style.display = (tf === 'month') ? 'inline-block' : 'none';
+        if (!monthPicker.value) {
+            monthPicker.value = (datePicker && datePicker.value) ? datePicker.value.slice(0, 7) : currentMonthStr;
+        }
+    }
+
+    const yearWrapper = document.getElementById('sales-year-filter-wrapper');
+    const yearUptoPicker = document.getElementById('sales-year-upto-picker');
+    if (yearWrapper) {
+        yearWrapper.style.display = (tf === 'year') ? 'inline-flex' : 'none';
+        if (yearUptoPicker && !yearUptoPicker.value) {
+            yearUptoPicker.value = (monthPicker && monthPicker.value) ? monthPicker.value : currentMonthStr;
+        }
+    }
 
     const customRange = document.getElementById('sales-custom-range');
-    if (customRange) customRange.style.display = tf === 'custom' ? 'flex' : 'none';
+    if (customRange) {
+        customRange.style.display = tf === 'custom' ? 'flex' : 'none';
+        if (tf === 'custom') {
+            const weekAgoStr = (new Date(Date.now() - 7 * 86400000 - tzOffset)).toISOString().slice(0, 10);
+            const fromPicker = document.getElementById('sales-from-date');
+            const toPicker = document.getElementById('sales-to-date');
+            if (fromPicker && !fromPicker.value) fromPicker.value = weekAgoStr;
+            if (toPicker && !toPicker.value) toPicker.value = todayStr;
+        }
+    }
 
     renderManaging();
 }
@@ -5665,172 +5969,253 @@ function renderManaging() {
                 `).join('');
     }
 
-    // --- FILTER LOGS BY TIMEFRAME ---
-    let filteredLogs = [];
-    let histoData = {}; // Key: Label (e.g., "10 AM", "Mon"), Value: Sum
+    // --- UNIFIED HIGH-PERFORMANCE TIMEFRAME CALCULATIONS ---
+    let startTs = 0;
+    let endTs = Infinity;
+    let histoData = {}; // Chronologically ordered { label: sum }
+    let selectedMonthYear = { year: now.getFullYear(), month: now.getMonth() + 1 };
 
     if (currentSalesTimeframe === 'day') {
         const datePicker = document.getElementById('sales-date-picker');
-        if (!datePicker.value) {
-            const tzOffset = now.getTimezoneOffset() * 60000;
-            datePicker.value = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 10);
+        if (datePicker && !datePicker.value) {
+            datePicker.value = todayLocalStr;
         }
-        const parts = datePicker.value.split('-');
-        const startOfDay = new Date(parts[0], parts[1] - 1, parts[2]).getTime();
-        const endOfDay = startOfDay + 86400000;
-        filteredLogs = allLogs.filter(l => l.timestamp >= startOfDay && l.timestamp < endOfDay);
-        filteredLogs.forEach(l => {
+        const refStr = (datePicker && datePicker.value) ? datePicker.value : todayLocalStr;
+        const [pY, pM, pD] = refStr.split('-').map(Number);
+        selectedMonthYear = { year: pY, month: pM };
+        startTs = new Date(pY, pM - 1, pD, 0, 0, 0, 0).getTime();
+        endTs = new Date(pY, pM - 1, pD, 23, 59, 59, 999).getTime();
+
+        const dayLogs = allLogs.filter(l => {
+            const d = parseLogDate(l);
+            if (!d) return false;
+            return d.getFullYear() === pY && d.getMonth() === (pM - 1) && d.getDate() === pD;
+        });
+
+        const hoursSet = new Set(dayLogs.map(l => parseLogDate(l).getHours()));
+        if (hoursSet.size === 0) {
+            [9, 12, 15, 18, 21].forEach(h => hoursSet.add(h));
+        }
+        const sortedHours = Array.from(hoursSet).sort((a, b) => a - b);
+        sortedHours.forEach(h => {
+            const hStr = (h < 10 ? '0' + h : String(h)) + ':00';
+            histoData[hStr] = 0;
+        });
+        dayLogs.forEach(l => {
             if (disabledMethods.includes(l.method)) return;
-            const h = new Date(l.timestamp).getHours();
-            histoData[h + ':00'] = (histoData[h + ':00'] || 0) + l.amount;
+            const d = parseLogDate(l);
+            if (d) {
+                const h = d.getHours();
+                const hStr = (h < 10 ? '0' + h : String(h)) + ':00';
+                histoData[hStr] = (histoData[hStr] || 0) + (Number(l.amount) || 0);
+            }
         });
     }
     else if (currentSalesTimeframe === 'week') {
-        const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).getTime();
-        filteredLogs = allLogs.filter(l => l.timestamp >= startOfWeek);
-        const days = currentAppLang === 'ar' ?
-            ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'] :
-            ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        filteredLogs.forEach(l => {
-            if (disabledMethods.includes(l.method)) return;
-            histoData[days[new Date(l.timestamp).getDay()]] = (histoData[days[new Date(l.timestamp).getDay()]] || 0) + l.amount;
-        });
-    }
-    else if (currentSalesTimeframe === 'month') {
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-        filteredLogs = allLogs.filter(l => l.timestamp >= startOfMonth);
-        filteredLogs.forEach(l => {
-            if (disabledMethods.includes(l.method)) return;
-            const d = new Date(l.timestamp).getDate().toString();
-            histoData[d] = (histoData[d] || 0) + l.amount;
-        });
-    }
-    else if (currentSalesTimeframe === 'year') {
-        const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
-        filteredLogs = allLogs.filter(l => l.timestamp >= startOfYear);
-        const months = currentAppLang === 'ar' ?
-            ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'] :
-            ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        filteredLogs.forEach(l => {
-            if (disabledMethods.includes(l.method)) return;
-            histoData[months[new Date(l.timestamp).getMonth()]] = (histoData[months[new Date(l.timestamp).getMonth()]] || 0) + l.amount;
-        });
-    }
-    else if (currentSalesTimeframe === 'custom') {
-        const fromPicker = document.getElementById('sales-from-date');
-        const toPicker = document.getElementById('sales-to-date');
-        if (!fromPicker.value || !toPicker.value) {
-            // Don't render until both dates are set
-        } else {
-            const fParts = fromPicker.value.split('-');
-            const tParts = toPicker.value.split('-');
-            const startTs = new Date(fParts[0], fParts[1] - 1, fParts[2]).getTime();
-            const endTs = new Date(tParts[0], tParts[1] - 1, tParts[2]).getTime() + 86400000;
-            filteredLogs = allLogs.filter(l => l.timestamp >= startTs && l.timestamp < endTs);
-            filteredLogs.forEach(l => {
-                if (disabledMethods.includes(l.method)) return;
-                const d = new Date(l.timestamp);
-                const key = String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-                histoData[key] = (histoData[key] || 0) + l.amount;
-            });
-        }
-    }
-
-    // Filter Deposits by Timeframe
-    let allDeposits = getCompanyData().depositLogs || [];
-    if (allDeposits && typeof allDeposits === 'object' && !Array.isArray(allDeposits)) {
-        allDeposits = Object.values(allDeposits);
-    }
-    let filteredDeposits = [];
-
-    if (currentSalesTimeframe === 'day') {
         const datePicker = document.getElementById('sales-date-picker');
-        const parts = datePicker.value.split('-');
-        const startOfDay = new Date(parts[0], parts[1] - 1, parts[2]).getTime();
-        const endOfDay = startOfDay + 86400000;
-        filteredDeposits = allDeposits.filter(l => l.timestamp >= startOfDay && l.timestamp < endOfDay);
-    }
-    else if (currentSalesTimeframe === 'week') {
-        const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).getTime();
-        filteredDeposits = allDeposits.filter(l => l.timestamp >= startOfWeek);
-    }
-    else if (currentSalesTimeframe === 'month') {
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-        filteredDeposits = allDeposits.filter(l => l.timestamp >= startOfMonth);
-    }
-    else if (currentSalesTimeframe === 'year') {
-        const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
-        filteredDeposits = allDeposits.filter(l => l.timestamp >= startOfYear);
-    }
-    else if (currentSalesTimeframe === 'custom') {
-        const fromPicker = document.getElementById('sales-from-date');
-        const toPicker = document.getElementById('sales-to-date');
-        if (fromPicker.value && toPicker.value) {
-            const fParts = fromPicker.value.split('-');
-            const tParts = toPicker.value.split('-');
-            const startTs = new Date(fParts[0], fParts[1] - 1, fParts[2]).getTime();
-            const endTs = new Date(tParts[0], tParts[1] - 1, tParts[2]).getTime() + 86400000;
-            filteredDeposits = allDeposits.filter(l => l.timestamp >= startTs && l.timestamp < endTs);
+        const refStr = (datePicker && datePicker.value) ? datePicker.value : todayLocalStr;
+        const [pY, pM, pD] = refStr.split('-').map(Number);
+        const refDate = new Date(pY, pM - 1, pD);
+        selectedMonthYear = { year: pY, month: pM };
+        
+        // Exact 7-day window ending at 23:59:59.999 of refDate
+        endTs = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate(), 23, 59, 59, 999).getTime();
+        startTs = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate() - 6, 0, 0, 0, 0).getTime();
+
+        const dayNamesAr = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+        const dayNamesEn = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const dayNames = isAr ? dayNamesAr : dayNamesEn;
+
+        const weekDateMap = {};
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate() - i);
+            const dateIso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            const label = `${dayNames[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`;
+            histoData[label] = 0;
+            weekDateMap[dateIso] = label;
         }
-    }
 
-    let totalDeposits = 0;
-    filteredDeposits.forEach(d => {
-        totalDeposits += d.amount;
-    });
+        const weekLogs = allLogs.filter(l => {
+            const d = parseLogDate(l);
+            if (!d) return false;
+            const ts = d.getTime();
+            return ts >= startTs && ts <= endTs;
+        });
 
-    // Filter Spend Logs by Timeframe
-    let allSpendLogs = getCompanyData().spendLogs || [];
-    let filteredSpends = [];
-    if (currentSalesTimeframe === 'day') {
-        const datePicker = document.getElementById('sales-date-picker');
-        const parts = datePicker.value.split('-');
-        const startOfDay = new Date(parts[0], parts[1] - 1, parts[2]).getTime();
-        const endOfDay = startOfDay + 86400000;
-        filteredSpends = allSpendLogs.filter(l => l && l.timestamp >= startOfDay && l.timestamp < endOfDay);
-    }
-    else if (currentSalesTimeframe === 'week') {
-        const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).getTime();
-        filteredSpends = allSpendLogs.filter(l => l && l.timestamp >= startOfWeek);
+        weekLogs.forEach(l => {
+            if (disabledMethods.includes(l.method)) return;
+            const ld = parseLogDate(l);
+            if (ld) {
+                const lIso = `${ld.getFullYear()}-${String(ld.getMonth() + 1).padStart(2, '0')}-${String(ld.getDate()).padStart(2, '0')}`;
+                const label = weekDateMap[lIso];
+                if (label) {
+                    histoData[label] = (histoData[label] || 0) + (Number(l.amount) || 0);
+                }
+            }
+        });
     }
     else if (currentSalesTimeframe === 'month') {
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-        filteredSpends = allSpendLogs.filter(l => l && l.timestamp >= startOfMonth);
+        const monthStr = getSelectedSalesMonth();
+        const [mY, mM] = monthStr.split('-').map(Number);
+        selectedMonthYear = { year: mY, month: mM };
+
+        startTs = new Date(mY, mM - 1, 1, 0, 0, 0, 0).getTime();
+        endTs = new Date(mY, mM, 0, 23, 59, 59, 999).getTime();
+        const daysInMonth = new Date(mY, mM, 0).getDate();
+
+        // Initialize every single day of the month from 1 to daysInMonth (e.g. 1..30 or 1..31)
+        for (let d = 1; d <= daysInMonth; d++) {
+            histoData[String(d)] = 0;
+        }
+
+        const monthLogs = allLogs.filter(l => {
+            const d = parseLogDate(l);
+            if (!d) return false;
+            if (d.getFullYear() === mY && (d.getMonth() + 1) === mM) return true;
+            const ts = d.getTime();
+            return ts >= startTs && ts <= endTs;
+        });
+
+        monthLogs.forEach(l => {
+            if (disabledMethods.includes(l.method)) return;
+            const d = parseLogDate(l);
+            if (d) {
+                const dStr = String(d.getDate());
+                if (histoData[dStr] !== undefined) {
+                    histoData[dStr] += (Number(l.amount) || 0);
+                }
+            }
+        });
     }
     else if (currentSalesTimeframe === 'year') {
-        const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
-        filteredSpends = allSpendLogs.filter(l => l && l.timestamp >= startOfYear);
+        const yearUptoPicker = document.getElementById('sales-year-upto-picker');
+        const uptoStr = (yearUptoPicker && yearUptoPicker.value) ? yearUptoPicker.value : getSelectedSalesMonth();
+        const [yYear, filterMonth] = uptoStr.split('-').map(Number);
+        selectedMonthYear = { year: yYear, month: filterMonth };
+
+        startTs = new Date(yYear, 0, 1, 0, 0, 0, 0).getTime();
+        endTs = new Date(yYear, filterMonth, 0, 23, 59, 59, 999).getTime();
+
+        const monthNamesAr = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+        const monthNamesEn = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const monthNames = isAr ? monthNamesAr : monthNamesEn;
+
+        // Show strictly from 1st month (January) up to the filter month selected
+        const monthBuckets = [];
+        for (let m = 0; m < filterMonth; m++) {
+            const mLabel = `${monthNames[m]} (${m + 1})`;
+            histoData[mLabel] = 0;
+            monthBuckets.push({ mIndex: m, label: mLabel });
+        }
+
+        const yearLogs = allLogs.filter(l => {
+            const d = parseLogDate(l);
+            if (!d) return false;
+            if (d.getFullYear() === yYear && (d.getMonth() + 1) <= filterMonth) return true;
+            const ts = d.getTime();
+            return ts >= startTs && ts <= endTs;
+        });
+
+        yearLogs.forEach(l => {
+            if (disabledMethods.includes(l.method)) return;
+            const d = parseLogDate(l);
+            if (d && d.getMonth() < filterMonth) {
+                const mLabel = monthBuckets[d.getMonth()].label;
+                histoData[mLabel] = (histoData[mLabel] || 0) + (Number(l.amount) || 0);
+            }
+        });
     }
     else if (currentSalesTimeframe === 'custom') {
         const fromPicker = document.getElementById('sales-from-date');
         const toPicker = document.getElementById('sales-to-date');
         if (fromPicker && toPicker && fromPicker.value && toPicker.value) {
-            const fParts = fromPicker.value.split('-');
-            const tParts = toPicker.value.split('-');
-            const startTs = new Date(fParts[0], fParts[1] - 1, fParts[2]).getTime();
-            const endTs = new Date(tParts[0], tParts[1] - 1, tParts[2]).getTime() + 86400000;
-            filteredSpends = allSpendLogs.filter(l => l && l.timestamp >= startTs && l.timestamp < endTs);
+            const [fY, fM, fD] = fromPicker.value.split('-').map(Number);
+            const [tY, tM, tD] = toPicker.value.split('-').map(Number);
+            startTs = new Date(fY, fM - 1, fD, 0, 0, 0, 0).getTime();
+            endTs = new Date(tY, tM - 1, tD, 23, 59, 59, 999).getTime();
+
+            const customLogs = allLogs.filter(l => {
+                const d = parseLogDate(l);
+                if (!d) return false;
+                const ts = d.getTime();
+                return ts >= startTs && ts <= endTs;
+            });
+            const dateMap = {};
+            customLogs.forEach(l => {
+                if (disabledMethods.includes(l.method)) return;
+                const d = parseLogDate(l);
+                if (d) {
+                    const key = String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getDate()).padStart(2, '0');
+                    dateMap[key] = (dateMap[key] || 0) + (Number(l.amount) || 0);
+                }
+            });
+            Object.keys(dateMap).sort().forEach(k => {
+                histoData[k] = dateMap[k];
+            });
         }
     }
+
+    // Unified filtering for all three transaction categories
+    const filteredLogs = allLogs.filter(l => {
+        const d = parseLogDate(l);
+        if (!d) return false;
+        if (currentSalesTimeframe === 'day') {
+            const refStr = (document.getElementById('sales-date-picker') && document.getElementById('sales-date-picker').value) || todayLocalStr;
+            const [pY, pM, pD] = refStr.split('-').map(Number);
+            return d.getFullYear() === pY && (d.getMonth() + 1) === pM && d.getDate() === pD;
+        }
+        if (currentSalesTimeframe === 'month') {
+            return d.getFullYear() === selectedMonthYear.year && (d.getMonth() + 1) === selectedMonthYear.month;
+        }
+        if (currentSalesTimeframe === 'year') {
+            return d.getFullYear() === selectedMonthYear.year && (d.getMonth() + 1) <= selectedMonthYear.month;
+        }
+        const ts = d.getTime();
+        return ts >= startTs && ts <= endTs;
+    });
+
+    let allDeposits = getCompanyData().depositLogs || [];
+    if (allDeposits && typeof allDeposits === 'object' && !Array.isArray(allDeposits)) {
+        allDeposits = Object.values(allDeposits);
+    }
+    const filteredDeposits = allDeposits.filter(d => {
+        const dt = parseLogDate(d);
+        if (!dt) return false;
+        const ts = dt.getTime();
+        return ts >= startTs && ts <= endTs;
+    });
+
+    let allSpendLogs = getCompanyData().spendLogs || [];
+    if (allSpendLogs && typeof allSpendLogs === 'object' && !Array.isArray(allSpendLogs)) {
+        allSpendLogs = Object.values(allSpendLogs);
+    }
+    const filteredSpends = allSpendLogs.filter(s => {
+        const dt = parseLogDate(s);
+        if (!dt) return false;
+        const ts = dt.getTime();
+        return ts >= startTs && ts <= endTs;
+    });
+
+    let totalDeposits = 0;
+    filteredDeposits.forEach(d => {
+        totalDeposits += (Number(d.amount) || 0);
+    });
 
     let spendByMethod = {};
     let totalCashSpends = 0;
     filteredSpends.forEach(s => {
-        const m = s.method || '';
-        spendByMethod[m] = (spendByMethod[m] || 0) + s.amount;
+        const m = s.method || 'Cash';
+        const amt = (Number(s.amount) || 0);
+        spendByMethod[m] = (spendByMethod[m] || 0) + amt;
     });
 
-    // Calculate Totals for Toggles
-    let grandTotal = 0;
     let methodTotals = {};
-    sources.forEach(s => methodTotals[s] = 0);
+    sources.forEach(s => { methodTotals[s] = 0; });
 
     filteredLogs.forEach(l => {
-        if (methodTotals[l.method] !== undefined) {
-            methodTotals[l.method] += l.amount;
-        } else {
-            methodTotals[l.method] = l.amount;
-        }
+        const m = l.method || 'Cash';
+        const amt = (Number(l.amount) || 0);
+        methodTotals[m] = (methodTotals[m] || 0) + amt;
     });
 
     const cashKey = Object.keys(methodTotals).find(k => k.toLowerCase() === 'cash' || k === 'نقدي' || k === 'كاش');
@@ -5843,24 +6228,26 @@ function renderManaging() {
         methodTotals[cashKey] = rawCashSales - totalDeposits - totalCashSpends;
     }
 
-    // Subtract other method spends
+    // Deduct other method spends
     Object.keys(spendByMethod).forEach(m => {
         if (m !== cashKey && methodTotals[m] !== undefined) {
             methodTotals[m] = methodTotals[m] - spendByMethod[m];
         }
     });
 
-    // Sum up active methods to get grand total
-    sources.forEach(s => {
+    // Sum up ALL unique methods present (sources + any logged method)
+    let grandTotal = 0;
+    const allMethodNames = Array.from(new Set([...sources, ...Object.keys(methodTotals)]));
+    allMethodNames.forEach(s => {
         if (!disabledMethods.includes(s) && methodTotals[s] !== undefined) {
             grandTotal += methodTotals[s];
         }
     });
 
-    // Calculate gross sales (Total Salary)
+    // Gross Sales (total of all filtered sales logs)
     let totalSalary = 0;
     filteredLogs.forEach(l => {
-        totalSalary += l.amount;
+        totalSalary += (Number(l.amount) || 0);
     });
 
     const totalSalaryEl = document.getElementById('sales-total-salary');
@@ -5868,13 +6255,16 @@ function renderManaging() {
         totalSalaryEl.textContent = totalSalary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    document.getElementById('sales-grand-total').textContent = grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const grandTotalEl = document.getElementById('sales-grand-total');
+    if (grandTotalEl) {
+        grandTotalEl.textContent = grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
 
     // Draw Toggles
     const togglesDiv = document.getElementById('sales-method-toggles');
     if (togglesDiv) {
-        togglesDiv.innerHTML = Object.keys(methodTotals).map(methodName => {
-            const total = methodTotals[methodName];
+        togglesDiv.innerHTML = allMethodNames.map(methodName => {
+            const total = methodTotals[methodName] !== undefined ? methodTotals[methodName] : 0;
             const isCounted = !disabledMethods.includes(methodName);
 
             const bg = isCounted ? 'var(--success-bg)' : 'var(--danger-bg)';
@@ -5887,21 +6277,22 @@ function renderManaging() {
             if (isCash) {
                 extraHtml = `
                     <div style="font-size: 0.78rem; border-top: 1px dashed rgba(255,255,255,0.25); margin-top: 8px; padding-top: 8px; display:flex; flex-direction:column; gap:4px; color:inherit;">
-                        <div class="flex-between"><span>${isAr ? 'المبيعات النقدية:' : 'Cash Sales:'}</span> <span>SAR ${rawCashSales.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
-                        <div class="flex-between"><span>${isAr ? 'الإيداعات:' : 'Deposited:'}</span> <span>SAR ${totalDeposits.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
-                        <div class="flex-between"><span>${isAr ? 'المصروفات النقدية:' : 'Spent Out:'}</span> <span style="color:#f87171;">SAR ${totalCashSpends.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
-                        <div class="flex-between" style="font-weight:800; border-top: 1px solid rgba(255,255,255,0.15); margin-top:2px; padding-top:2px;"><span>${isAr ? 'المتبقي بالصندوق:' : 'Left in Box:'}</span> <span>SAR ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+                        <div class="flex-between"><span>${isAr ? 'المبيعات النقدية:' : 'Cash Sales:'}</span> <span>SAR ${rawCashSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                        <div class="flex-between"><span>${isAr ? 'الإيداعات:' : 'Deposited:'}</span> <span>SAR ${totalDeposits.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                        <div class="flex-between"><span>${isAr ? 'المصروفات النقدية:' : 'Spent Out:'}</span> <span style="color:#f87171;">SAR ${totalCashSpends.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                        <div class="flex-between" style="font-weight:800; border-top: 1px solid rgba(255,255,255,0.15); margin-top:2px; padding-top:2px;"><span>${isAr ? 'المتبقي بالصندوق:' : 'Left in Box:'}</span> <span>SAR ${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                     </div>
                 `;
             }
 
+            const escapedMethod = String(methodName).replace(/'/g, "\\'");
             return `
-                        <div onclick="toggleSalesMethod('${methodName}')" style="cursor: pointer; background: ${bg}; border: 2px solid ${border}; color: ${color}; padding: 12px 20px; border-radius: 12px; text-align: left; min-width: 180px; transition: transform 0.1s; box-shadow: var(--shadow-sm);">
-                            <div style="font-size: 0.8rem; font-weight: 800; text-transform: uppercase; margin-bottom: 6px;">${icon} ${methodName}</div>
-                            <div style="font-size: 1.25rem; font-weight: 800;">SAR ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                            ${extraHtml}
-                        </div>
-                    `;
+                <div onclick="toggleSalesMethod('${escapedMethod}')" style="cursor: pointer; background: ${bg}; border: 2px solid ${border}; color: ${color}; padding: 12px 20px; border-radius: 12px; text-align: left; min-width: 180px; transition: transform 0.1s; box-shadow: var(--shadow-sm);">
+                    <div style="font-size: 0.8rem; font-weight: 800; text-transform: uppercase; margin-bottom: 6px;">${icon} ${methodName}</div>
+                    <div style="font-size: 1.25rem; font-weight: 800;">SAR ${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    ${extraHtml}
+                </div>
+            `;
         }).join('');
     }
 
@@ -5911,13 +6302,11 @@ function renderManaging() {
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
 
-        // Destroy previous instance to avoid canvas reuse errors
         if (_salesChartInstance) {
             _salesChartInstance.destroy();
             _salesChartInstance = null;
         }
 
-        // Resolve CSS var colours for Chart.js (which can't read CSS vars natively)
         const rootStyle = getComputedStyle(document.documentElement);
         const primaryColor = rootStyle.getPropertyValue('--primary').trim() || '#6366f1';
         const secondaryColor = rootStyle.getPropertyValue('--secondary').trim() || '#f59e0b';
@@ -5933,7 +6322,6 @@ function renderManaging() {
         const summaryDiv = document.getElementById('sales-chart-summary');
 
         if (currentSalesChartType === 'doughnut') {
-            // --- DOUGHNUT: breakdown by payment method ---
             const dLabels = Object.keys(methodTotals).filter(m => methodTotals[m] > 0);
             const dData = dLabels.map(m => methodTotals[m]);
             const dColors = dLabels.map((_, i) => PALETTE[i % PALETTE.length]);
@@ -5947,7 +6335,7 @@ function renderManaging() {
                     overlay.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.9rem;color:' + textMuted + ';';
                     canvas.parentElement.appendChild(overlay);
                 }
-                overlay.textContent = 'No data for this timeframe.';
+                overlay.textContent = isAr ? 'لا توجد بيانات لهذه الفترة.' : 'No data for this timeframe.';
                 overlay.style.display = 'flex';
                 if (summaryDiv) summaryDiv.innerHTML = '';
                 return;
@@ -5972,6 +6360,7 @@ function renderManaging() {
                     responsive: true,
                     maintainAspectRatio: true,
                     cutout: '62%',
+                    animation: { duration: 200 },
                     plugins: {
                         legend: { display: false },
                         tooltip: {
@@ -5983,42 +6372,46 @@ function renderManaging() {
                 }
             });
 
-            // Pill legend
             if (summaryDiv) {
                 summaryDiv.innerHTML = dLabels.map((lbl, i) => `
-                            <span style="display:inline-flex;align-items:center;gap:5px;font-size:0.78rem;font-weight:700;color:${dColors[i]};background:${dColors[i]}18;padding:3px 10px;border-radius:20px;">
-                                <span style="width:8px;height:8px;border-radius:50%;background:${dColors[i]};display:inline-block;"></span>
-                                ${lbl}: SAR ${methodTotals[lbl].toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                            </span>`).join('');
+                    <span style="display:inline-flex;align-items:center;gap:5px;font-size:0.78rem;font-weight:700;color:${dColors[i]};background:${dColors[i]}18;padding:3px 10px;border-radius:20px;">
+                        <span style="width:8px;height:8px;border-radius:50%;background:${dColors[i]};display:inline-block;"></span>
+                        ${lbl}: SAR ${methodTotals[lbl].toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>`).join('');
             }
 
         } else {
-            // --- BAR / LINE: time-series ---
             const labels = Object.keys(histoData);
             const values = Object.values(histoData);
 
-            if (labels.length === 0) {
-                canvas.style.display = 'none';
-                let overlay = document.getElementById('sales-chart-empty');
-                if (!overlay) {
-                    overlay = document.createElement('div');
-                    overlay.id = 'sales-chart-empty';
-                    overlay.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:0.9rem;color:' + textMuted + ';';
-                    canvas.parentElement.appendChild(overlay);
-                }
-                overlay.textContent = 'No data for this timeframe.';
-                overlay.style.display = 'flex';
-                if (summaryDiv) summaryDiv.innerHTML = '';
-                return;
-            }
             canvas.style.display = '';
             const oldOverlay = document.getElementById('sales-chart-empty');
             if (oldOverlay) oldOverlay.style.display = 'none';
 
-            // Gradient fill for bar/line
             const grad = ctx.createLinearGradient(0, 0, 0, 280);
-            grad.addColorStop(0, primaryColor + 'cc');
-            grad.addColorStop(1, primaryColor + '18');
+            grad.addColorStop(0, primaryColor + 'ee');
+            grad.addColorStop(1, primaryColor + '20');
+
+            const maxVal = Math.max(...values, 1);
+            const hasMultipleSales = values.filter(v => v > 0).length > 1;
+
+            // Advanced dynamic styling for each bar:
+            // - 0-sales days have a clean subtle indicator
+            // - Peak sales day/month is highlighted in emerald green
+            // - Other active sales bars have vibrant gradient styling
+            const barBgColors = values.map(v => {
+                if (v === 0) return borderColor + '45';
+                if (v === maxVal && hasMultipleSales) return '#10b981';
+                const ratio = v / maxVal;
+                const alpha = Math.round(150 + ratio * 105).toString(16).padStart(2, '0');
+                return primaryColor + alpha;
+            });
+
+            const barBorderColors = values.map(v => {
+                if (v === maxVal && hasMultipleSales) return '#059669';
+                if (v > 0) return primaryColor;
+                return borderColor + '80';
+            });
 
             const isLine = currentSalesChartType === 'line';
             _salesChartInstance = new Chart(ctx, {
@@ -6026,21 +6419,18 @@ function renderManaging() {
                 data: {
                     labels,
                     datasets: [{
-                        label: t('label-sales') + ' (SAR)',
+                        label: (typeof t === 'function' ? t('label-sales') : 'Sales') + ' (SAR)',
                         data: values,
-                        backgroundColor: isLine ? grad : values.map((v, i) => {
-                            const max = Math.max(...values, 1);
-                            const alpha = Math.round(80 + (v / max) * 130).toString(16).padStart(2, '0');
-                            return primaryColor + alpha;
-                        }),
-                        borderColor: primaryColor,
+                        backgroundColor: isLine ? grad : barBgColors,
+                        borderColor: isLine ? primaryColor : barBorderColors,
                         borderWidth: isLine ? 3 : 1.5,
-                        borderRadius: isLine ? 0 : 8,
+                        borderRadius: isLine ? 0 : 6,
                         borderSkipped: false,
+                        maxBarThickness: currentSalesTimeframe === 'month' ? 24 : 36,
                         fill: isLine,
-                        tension: 0.42,
-                        pointRadius: isLine ? 5 : 0,
-                        pointHoverRadius: isLine ? 8 : 0,
+                        tension: 0.38,
+                        pointRadius: isLine ? 4 : 0,
+                        pointHoverRadius: isLine ? 7 : 0,
                         pointBackgroundColor: isLine ? primaryColor : undefined,
                         pointBorderColor: isLine ? cardBg : undefined,
                         pointBorderWidth: isLine ? 2 : 0,
@@ -6050,25 +6440,25 @@ function renderManaging() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    animation: { duration: 600, easing: 'easeOutQuart' },
+                    animation: { duration: 250, easing: 'easeOutQuart' },
                     interaction: { mode: 'index', intersect: false },
                     scales: {
                         x: {
                             grid: { display: false },
                             ticks: {
                                 color: textMuted,
-                                font: { size: 11, weight: '600', family: 'Inter, sans-serif' },
-                                maxRotation: 45
+                                font: { size: currentSalesTimeframe === 'month' ? 10 : 11, weight: '700', family: 'Inter, sans-serif' },
+                                maxRotation: currentSalesTimeframe === 'month' ? 0 : 45
                             },
                             border: { color: borderColor }
                         },
                         y: {
                             beginAtZero: true,
-                            grid: { color: borderColor + '80', drawBorder: false },
+                            grid: { color: borderColor + '60', drawBorder: false },
                             ticks: {
                                 color: textMuted,
                                 font: { size: 11, family: 'Inter, sans-serif' },
-                                callback: v => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v
+                                callback: v => v >= 1000 ? (v / 1000).toLocaleString() + 'k' : v
                             },
                             border: { display: false }
                         }
@@ -6080,52 +6470,81 @@ function renderManaging() {
                             titleColor: textMuted,
                             bodyColor: primaryColor,
                             borderColor: borderColor,
-                            borderWidth: 1,
+                            borderWidth: 1.5,
                             padding: 12,
                             cornerRadius: 10,
                             callbacks: {
-                                label: ctx => ` SAR ${ctx.parsed.y.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                                title: ctx => {
+                                    const label = ctx[0].label;
+                                    if (currentSalesTimeframe === 'month') {
+                                        return (isAr ? 'يوم ' : 'Day ') + label + ` (${selectedMonthYear.month}/${selectedMonthYear.year})`;
+                                    }
+                                    if (currentSalesTimeframe === 'year') {
+                                        return (isAr ? 'شهر ' : 'Month: ') + label + ` (${selectedMonthYear.year})`;
+                                    }
+                                    return label;
+                                },
+                                label: ctx => ` 💰 SAR ${(ctx.parsed.y || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                                afterLabel: ctx => {
+                                    const val = ctx.parsed.y || 0;
+                                    if (val === 0) return isAr ? ' ⚪ لا توجد مبيعات مسجلة' : ' ⚪ No sales recorded';
+                                    if (val === maxVal && hasMultipleSales) return isAr ? ' 🏆 اليوم الأعلى مبيعاً!' : ' 🏆 Highest peak sales!';
+                                    return '';
+                                }
                             }
                         }
                     }
                 }
             });
 
-            // Quick stats pill row
             if (summaryDiv && values.length > 0) {
                 const total = values.reduce((a, b) => a + b, 0);
-                const avg = total / values.length;
-                const peak = Math.max(...values);
-                const peakLabel = labels[values.indexOf(peak)];
+                const nonZeroValues = values.filter(v => v > 0);
+                const avgActive = nonZeroValues.length > 0 ? (total / nonZeroValues.length) : 0;
+                const peak = Math.max(...values, 0);
+                const peakLabel = peak > 0 ? (labels[values.indexOf(peak)] || '') : '-';
+                const activeUnits = nonZeroValues.length;
+                const totalUnits = values.length;
+
+                let periodLabel = isAr ? 'أيام العمل النشطة' : 'Active Days';
+                let unitName = isAr ? 'يوم' : 'days';
+                if (currentSalesTimeframe === 'year') {
+                    periodLabel = isAr ? 'الشهور المحسوبة' : 'Calculated Months';
+                    unitName = isAr ? 'شهر' : 'months';
+                }
+
                 summaryDiv.innerHTML = [
-                    { icon: '💰', label: t('label-total'), val: 'SAR ' + total.toLocaleString(undefined, { minimumFractionDigits: 2 }) },
-                    { icon: '📈', label: t('label-avg'), val: 'SAR ' + avg.toFixed(2) },
-                    { icon: '🏆', label: t('label-peak'), val: `${peakLabel} · SAR ${peak.toLocaleString(undefined, { minimumFractionDigits: 2 })}` }
+                    { icon: '💰', label: isAr ? 'إجمالي المبيعات' : 'Total Sales', val: 'SAR ' + total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
+                    { icon: '📈', label: isAr ? 'معدل الأيام النشطة' : 'Active Day Avg', val: 'SAR ' + avgActive.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
+                    { icon: '🏆', label: isAr ? 'الأعلى (Peak)' : 'Peak', val: peak > 0 ? `${peakLabel} · SAR ${peak.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-' },
+                    { icon: '📅', label: periodLabel, val: `${activeUnits} / ${totalUnits} ${unitName}` }
                 ].map(s => `
-                            <div style="flex:1; min-width:100px; text-align:center; background:var(--bg-color); border:1px solid var(--border-color); border-radius:10px; padding:8px 12px;">
-                                <div style="font-size:1.1rem;">${s.icon}</div>
-                                <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.05em;">${s.label}</div>
-                                <div style="font-size:0.82rem; font-weight:800; color:var(--primary); margin-top:2px;">${s.val}</div>
-                            </div>`).join('');
+                    <div style="flex:1; min-width:115px; text-align:center; background:var(--bg-color); border:1px solid var(--border-color); border-radius:12px; padding:10px 14px; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
+                        <div style="font-size:1.15rem; margin-bottom:2px;">${s.icon}</div>
+                        <div style="font-size:0.7rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">${s.label}</div>
+                        <div style="font-size:0.88rem; font-weight:800; color:var(--primary); margin-top:3px;">${s.val}</div>
+                    </div>`).join('');
             }
         }
     })();
 
-    // Draw Recent Transactions Log
+    // Draw Recent Transactions Log (Optimized: single DOM innerHTML assignment + 60-item limit for zero lag)
     const logDiv = document.getElementById('sales-transaction-log');
     if (logDiv) {
-        logDiv.innerHTML = '';
         const combined = [
             ...filteredLogs.map(l => ({ ...l, type: 'sale' })),
             ...filteredDeposits.map(d => ({ ...d, type: 'deposit' })),
             ...filteredSpends.map(s => ({ ...s, type: 'spend' }))
-        ].sort((a, b) => b.timestamp - a.timestamp);
+        ].sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
 
         if (combined.length === 0) {
-            logDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.95rem; padding: 20px;">${t('msg-no-transactions')}</p>`;
+            logDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); font-size:0.95rem; padding: 20px;">${typeof t === 'function' ? t('msg-no-transactions') : 'No transactions found.'}</p>`;
         } else {
-            const sources = getCompanyData().incomeSources || ['Cash', 'Credit Card'];
-            combined.forEach(item => {
+            const maxToRender = 60;
+            const itemsToRender = combined.slice(0, maxToRender);
+            const htmlArr = [];
+
+            itemsToRender.forEach(item => {
                 let isSalesAdmin = isAdmin || document.body.classList.contains('perm-finance') || document.body.classList.contains('perm-sales') || (currentUser && item.cashier && currentUser.email.toLowerCase() === item.cashier.toLowerCase());
                 let actionArea = '';
 
@@ -6138,75 +6557,85 @@ function renderManaging() {
                         actionArea = `
                             <div style="display:flex; gap:8px; align-items:center;">
                                 <button id="swap-btn-${item.id}" onclick="showSwapSelect('${item.id}')" style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius:6px; color: var(--text-main); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="${isAr ? 'تبديل طريقة الدفع' : 'Swap payment method'}">
-                                    🔄 ${t('btn-swap') || 'Swap'}
+                                    🔄 ${typeof t === 'function' ? t('btn-swap') : 'Swap'}
                                 </button>
                                 <select id="swap-select-${item.id}" onchange="swapSaleMethod('${item.id}', this.value)" onblur="cancelSwapSelect('${item.id}')" style="display:none; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.9rem; font-weight: bold; cursor: pointer;">
                                     <option value="">${isAr ? 'اختر...' : 'Choose...'}</option>
                                     ${sources.map(s => `<option value="${s}" ${s === item.method ? 'disabled selected' : ''}>${translateDynamicTerm(s)}</option>`).join('')}
                                 </select>
-                                <button onclick="deleteSaleTransaction('${item.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="${t('btn-remove')}">${t('btn-undo-action')}</button>
+                                <button onclick="deleteSaleTransaction('${item.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="${typeof t === 'function' ? t('btn-remove') : 'Remove'}">${typeof t === 'function' ? t('btn-undo-action') : 'Undo'}</button>
                             </div>
                         `;
                     }
 
-                    logDiv.innerHTML += `
+                    htmlArr.push(`
                         <div class="ledger-card" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; opacity: ${opacity}; margin-bottom: 0;">
                             <div>
-                                <div style="font-weight: 800; font-size: 1.25rem; color: var(--text-main); text-decoration: ${strike};">SAR ${item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                                <div style="font-weight: 800; font-size: 1.25rem; color: var(--text-main); text-decoration: ${strike};">SAR ${Number(item.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                                 <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px; display:flex; gap:8px; align-items:center;">
                                     <span class="badge" style="background: ${isCounted ? 'var(--primary)' : 'var(--text-muted)'}; color: white; padding:2px 8px;">${translateDynamicTerm(item.method)}</span> 
-                                    <span>🕒 ${item.date}</span>
+                                    <span>🕒 ${item.date || ''}</span>
                                     <span style="font-style:italic; opacity:0.7;">by ${item.cashier ? item.cashier.split('@')[0] : 'System'}</span>
                                     ${item.isPastEntry ? `<span class="badge" style="background:var(--warning); color:white; padding:2px 8px;">${isAr ? 'سابق' : 'Past'}</span>` : ''}
                                 </div>
                             </div>
                             <div>${actionArea}</div>
                         </div>
-                    `;
+                    `);
                 } else if (item.type === 'deposit') {
                     if (isSalesAdmin) {
                         actionArea = `
-                            <button onclick="deleteDepositTransaction('${item.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="${t('btn-remove')}">${t('btn-undo-action')}</button>
+                            <button onclick="deleteDepositTransaction('${item.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="${typeof t === 'function' ? t('btn-remove') : 'Remove'}">${typeof t === 'function' ? t('btn-undo-action') : 'Undo'}</button>
                         `;
                     }
 
-                    logDiv.innerHTML += `
+                    htmlArr.push(`
                         <div class="ledger-card" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; margin-bottom: 0; border-left: 4px solid #f59e0b;">
                             <div>
-                                <div style="font-weight: 800; font-size: 1.25rem; color: #f59e0b;">SAR -${item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                                <div style="font-weight: 800; font-size: 1.25rem; color: #f59e0b;">SAR -${Number(item.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                                 <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px; display:flex; gap:8px; align-items:center;">
                                     <span class="badge" style="background: #f59e0b; color: white; padding:2px 8px;">${isAr ? 'إيداع صندوق الكاش' : 'Cashier Deposit'}</span> 
-                                    <span>🕒 ${item.date}</span>
+                                    <span>🕒 ${item.date || ''}</span>
                                     <span style="font-style:italic; opacity:0.7;">by ${item.cashier ? item.cashier.split('@')[0] : 'System'}</span>
                                 </div>
                             </div>
                             <div>${actionArea}</div>
                         </div>
-                    `;
+                    `);
                 } else if (item.type === 'spend') {
                     if (isSalesAdmin) {
                         actionArea = `
-                            <button onclick="deleteSpendLog('${item.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="${t('btn-remove')}">${t('btn-undo-action')}</button>
+                            <button onclick="deleteSpendLog('${item.id}')" style="background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius:6px; color: var(--danger); font-size: 0.9rem; cursor: pointer; padding: 6px 12px; font-weight:bold;" title="${typeof t === 'function' ? t('btn-remove') : 'Remove'}">${typeof t === 'function' ? t('btn-undo-action') : 'Undo'}</button>
                         `;
                     }
 
-                    logDiv.innerHTML += `
+                    htmlArr.push(`
                         <div class="ledger-card" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; margin-bottom: 0; border-left: 4px solid var(--danger);">
                             <div>
-                                <div style="font-weight: 800; font-size: 1.25rem; color: var(--danger);">SAR -${item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                                <div style="font-weight: 800; font-size: 1.25rem; color: var(--danger);">SAR -${Number(item.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                                 <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                                     <span class="badge" style="background: var(--danger); color: white; padding:2px 8px;">${isAr ? 'مصروف مباشر' : 'Direct Spend'}</span>
                                     <span class="badge" style="background: var(--input-bg); color: var(--text-main); border: 1px solid var(--border-color); padding:2px 8px;">${translateDynamicTerm(item.method)}</span>
-                                    <span>🕒 ${item.date}</span>
+                                    <span>🕒 ${item.date || ''}</span>
                                     <span style="font-style:italic; opacity:0.7;">by ${item.cashier ? item.cashier.split('@')[0] : 'System'}</span>
                                     ${item.note ? `<span style="color:var(--text-main); font-weight:600;">📝 ${item.note}</span>` : ''}
                                 </div>
                             </div>
                             <div>${actionArea}</div>
                         </div>
-                    `;
+                    `);
                 }
             });
+
+            if (combined.length > maxToRender) {
+                htmlArr.push(`
+                    <div style="text-align: center; padding: 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">
+                        ${isAr ? `يتم عرض أحدث ${maxToRender} معاملة من أصل ${combined.length}` : `Showing latest ${maxToRender} of ${combined.length} transactions`}
+                    </div>
+                `);
+            }
+
+            logDiv.innerHTML = htmlArr.join('');
         }
     }
     // Refresh pending spend orders panel
@@ -8445,37 +8874,104 @@ function exportWorkerFinancePDF() {
 }
 
 // --- VIOLATION RULES SYSTEM ---
+// --- VIOLATION RULES SYSTEM ---
 function addViolationRule() {
-    const name = document.getElementById('new-vrule-name').value.trim();
-    const amount = parseFloat(document.getElementById('new-vrule-amount').value);
-    if (!name || isNaN(amount) || amount <= 0) { alert("Please provide a valid name and amount."); return; }
-    getCompanyData().violationRules.push({ id: Date.now().toString(), name, amount });
-    document.getElementById('new-vrule-name').value = ''; document.getElementById('new-vrule-amount').value = '';
+    const nameEl = document.getElementById('new-vrule-name');
+    const amountEl = document.getElementById('new-vrule-amount');
+    const name = nameEl ? nameEl.value.trim() : '';
+    const amount = amountEl ? parseFloat(amountEl.value) : NaN;
+    if (!name || isNaN(amount) || amount <= 0) { 
+        alert("Please provide a valid name and amount."); 
+        return; 
+    }
+    const compData = getCompanyData();
+    if (!compData.violationRules || !Array.isArray(compData.violationRules)) {
+        compData.violationRules = [];
+    }
+    const newRule = { 
+        id: 'vrule_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7), 
+        name: name, 
+        amount: amount 
+    };
+    compData.violationRules.push(newRule);
+    if (nameEl) nameEl.value = ''; 
+    if (amountEl) amountEl.value = '';
 
-    // Targeted write to global violationRules list
-    db.ref('companies/' + currentCompany + '/violationRules').set(getCompanyData().violationRules)
-        .catch(err => console.error("Error adding violation rule:", err));
+    // Render immediately in the UI so the user sees it without needing to reload!
+    renderViolationRules();
+
+    // Targeted write to global violationRules list in Firebase
+    db.ref('companies/' + currentCompany + '/violationRules').set(compData.violationRules)
+        .then(() => {
+            console.log("✅ Violation rule saved to Firebase for", currentCompany);
+        })
+        .catch(err => {
+            console.error("Error adding violation rule:", err);
+            alert("Database write error: " + err.message);
+        });
 }
 
 function deleteViolationRule(id) {
-    getCompanyData().violationRules = getCompanyData().violationRules.filter(r => r.id !== id);
+    if (!id) return;
+    const compData = getCompanyData();
+    if (!compData.violationRules || !Array.isArray(compData.violationRules)) {
+        compData.violationRules = [];
+    }
+    
+    // Filter matching by ID, index string, or name (covers rules created with or without ID)
+    compData.violationRules = compData.violationRules.filter((r, idx) => {
+        if (!r) return false;
+        if (r.id && String(r.id) === String(id)) return false;
+        if (String(idx) === String(id)) return false;
+        if (r.name && String(r.name) === String(id)) return false;
+        return true;
+    });
 
-    // Targeted write to global violationRules list
-    db.ref('companies/' + currentCompany + '/violationRules').set(getCompanyData().violationRules)
-        .catch(err => console.error("Error deleting violation rule:", err));
+    // Render immediately in the UI so the deleted rule vanishes on click!
+    renderViolationRules();
+
+    // Targeted write to global violationRules list in Firebase
+    const dataToWrite = compData.violationRules.length > 0 ? compData.violationRules : [];
+    db.ref('companies/' + currentCompany + '/violationRules').set(dataToWrite)
+        .then(() => {
+            console.log("✅ Violation rule deleted from Firebase for", currentCompany);
+        })
+        .catch(err => {
+            console.error("Error deleting violation rule:", err);
+            alert("Database write error: " + err.message);
+        });
 }
 
 function renderViolationRules() {
-    const list = document.getElementById('vrule-list'); list.innerHTML = '';
+    const list = document.getElementById('vrule-list'); 
+    if (list) list.innerHTML = '';
     const select = document.getElementById('v-rule-select');
     if (select) select.innerHTML = '<option value="">-- Custom / Select Rule --</option>';
 
-    getCompanyData().violationRules.forEach(rule => {
-        const li = document.createElement('li'); li.className = 'flex-between list-item';
-        li.innerHTML = `<div><span style="font-weight: 600; color:var(--text-main);">${rule.name}</span><br><span style="font-size:0.8rem; color:var(--danger); font-weight: 500;">- SAR ${rule.amount}</span></div> <button class="btn-outline-danger" style="padding: 4px 10px; font-size: 0.75rem;" onclick="deleteViolationRule('${rule.id}')">Del</button>`;
-        list.appendChild(li);
+    const compData = getCompanyData();
+    if (!compData.violationRules || !Array.isArray(compData.violationRules)) {
+        compData.violationRules = [];
+    }
+
+    compData.violationRules.forEach((rule, idx) => {
+        if (!rule || !rule.name) return;
+        const ruleId = rule.id || ('vrule_' + idx + '_' + String(rule.name).replace(/\s+/g, '_'));
+        rule.id = ruleId;
+        const escapedId = String(ruleId).replace(/'/g, "\\'");
+        const displayName = typeof escapeHtml === 'function' ? escapeHtml(rule.name) : rule.name;
+
+        if (list) {
+            const li = document.createElement('li'); 
+            li.className = 'flex-between list-item';
+            li.style.cssText = 'padding: 10px 12px; margin-bottom: 8px; border-radius: 10px; background: var(--input-bg); border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;';
+            li.innerHTML = `<div><span style="font-weight: 700; color:var(--text-main);">${displayName}</span><br><span style="font-size:0.8rem; color:var(--danger); font-weight: 600;">- SAR ${rule.amount}</span></div> <button type="button" class="btn-outline-danger" style="padding: 6px 12px; font-size: 0.78rem; font-weight: 700; border-radius: 8px; cursor: pointer;" onclick="deleteViolationRule('${escapedId}')">Del</button>`;
+            list.appendChild(li);
+        }
         if (select) {
-            const option = document.createElement('option'); option.value = rule.amount; option.dataset.name = rule.name; option.textContent = `${rule.name} (-${rule.amount} SAR)`;
+            const option = document.createElement('option'); 
+            option.value = rule.amount; 
+            option.dataset.name = rule.name; 
+            option.textContent = `${rule.name} (-${rule.amount} SAR)`;
             select.appendChild(option);
         }
     });
@@ -15642,22 +16138,8 @@ function renderLeaderboard() {
     }
 }
 
-// --- MOBILE USER DROPDOWN TRIGGER ---
-window.toggleUserDropdown = function (event) {
-    if (event) event.stopPropagation();
-    const dropdown = document.getElementById('user-dropdown-menu');
-    if (dropdown) {
-        dropdown.classList.toggle('show-dropdown');
-    }
-};
+// Note: toggleUserDropdown is centrally handled in js/core.js
 
-document.addEventListener('click', function (e) {
-    const container = document.querySelector('.user-menu-container');
-    const dropdown = document.getElementById('user-dropdown-menu');
-    if (container && dropdown && !container.contains(e.target)) {
-        dropdown.classList.remove('show-dropdown');
-    }
-});
 
 // --- WORKER PAYMENT REQUESTS ENGINE ---
 
@@ -32983,7 +33465,7 @@ function attachSallaOrdersListener() {
                     if (!appData[comp]) appData[comp] = {};
                     appData[comp].sallaOrders = val;
                 }
-                sallaOrdersCache = { ...val };
+                sallaOrdersCache = { ...(sallaOrdersCache || {}), ...val };
                 scheduleSallaRender();
             });
         } catch(e) {

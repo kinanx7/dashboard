@@ -972,22 +972,8 @@ function renderLeaderboard() {
     }
 }
 
-// --- MOBILE USER DROPDOWN TRIGGER ---
-window.toggleUserDropdown = function (event) {
-    if (event) event.stopPropagation();
-    const dropdown = document.getElementById('user-dropdown-menu');
-    if (dropdown) {
-        dropdown.classList.toggle('show-dropdown');
-    }
-};
+// Note: toggleUserDropdown is centrally handled in js/core.js
 
-document.addEventListener('click', function (e) {
-    const container = document.querySelector('.user-menu-container');
-    const dropdown = document.getElementById('user-dropdown-menu');
-    if (container && dropdown && !container.contains(e.target)) {
-        dropdown.classList.remove('show-dropdown');
-    }
-});
 
 // --- WORKER PAYMENT REQUESTS ENGINE ---
 

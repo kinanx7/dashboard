@@ -367,37 +367,104 @@ function exportWorkerFinancePDF() {
 }
 
 // --- VIOLATION RULES SYSTEM ---
+// --- VIOLATION RULES SYSTEM ---
 function addViolationRule() {
-    const name = document.getElementById('new-vrule-name').value.trim();
-    const amount = parseFloat(document.getElementById('new-vrule-amount').value);
-    if (!name || isNaN(amount) || amount <= 0) { alert("Please provide a valid name and amount."); return; }
-    getCompanyData().violationRules.push({ id: Date.now().toString(), name, amount });
-    document.getElementById('new-vrule-name').value = ''; document.getElementById('new-vrule-amount').value = '';
+    const nameEl = document.getElementById('new-vrule-name');
+    const amountEl = document.getElementById('new-vrule-amount');
+    const name = nameEl ? nameEl.value.trim() : '';
+    const amount = amountEl ? parseFloat(amountEl.value) : NaN;
+    if (!name || isNaN(amount) || amount <= 0) { 
+        alert("Please provide a valid name and amount."); 
+        return; 
+    }
+    const compData = getCompanyData();
+    if (!compData.violationRules || !Array.isArray(compData.violationRules)) {
+        compData.violationRules = [];
+    }
+    const newRule = { 
+        id: 'vrule_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7), 
+        name: name, 
+        amount: amount 
+    };
+    compData.violationRules.push(newRule);
+    if (nameEl) nameEl.value = ''; 
+    if (amountEl) amountEl.value = '';
 
-    // Targeted write to global violationRules list
-    db.ref('companies/' + currentCompany + '/violationRules').set(getCompanyData().violationRules)
-        .catch(err => console.error("Error adding violation rule:", err));
+    // Render immediately in the UI so the user sees it without needing to reload!
+    renderViolationRules();
+
+    // Targeted write to global violationRules list in Firebase
+    db.ref('companies/' + currentCompany + '/violationRules').set(compData.violationRules)
+        .then(() => {
+            console.log("✅ Violation rule saved to Firebase for", currentCompany);
+        })
+        .catch(err => {
+            console.error("Error adding violation rule:", err);
+            alert("Database write error: " + err.message);
+        });
 }
 
 function deleteViolationRule(id) {
-    getCompanyData().violationRules = getCompanyData().violationRules.filter(r => r.id !== id);
+    if (!id) return;
+    const compData = getCompanyData();
+    if (!compData.violationRules || !Array.isArray(compData.violationRules)) {
+        compData.violationRules = [];
+    }
+    
+    // Filter matching by ID, index string, or name (covers rules created with or without ID)
+    compData.violationRules = compData.violationRules.filter((r, idx) => {
+        if (!r) return false;
+        if (r.id && String(r.id) === String(id)) return false;
+        if (String(idx) === String(id)) return false;
+        if (r.name && String(r.name) === String(id)) return false;
+        return true;
+    });
 
-    // Targeted write to global violationRules list
-    db.ref('companies/' + currentCompany + '/violationRules').set(getCompanyData().violationRules)
-        .catch(err => console.error("Error deleting violation rule:", err));
+    // Render immediately in the UI so the deleted rule vanishes on click!
+    renderViolationRules();
+
+    // Targeted write to global violationRules list in Firebase
+    const dataToWrite = compData.violationRules.length > 0 ? compData.violationRules : [];
+    db.ref('companies/' + currentCompany + '/violationRules').set(dataToWrite)
+        .then(() => {
+            console.log("✅ Violation rule deleted from Firebase for", currentCompany);
+        })
+        .catch(err => {
+            console.error("Error deleting violation rule:", err);
+            alert("Database write error: " + err.message);
+        });
 }
 
 function renderViolationRules() {
-    const list = document.getElementById('vrule-list'); list.innerHTML = '';
+    const list = document.getElementById('vrule-list'); 
+    if (list) list.innerHTML = '';
     const select = document.getElementById('v-rule-select');
     if (select) select.innerHTML = '<option value="">-- Custom / Select Rule --</option>';
 
-    getCompanyData().violationRules.forEach(rule => {
-        const li = document.createElement('li'); li.className = 'flex-between list-item';
-        li.innerHTML = `<div><span style="font-weight: 600; color:var(--text-main);">${rule.name}</span><br><span style="font-size:0.8rem; color:var(--danger); font-weight: 500;">- SAR ${rule.amount}</span></div> <button class="btn-outline-danger" style="padding: 4px 10px; font-size: 0.75rem;" onclick="deleteViolationRule('${rule.id}')">Del</button>`;
-        list.appendChild(li);
+    const compData = getCompanyData();
+    if (!compData.violationRules || !Array.isArray(compData.violationRules)) {
+        compData.violationRules = [];
+    }
+
+    compData.violationRules.forEach((rule, idx) => {
+        if (!rule || !rule.name) return;
+        const ruleId = rule.id || ('vrule_' + idx + '_' + String(rule.name).replace(/\s+/g, '_'));
+        rule.id = ruleId;
+        const escapedId = String(ruleId).replace(/'/g, "\\'");
+        const displayName = typeof escapeHtml === 'function' ? escapeHtml(rule.name) : rule.name;
+
+        if (list) {
+            const li = document.createElement('li'); 
+            li.className = 'flex-between list-item';
+            li.style.cssText = 'padding: 10px 12px; margin-bottom: 8px; border-radius: 10px; background: var(--input-bg); border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;';
+            li.innerHTML = `<div><span style="font-weight: 700; color:var(--text-main);">${displayName}</span><br><span style="font-size:0.8rem; color:var(--danger); font-weight: 600;">- SAR ${rule.amount}</span></div> <button type="button" class="btn-outline-danger" style="padding: 6px 12px; font-size: 0.78rem; font-weight: 700; border-radius: 8px; cursor: pointer;" onclick="deleteViolationRule('${escapedId}')">Del</button>`;
+            list.appendChild(li);
+        }
         if (select) {
-            const option = document.createElement('option'); option.value = rule.amount; option.dataset.name = rule.name; option.textContent = `${rule.name} (-${rule.amount} SAR)`;
+            const option = document.createElement('option'); 
+            option.value = rule.amount; 
+            option.dataset.name = rule.name; 
+            option.textContent = `${rule.name} (-${rule.amount} SAR)`;
             select.appendChild(option);
         }
     });

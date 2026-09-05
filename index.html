@@ -81,7 +81,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=180">
+    <link rel="stylesheet" href="style.css?v=277">
 </head>
 
 <body class="theme-burgeroov">
@@ -324,15 +324,24 @@
                         🏢 <span class="swap-btn-text-full" data-i18n="btn-swap-company">Swap Company</span><span
                             class="swap-btn-text-short" data-i18n="btn-swap-short">Swap</span>
                     </button>
-                    <button class="btn-outline" style="
-              color: #fff;
-              border-color: rgba(255, 255, 255, 0.3);
-              padding: 6px 12px;
-              font-size: 0.8rem;
-              margin-right: 8px;
-            " onclick="toggleLanguage()" id="lang-toggle-btn" translate="no">
-                        🌐 عربي
-                    </button>
+                    <div class="lang-selector-container" id="lang-selector-container">
+                        <button type="button" class="btn-outline lang-current-badge" id="lang-current-badge" onclick="toggleLangDropdown(event)" aria-label="Language Selector">
+                            <span id="lang-current-flag">🇸🇦</span>
+                            <span id="lang-current-label">عربي</span>
+                            <span class="lang-arrow">▾</span>
+                        </button>
+                        <div class="lang-dropdown-sheet" id="lang-dropdown-sheet">
+                            <button type="button" class="lang-dropdown-opt" onclick="setAppLanguage('ar'); closeLangDropdown();" data-lang="ar">
+                                <span>🇸🇦</span> <span>عربي</span>
+                            </button>
+                            <button type="button" class="lang-dropdown-opt" onclick="setAppLanguage('bn'); closeLangDropdown();" data-lang="bn">
+                                <span>🇧🇩</span> <span>বাংলা</span>
+                            </button>
+                            <button type="button" class="lang-dropdown-opt" onclick="setAppLanguage('en'); closeLangDropdown();" data-lang="en">
+                                <span>🇺🇸</span> <span>English</span>
+                            </button>
+                        </div>
+                    </div>
                     <button class="btn-outline" style="
               color: #fff;
               border-color: rgba(255, 255, 255, 0.3);
@@ -351,8 +360,8 @@
                         Logout
                     </button>
 
-                    <div class="user-menu-container">
-                        <div class="user-avatar" onclick="toggleUserDropdown(event)">
+                    <div class="user-menu-container" id="user-menu-container">
+                        <div class="user-avatar" onclick="toggleUserDropdown(event)" title="User Profile">
                             <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2"
                                 fill="none" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
@@ -360,21 +369,30 @@
                             </svg>
                         </div>
                         <div class="user-dropdown" id="user-dropdown-menu">
-                            <div id="display-user-email"></div>
-                            <div id="display-user-role" class="user-role-badge"></div>
-                            <div class="dropdown-mob-actions">
+                            <div style="display:flex; align-items:center; gap:10px; width:100%; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.12);">
+                                <div id="display-user-avatar-initial" style="width:36px; height:36px; border-radius:50%; background:var(--primary); color:#fff; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:1.05rem; flex-shrink:0;">
+                                    👤
+                                </div>
+                                <div style="display:flex; flex-direction:column; min-width:0; flex:1; text-align:start;">
+                                    <div id="display-user-name" style="font-weight:800; color:#ffffff; font-size:0.92rem; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                        User
+                                    </div>
+                                    <div id="display-user-email" style="color:rgba(255,255,255,0.65); font-size:0.75rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+                                </div>
+                            </div>
+                            <div id="display-user-role" class="user-role-badge" style="margin:6px 0; align-self:flex-start;"></div>
+                            <div class="dropdown-mob-actions" style="width:100%;">
                                 <button class="btn-outline dropdown-mob-btn kinan-only"
                                     onclick="showCompanySelectionHUD(event)" id="company-swap-btn-mob"
                                     style="display: none;">
                                     🏢 <span data-i18n="btn-swap-company">Swap Company</span>
                                 </button>
-                                <button class="btn-outline dropdown-mob-btn" onclick="toggleLanguage(event)"
-                                    id="lang-toggle-btn-mob" translate="no">
-                                    🌐 عربي
-                                </button>
                                 <button class="btn-outline dropdown-mob-btn" onclick="toggleDarkMode(event)"
                                     id="dark-mode-btn-mob" data-i18n="btn-dark-mode">
                                     🌙 Dark Mode
+                                </button>
+                                <button class="btn-outline dropdown-mob-btn" onclick="logout()" style="color:#ef4444; border-color:rgba(239,68,68,0.35); background:rgba(239,68,68,0.1);" data-i18n="btn-logout">
+                                    🚪 Logout
                                 </button>
                             </div>
                         </div>
@@ -901,24 +919,24 @@
                                     <label data-i18n="label-ov-hours">Overtime Hours</label>
                                     <select id="att-ov-hours"
                                         style="padding:10px; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);">
-                                        <option value="1">+1 Hour</option>
-                                        <option value="2">+2 Hours</option>
-                                        <option value="3">+3 Hours</option>
-                                        <option value="4">+4 Hours</option>
-                                        <option value="5">+5 Hours</option>
-                                        <option value="6">+6 Hours</option>
-                                        <option value="7">+7 Hours</option>
+                                        <option value="1">+1 ساعة (+1 Hr)</option>
+                                        <option value="2">+2 ساعة (+2 Hrs)</option>
+                                        <option value="3">+3 ساعات (+3 Hrs)</option>
+                                        <option value="4">+4 ساعات (+4 Hrs)</option>
+                                        <option value="5">+5 ساعات (+5 Hrs)</option>
+                                        <option value="6">+6 ساعات (+6 Hrs)</option>
+                                        <option value="7">+7 ساعات (+7 Hrs)</option>
                                     </select>
                                 </div>
                                 <div class="form-group" style="margin-bottom:0;">
                                     <label data-i18n="label-ov-multiplier">Overtime Multiplier</label>
                                     <select id="att-ov-multiplier"
                                         style="padding:10px; background: var(--input-bg); border-color: var(--border-color); color: var(--text-main); border-radius: var(--radius-md);">
-                                        <option value="1.0">x1.00 (Standard)</option>
-                                        <option value="1.25">x1.25 (Peak Day)</option>
-                                        <option value="1.5">x1.50 (Weekend/Holiday)</option>
+                                        <option value="1.0">x1.00 (عادي - Standard)</option>
+                                        <option value="1.25">x1.25 (يوم ذروة - Peak Day)</option>
+                                        <option value="1.5">x1.50 (عطلة أسبوعية - Weekend)</option>
                                         <option value="1.75">x1.75</option>
-                                        <option value="2.0">x2.00 (Double Pay)</option>
+                                        <option value="2.0">x2.00 (مضاعف - Double Pay)</option>
                                     </select>
                                 </div>
                                 <div style="text-align: right; display: flex; flex-direction: column; gap: 4px;">
@@ -1455,35 +1473,35 @@
                 <!-- Leaderboard Points Rules Configuration (Admin Only) -->
                 <div class="card admin-only" style="margin-top: 24px;">
                     <div class="card-header-flex">
-                        <h2 class="card-title in-flex">⚙️ Leaderboard Point Rules Configuration</h2>
+                        <h2 class="card-title in-flex" data-i18n="title-pts-rules">⚙️ إعدادات واحتساب نقاط المتصدرين</h2>
                     </div>
-                    <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom: 16px;">
-                        Customize the exact points awarded to workers for attendance, task completions, and driver deliveries.
+                    <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom: 16px;" data-i18n="desc-pts-rules">
+                        تخصيص النقاط الممنوحة للموظفين للحضور، وإنجاز المهام، وتوصيلات السائقين.
                     </p>
                     <form onsubmit="event.preventDefault(); saveRankingSettings();" style="margin:0; padding:0; background:transparent; border:none; box-shadow:none;">
                         <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 16px;">
                             <div class="form-group">
-                                <label style="font-size:0.8rem;">📅 Attendance Point (per day)</label>
+                                <label style="font-size:0.8rem;" data-i18n="label-pts-att">📅 نقاط الحضور (لكل يوم)</label>
                                 <input type="number" id="rank-pts-attendance" value="5" min="0" step="1" required />
                             </div>
                             <div class="form-group">
-                                <label style="font-size:0.8rem;">⏰ On-Time Check-In Bonus</label>
+                                <label style="font-size:0.8rem;" data-i18n="label-pts-ontime">⏰ مكافأة الحضور في الوقت المحدد</label>
                                 <input type="number" id="rank-pts-ontime" value="2" min="0" step="1" required />
                             </div>
                             <div class="form-group">
-                                <label style="font-size:0.8rem;">📋 Normal Task Point</label>
+                                <label style="font-size:0.8rem;" data-i18n="label-pts-norm-task">📋 نقاط المهمة العادية</label>
                                 <input type="number" id="rank-pts-normal-task" value="10" min="0" step="1" required />
                             </div>
                             <div class="form-group">
-                                <label style="font-size:0.8rem;">🔴 High / Urgent Task Point</label>
+                                <label style="font-size:0.8rem;" data-i18n="label-pts-urg-task">🔴 نقاط المهمة الهامة / العاجلة</label>
                                 <input type="number" id="rank-pts-urgent-task" value="20" min="0" step="1" required />
                             </div>
                             <div class="form-group">
-                                <label style="font-size:0.8rem;">🚚 Delivery Point (per order)</label>
+                                <label style="font-size:0.8rem;" data-i18n="label-pts-deliv">🚚 نقاط التوصيل (لكل طلب)</label>
                                 <input type="number" id="rank-pts-delivery" value="15" min="0" step="1" required />
                             </div>
                         </div>
-                        <button type="submit" class="btn-primary" style="padding: 10px 20px;">💾 Save Point Rules</button>
+                        <button type="submit" class="btn-primary" style="padding: 10px 20px;" data-i18n="btn-save-pts">💾 حفظ قواعد النقاط</button>
                     </form>
                 </div>
             </div>
@@ -2879,12 +2897,23 @@
                             <button id="tf-week" onclick="setSalesTimeframe('week')"
                                 style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);"
                                 data-i18n="btn-tf-week">Week</button>
-                            <button id="tf-month" onclick="setSalesTimeframe('month')"
-                                style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);"
-                                data-i18n="btn-tf-month">Month</button>
-                            <button id="tf-year" onclick="setSalesTimeframe('year')"
-                                style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);"
-                                data-i18n="btn-tf-year">Year</button>
+                            <div style="display:flex; gap:4px; align-items:center;">
+                                <button id="tf-month" onclick="setSalesTimeframe('month')"
+                                    style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);"
+                                    data-i18n="btn-tf-month">Month</button>
+                                <input type="month" id="sales-month-picker" onchange="renderManaging()"
+                                    style="display:none; padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-color); font-size: 0.85rem; height: 32px; background: var(--card-bg); color: var(--text-main);">
+                            </div>
+                            <div style="display:flex; gap:4px; align-items:center;">
+                                <button id="tf-year" onclick="setSalesTimeframe('year')"
+                                    style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);"
+                                    data-i18n="btn-tf-year">Year</button>
+                                <div id="sales-year-filter-wrapper" style="display:none; align-items:center; gap:6px;">
+                                    <input type="month" id="sales-year-upto-picker" onchange="renderManaging()"
+                                        style="padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-color); font-size: 0.85rem; height: 32px; background: var(--card-bg); color: var(--text-main);">
+                                    <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700;" data-i18n="label-upto-month">(من بداية السنة حتى الشهر المختار)</span>
+                                </div>
+                            </div>
                             <button id="tf-custom" onclick="setSalesTimeframe('custom')"
                                 style="border-radius:100px; padding: 6px 16px; background:transparent; color:var(--text-muted);"
                                 data-i18n="btn-tf-custom">📅 Range</button>
@@ -6177,18 +6206,17 @@
             <span id="mob-active-icon" class="mob-bar-icon">⚙️</span>
             <span id="mob-active-label">Operations</span>
         </div>
-        <!-- Center: quick access to 3 most used tabs -->
+        <!-- Center: quick access to 4 most used worker tabs -->
         <div id="mob-quick-tabs">
-            <button class="mob-quick-btn active-tab" id="mob-tab-ops" onclick="switchTab('ops')"
-                title="Operations">⚙️</button>
-            <button class="mob-quick-btn" id="mob-tab-summary" onclick="switchTab('summary')"
-                title="Summary">📊</button>
+            <button class="mob-quick-btn active-tab" id="mob-tab-ops" onclick="switchTab('ops')" title="Operations">⚙️</button>
             <button class="mob-quick-btn" id="mob-tab-tasks" onclick="switchTab('tasks')" title="Tasks">📋</button>
+            <button class="mob-quick-btn" id="mob-tab-prepare" onclick="switchTab('prepare')" title="Prepare">👨‍🍳</button>
+            <button class="mob-quick-btn" id="mob-tab-warehouse" onclick="switchTab('warehouse')" title="Warehouse">📦</button>
         </div>
         <!-- Right: open department picker -->
         <button id="mob-dept-menu-btn" onclick="openMobDeptMenu()" aria-label="Departments menu">
-            <span id="mob-menu-icon">☰</span>
-            <span>Depts</span>
+            <span id="mob-menu-icon">🗂️</span>
+            <span data-i18n="btn-more">More</span>
         </button>
     </nav>
 
@@ -6196,34 +6224,37 @@
     <div id="mob-dept-backdrop" onclick="closeMobDeptMenu()"></div>
     <div id="mob-dept-sheet" role="dialog" aria-label="Department Menu">
         <div id="mob-dept-sheet-handle"></div>
-        <h3 id="mob-dept-sheet-title">📂 Departments</h3>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding: 0 4px;">
+            <h3 id="mob-dept-sheet-title" style="margin: 0; font-size: 1.05rem; font-weight: 800; color: var(--text-main);"><span class="mob-dept-icon" style="margin-right:4px;">📂</span><span data-i18n="title-departments">Departments</span></h3>
+            <button type="button" onclick="closeMobDeptMenu()" style="width: 32px; height: 32px; min-height: 32px; border-radius: 50%; background: rgba(255,255,255,0.08); border: 1px solid var(--border-color); color: var(--text-muted); font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;" aria-label="Close">✕</button>
+        </div>
         <div id="mob-dept-grid">
             <button class="mob-dept-item mob-sheet-tab" data-tab="ops" onclick="switchTab('ops'); closeMobDeptMenu()">
-                <span class="mob-dept-icon">⚙️</span><span>Operations</span>
+                <span class="mob-dept-icon">⚙️</span><span data-i18n="tab-ops">Operations</span>
             </button>
             <button class="mob-dept-item mob-sheet-tab" data-tab="ranks"
                 onclick="switchTab('ranks'); closeMobDeptMenu()">
-                <span class="mob-dept-icon">🏆</span><span>Ranks</span>
+                <span class="mob-dept-icon">🏆</span><span data-i18n="tab-ranks">Ranks</span>
             </button>
             <button class="mob-dept-item mob-sheet-tab" data-tab="tasks"
                 onclick="switchTab('tasks'); closeMobDeptMenu()">
-                <span class="mob-dept-icon">📋</span><span>Tasks</span>
+                <span class="mob-dept-icon">📋</span><span data-i18n="tab-tasks">Tasks</span>
             </button>
             <button class="mob-dept-item mob-sheet-tab" data-tab="warehouse"
                 onclick="switchTab('warehouse'); closeMobDeptMenu()">
-                <span class="mob-dept-icon">📦</span><span>Warehouse</span>
+                <span class="mob-dept-icon">📦</span><span data-i18n="tab-warehouse">Warehouse</span>
             </button>
             <button class="mob-dept-item mob-sheet-tab" data-tab="drivers"
                 onclick="switchTab('drivers'); closeMobDeptMenu()">
-                <span class="mob-dept-icon">🚚</span><span>Drivers</span>
+                <span class="mob-dept-icon">🚚</span><span data-i18n="tab-drivers">Drivers</span>
             </button>
             <button class="mob-dept-item mob-sheet-tab" data-tab="finance"
                 onclick="switchTab('finance'); closeMobDeptMenu()">
-                <span class="mob-dept-icon">💰</span><span>Finance</span>
+                <span class="mob-dept-icon">💰</span><span data-i18n="tab-finance">Finance</span>
             </button>
             <button class="mob-dept-item mob-sheet-tab" data-tab="summary"
                 onclick="switchTab('summary'); closeMobDeptMenu()">
-                <span class="mob-dept-icon">📊</span><span>Summary</span>
+                <span class="mob-dept-icon">📊</span><span data-i18n="tab-summary">Summary</span>
             </button>
             <button class="mob-dept-item mob-sheet-tab" data-tab="managing"
                 onclick="switchTab('managing'); closeMobDeptMenu()">
@@ -7108,7 +7139,7 @@
             <!-- Action Confirmation Button -->
             <button type="button" onclick="acknowledgeAnnouncement()" class="exec-confirm-btn" style="width:100%; padding:14px 18px; border-radius:12px; font-size:0.94rem; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-sizing:border-box; text-align:center; white-space:normal; word-break:break-word;">
                 <span>✅</span>
-                <span>أقر بالاطلاع والفهم • Confirm & Acknowledge</span>
+                <span>أقر بالاطلاع والفهم</span>
             </button>
         </div>
     </div>
@@ -7120,7 +7151,7 @@
                 <div style="display:flex; align-items:center; gap:10px;">
                     <span style="font-size:1.4rem;">👁️</span>
                     <div>
-                        <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:#3b82f6;">Announcement Readership & Viewers</h3>
+                        <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:#3b82f6;">قراء ومشاهدو الإعلان</h3>
                         <span id="readership-ann-title" style="font-size:0.8rem; color:var(--text-muted); font-weight:700;">-</span>
                     </div>
                 </div>
@@ -7138,7 +7169,7 @@
             </div>
 
             <div style="display:flex; justify-content:flex-end; border-top:1px solid var(--border-color); padding-top:14px; margin-top:18px;">
-                <button type="button" onclick="closeAnnouncementReadershipModal()" class="btn-neutral" style="padding:9px 20px; border-radius:10px; font-weight:700;">Close</button>
+                <button type="button" onclick="closeAnnouncementReadershipModal()" class="btn-neutral" style="padding:9px 20px; border-radius:10px; font-weight:700;">إغلاق</button>
             </div>
         </div>
     </div>
@@ -7150,7 +7181,7 @@
                 <div style="display:flex; align-items:center; gap:10px;">
                     <span style="font-size:1.4rem;">📇</span>
                     <div>
-                        <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:var(--text-main);">جهات الاتصال والأرقام المحفوظة • Saved Contacts</h3>
+                        <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:var(--text-main);">جهات الاتصال والأرقام المحفوظة</h3>
                         <span style="font-size:0.78rem; color:var(--text-muted); font-weight:600;">احفظ أرقام الأشخاص والمسؤولين لاختيارهم فورياً في التذكيرات</span>
                     </div>
                 </div>
@@ -7159,7 +7190,7 @@
 
             <!-- Add New Contact Card Inside Modal -->
             <div style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:12px; padding:14px; margin-bottom:16px;">
-                <strong style="display:block; font-size:0.88rem; margin-bottom:10px; color:var(--text-main);">➕ إضافة جهة اتصال جديدة • Add New Contact:</strong>
+                <strong style="display:block; font-size:0.88rem; margin-bottom:10px; color:var(--text-main);">➕ إضافة جهة اتصال جديدة:</strong>
                 <div style="display:flex; flex-direction:column; gap:10px;">
                     <input type="text" id="new-contact-name-input" placeholder="اسم الشخص أو الجهة (مثال: أحمد الصيانة، مالك العقار...)" style="width:100%; padding:9px 12px; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:0.85rem; box-sizing:border-box;">
                     <div style="display:flex; gap:8px;">
@@ -7180,15 +7211,15 @@
             </div>
 
             <div style="display:flex; justify-content:flex-end; border-top:1px solid var(--border-color); padding-top:14px; margin-top:16px;">
-                <button type="button" onclick="closeReminderContactsModal()" class="btn-neutral" style="padding:8px 18px; border-radius:10px; font-weight:700;">إغلاق • Close</button>
+                <button type="button" onclick="closeReminderContactsModal()" class="btn-neutral" style="padding:8px 18px; border-radius:10px; font-weight:700;">إغلاق</button>
             </div>
         </div>
     </div>
 
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=264"></script>
-    <script src="app.js?v=264"></script>
+    <script src="translations.js?v=277"></script>
+    <script src="app.js?v=277"></script>
 </body>
 
 </html>

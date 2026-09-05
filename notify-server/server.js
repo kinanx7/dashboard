@@ -1562,6 +1562,7 @@ app.get('/salla/sync-orders', async (_req, res) => {
                     });
                 });
                 req.on('error', () => resolve(null));
+                req.setTimeout(8000, () => { req.destroy(); resolve(null); });
                 req.end();
             });
 
@@ -1770,8 +1771,8 @@ app.post(['/salla*', '/salla/webhook', '/salla/webhcook', '/salla/webhcoo', '/sa
             return res.status(200).json({ status: 'success', message: 'App authorized successfully via Easy Mode' });
         }
 
-        // Ignore draft cart events that lack finalized order data (real orders arrive via order.created / order.updated)
-        if (event.startsWith('abandoned.cart') || event.startsWith('cart.') || event.startsWith('checkout.')) {
+        // Ignore draft cart events that lack finalized order data (real orders arrive via order.created / order.updated / abandoned.cart.purchased)
+        if (event !== 'abandoned.cart.purchased' && (event.startsWith('abandoned.cart') || event.startsWith('cart.') || event.startsWith('checkout.'))) {
             return res.status(200).json({ status: 'ignored', reason: 'Cart draft event is not a finalized order' });
         }
 

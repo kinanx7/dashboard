@@ -63,7 +63,7 @@ function attachSallaOrdersListener() {
                     if (!appData[comp]) appData[comp] = {};
                     appData[comp].sallaOrders = val;
                 }
-                sallaOrdersCache = { ...val };
+                sallaOrdersCache = { ...(sallaOrdersCache || {}), ...val };
                 scheduleSallaRender();
             });
         } catch(e) {
