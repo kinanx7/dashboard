@@ -2152,12 +2152,32 @@ function listenToCloudData() {
                 if (typeof renderSummaryTable === 'function') renderSummaryTable(); 
                 if (typeof renderFinanceTable === 'function') renderFinanceTable(); 
             } },
-            { key: 'sales', render: () => { 
-                if (typeof renderSales === 'function') renderSales(); 
-                if (typeof renderSalesHistoryTable === 'function') renderSalesHistoryTable(); 
-                if (typeof renderSalesSummaryTable === 'function') renderSalesSummaryTable(); 
+            { key: 'salesLogs', render: () => { 
+                if (typeof renderManaging === 'function') renderManaging(); 
+                if (typeof renderFinanceTable === 'function') renderFinanceTable();
             } },
-            { key: 'costs', render: () => { if (typeof renderCosts === 'function') renderCosts(); } },
+            { key: 'depositLogs', render: () => { 
+                if (typeof renderManaging === 'function') renderManaging(); 
+            } },
+            { key: 'spendLogs', render: () => { 
+                if (typeof renderManaging === 'function') renderManaging(); 
+                if (typeof renderFinanceTable === 'function') renderFinanceTable();
+            } },
+            { key: 'spendOrders', render: () => { 
+                if (typeof renderSpendOrders === 'function') renderSpendOrders(); 
+                if (typeof renderManaging === 'function') renderManaging(); 
+            } },
+            { key: 'costLogs', render: () => { 
+                if (typeof renderCosts === 'function') renderCosts(); 
+                if (typeof renderManaging === 'function') renderManaging(); 
+                if (typeof renderFinanceTable === 'function') renderFinanceTable();
+            } },
+            { key: 'incomeSources', render: () => { 
+                if (typeof renderManaging === 'function') renderManaging(); 
+            } },
+            { key: 'disabledSalesMethods', render: () => { 
+                if (typeof renderManaging === 'function') renderManaging(); 
+            } },
             { key: 'generalTasks', render: () => { if (typeof renderTasks === 'function') renderTasks(); } },
             { key: 'constantResponsibilities', render: () => { if (typeof renderConstantTasksSection === 'function') renderConstantTasksSection(); } },
             { key: 'generalDeliveries', render: () => { if (typeof renderTasks === 'function') renderTasks(); } },
@@ -2173,7 +2193,10 @@ function listenToCloudData() {
             { key: 'violationRules', render: () => { if (typeof renderViolationRules === 'function') renderViolationRules(); } }
         ];
 
-        const arrayNodeKeys = ['workers', 'warehouse', 'driverVolumeRewards', 'branches', 'violationRules', 'jobCatalog'];
+        const arrayNodeKeys = [
+            'workers', 'warehouse', 'driverVolumeRewards', 'branches', 'violationRules', 'jobCatalog',
+            'salesLogs', 'depositLogs', 'spendLogs', 'spendOrders', 'costLogs', 'incomeSources', 'disabledSalesMethods'
+        ];
         subNodes.forEach(node => {
             const nodeRef = db.ref(`companies/${currentCompany}/${node.key}`);
             nodeRef.on('value', snap => {
@@ -2186,7 +2209,7 @@ function listenToCloudData() {
                         if (!val) val = {};
                     }
                     appData[currentCompany][node.key] = val;
-                    if (node.key === 'workers' || node.key === 'driverVolumeRewards' || node.key === 'violationRules') {
+                    if (['workers', 'driverVolumeRewards', 'violationRules', 'salesLogs', 'costLogs', 'depositLogs', 'spendLogs', 'spendOrders'].includes(node.key)) {
                         ensureArraysExist(appData[currentCompany]);
                     }
                 }

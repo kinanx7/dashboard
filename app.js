@@ -2152,12 +2152,32 @@ function listenToCloudData() {
                 if (typeof renderSummaryTable === 'function') renderSummaryTable(); 
                 if (typeof renderFinanceTable === 'function') renderFinanceTable(); 
             } },
-            { key: 'sales', render: () => { 
-                if (typeof renderSales === 'function') renderSales(); 
-                if (typeof renderSalesHistoryTable === 'function') renderSalesHistoryTable(); 
-                if (typeof renderSalesSummaryTable === 'function') renderSalesSummaryTable(); 
+            { key: 'salesLogs', render: () => { 
+                if (typeof renderManaging === 'function') renderManaging(); 
+                if (typeof renderFinanceTable === 'function') renderFinanceTable();
             } },
-            { key: 'costs', render: () => { if (typeof renderCosts === 'function') renderCosts(); } },
+            { key: 'depositLogs', render: () => { 
+                if (typeof renderManaging === 'function') renderManaging(); 
+            } },
+            { key: 'spendLogs', render: () => { 
+                if (typeof renderManaging === 'function') renderManaging(); 
+                if (typeof renderFinanceTable === 'function') renderFinanceTable();
+            } },
+            { key: 'spendOrders', render: () => { 
+                if (typeof renderSpendOrders === 'function') renderSpendOrders(); 
+                if (typeof renderManaging === 'function') renderManaging(); 
+            } },
+            { key: 'costLogs', render: () => { 
+                if (typeof renderCosts === 'function') renderCosts(); 
+                if (typeof renderManaging === 'function') renderManaging(); 
+                if (typeof renderFinanceTable === 'function') renderFinanceTable();
+            } },
+            { key: 'incomeSources', render: () => { 
+                if (typeof renderManaging === 'function') renderManaging(); 
+            } },
+            { key: 'disabledSalesMethods', render: () => { 
+                if (typeof renderManaging === 'function') renderManaging(); 
+            } },
             { key: 'generalTasks', render: () => { if (typeof renderTasks === 'function') renderTasks(); } },
             { key: 'constantResponsibilities', render: () => { if (typeof renderConstantTasksSection === 'function') renderConstantTasksSection(); } },
             { key: 'generalDeliveries', render: () => { if (typeof renderTasks === 'function') renderTasks(); } },
@@ -2173,7 +2193,10 @@ function listenToCloudData() {
             { key: 'violationRules', render: () => { if (typeof renderViolationRules === 'function') renderViolationRules(); } }
         ];
 
-        const arrayNodeKeys = ['workers', 'warehouse', 'driverVolumeRewards', 'branches', 'violationRules', 'jobCatalog'];
+        const arrayNodeKeys = [
+            'workers', 'warehouse', 'driverVolumeRewards', 'branches', 'violationRules', 'jobCatalog',
+            'salesLogs', 'depositLogs', 'spendLogs', 'spendOrders', 'costLogs', 'incomeSources', 'disabledSalesMethods'
+        ];
         subNodes.forEach(node => {
             const nodeRef = db.ref(`companies/${currentCompany}/${node.key}`);
             nodeRef.on('value', snap => {
@@ -2186,7 +2209,7 @@ function listenToCloudData() {
                         if (!val) val = {};
                     }
                     appData[currentCompany][node.key] = val;
-                    if (node.key === 'workers' || node.key === 'driverVolumeRewards' || node.key === 'violationRules') {
+                    if (['workers', 'driverVolumeRewards', 'violationRules', 'salesLogs', 'costLogs', 'depositLogs', 'spendLogs', 'spendOrders'].includes(node.key)) {
                         ensureArraysExist(appData[currentCompany]);
                     }
                 }
@@ -5624,9 +5647,11 @@ function addIncomeSource() {
         if (!getCompanyData().incomeSources.includes(source)) {
             getCompanyData().incomeSources.push(source);
             document.getElementById('new-income-source').value = '';
+            renderManaging();
 
             // Targeted write to incomeSources
             db.ref('companies/' + currentCompany + '/incomeSources').set(getCompanyData().incomeSources)
+                .then(() => renderManaging())
                 .catch(err => console.error("Error adding income source:", err));
         } else {
             alert("This income source already exists.");
@@ -5637,9 +5662,11 @@ function addIncomeSource() {
 function deleteIncomeSource(sourceName) {
     if (!confirm(`Delete the income source '${sourceName}'?`)) return;
     getCompanyData().incomeSources = getCompanyData().incomeSources.filter(s => s !== sourceName);
+    renderManaging();
 
     // Targeted write to incomeSources
     db.ref('companies/' + currentCompany + '/incomeSources').set(getCompanyData().incomeSources)
+        .then(() => renderManaging())
         .catch(err => console.error("Error deleting income source:", err));
 }
 
@@ -5675,14 +5702,20 @@ function logSaleTransaction() {
 
     amountInput.value = '';
 
+    // Immediate optimistic local render so the sale appears on screen INSTANTLY!
+    renderManaging();
+
     // Targeted write for sales transactions
     db.ref('companies/' + currentCompany + '/salesLogs/' + newLog.id).set(newLog)
         .then(() => {
             logActivity('sales', workerId, myWorker ? myWorker.name : 'System', `Entered sale transaction of SAR ${amount} via ${method}`);
+            renderManaging();
         })
         .catch(error => {
             console.error("Error saving sale:", error);
             alert("Failed to save transaction.");
+            getCompanyData().salesLogs = (getCompanyData().salesLogs || []).filter(l => l.id !== newLog.id);
+            renderManaging();
         });
 }
 
@@ -5762,14 +5795,20 @@ function logPastSaleTransaction() {
     document.getElementById('past-sale-password').value = '';
     document.getElementById('past-sale-date').value = '';
 
+    // Immediate optimistic local render
+    renderManaging();
+
     db.ref('companies/' + currentCompany + '/salesLogs/' + newLog.id).set(newLog)
         .then(() => {
             logActivity('sales', workerId, myWorker ? myWorker.name : 'System', `Entered past sale transaction of SAR ${amount} via ${method} on date ${dateStr}`);
+            renderManaging();
             renderAll();
         })
         .catch(error => {
             console.error("Error saving past sale:", error);
             alert("Failed to save transaction.");
+            getCompanyData().salesLogs = (getCompanyData().salesLogs || []).filter(l => l.id !== newLog.id);
+            renderManaging();
         });
 }
 
@@ -5826,14 +5865,23 @@ function logDepositTransaction() {
     amountInput.value = '';
     if (dateInput) dateInput.value = '';
 
+    // Immediate optimistic local render
+    renderManaging();
+
     db.ref('companies/' + currentCompany + '/depositLogs/' + newDeposit.id).set(newDeposit)
         .then(() => {
             logActivity('deposit', workerId, myWorker ? myWorker.name : 'System', `Logged cashier box deposit of SAR ${amount}`);
+            renderManaging();
             renderAll();
         })
         .catch(error => {
             console.error("Error logging deposit:", error);
             alert("Failed to save deposit.");
+            let logs = getCompanyData().depositLogs || [];
+            if (Array.isArray(logs)) {
+                getCompanyData().depositLogs = logs.filter(d => d.id !== newDeposit.id);
+            }
+            renderManaging();
         });
 }
 
@@ -5846,16 +5894,21 @@ function deleteDepositTransaction(id) {
     const oldLog = logs.find(l => l.id === id);
     getCompanyData().depositLogs = logs.filter(l => l.id !== id);
 
+    // Immediate optimistic render
+    renderManaging();
+
     db.ref('companies/' + currentCompany + '/depositLogs/' + id).remove()
         .then(() => {
             if (oldLog) {
                 logActivity('deposit_delete', oldLog.workerId, oldLog.cashier, `Deleted deposit of SAR ${oldLog.amount}`);
             }
+            renderManaging();
             renderAll();
         })
         .catch(error => {
             console.error("Error deleting deposit:", error);
             alert("Failed to delete deposit.");
+            renderManaging();
         });
 }
 
@@ -5891,13 +5944,21 @@ function swapSaleMethod(id, newMethod) {
         return;
     }
 
+    // Immediate optimistic update
+    logVal.method = newMethod;
+    renderManaging();
+    cancelSwapSelect(id);
+
     db.ref('companies/' + currentCompany + '/salesLogs/' + id).update({
         method: newMethod
     }).then(() => {
         logActivity('sales', logVal.workerId, logVal.cashier, `Swapped payment method of sale transaction (SAR ${logVal.amount}) from ${oldMethod} to ${newMethod}`);
+        renderManaging();
     }).catch(error => {
         console.error("Error swapping sale method:", error);
         alert("Failed to swap method.");
+        logVal.method = oldMethod;
+        renderManaging();
         cancelSwapSelect(id);
     });
 }
@@ -5910,9 +5971,11 @@ function toggleSalesMethod(methodName) {
         disabled.push(methodName);
     }
     getCompanyData().disabledSalesMethods = disabled;
+    renderManaging();
 
     // Targeted write to disabledSalesMethods
     db.ref('companies/' + currentCompany + '/disabledSalesMethods').set(disabled)
+        .then(() => renderManaging())
         .catch(err => console.error("Error toggling sales method:", err));
 }
 
@@ -6688,16 +6751,21 @@ function logDirectSpendGeneric(amountId, methodId, noteId) {
     if (!companyData.spendLogs) companyData.spendLogs = [];
     companyData.spendLogs.unshift(spendLogObj);
 
+    // Immediate optimistic local render
+    renderManaging();
+
     db.ref(`companies/${currentCompany}/spendLogs`).set(companyData.spendLogs)
         .then(() => {
             logActivity('sales', 'system', 'Direct Spend', `Logged direct spend: SAR ${amount} via ${method} — ${note}`);
             document.getElementById(amountId).value = '';
             document.getElementById(noteId).value = '';
+            renderManaging();
             alert(isAr ? `✅ تم تسجيل المصروف مباشرة بقيمة SAR ${amount} من ${method}.` : `✅ Direct spend logged successfully! SAR ${amount} deducted from ${method}.`);
         })
         .catch(err => {
             console.error('Error logging direct spend:', err);
             alert(isAr ? 'حدث خطأ أثناء تسجيل المصروف.' : 'Error logging direct spend.');
+            renderManaging();
         });
 }
 
@@ -6760,16 +6828,21 @@ function submitSpendOrder() {
     if (!companyData.spendOrders) companyData.spendOrders = [];
     companyData.spendOrders.unshift(orderObj);
 
+    // Immediate optimistic render
+    renderSpendOrders();
+
     db.ref(`companies/${currentCompany}/spendOrders`).set(companyData.spendOrders)
         .then(() => {
             logActivity('sales', 'system', 'Spend Requested', `Requested spend order: SAR ${amount} via ${method} — ${note}`);
             document.getElementById('finance-spend-amount').value = '';
             document.getElementById('finance-spend-note').value = '';
+            renderSpendOrders();
             alert(isAr ? `✅ تم إرسال أمر الصرف للكاشير بنجاح بقيمة SAR ${amount}.` : `✅ Spend order submitted! Pending cashier approval.`);
         })
         .catch(err => {
             console.error('Error submitting spend order:', err);
             alert(isAr ? 'حدث خطأ أثناء إرسال أمر الصرف.' : 'Error submitting spend order.');
+            renderSpendOrders();
         });
 }
 
@@ -6781,13 +6854,18 @@ function cancelSpendOrder(orderId) {
     const orders = companyData.spendOrders || [];
     companyData.spendOrders = orders.filter(o => o && o.id !== orderId);
 
+    // Immediate optimistic render
+    renderSpendOrders();
+
     db.ref(`companies/${currentCompany}/spendOrders`).set(companyData.spendOrders)
         .then(() => {
             logActivity('sales_delete', 'system', 'Spend Cancelled', `Cancelled spend order (ID: ${orderId})`);
+            renderSpendOrders();
         })
         .catch(err => {
             console.error('Error cancelling spend order:', err);
             alert(isAr ? 'حدث خطأ أثناء إلغاء أمر الصرف.' : 'Error cancelling spend order.');
+            renderSpendOrders();
         });
 }
 
@@ -6802,13 +6880,18 @@ function rejectSpendOrder(orderId) {
 
     orders[orderIndex].status = 'rejected';
 
+    // Immediate optimistic render
+    renderSpendOrders();
+
     db.ref(`companies/${currentCompany}/spendOrders`).set(orders)
         .then(() => {
             logActivity('sales_delete', 'system', 'Spend Rejected', `Rejected spend order (ID: ${orderId})`);
+            renderSpendOrders();
         })
         .catch(err => {
             console.error('Error rejecting spend order:', err);
             alert(isAr ? 'حدث خطأ أثناء رفض أمر الصرف.' : 'Error rejecting spend order.');
+            renderSpendOrders();
         });
 }
 
@@ -6855,6 +6938,9 @@ function acceptSpendOrder(orderId) {
     if (!companyData.spendLogs) companyData.spendLogs = [];
     companyData.spendLogs.unshift(spendLogObj);
 
+    // Immediate optimistic render
+    renderManaging();
+
     const updates = {};
     updates[`companies/${currentCompany}/spendLogs`] = companyData.spendLogs;
     updates[`companies/${currentCompany}/spendOrders`] = companyData.spendOrders;
@@ -6862,11 +6948,13 @@ function acceptSpendOrder(orderId) {
     db.ref().update(updates)
         .then(() => {
             logActivity('sales', 'system', 'Spend Accepted', `Spend order accepted: SAR ${order.amount} via ${paidMethod} — ${order.note}`);
+            renderManaging();
             alert(isAr ? `✅ تم قبول أمر الصرف وتسجيل مصروف SAR ${order.amount} من ${paidMethod}.` : `✅ Spend accepted! SAR ${order.amount} deducted from ${paidMethod}.`);
         })
         .catch(err => {
             console.error('Error accepting spend order:', err);
             alert(isAr ? 'حدث خطأ أثناء قبول أمر الصرف.' : 'Error accepting spend order.');
+            renderManaging();
         });
 }
 
@@ -6881,13 +6969,18 @@ function deleteSpendLog(logId) {
 
     companyData.spendLogs = logs.filter(l => l.id !== logId);
 
+    // Immediate optimistic render
+    renderManaging();
+
     db.ref(`companies/${currentCompany}/spendLogs`).set(companyData.spendLogs)
         .then(() => {
             logActivity('sales_delete', 'system', 'Spend Log', `Deleted direct spend of SAR ${oldLog.amount} via ${oldLog.method} — ${oldLog.note}`);
+            renderManaging();
         })
         .catch(err => {
             console.error('Error deleting spend log:', err);
             alert(isAr ? 'حدث خطأ أثناء حذف المصروف.' : 'Error deleting spend log.');
+            renderManaging();
         });
 }
 
