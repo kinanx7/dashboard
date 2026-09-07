@@ -7575,12 +7575,12 @@
     </div>
 
     <!-- 2. VICard Redeem / Verification QR Modal (Customer View) -->
-    <div id="vicard-redeem-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); backdrop-filter:blur(10px); justify-content:center; align-items:center; z-index:999999; padding:16px;">
-        <div class="modal-content" style="max-width:440px; width:100%; border-radius:24px; padding:28px 24px; background:linear-gradient(135deg, #1a1a24, #0d0d12); border:1px solid rgba(212,175,55,0.5); box-shadow:0 25px 70px rgba(0,0,0,0.9); color:#fff; text-align:center;">
+    <div id="vicard-redeem-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); backdrop-filter:blur(10px); justify-content:center; align-items:center; z-index:100000000; padding:16px;" onclick="if (event.target === this) closeVicardRedeemModal();">
+        <div class="modal-content" onclick="event.stopPropagation();" style="max-width:440px; width:100%; border-radius:24px; padding:28px 24px; background:linear-gradient(135deg, #1a1a24, #0d0d12); border:1px solid rgba(212,175,55,0.5); box-shadow:0 25px 70px rgba(0,0,0,0.9); color:#fff; text-align:center;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
                 <div style="display:flex; align-items:center; gap:8px;">
                     <span style="font-size:1.4rem;">✨</span>
-                    <span style="font-size:0.95rem; font-weight:800; color:#f5d77f; text-transform:uppercase; letter-spacing:1px;">VICard Pass</span>
+                    <span style="font-size:0.95rem; font-weight:800; color:#f5d77f; text-transform:uppercase; letter-spacing:1px;">VICard Offer</span>
                 </div>
                 <button type="button" onclick="closeVicardRedeemModal()" style="background:none; border:none; color:#a0aec0; font-size:1.4rem; cursor:pointer;">✖</button>
             </div>
@@ -7602,9 +7602,9 @@
                 Present this QR code to the cashier. They will scan it to verify your card and apply your VIP discount.
             </div>
 
-            <!-- 3-Minute Live Timer -->
+            <!-- 5-Minute Live Timer -->
             <div style="display:inline-flex; align-items:center; gap:6px; background:rgba(212,175,55,0.15); border:1px solid rgba(212,175,55,0.3); padding:6px 14px; border-radius:20px; font-size:0.82rem; color:#f5d77f; font-weight:700;">
-                <span>⏱️</span> Expires in: <span id="vicard-redeem-timer">03:00</span>
+                <span>⏱️</span> Expires in: <span id="vicard-redeem-timer">05:00</span>
             </div>
         </div>
     </div>
@@ -7959,8 +7959,8 @@
 
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=288"></script>
-    <script src="app.js?v=288"></script>
+    <script src="translations.js?v=289"></script>
+    <script src="app.js?v=289"></script>
 </body>
 
 </html>

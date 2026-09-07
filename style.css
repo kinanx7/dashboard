@@ -6089,6 +6089,10 @@ html.vicard-standalone-view > body > *:not(#vicard-splash-screen):not(#vicard-cu
     pointer-events: none !important;
 }
 
+#vicard-redeem-modal {
+    z-index: 100000000 !important;
+}
+
 /* Show Splash Screen when in standalone mode until data is ready */
 html.vicard-standalone-view:not(.vicard-ready) #vicard-splash-screen:not(.hidden) {
     display: flex !important;

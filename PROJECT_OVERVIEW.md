@@ -45,7 +45,7 @@ dashboard/
 ### 🔨 Re-Bundling Command
 Whenever editing any module inside `js/`, you MUST re-build `app.js` using Node:
 ```bash
-node -e "const fs = require('fs'); const files = ['js/core.js', 'js/auth.js', 'js/adverts_notes.js', 'js/sales_costs.js', 'js/warehouse.js', 'js/tasks.js', 'js/drivers.js', 'js/ops.js', 'js/finance.js', 'js/market.js', 'js/prepare.js']; const bundle = files.map(f => fs.readFileSync(f, 'utf8')).join('\n\n'); fs.writeFileSync('app.js', bundle); console.log('Successfully bundled app.js (' + bundle.length + ' bytes)');"
+node -e "const fs = require('fs'); const files = ['js/core.js', 'js/auth.js', 'js/adverts_notes.js', 'js/sales_costs.js', 'js/warehouse.js', 'js/tasks.js', 'js/drivers.js', 'js/ops.js', 'js/finance.js', 'js/market.js', 'js/prepare.js', 'js/contracts.js', 'js/tracking.js', 'js/learning.js', 'js/salla.js', 'js/nfc.js']; const bundle = files.map(f => fs.readFileSync(f, 'utf8')).join('\n\n'); fs.writeFileSync('app.js', bundle); console.log('Successfully bundled app.js (' + bundle.length + ' bytes)');"
 ```
 
 ---

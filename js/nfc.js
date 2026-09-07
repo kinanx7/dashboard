@@ -1904,10 +1904,13 @@ function generateRestaurantMenuWebsiteHtml(restaurant, card) {
                             <div style="color: #fff; font-size: 1.1rem; font-weight: 700;">No menu units currently available</div>
                             <div style="color: #94a3b8; font-size: 0.85rem; margin-top: 4px;">Please check back later or choose another partner restaurant.</div>
                         </div>
-                    ` : units.map(u => {
+                    ` : units.map((u, uIdx) => {
                         const dishImg = u.image || coverSrc;
+                        const safeCardId = String((card && card.id) || '').replace(/'/g, "\\'");
+                        const safeRestId = String((restaurant && restaurant.id) || '').replace(/'/g, "\\'");
+                        const safeUnitId = String(u.id || ('unit_' + uIdx)).replace(/'/g, "\\'");
                         return `
-                            <div class="keeta-dish-card">
+                            <div class="keeta-dish-card" onclick="handleApplyUnitOffer('${safeCardId}', '${safeRestId}', '${safeUnitId}')" style="cursor:pointer;">
                                 <div class="keeta-dish-main">
                                     <div class="keeta-dish-info">
                                         <div class="keeta-dish-badge-row">
@@ -1928,8 +1931,8 @@ function generateRestaurantMenuWebsiteHtml(restaurant, card) {
                                         <div class="keeta-dish-img-wrap">
                                             <img src="${dishImg}" class="keeta-dish-img" alt="${escapeHtml(u.name)}" onerror="this.src='burgeroov_cover.jpg'">
                                         </div>
-                                        <button type="button" class="keeta-dish-redeem-btn" onclick="handleApplyUnitOffer('${card.id}', '${restaurant.id}', '${u.id || u.name}')">
-                                            <span>Get Pass</span>
+                                        <button type="button" class="keeta-dish-redeem-btn" onclick="event.stopPropagation(); handleApplyUnitOffer('${safeCardId}', '${safeRestId}', '${safeUnitId}')">
+                                            <span>Get Offer</span>
                                             <span class="keeta-btn-plus">+</span>
                                         </button>
                                     </div>
@@ -1945,19 +1948,50 @@ function generateRestaurantMenuWebsiteHtml(restaurant, card) {
 
 // --- APPLY OFFER & GENERATE VERIFICATION QR CODE ---
 function handleApplyUnitOffer(cardId, restId, unitId) {
-    const card = vicardData.cards[cardId];
-    const rest = vicardData.restaurants[restId];
-    if (!rest) return;
+    let card = (vicardData && vicardData.cards) ? vicardData.cards[cardId] : null;
+    if (!card) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlCardId = urlParams.get('vicard');
+        if (urlCardId && vicardData && vicardData.cards && vicardData.cards[urlCardId]) {
+            card = vicardData.cards[urlCardId];
+        } else {
+            card = {
+                id: cardId || urlCardId || 'VIC-MEMBER',
+                name: 'VIP Member',
+                status: 'active',
+                tier: 'Black VIP'
+            };
+        }
+    }
+
+    let rest = (vicardData && vicardData.restaurants) ? vicardData.restaurants[restId] : null;
+    if (!rest) {
+        const defaults = {
+            'rest_burgeroov': { id: 'rest_burgeroov', name: 'Burgeroov', logo: 'burgeroov.png', units: [
+                { id: 'unit_b1', name: 'Double Truffle Smash Burger Combo', offerPrice: 42, originalPrice: 58 },
+                { id: 'unit_b2', name: 'Crispy Chicken Supreme Meal', offerPrice: 35, originalPrice: 49 },
+                { id: 'unit_b3', name: 'Gourmet Belgian Chocolate Shake', offerPrice: 15, originalPrice: 26 }
+            ]},
+            'rest_mvcfresh': { id: 'rest_mvcfresh', name: 'MVC Fresh', logo: 'mvcfresh.png', units: [
+                { id: 'unit_f1', name: 'Exotic Tropical Fruit Basket (Large)', offerPrice: 99, originalPrice: 140 }
+            ]},
+            'rest_mvcmeat': { id: 'rest_mvcmeat', name: 'MVC Meat Market', logo: 'mvcmeat.png', units: [
+                { id: 'unit_m1', name: 'Japanese Wagyu A5 Ribeye Steak (300g)', offerPrice: 199, originalPrice: 280 }
+            ]}
+        };
+        rest = defaults[restId] || { id: restId, name: 'Partner Restaurant', units: [] };
+    }
 
     // Find unit details
     let unit = null;
     if (Array.isArray(rest.units)) {
-        unit = rest.units.find(u => u.id === unitId || u.name === unitId);
+        unit = rest.units.find((u, idx) => u.id === unitId || ('unit_' + idx) === unitId || u.name === unitId);
     }
     if (!unit && Array.isArray(rest.offers)) {
-        const off = rest.offers.find(o => o.id === unitId || o.title === unitId);
+        const off = rest.offers.find((o, idx) => o.id === unitId || ('off_' + idx) === unitId || o.title === unitId);
         if (off) {
             unit = {
+                id: off.id || unitId,
                 name: off.title,
                 offerPrice: off.discount || 'VIP',
                 image: rest.logo
@@ -1966,14 +2000,15 @@ function handleApplyUnitOffer(cardId, restId, unitId) {
     }
     if (!unit) {
         unit = {
-            name: 'VIP Dining Privilege',
+            id: unitId || 'unit_vip',
+            name: typeof unitId === 'string' && unitId ? unitId : 'VIP Dining Offer',
             offerPrice: 'Special',
             image: rest.logo
         };
     }
 
     // Check card status
-    if (!card || card.status !== 'active') {
+    if (card && card.status && card.status !== 'active') {
         showVicardDeactivatedAlert(card || { id: cardId, name: 'Cardholder' });
         return;
     }
@@ -1989,7 +2024,25 @@ function showVicardDeactivatedAlert(card) {
 
 function openVicardUnitQrModal(card, rest, unit) {
     const modal = document.getElementById('vicard-redeem-modal');
-    if (!modal) return;
+    if (!modal) {
+        console.error('vicard-redeem-modal not found!');
+        return;
+    }
+
+    // Move modal directly to document.body to break free from any stacking contexts
+    if (modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+    }
+
+    // Ensure maximum z-index so it immediately pops up on top of the customer portal overlay
+    modal.style.setProperty('z-index', '100000000', 'important');
+    modal.style.position = 'fixed';
+    modal.style.top = '0';
+    modal.style.left = '0';
+    modal.style.right = '0';
+    modal.style.bottom = '0';
+    modal.style.width = '100vw';
+    modal.style.height = '100vh';
 
     const restNameEl = document.getElementById('vicard-redeem-rest-name');
     const offerTitleEl = document.getElementById('vicard-redeem-offer-title');
@@ -1998,9 +2051,9 @@ function openVicardUnitQrModal(card, rest, unit) {
     const qrContainer = document.getElementById('vicard-redeem-qrcode');
     const timerEl = document.getElementById('vicard-redeem-timer');
 
-    if (restNameEl) restNameEl.textContent = rest.name;
+    if (restNameEl) restNameEl.textContent = rest.name || 'Partner Restaurant';
     if (offerTitleEl) offerTitleEl.textContent = `${unit.name} (SAR ${unit.offerPrice})`;
-    if (custNameEl) custNameEl.textContent = card.name;
+    if (custNameEl) custNameEl.textContent = card.name || 'VIP Member';
     if (cardIdEl) cardIdEl.textContent = card.id;
 
     // Verification URL pointing to the cashier verification screen
@@ -2034,7 +2087,7 @@ function openVicardUnitQrModal(card, rest, unit) {
         if (secondsLeft <= 0) {
             clearInterval(_vicardRedeemTimerInterval);
             closeVicardRedeemModal();
-            alert('⚠️ Verification QR code expired. Please tap "Apply Offer" again.');
+            alert('⚠️ Verification QR code expired. Please tap "Get Offer" again.');
             return;
         }
         const mins = String(Math.floor(secondsLeft / 60)).padStart(2, '0');
