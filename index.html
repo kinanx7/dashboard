@@ -4,7 +4,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Burgeroov Management Portal</title>
+    <!-- Immediate Standalone Check for NFC VICard Visitors -->
+    <script>
+        (function () {
+            var search = window.location.search || '';
+            if (search.indexOf('vicard=') !== -1 || search.indexOf('verify_vicard=') !== -1) {
+                document.documentElement.classList.add('vicard-standalone-view');
+                window.__IS_VICARD_STANDALONE = true;
+            }
+        })();
+    </script>
+
     <!-- Global Error Diagnostic Banner -->
     <script>
         (function () {
@@ -80,11 +90,67 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js"></script>
+    <!-- QR Code Generator Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=278">
+    <link rel="stylesheet" href="style.css?v=294">
 </head>
 
 <body class="theme-burgeroov">
+
+    <!-- Dedicated Cyber-Luxury VIP Contactless Splash Screen for NFC VICard Visitors -->
+    <div id="vicard-splash-screen" class="vicard-splash-container" style="display: none;">
+        <!-- Glowing ambient backdrop -->
+        <div class="vicard-splash-ambient-glow"></div>
+
+        <!-- Concentric NFC Contactless Radar Rings & 3D Floating Metallic Card -->
+        <div class="vicard-nfc-radar-wrap">
+            <div class="vicard-nfc-wave wave-1"></div>
+            <div class="vicard-nfc-wave wave-2"></div>
+            <div class="vicard-nfc-wave wave-3"></div>
+
+            <!-- Floating 3D Metallic Card Preview -->
+            <div class="vicard-splash-card">
+                <div class="vicard-splash-card-glare"></div>
+                <div class="vicard-splash-card-top">
+                    <div class="vicard-splash-chip"></div>
+                    <div class="vicard-splash-nfc-icon">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+                <div class="vicard-splash-card-mid">
+                    <div class="vicard-splash-card-logo">VICARD</div>
+                    <div class="vicard-splash-card-sub">VIP DINING CONCIERGE</div>
+                </div>
+                <div class="vicard-splash-card-bottom">
+                    <div class="vicard-splash-card-num">•••• •••• •••• VIP</div>
+                    <div class="vicard-splash-card-tier">ALL PRIVILEGES</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Animated Status Details -->
+        <div class="vicard-splash-status-block">
+            <div class="vicard-splash-badge">
+                <span class="vicard-splash-dot"></span>
+                <span>SECURE CONTACTLESS HANDSHAKE</span>
+            </div>
+            <div class="vicard-splash-title">VICARD VIP CLUB</div>
+            <div id="vicard-splash-status-text" class="vicard-splash-step">
+                Authenticating encrypted NFC token...
+            </div>
+            <div class="vicard-splash-arabic">جاري استدعاء بطاقة العضوية والخصومات الحصرية...</div>
+            
+            <!-- Futuristic Laser Progress Bar -->
+            <div class="vicard-splash-progress-track">
+                <div id="vicard-splash-progress-bar" class="vicard-splash-progress-fill"></div>
+            </div>
+            <div class="vicard-splash-meta">
+                <span>ENCRYPTED 256-BIT PROTOCOL</span>
+                <span id="vicard-splash-pct">100%</span>
+            </div>
+        </div>
+    </div>
 
     <!-- Launch Loader Overlay -->
     <div id="launch-loader-overlay"
@@ -517,6 +583,9 @@
                     <button id="tab-salla" class="dept-tab" onclick="switchTab('salla')"
                         data-i18n="tab-salla">🛍️
                         Salla Store</button>
+                    <button id="tab-nfc" class="dept-tab" onclick="switchTab('nfc')"
+                        data-i18n="tab-nfc">💳
+                        NFC VICard</button>
                 </div>
                 <button type="button" class="btn-outline" id="tab-reorder-btn" onclick="toggleTabReorderMode()"
                     style="padding: 8px 16px; border-radius: 100px; font-weight: 700; font-size: 0.85rem;"
@@ -5200,6 +5269,236 @@
 
         </div>
 
+        <!-- ========================================== -->
+        <!-- NFC VICard SECTION (Admin Only)            -->
+        <!-- ========================================== -->
+        <!-- ========================================== -->
+        <!-- NFC VICard Section (Screen-Sized Manager Hub & Professional Customer Website) -->
+        <!-- ========================================== -->
+        <div id="view-nfc" class="view-section" style="grid-template-columns: 1fr; max-width: 1550px; width: 100%; margin: 0 auto; padding: 0 20px; box-sizing: border-box; min-height: 85vh;">
+            <!-- Executive NFC Header Banner -->
+            <div class="card" style="margin-bottom: 24px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 16px; padding: 20px 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.12);">
+                <div class="flex-between" style="flex-wrap: wrap; gap: 16px; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 14px;">
+                        <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(212,175,55,0.08); border: 1px solid rgba(212,175,55,0.22); display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; color: #d4af37;">
+                            💳
+                        </div>
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                <h2 style="font-size: 1.3rem; font-weight: 700; margin: 0; color: var(--text-main); letter-spacing: -0.01em;">
+                                    VICard Management
+                                </h2>
+                                <span style="font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: rgba(212,175,55,0.1); color: #d4af37; border: 1px solid rgba(212,175,55,0.25); letter-spacing: 0.04em; text-transform: uppercase;">
+                                    NFC Network
+                                </span>
+                            </div>
+                            <p style="margin: 3px 0 0 0; color: var(--text-muted); font-size: 0.84rem; font-weight: 400;">
+                                Issue customer cards, manage partner restaurant contracts, and verify live redemptions
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Management Quick Buttons & Segmented View Switcher -->
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <button type="button" class="btn" onclick="openVicardBannerModal()"
+                            style="padding: 8px 14px; border-radius: 9px; font-size: 0.82rem; font-weight: 700; background: rgba(212,175,55,0.12); color: #d4af37; border: 1px solid rgba(212,175,55,0.3); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s ease;">
+                            <span>🎨</span> Edit Hero Banner
+                        </button>
+                        <button type="button" class="btn" onclick="openVicardTiersModal()"
+                            style="padding: 8px 14px; border-radius: 9px; font-size: 0.82rem; font-weight: 700; background: rgba(59,130,246,0.12); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s ease;">
+                            <span>🏅</span> Manage Tiers
+                        </button>
+
+                        <div class="nfc-view-switcher" style="display: inline-flex; align-items: center; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 3px; gap: 3px;">
+                            <button type="button" id="nfc-view-btn-manager" onclick="switchNfcSubTab('manager')"
+                                style="padding: 7px 16px; border-radius: 7px; font-size: 0.82rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 6px; background: var(--card-bg); color: var(--text-main); box-shadow: 0 1px 3px rgba(0,0,0,0.18);">
+                                <span>🛠️</span> Manager Hub
+                            </button>
+                            <button type="button" id="nfc-view-btn-customer" onclick="switchNfcSubTab('customer')"
+                                style="padding: 7px 16px; border-radius: 7px; font-size: 0.82rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 6px; background: transparent; color: var(--text-muted);">
+                                <span>🌐</span> Customer Preview
+                            </button>
+                            <button type="button" id="nfc-master-view-toggle" onclick="toggleNfcMasterView()" style="display: none;"></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Executive HUD KPI Strip -->
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border-color);" class="nfc-hud-stats-grid">
+                    <div style="background: rgba(255,255,255,0.02); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border-color);">
+                        <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Total Issued Cards</div>
+                        <div id="vicard-stat-total" style="font-size: 1.5rem; font-weight: 700; color: var(--text-main); margin-top: 3px; font-variant-numeric: tabular-nums;">0</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.02); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border-color);">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Active Cards</span>
+                            <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px rgba(16,185,129,0.6);"></span>
+                        </div>
+                        <div id="vicard-stat-active" style="font-size: 1.5rem; font-weight: 700; color: #10b981; margin-top: 3px; font-variant-numeric: tabular-nums;">0</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.02); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border-color);">
+                        <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Partner Restaurants</div>
+                        <div id="vicard-stat-restaurants" style="font-size: 1.5rem; font-weight: 700; color: var(--text-main); margin-top: 3px; font-variant-numeric: tabular-nums;">0</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.02); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border-color);">
+                        <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Offered Menu Units</div>
+                        <div id="vicard-stat-offers" style="font-size: 1.5rem; font-weight: 700; color: var(--text-main); margin-top: 3px; font-variant-numeric: tabular-nums;">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= SUB-VIEW 1: MANAGER VIEW ================= -->
+            <div id="nfc-subview-manager">
+                <div style="display: grid; grid-template-columns: 360px 1fr; gap: 24px; align-items: start;" class="nfc-grid-responsive">
+                    <!-- Column 1: Issue New VICard Form -->
+                    <div class="card" style="border-radius: 18px; border: 1px solid var(--border-color); padding: 24px; position: sticky; top: 80px;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color);">
+                            <span style="font-size: 1.4rem;">✨</span>
+                            <h3 style="font-size: 1.15rem; font-weight: 800; margin: 0; color: var(--text-main);">Issue New VICard</h3>
+                        </div>
+
+                        <form id="form-create-vicard" onsubmit="handleCreateVicard(event)">
+                            <div style="margin-bottom: 14px;">
+                                <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">
+                                    Customer Full Name *
+                                </label>
+                                <input type="text" id="vicard-cust-name" required placeholder="e.g. Kinan Al-Khatib"
+                                    style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.95rem; box-sizing: border-box;">
+                            </div>
+
+                            <div style="margin-bottom: 14px;">
+                                <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">
+                                    Phone Number (Optional)
+                                </label>
+                                <input type="tel" id="vicard-cust-phone" placeholder="e.g. 0501234567" dir="ltr"
+                                    style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.95rem; box-sizing: border-box;">
+                            </div>
+
+                            <div style="margin-bottom: 16px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                    <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin: 0;">
+                                        Card Membership Tier
+                                    </label>
+                                    <a href="javascript:void(0)" onclick="openVicardTiersModal()" style="font-size: 0.75rem; color: #d4af37; text-decoration: none; font-weight: 700;">⚙️ Manage Tiers</a>
+                                </div>
+                                <select id="vicard-cust-tier" style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.92rem; box-sizing: border-box;">
+                                    <!-- Populated dynamically by populateVicardTierSelects() -->
+                                </select>
+                            </div>
+
+                            <button type="submit" class="btn" style="width: 100%; padding: 12px; border-radius: 12px; font-size: 0.95rem; font-weight: 800; background: linear-gradient(135deg, #d4af37, #b8860b); color: #000; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(212,175,55,0.3); display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                <span>⚡</span> Create VICard & Generate NFC URL
+                            </button>
+                        </form>
+
+                        <!-- NFC Quick Guide Box -->
+                        <div style="margin-top: 20px; padding: 14px; border-radius: 12px; background: rgba(212,175,55,0.06); border: 1px dashed rgba(212,175,55,0.3);">
+                            <div style="font-size: 0.82rem; font-weight: 700; color: #d4af37; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                                <span>📲</span> How to write to NFC Card:
+                            </div>
+                            <ol style="margin: 0; padding-left: 18px; font-size: 0.78rem; color: var(--text-muted); line-height: 1.5;">
+                                <li>Open free app <strong>NFC Tools</strong> on your phone</li>
+                                <li>Select <strong>Write</strong> ➔ <strong>Add a record</strong> ➔ <strong>Custom URL / URI</strong></li>
+                                <li>Paste generated URL and tap <strong>Write</strong> against the card</li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <!-- Column 2: Partner Restaurants & Customer Cards Directory -->
+                    <div style="display: flex; flex-direction: column; gap: 24px;">
+                        <!-- Partner Restaurants Section -->
+                        <div class="card" style="border-radius: 18px; border: 1px solid var(--border-color); padding: 24px;">
+                            <div class="flex-between" style="flex-wrap: wrap; gap: 10px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color);">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span style="font-size: 1.4rem;">🍽️</span>
+                                    <div>
+                                        <h3 style="font-size: 1.15rem; font-weight: 800; margin: 0; color: var(--text-main);">Partner Restaurants & Menu Units</h3>
+                                        <div style="font-size: 0.8rem; color: var(--text-muted);">Manage contracted restaurants, logos, dish photos, and exclusive prices</div>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn" onclick="openAddRestaurantModal()"
+                                    style="padding: 9px 18px; border-radius: 10px; font-size: 0.88rem; font-weight: 800; background: var(--primary); color: #fff; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                                    <span>➕</span> Add Restaurant
+                                </button>
+                            </div>
+
+                            <div id="vicard-restaurants-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px;">
+                                <!-- Dynamically populated by renderVicardRestaurants() -->
+                            </div>
+                        </div>
+
+                        <!-- Issued Customer Cards Directory -->
+                        <div class="card" style="border-radius: 18px; border: 1px solid var(--border-color); padding: 24px;">
+                            <div class="flex-between" style="flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span style="font-size: 1.4rem;">👥</span>
+                                    <div>
+                                        <h3 style="font-size: 1.15rem; font-weight: 800; margin: 0; color: var(--text-main);">Issued Customer Cards</h3>
+                                        <div style="font-size: 0.8rem; color: var(--text-muted);">Activate, suspend, or delete customer cards with real-time Firebase sync</div>
+                                    </div>
+                                </div>
+
+                                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                    <input type="text" id="vicard-cust-search" placeholder="🔍 Search name or VIC-ID..." oninput="filterVicardCustomers()"
+                                        style="padding: 8px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.85rem; width: 190px;">
+                                    <select id="vicard-cust-filter-status" onchange="filterVicardCustomers()"
+                                        style="padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.85rem;">
+                                        <option value="all">All Status</option>
+                                        <option value="active">Active Only</option>
+                                        <option value="deactivated">Deactivated Only</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div style="overflow-x: auto;">
+                                <table class="custom-table" style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
+                                    <thead>
+                                        <tr style="border-bottom: 1px solid var(--border-color); text-align: left; background: var(--card-bg);">
+                                            <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600;">Card ID</th>
+                                            <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600;">Customer</th>
+                                            <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600;">Phone</th>
+                                            <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600;">Status</th>
+                                            <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600;">Visits</th>
+                                            <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600; text-align: center;">Toggle Activation</th>
+                                            <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600; text-align: right;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="vicard-customers-table-body">
+                                        <!-- Dynamically populated by renderVicardCustomersTable() -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= SUB-VIEW 2: PROFESSIONAL CUSTOMER WEBSITE ================= -->
+            <div id="nfc-subview-customer" style="display: none;">
+                <!-- Website Toolbar / Card Switcher -->
+                <div class="card" style="padding: 14px 20px; border-radius: 16px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; background: rgba(20,20,30,0.8); border: 1px solid rgba(212,175,55,0.25);">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.2rem;">👁️</span>
+                        <span style="font-size: 0.9rem; font-weight: 700; color: #cbd5e0;">Previewing as VIP Cardholder:</span>
+                        <select id="vicard-website-card-select" onchange="renderCustomerWebsite()"
+                            style="padding: 8px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.9rem; font-weight: 700; min-width: 250px;">
+                            <!-- Populated dynamically with customer cards -->
+                        </select>
+                    </div>
+
+                    <button type="button" onclick="switchNfcSubTab('manager')"
+                        style="padding: 8px 18px; border-radius: 10px; font-size: 0.85rem; font-weight: 800; background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.15); cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        <span>👔</span> Return to Manager Hub
+                    </button>
+                </div>
+
+                <!-- Live Customer Website Dynamic Content -->
+                <div id="nfc-customer-website-content">
+                    <!-- Rendered by renderCustomerWebsite() -->
+                </div>
+            </div>
+        </div>
+
         <!-- Locked Department Overlay (shown when a worker taps a restricted tab) -->
         <div id="view-locked" class="view-section">
             <div style="text-align:center; max-width:480px; margin:0 auto; padding:20px;">
@@ -6320,6 +6619,10 @@
                 onclick="switchTab('salla'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">🛍️</span><span data-i18n="tab-salla">Salla Store</span>
             </button>
+            <button class="mob-dept-item mob-sheet-tab" id="mob-tab-nfc" data-tab="nfc"
+                onclick="switchTab('nfc'); closeMobDeptMenu()">
+                <span class="mob-dept-icon">💳</span><span data-i18n="tab-nfc">NFC VICard</span>
+            </button>
         </div>
     </div>
     <!-- 3-Month Attendance Report Modal -->
@@ -7216,10 +7519,448 @@
         </div>
     </div>
 
+    <!-- ======================================================== -->
+    <!-- VICARD NFC SYSTEM MODALS & OVERLAYS                      -->
+    <!-- ======================================================== -->
+
+    <!-- 1. VICard Created Success Modal -->
+    <div id="vicard-created-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); justify-content:center; align-items:center; z-index:999999; padding:16px;">
+        <div class="modal-content" style="max-width:540px; width:100%; border-radius:24px; padding:28px; background:linear-gradient(135deg, #181820, #0d0d12); border:1px solid rgba(212,175,55,0.4); box-shadow:0 20px 60px rgba(0,0,0,0.8); color:#fff; text-align:center;">
+            <div style="width:64px; height:64px; border-radius:50%; background:linear-gradient(135deg, #d4af37, #aa771c); display:flex; align-items:center; justify-content:center; font-size:2rem; margin:0 auto 16px; box-shadow:0 0 25px rgba(212,175,55,0.5);">
+                🎉
+            </div>
+            <h3 style="font-size:1.4rem; font-weight:800; margin:0 0 6px 0; color:#fff;">VICard Successfully Created!</h3>
+            <p style="font-size:0.88rem; color:#a0aec0; margin:0 0 20px 0;">The card is active and ready to be programmed onto your NFC Card via NFC Tools.</p>
+
+            <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:16px; margin-bottom:20px; text-align:left;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                    <span style="color:#a0aec0; font-size:0.82rem;">Customer Name:</span>
+                    <strong id="vicard-modal-created-name" style="color:#fff; font-size:0.92rem;">—</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                    <span style="color:#a0aec0; font-size:0.82rem;">Card ID:</span>
+                    <strong id="vicard-modal-created-id" style="color:#f5d77f; font-family:monospace; font-size:1rem; font-weight:700;">—</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                    <span style="color:#a0aec0; font-size:0.82rem;">NFC Target URL:</span>
+                    <span style="color:#2ed573; font-size:0.82rem; font-weight:700;">Active & Ready</span>
+                </div>
+                <div style="margin-top:12px; position:relative;">
+                    <input type="text" id="vicard-modal-created-url" readonly
+                        style="width:100%; padding:10px 42px 10px 12px; border-radius:8px; border:1px solid rgba(212,175,55,0.3); background:rgba(0,0,0,0.6); color:#f5d77f; font-family:monospace; font-size:0.82rem; box-sizing:border-box;">
+                    <button type="button" onclick="copyVicardModalUrl()" title="Copy URL"
+                        style="position:absolute; right:6px; top:50%; transform:translateY(-50%); background:none; border:none; color:#d4af37; font-size:1.1rem; cursor:pointer; padding:4px;">
+                        📋
+                    </button>
+                </div>
+            </div>
+
+            <!-- Steps for NFC Tools -->
+            <div style="background:rgba(212,175,55,0.08); border-radius:12px; padding:12px 16px; margin-bottom:24px; text-align:left; font-size:0.8rem; color:#cbd5e0;">
+                <strong style="color:#f5d77f; display:block; margin-bottom:4px;">📲 Steps to write with NFC Tools:</strong>
+                1. Open NFC Tools app ➔ 2. Write ➔ 3. Add a record ➔ 4. Custom URL / URI ➔ 5. Paste this link & hold card to phone back.
+            </div>
+
+            <div style="display:flex; gap:10px; justify-content:center;">
+                <button type="button" onclick="copyVicardModalUrl()" class="btn"
+                    style="flex:1; padding:12px; border-radius:12px; font-weight:700; background:linear-gradient(135deg, #d4af37, #aa771c); color:#000; border:none; cursor:pointer;">
+                    📋 Copy NFC Link
+                </button>
+                <button type="button" onclick="closeVicardCreatedModal()" class="btn"
+                    style="padding:12px 22px; border-radius:12px; font-weight:700; background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); cursor:pointer;">
+                    Done
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. VICard Redeem / Verification QR Modal (Customer View) -->
+    <div id="vicard-redeem-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); backdrop-filter:blur(10px); justify-content:center; align-items:center; z-index:999999; padding:16px;">
+        <div class="modal-content" style="max-width:440px; width:100%; border-radius:24px; padding:28px 24px; background:linear-gradient(135deg, #1a1a24, #0d0d12); border:1px solid rgba(212,175,55,0.5); box-shadow:0 25px 70px rgba(0,0,0,0.9); color:#fff; text-align:center;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:1.4rem;">✨</span>
+                    <span style="font-size:0.95rem; font-weight:800; color:#f5d77f; text-transform:uppercase; letter-spacing:1px;">VICard Pass</span>
+                </div>
+                <button type="button" onclick="closeVicardRedeemModal()" style="background:none; border:none; color:#a0aec0; font-size:1.4rem; cursor:pointer;">✖</button>
+            </div>
+
+            <div id="vicard-redeem-offer-title" style="font-size:1.2rem; font-weight:800; color:#fff; margin-bottom:4px;">Special Offer</div>
+            <div id="vicard-redeem-rest-name" style="font-size:0.85rem; color:#a0aec0; margin-bottom:10px;">Partner Restaurant</div>
+            <div style="display:flex; justify-content:center; align-items:center; gap:12px; margin-bottom:16px; font-size:0.85rem;">
+                <span style="color:#d4af37; font-weight:700;">👤 <span id="vicard-redeem-customer-name">Customer</span></span>
+                <span style="color:#a0aec0;">•</span>
+                <span style="color:#f5d77f; font-family:monospace; font-weight:700;">💳 <span id="vicard-redeem-card-id">VIC-XXXX</span></span>
+            </div>
+
+            <!-- QR Container -->
+            <div style="background:#fff; padding:18px; border-radius:18px; display:inline-block; margin-bottom:18px; box-shadow:0 8px 30px rgba(0,0,0,0.5);">
+                <div id="vicard-redeem-qrcode" style="display:flex; justify-content:center; align-items:center; min-width:200px; min-height:200px;"></div>
+            </div>
+
+            <div style="font-size:0.82rem; color:#cbd5e0; margin-bottom:12px;">
+                Present this QR code to the cashier. They will scan it to verify your card and apply your VIP discount.
+            </div>
+
+            <!-- 3-Minute Live Timer -->
+            <div style="display:inline-flex; align-items:center; gap:6px; background:rgba(212,175,55,0.15); border:1px solid rgba(212,175,55,0.3); padding:6px 14px; border-radius:20px; font-size:0.82rem; color:#f5d77f; font-weight:700;">
+                <span>⏱️</span> Expires in: <span id="vicard-redeem-timer">03:00</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Add / Edit Partner Restaurant Modal -->
+    <div id="vicard-restaurant-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); backdrop-filter:blur(6px); justify-content:center; align-items:center; z-index:999999; padding:16px;">
+        <div class="modal-content" style="max-width:520px; width:100%; border-radius:20px; padding:26px; background:var(--card-bg); border:1px solid var(--border-color); box-shadow:0 14px 45px rgba(0,0,0,0.6); color:var(--text-main);">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:12px; margin-bottom:16px;">
+                <h3 id="vicard-restaurant-modal-title" style="margin:0; font-size:1.2rem; font-weight:800; color:var(--text-main);">➕ Add Partner Restaurant</h3>
+                <button type="button" onclick="closeVicardRestaurantModal()" style="background:transparent; border:none; font-size:1.3rem; cursor:pointer; color:var(--text-muted);">✖</button>
+            </div>
+
+            <form id="form-vicard-restaurant" onsubmit="handleSaveVicardRestaurant(event)">
+                <input type="hidden" id="vicard-rest-id" value="">
+
+                <div style="margin-bottom:14px;">
+                    <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Restaurant Name *</label>
+                    <input type="text" id="vicard-rest-name" required placeholder="e.g. Burgeroov"
+                        style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.92rem; box-sizing:border-box;">
+                </div>
+
+                <div style="margin-bottom:14px;">
+                    <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Restaurant Logo (Upload File or Enter URL)</label>
+                    <input type="file" id="vicard-rest-logo-file" accept="image/*" onchange="handleVicardLogoFileSelect(event)"
+                        style="width:100%; padding:8px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.85rem; box-sizing:border-box; cursor:pointer; margin-bottom:8px;">
+                    <input type="text" id="vicard-rest-logo" placeholder="Or paste logo URL (e.g. burgeroov.png or https://...)"
+                        style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; box-sizing:border-box;">
+                    <div style="text-align:center; margin-top:8px;">
+                        <img id="vicard-rest-logo-preview" style="display:none; max-height:80px; border-radius:12px; border:1.5px solid rgba(212,175,55,0.4); margin:0 auto; object-fit:contain;">
+                    </div>
+                </div>
+
+                <div style="margin-bottom:14px;">
+                    <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Restaurant Cover Photo (Upload File or Enter URL)</label>
+                    <input type="file" id="vicard-rest-cover-file" accept="image/*" onchange="handleVicardCoverFileSelect(event)"
+                        style="width:100%; padding:8px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.85rem; box-sizing:border-box; cursor:pointer; margin-bottom:8px;">
+                    <input type="text" id="vicard-rest-cover" placeholder="Or paste cover image URL (e.g. burgeroov_cover.jpg or https://...)"
+                        style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; box-sizing:border-box;">
+                    <div style="text-align:center; margin-top:8px;">
+                        <img id="vicard-rest-cover-preview" style="display:none; max-height:90px; border-radius:12px; border:1.5px solid rgba(212,175,55,0.4); margin:0 auto; object-fit:cover; width:100%; max-width:260px;">
+                    </div>
+                </div>
+
+                <div style="margin-bottom:14px;">
+                    <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Cuisine / Category</label>
+                    <input type="text" id="vicard-rest-category" placeholder="e.g. Gourmet Smash Burgers & Shakes"
+                        style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.92rem; box-sizing:border-box;">
+                </div>
+
+                <div style="margin-bottom:16px;">
+                    <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Location / Branches</label>
+                    <input type="text" id="vicard-rest-location" placeholder="e.g. Riyadh - Olaya St"
+                        style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.92rem; box-sizing:border-box;">
+                </div>
+
+                <div style="margin-bottom:20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <label style="display:block; font-size:0.85rem; font-weight:700; color:var(--text-main); margin:0;">
+                            🏅 Eligible Membership Tiers:
+                        </label>
+                        <span style="font-size:0.75rem; color:var(--text-muted);">Unchecked all = Available to all</span>
+                    </div>
+                    <div id="vicard-rest-tiers-container" style="display:flex; flex-wrap:wrap; gap:8px; padding:10px; border-radius:10px; background:var(--input-bg); border:1px solid var(--border-color);">
+                        <!-- Populated dynamically by populateVicardRestTiersCheckboxes() -->
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border-color); padding-top:14px;">
+                    <button type="button" onclick="closeVicardRestaurantModal()" class="btn-neutral" style="padding:9px 18px; border-radius:10px; font-weight:700;">Cancel</button>
+                    <button type="submit" id="vicard-restaurant-submit-btn" class="btn-success" style="padding:9px 24px; border-radius:10px; font-weight:800; background:linear-gradient(135deg, #10b981, #059669); color:#fff; border:none; cursor:pointer;">Save Restaurant</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 4. Add / Edit Menu Unit Modal -->
+    <div id="vicard-unit-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); backdrop-filter:blur(6px); justify-content:center; align-items:center; z-index:999999; padding:16px;">
+        <div class="modal-content" style="max-width:540px; width:100%; border-radius:20px; padding:26px; background:var(--card-bg); border:1px solid var(--border-color); box-shadow:0 14px 45px rgba(0,0,0,0.6); color:var(--text-main);">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:12px; margin-bottom:16px;">
+                <div>
+                    <h3 id="vicard-unit-modal-title" style="margin:0; font-size:1.2rem; font-weight:800; color:var(--text-main);">🍲 Add Menu Unit / Special Dish</h3>
+                    <div style="font-size:0.8rem; color:#f5d77f; margin-top:2px;">Adding to: <span id="vicard-unit-rest-name-display" style="font-weight:800;">Restaurant</span></div>
+                </div>
+                <button type="button" onclick="closeVicardUnitModal()" style="background:transparent; border:none; font-size:1.3rem; cursor:pointer; color:var(--text-muted);">✖</button>
+            </div>
+
+            <form id="form-vicard-unit" onsubmit="handleSaveVicardUnit(event)">
+                <input type="hidden" id="vicard-unit-rest-id" value="">
+                <input type="hidden" id="vicard-unit-id" value="">
+
+                <div style="margin-bottom:14px;">
+                    <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Dish / Unit Name *</label>
+                    <input type="text" id="vicard-unit-name" required placeholder="e.g. Double Truffle Smash Burger Combo"
+                        style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.92rem; box-sizing:border-box;">
+                </div>
+
+                <div style="margin-bottom:14px;">
+                    <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Unit Image (Upload Photo or Paste URL)</label>
+                    <input type="file" id="vicard-unit-image-file" accept="image/*" onchange="handleVicardUnitImageFileSelect(event)"
+                        style="width:100%; padding:8px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.85rem; box-sizing:border-box; cursor:pointer; margin-bottom:8px;">
+                    <input type="text" id="vicard-unit-image" placeholder="Or paste image URL (e.g. burgeroov.png or https://...)"
+                        style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; box-sizing:border-box;">
+                    <div style="text-align:center; margin-top:8px;">
+                        <img id="vicard-unit-image-preview" style="display:none; max-height:100px; border-radius:12px; border:1.5px solid rgba(212,175,55,0.4); margin:0 auto; object-fit:cover;">
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:14px;">
+                    <div>
+                        <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Regular Price (SAR)</label>
+                        <input type="number" id="vicard-unit-orig-price" step="any" min="0" placeholder="e.g. 58"
+                            style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.95rem; font-weight:700; box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">VICard Offer Price (SAR) *</label>
+                        <input type="number" id="vicard-unit-offer-price" required step="any" min="0" placeholder="e.g. 42"
+                            style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:#2ed573; font-size:1.05rem; font-weight:800; box-sizing:border-box;">
+                    </div>
+                </div>
+
+                <div style="margin-bottom:14px;">
+                    <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Discount Badge (Optional)</label>
+                    <input type="text" id="vicard-unit-discount" placeholder="e.g. 28% OFF or Save 16 SAR"
+                        style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.92rem; box-sizing:border-box;">
+                </div>
+
+                <div style="margin-bottom:18px;">
+                    <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Meal Description / Ingredients</label>
+                    <textarea id="vicard-unit-desc" rows="2" placeholder="e.g. Two smash patties, black truffle aioli, fries & soft drink."
+                        style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; box-sizing:border-box; resize:vertical;"></textarea>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border-color); padding-top:14px;">
+                    <button type="button" onclick="closeVicardUnitModal()" class="btn-neutral" style="padding:9px 18px; border-radius:10px; font-weight:700;">Cancel</button>
+                    <button type="submit" id="vicard-unit-submit-btn" class="btn-success" style="padding:9px 24px; border-radius:10px; font-weight:800; background:linear-gradient(135deg, #10b981, #059669); color:#fff; border:none; cursor:pointer;">Save Menu Unit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 4. Add / Edit Offer Modal -->
+    <div id="vicard-offer-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); backdrop-filter:blur(6px); justify-content:center; align-items:center; z-index:999999; padding:16px;">
+        <div class="modal-content" style="max-width:500px; width:100%; border-radius:20px; padding:24px; background:var(--card-bg); border:1px solid var(--border-color); box-shadow:0 14px 45px rgba(0,0,0,0.6); color:var(--text-main);">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:12px; margin-bottom:16px;">
+                <h3 id="vicard-offer-modal-title" style="margin:0; font-size:1.15rem; font-weight:800; color:var(--text-main);">🏷️ Add Offer</h3>
+                <button type="button" onclick="closeVicardOfferModal()" style="background:transparent; border:none; font-size:1.3rem; cursor:pointer; color:var(--text-muted);">✖</button>
+            </div>
+
+            <form id="form-vicard-offer" onsubmit="handleSaveVicardOffer(event)">
+                <input type="hidden" id="vicard-offer-rest-id" value="">
+                <input type="hidden" id="vicard-offer-id" value="">
+
+                <div style="margin-bottom:14px;">
+                    <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Offer Title *</label>
+                    <input type="text" id="vicard-offer-title" required placeholder="e.g. 20% Off Total Bill"
+                        style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.92rem; box-sizing:border-box;">
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:14px;">
+                    <div>
+                        <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Discount Value</label>
+                        <input type="text" id="vicard-offer-discount" placeholder="e.g. 20% or Free Appetizer"
+                            style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.92rem; box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Discount % (For cashier)</label>
+                        <input type="number" id="vicard-offer-percent" min="0" max="100" placeholder="e.g. 20"
+                            style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.92rem; box-sizing:border-box;">
+                    </div>
+                </div>
+
+                <div style="margin-bottom:14px;">
+                    <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Description / Terms</label>
+                    <textarea id="vicard-offer-desc" rows="2" placeholder="e.g. Valid on dine-in orders only, excluding tobacco."
+                        style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; box-sizing:border-box; resize:vertical;"></textarea>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border-color); padding-top:14px;">
+                    <button type="button" onclick="closeVicardOfferModal()" class="btn-neutral" style="padding:8px 18px; border-radius:10px; font-weight:700;">Cancel</button>
+                    <button type="submit" class="btn-success" style="padding:8px 22px; border-radius:10px; font-weight:700;">Save Offer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 4b. HERO BANNER CUSTOMIZER MODAL -->
+    <div id="vicard-banner-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.75); z-index:999999; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(6px);">
+        <div style="background:var(--card-bg, #1a1a24); border:1px solid rgba(212,175,55,0.4); border-radius:18px; width:100%; max-width:540px; box-shadow:0 12px 40px rgba(0,0,0,0.6); overflow:hidden;">
+            <div style="padding:18px 22px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; background:linear-gradient(135deg, rgba(212,175,55,0.1), transparent);">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:1.4rem;">🎨</span>
+                    <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:var(--text-main);">Customize VICard Hero Banner</h3>
+                </div>
+                <button type="button" onclick="closeVicardBannerModal()" style="background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--text-muted);">✖</button>
+            </div>
+            <form onsubmit="saveVicardHeroBanner(event)" style="padding:20px 22px;">
+                <div style="margin-bottom:12px;">
+                    <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Badge / Top Tag</label>
+                    <input type="text" id="vicard-banner-badge-input" placeholder="e.g. ✨ VIP PRIVILEGES UNLOCKED"
+                        style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.9rem; box-sizing:border-box;">
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Main Title</label>
+                    <input type="text" id="vicard-banner-title-input" required placeholder="e.g. Exclusive Dining Privileges"
+                        style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.95rem; font-weight:700; box-sizing:border-box;">
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Subtitle / Description</label>
+                    <textarea id="vicard-banner-sub-input" rows="2" placeholder="e.g. Flash your VICard at our top-tier partners across the city for VIP treatments & up to 30% instant cashback."
+                        style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.85rem; box-sizing:border-box; resize:vertical;"></textarea>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+                    <div>
+                        <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Button Text (Optional)</label>
+                        <input type="text" id="vicard-banner-btn-text-input" placeholder="e.g. 🌟 Explore Top Offers"
+                            style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Background Gradient Preset</label>
+                        <select id="vicard-banner-grad-input" style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; box-sizing:border-box;">
+                            <option value="gold-royal">👑 Royal Gold & Obsidian</option>
+                            <option value="emerald-luxury">💎 Emerald Luxury</option>
+                            <option value="sapphire-night">🌌 Sapphire Midnight</option>
+                            <option value="ruby-passion">🍷 Ruby Velvet</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border-color); padding-top:14px;">
+                    <button type="button" onclick="closeVicardBannerModal()" class="btn-neutral" style="padding:8px 18px; border-radius:10px; font-weight:700;">Cancel</button>
+                    <button type="submit" class="btn-primary" style="padding:8px 22px; border-radius:10px; font-weight:700; background:linear-gradient(135deg, #d4af37, #aa771c); border:none; color:#000;">Save Banner</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 4c. MEMBERSHIP TIERS MANAGEMENT MODAL -->
+    <div id="vicard-tiers-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.75); z-index:999999; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(6px);">
+        <div style="background:var(--card-bg, #1a1a24); border:1px solid rgba(212,175,55,0.4); border-radius:18px; width:100%; max-width:680px; box-shadow:0 12px 40px rgba(0,0,0,0.6); max-height:85vh; display:flex; flex-direction:column; overflow:hidden;">
+            <div style="padding:18px 22px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; background:linear-gradient(135deg, rgba(212,175,55,0.1), transparent);">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:1.4rem;">👑</span>
+                    <div>
+                        <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:var(--text-main);">VICard Membership Tiers</h3>
+                        <p style="margin:2px 0 0 0; font-size:0.78rem; color:var(--text-muted);">Customize VIP tiers, spending thresholds, extra bonus perks & colors</p>
+                    </div>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <button type="button" onclick="openVicardTierEditModal()" class="btn-primary" style="padding:6px 14px; border-radius:8px; font-size:0.82rem; font-weight:700; background:linear-gradient(135deg, #d4af37, #aa771c); border:none; color:#000; cursor:pointer;">➕ Add New Tier</button>
+                    <button type="button" onclick="closeVicardTiersModal()" style="background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--text-muted);">✖</button>
+                </div>
+            </div>
+            <div style="padding:18px 22px; overflow-y:auto; flex:1;">
+                <div id="vicard-tiers-table-container">
+                    <!-- Dynamic tier list rendered by renderVicardTiersManager() -->
+                </div>
+            </div>
+            <div style="padding:12px 22px; border-top:1px solid var(--border-color); display:flex; justify-content:flex-end;">
+                <button type="button" onclick="closeVicardTiersModal()" class="btn-neutral" style="padding:8px 20px; border-radius:10px; font-weight:700;">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4d. ADD / EDIT MEMBERSHIP TIER MODAL -->
+    <div id="vicard-tier-edit-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.8); z-index:1000000; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(8px);">
+        <div style="background:var(--card-bg, #1a1a24); border:1px solid rgba(212,175,55,0.5); border-radius:18px; width:100%; max-width:480px; box-shadow:0 12px 40px rgba(0,0,0,0.7); overflow:hidden;">
+            <div style="padding:16px 20px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:1.3rem;">🏅</span>
+                    <h3 id="vicard-tier-edit-title" style="margin:0; font-size:1.1rem; font-weight:800; color:var(--text-main);">Add Membership Tier</h3>
+                </div>
+                <button type="button" onclick="closeVicardTierEditModal()" style="background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--text-muted);">✖</button>
+            </div>
+            <form onsubmit="saveVicardTier(event)" style="padding:18px 20px;">
+                <input type="hidden" id="vicard-tier-edit-orig-id" value="">
+                <div style="margin-bottom:12px;">
+                    <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Tier ID / Code (Internal key, e.g. platinum)</label>
+                    <input type="text" id="vicard-tier-id-input" required placeholder="e.g. platinum"
+                        style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; box-sizing:border-box;">
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 80px; gap:10px; margin-bottom:12px;">
+                    <div>
+                        <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Tier Display Name</label>
+                        <input type="text" id="vicard-tier-name-input" required placeholder="e.g. Platinum VIP"
+                            style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.9rem; font-weight:700; box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Icon</label>
+                        <input type="text" id="vicard-tier-icon-input" required placeholder="✨"
+                            style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:1.1rem; text-align:center; box-sizing:border-box;">
+                    </div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+                    <div>
+                        <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Min Spend (SAR)</label>
+                        <input type="number" id="vicard-tier-minspend-input" required min="0" step="50" placeholder="e.g. 1000"
+                            style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.9rem; box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Extra Bonus Perks</label>
+                        <input type="text" id="vicard-tier-perks-input" placeholder="e.g. +5% bonus, free valet"
+                            style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.85rem; box-sizing:border-box;">
+                    </div>
+                </div>
+                <div style="margin-bottom:16px;">
+                    <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Card Color / Gradient</label>
+                    <input type="text" id="vicard-tier-gradient-input" placeholder="e.g. linear-gradient(135deg, #e5e7eb, #9ca3af)"
+                        style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.85rem; box-sizing:border-box;">
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border-color); padding-top:14px;">
+                    <button type="button" onclick="closeVicardTierEditModal()" class="btn-neutral" style="padding:8px 18px; border-radius:10px; font-weight:700;">Cancel</button>
+                    <button type="submit" class="btn-success" style="padding:8px 22px; border-radius:10px; font-weight:700; background:linear-gradient(135deg, #10b981, #059669); border:none; color:#fff;">Save Tier</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 5. FULL-SCREEN STANDALONE CUSTOMER PORTAL OVERLAY (?vicard=VIC-XXXX) -->
+    <div id="vicard-customer-portal-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#08080c; z-index:9999999; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:20px 16px;">
+        <div style="max-width:540px; margin:0 auto; padding-bottom:50px;">
+            <!-- Top bar -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div style="width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg, #d4af37, #aa771c); display:flex; align-items:center; justify-content:center; font-size:1.2rem; box-shadow:0 2px 10px rgba(212,175,55,0.4);">💳</div>
+                    <span style="font-size:1.1rem; font-weight:900; background:linear-gradient(135deg, #fff, #d4af37); -webkit-background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:1px;">VICARD VIP</span>
+                </div>
+                <button type="button" onclick="closeVicardCustomerPortal()" style="background:rgba(255,255,255,0.1); border:none; color:#fff; border-radius:20px; padding:6px 14px; font-size:0.8rem; cursor:pointer; font-weight:600;">Exit ✖</button>
+            </div>
+
+            <!-- Dynamic Customer Portal Content populated by js/nfc.js -->
+            <div id="vicard-portal-content"></div>
+        </div>
+    </div>
+
+    <!-- 6. FULL-SCREEN CASHIER VERIFICATION OVERLAY (?verify_vicard=VIC-XXXX) -->
+    <div id="vicard-cashier-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#08080c; z-index:9999999; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:20px 16px;">
+        <div style="max-width:500px; margin:0 auto; padding-bottom:50px;">
+            <!-- Top bar -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:1.3rem;">🛡️</span>
+                    <span style="font-size:1.05rem; font-weight:800; color:#fff;">Restaurant Cashier Verification</span>
+                </div>
+                <button type="button" onclick="closeVicardCashierScreen()" style="background:rgba(255,255,255,0.1); border:none; color:#fff; border-radius:20px; padding:6px 14px; font-size:0.8rem; cursor:pointer; font-weight:600;">Exit ✖</button>
+            </div>
+
+            <!-- Dynamic Cashier Screen Content populated by js/nfc.js -->
+            <div id="vicard-cashier-content"></div>
+        </div>
+    </div>
+
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=278"></script>
-    <script src="app.js?v=278"></script>
+    <script src="translations.js?v=288"></script>
+    <script src="app.js?v=288"></script>
 </body>
 
 </html>

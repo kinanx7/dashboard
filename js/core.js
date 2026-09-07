@@ -1167,6 +1167,8 @@ function selectCompany(companyId) {
             if (typeof startWorkerLocationBroadcaster === 'function') startWorkerLocationBroadcaster();
             if (typeof initGlobalLiveLocationListener === 'function') initGlobalLiveLocationListener();
             if (typeof zoomToActiveCompanyWorkZone === 'function') zoomToActiveCompanyWorkZone();
+            if (typeof initVicardSystem === 'function') initVicardSystem();
+            if (typeof checkVicardUrlParams === 'function') checkVicardUrlParams();
         });
     } else {
         listenToCloudData();
@@ -1175,6 +1177,8 @@ function selectCompany(companyId) {
         if (typeof startWorkerLocationBroadcaster === 'function') startWorkerLocationBroadcaster();
         if (typeof initGlobalLiveLocationListener === 'function') initGlobalLiveLocationListener();
         if (typeof zoomToActiveCompanyWorkZone === 'function') zoomToActiveCompanyWorkZone();
+        if (typeof initVicardSystem === 'function') initVicardSystem();
+        if (typeof checkVicardUrlParams === 'function') checkVicardUrlParams();
     }
 }
 
@@ -1384,6 +1388,14 @@ auth.onAuthStateChanged((user) => {
             } else if (typeof window.applyCustomerModeUI === 'function') {
                 window.applyCustomerModeUI();
             }
+            return;
+        }
+        const vicardUrlParams = new URLSearchParams(window.location.search);
+        if (vicardUrlParams.has('vicard') || vicardUrlParams.has('verify_vicard')) {
+            document.documentElement.classList.add('vicard-standalone-view');
+            overlay.style.display = 'none';
+            if (typeof initVicardSystem === 'function') initVicardSystem();
+            if (typeof checkVicardUrlParams === 'function') checkVicardUrlParams();
             return;
         }
         hideUnassignedOverlay();
@@ -1764,7 +1776,8 @@ function markLockedTabs() {
         learning: true,
         contracts: isAdmin,
         tracking: isAdmin,
-        salla: isAdmin || document.body.classList.contains('perm-salla')
+        salla: isAdmin || document.body.classList.contains('perm-salla'),
+        nfc: isAdmin
     };
 
     Object.entries(access).forEach(([tabId, hasAccess]) => {
@@ -2706,7 +2719,7 @@ function switchTab(tab) {
         }
     }
 
-    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant', 'vault', 'messaging', 'learning', 'contracts', 'tracking', 'salla'];
+    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant', 'vault', 'messaging', 'learning', 'contracts', 'tracking', 'salla', 'nfc'];
 
     allTabs.forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
@@ -2745,6 +2758,9 @@ function switchTab(tab) {
     if (tab === 'salla') {
         if (typeof renderSallaSection === 'function') renderSallaSection();
     }
+    if (tab === 'nfc') {
+        if (typeof renderNfcSection === 'function') renderNfcSection();
+    }
     if (tab === 'adverts') {
         if (typeof renderAnnouncementsSection === 'function') renderAnnouncementsSection();
     }
@@ -2782,7 +2798,8 @@ function switchTab(tab) {
         learning: { icon: '🎓', label: 'Learning' },
         contracts: { icon: '📜', label: 'Contracts' },
         tracking: { icon: '📍', label: 'Live Radar' },
-        salla: { icon: '🛍️', label: 'Salla' }
+        salla: { icon: '🛍️', label: 'Salla' },
+        nfc: { icon: '💳', label: 'NFC VICard' }
     };
     const meta = tabMeta[tab] || { icon: '⚙️', label: tab };
     const iconEl = document.getElementById('mob-active-icon');
@@ -2794,7 +2811,7 @@ function switchTab(tab) {
         notes: 'tab-notes', activity: 'tab-activity', managing: 'tab-sales', costs: 'tab-costs',
         attendance: 'tab-attendance', reminders: 'tab-reminders', market: 'tab-market', prepare: 'tab-prepare',
         'ai-assistant': 'tab-ai-assistant', vault: 'tab-vault', messaging: 'tab-messaging',
-        learning: 'tab-learning', contracts: 'tab-contracts', tracking: 'tab-tracking', salla: 'tab-salla'
+        learning: 'tab-learning', contracts: 'tab-contracts', tracking: 'tab-tracking', salla: 'tab-salla', nfc: 'tab-nfc'
     };
     const tabKey = tabI18nKeys[tab];
     const localizedLabel = (tabKey && typeof t === 'function') ? t(tabKey) : meta.label;
@@ -3178,6 +3195,7 @@ function renderAll() {
     else if (currentTab === 'contracts') { if (typeof renderContractsSection === 'function') renderContractsSection(); }
     else if (currentTab === 'tracking') { if (typeof renderTrackingSection === 'function') renderTrackingSection(); }
     else if (currentTab === 'salla') { if (typeof renderSallaSection === 'function') renderSallaSection(); }
+    else if (currentTab === 'nfc') { if (typeof renderNfcSection === 'function') renderNfcSection(); }
 
     if (typeof renderPaymentRequests === 'function') renderPaymentRequests();
     if (typeof renderWorkerCustodyRequests === 'function') renderWorkerCustodyRequests();
