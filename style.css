@@ -892,8 +892,10 @@ body {
 #view-learning.active-view,
 #view-contracts.active-view,
 #view-tracking.active-view,
-#view-salla.active-view {
+#view-salla.active-view,
+#view-nfc.active-view {
     grid-template-columns: 1fr;
+    display: block !important;
 }
 
 #attendance-table {
@@ -6956,12 +6958,88 @@ html.vicard-standalone-view > body > *:not(#vicard-customer-portal-overlay):not(
 /* 12-INCH TABLET & TOUCH OPTIMIZATION (VIEWPORT 769px - 1280px)              */
 /* iPad Pro 12.9" / 11", Galaxy Tab S8+/S9+ 12.4", Surface Pro               */
 /* ========================================================================== */
+/* 12-INCH TABLET & TOUCH OPTIMIZATION (VIEWPORT 769px - 1280px)              */
+/* iPad Pro 12.9" / 11", Galaxy Tab S8+/S9+ 12.4", Surface Pro               */
+/* ========================================================================== */
 
 @media (min-width: 769px) and (max-width: 1280px) {
-    /* 1. Standalone Customer Portal on Tablet (Expands past 540px to 1060px) */
-    #vicard-customer-portal-overlay {
-        padding: 20px 32px !important;
+    /* Prevent any sideways swiping or blank areas on tablets */
+    html, body {
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+        position: relative !important;
+    }
+
+    #app-wrapper {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
         box-sizing: border-box !important;
+    }
+
+    /* 1. Main Dashboard NFC Section (#view-nfc) */
+    #view-nfc,
+    #view-nfc.active-view {
+        display: block !important;
+        grid-template-columns: 1fr !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 0 16px 40px 16px !important;
+        margin: 0 auto !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
+    }
+
+    /* 2. Executive NFC Header Banner inside Manager */
+    #view-nfc .card {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+    }
+
+    .nfc-hud-stats-grid {
+        display: grid !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        gap: 12px !important;
+    }
+
+    /* 3. NFC Manager Grid (Form + Partner Directory) */
+    .nfc-grid-responsive {
+        display: grid !important;
+        grid-template-columns: 310px minmax(0, 1fr) !important;
+        gap: 18px !important;
+        align-items: start !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    #vicard-restaurants-grid {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+        gap: 16px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* 4. Subviews (Manager Hub & Customer Website Preview) */
+    #nfc-subview-manager,
+    #nfc-subview-customer,
+    #nfc-customer-website-content {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
+    }
+
+    /* 5. Standalone Customer Portal on Tablet (Expands cleanly up to 1060px) */
+    #vicard-customer-portal-overlay {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 20px 24px !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
     }
 
     #vicard-customer-portal-overlay > div {
@@ -6969,15 +7047,17 @@ html.vicard-standalone-view > body > *:not(#vicard-customer-portal-overlay):not(
         width: 100% !important;
         margin: 0 auto !important;
         padding-bottom: 60px !important;
+        box-sizing: border-box !important;
     }
 
     #vicard-portal-content {
         max-width: 1060px !important;
         margin: 0 auto !important;
         width: 100% !important;
+        box-sizing: border-box !important;
     }
 
-    /* 2. Main Dashboard Department Tabs on Tablet */
+    /* 6. Main Dashboard Department Tabs on Tablet */
     .department-tabs {
         overflow-x: auto !important;
         -webkit-overflow-scrolling: touch !important;
@@ -6986,6 +7066,8 @@ html.vicard-standalone-view > body > *:not(#vicard-customer-portal-overlay):not(
         justify-content: flex-start !important;
         gap: 8px !important;
         scrollbar-width: none !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
 
     .department-tabs::-webkit-scrollbar {
@@ -6999,21 +7081,29 @@ html.vicard-standalone-view > body > *:not(#vicard-customer-portal-overlay):not(
         min-height: 42px !important;
     }
 
-    /* 3. Hero Story Banner Scaling for Tablet Viewports (Slides) */
+    /* 7. Hero Story Banner Scaling for Tablet Viewports (Slides) */
     .keeta-hero-banner {
+        width: 100% !important;
+        max-width: 100% !important;
         min-height: 260px !important;
         max-height: 320px !important;
         border-radius: 22px !important;
         margin-bottom: 24px !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
     }
 
     .keeta-hero-img {
+        width: 100% !important;
+        height: 100% !important;
         object-fit: cover !important;
         object-position: center !important;
     }
 
     .keeta-hero-overlay {
         padding: 26px 28px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
 
     .keeta-hero-heading {
@@ -7038,14 +7128,17 @@ html.vicard-standalone-view > body > *:not(#vicard-customer-portal-overlay):not(
         padding: 5px 12px !important;
     }
 
-    /* 4. Category Tabs (Touch-Friendly 44px targets on 12" tablet) */
+    /* 8. Category Tabs (Touch-Friendly 44px targets with overscroll containment) */
     .keeta-category-carousel {
         display: flex !important;
         gap: 10px !important;
         overflow-x: auto !important;
         padding: 4px 2px 10px 2px !important;
         -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior-x: contain !important;
         scrollbar-width: none !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
 
     .keeta-category-carousel::-webkit-scrollbar {
@@ -7066,22 +7159,27 @@ html.vicard-standalone-view > body > *:not(#vicard-customer-portal-overlay):not(
         cursor: pointer !important;
     }
 
-    /* 5. Restaurant Grid (2 or 3 Proportional Columns) */
+    /* 9. Restaurant Grid (2 or 3 Proportional Columns) */
     .keeta-restaurants-grid {
         display: grid !important;
-        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
-        gap: 20px !important;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important;
+        gap: 18px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
 
     .keeta-restaurant-card {
         border-radius: 18px !important;
         overflow: hidden !important;
         transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
 
     .keeta-card-cover {
         height: 175px !important;
         object-fit: cover !important;
+        width: 100% !important;
     }
 
     .keeta-card-body {
@@ -7095,16 +7193,20 @@ html.vicard-standalone-view > body > *:not(#vicard-customer-portal-overlay):not(
         gap: 10px !important;
     }
 
-    /* 6. Dishes Grid in Restaurant Storefront */
+    /* 10. Dishes Grid in Restaurant Storefront */
     .keeta-dishes-grid {
         display: grid !important;
-        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important;
         gap: 18px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
 
     .keeta-dish-card {
         padding: 16px !important;
         border-radius: 16px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
 
     .keeta-dish-img {
@@ -7120,12 +7222,20 @@ html.vicard-standalone-view > body > *:not(#vicard-customer-portal-overlay):not(
         min-height: 42px !important;
     }
 
-    /* 7. Cashier Screen on Tablet Stand */
+    /* 11. Cashier Screen on Tablet Stand */
+    #vicard-cashier-overlay {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+        box-sizing: border-box !important;
+    }
+
     #vicard-cashier-overlay > div {
         max-width: 540px !important;
         width: 100% !important;
         padding: 24px 28px !important;
         margin: 28px auto !important;
+        box-sizing: border-box !important;
     }
 
     #vicard-cashier-bill,
@@ -7141,31 +7251,14 @@ html.vicard-standalone-view > body > *:not(#vicard-customer-portal-overlay):not(
         letter-spacing: 8px !important;
     }
 
-    /* 8. Executive Manager View on Tablet */
-    .nfc-hud-stats-grid {
-        grid-template-columns: repeat(4, 1fr) !important;
-        gap: 12px !important;
-    }
-
-    .nfc-grid-responsive {
-        grid-template-columns: 320px 1fr !important;
-        gap: 20px !important;
-    }
-
-    #vicard-restaurants-grid {
-        display: grid !important;
-        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
-        gap: 18px !important;
-    }
-
-    /* 9. 3D Card Loading Stage on 12-Inch Tablet */
+    /* 12. 3D Card Loading Stage on 12-Inch Tablet */
     #vicard-3d-card-stage {
         width: 380px !important;
         height: 240px !important;
         margin: 20px auto 35px auto !important;
     }
 
-    /* 10. Modals (Restaurant, Unit, Banner) on Tablet */
+    /* 13. Modals on Tablet */
     #vicard-restaurant-modal .modal-content,
     #vicard-unit-modal .modal-content,
     #vicard-banner-modal .modal-content {
@@ -7178,17 +7271,25 @@ html.vicard-standalone-view > body > *:not(#vicard-customer-portal-overlay):not(
 /* Tablet Portrait Specific Tweaks (769px to 960px) */
 @media (min-width: 769px) and (max-width: 960px) {
     .nfc-hud-stats-grid {
-        grid-template-columns: repeat(2, 1fr) !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
         gap: 10px !important;
     }
 
     .nfc-grid-responsive {
-        grid-template-columns: 1fr !important;
-        gap: 24px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 20px !important;
+        width: 100% !important;
+    }
+
+    .nfc-grid-responsive > .card:first-child {
+        position: relative !important;
+        top: auto !important;
     }
 
     .keeta-restaurants-grid,
     .keeta-dishes-grid {
         grid-template-columns: repeat(2, 1fr) !important;
+        gap: 14px !important;
     }
 }

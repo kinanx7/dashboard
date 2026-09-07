@@ -10,7 +10,7 @@ const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf
 
 assert(indexHtml.includes('id="vicard-rest-cashier-pin"'), 'Cashier PIN input must exist in index.html');
 assert(indexHtml.includes('pattern="\\d{4}"') || indexHtml.includes('pattern="[0-9]{4}"'), 'PIN input must enforce 4 digits pattern');
-assert(indexHtml.includes('app.js?v=303'), 'Cache buster must be bumped to v=303');
+assert(indexHtml.includes('app.js?v=304'), 'Cache buster must be bumped to v=304');
 console.log('✔ index.html contains Cashier PIN input field and bumped cache-busters.');
 
 // [2] Verify style.css Tablet Responsive Rules
@@ -18,6 +18,7 @@ console.log('\n[2] Checking style.css Tablet Styles...');
 const styleCss = fs.readFileSync(path.join(__dirname, '..', 'style.css'), 'utf8');
 
 assert(styleCss.includes('@media (min-width: 769px) and (max-width: 1280px)'), '12-inch tablet media query must be defined');
+assert(styleCss.includes('#view-nfc.active-view'), '#view-nfc.active-view must be in single column views list');
 assert(styleCss.includes('#vicard-customer-portal-overlay > div'), 'Customer portal overlay container must expand on tablet');
 assert(styleCss.includes('.department-tabs'), 'Main department tabs must be styled for tablet');
 assert(styleCss.includes('.keeta-cat-pill'), 'Category pills (.keeta-cat-pill) must be styled for tablet');
@@ -26,6 +27,7 @@ assert(styleCss.includes('.keeta-restaurants-grid'), 'Restaurant grid must be st
 assert(styleCss.includes('.keeta-dishes-grid'), 'Dishes grid must be styled for tablet');
 assert(styleCss.includes('#vicard-cashier-overlay'), 'Cashier overlay must be styled for tablet');
 assert(styleCss.includes('#vicard-3d-card-stage'), '3D card stage must be styled for tablet');
+assert(styleCss.includes('minmax(0, 1fr)'), 'CSS Grid minmax(0, 1fr) must be used to prevent blowout');
 console.log('✔ style.css contains full 12-inch tablet responsive layout rules.');
 
 // [3] Verify js/nfc.js, js/style.js & app.js Implementation
@@ -35,6 +37,8 @@ const styleJs = fs.readFileSync(path.join(__dirname, '..', 'js/style.js'), 'utf8
 const appJs = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 
 assert(styleJs.includes('vicardTabletLayout'), 'js/style.js must define vicardTabletLayout');
+assert(styleJs.includes('view-nfc'), 'js/style.js must enforce #view-nfc tablet containment');
+assert(styleJs.includes('hookTabSwitchers'), 'js/style.js must hook tab switchers');
 assert(appJs.includes('vicardTabletLayout'), 'bundled app.js must include vicardTabletLayout from js/style.js');
 assert(nfcJs.includes("cashierPin: '1234'"), 'Default Burgeroov must have cashierPin in nfc.js');
 assert(appJs.includes("cashierPin: '1234'"), 'Default Burgeroov must have cashierPin in app.js');
