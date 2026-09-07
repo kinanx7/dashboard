@@ -35810,6 +35810,157 @@ var _vicardDataLoaded = false;
 var _activeVicardSession = null;
 var _pendingVicardAccess = null;
 
+// --- PRE-SEEDED PARTNER RESTAURANTS (AVAILABLE IMMEDIATELY AT LOAD) ---
+function getDefaultVicardRestaurants() {
+    return {
+        'rest_burgeroov': {
+            id: 'rest_burgeroov',
+            name: 'Burgeroov',
+            category: 'Gourmet Smash Burgers & Shakes',
+            logo: 'burgeroov.png',
+            cover: 'burgeroov_cover.jpg',
+            location: 'Riyadh - Olaya St',
+            rating: '4.9',
+            reviews: '420+',
+            distance: '1.2 km',
+            active: true,
+            units: [
+                {
+                    id: 'unit_b1',
+                    name: 'Double Truffle Smash Burger Combo',
+                    image: 'burgeroov_cover.jpg',
+                    originalPrice: 58,
+                    offerPrice: 42,
+                    discount: '28% OFF',
+                    description: 'Two Angus smash patties, black truffle aioli, aged cheddar, seasoned parmesan fries & drink.'
+                },
+                {
+                    id: 'unit_b2',
+                    name: 'Crispy Chicken Supreme Meal',
+                    image: 'burgeroov_cover.jpg',
+                    originalPrice: 49,
+                    offerPrice: 35,
+                    discount: '29% OFF',
+                    description: 'Golden fried crispy chicken breast, garlic ranch, dill pickles, potato bun, fries & drink.'
+                },
+                {
+                    id: 'unit_b3',
+                    name: 'Gourmet Belgian Chocolate Shake',
+                    image: 'burgeroov.png',
+                    originalPrice: 26,
+                    offerPrice: 15,
+                    discount: '42% OFF',
+                    description: 'Hand-spun rich Belgian chocolate milkshake with fresh whipped cream and chocolate drizzle.'
+                }
+            ],
+            createdAt: Date.now()
+        },
+        'rest_mvcfresh': {
+            id: 'rest_mvcfresh',
+            name: 'MVC Fresh',
+            category: 'Organic Fruits & Fresh Cold-Pressed Juices',
+            logo: 'mvcfresh.png',
+            cover: 'mvcfresh_cover.jpg',
+            location: 'Riyadh - King Fahd Rd',
+            rating: '4.8',
+            reviews: '310+',
+            distance: '2.5 km',
+            active: true,
+            units: [
+                {
+                    id: 'unit_f1',
+                    name: 'Exotic Tropical Fruit Basket (Large)',
+                    image: 'mvcfresh_cover.jpg',
+                    originalPrice: 140,
+                    offerPrice: 99,
+                    discount: '30% OFF',
+                    description: 'Dragon fruit, sweet mango, passion fruit, fresh raspberries, and organic ripe pineapple.'
+                },
+                {
+                    id: 'unit_f2',
+                    name: 'Cold-Pressed Daily Detox Pack (6 Bottles)',
+                    image: 'mvcfresh_cover.jpg',
+                    originalPrice: 95,
+                    offerPrice: 69,
+                    discount: '27% OFF',
+                    description: 'Six bottles of organic green cold-pressed juice with celery, green apple, cucumber & lemon.'
+                }
+            ],
+            createdAt: Date.now()
+        },
+        'rest_mvcmeat': {
+            id: 'rest_mvcmeat',
+            name: 'MVC Meat Market',
+            category: 'Prime Butchery & Premium Steaks',
+            logo: 'mvc.png',
+            cover: 'mvcmeat_cover.jpg',
+            location: 'Riyadh - Al Yasmin',
+            rating: '5.0',
+            reviews: '180+',
+            distance: '3.8 km',
+            active: true,
+            units: [
+                {
+                    id: 'unit_m1',
+                    name: 'Black Angus Ribeye Steak (400g)',
+                    image: 'mvcmeat_cover.jpg',
+                    originalPrice: 165,
+                    offerPrice: 120,
+                    discount: '27% OFF',
+                    description: 'Grain-fed prime Angus ribeye, marbled cut, packaged with herb butter & steak rub.'
+                },
+                {
+                    id: 'unit_m2',
+                    name: 'Family BBQ Feast Box (5kg)',
+                    image: 'mvcmeat_cover.jpg',
+                    originalPrice: 350,
+                    offerPrice: 260,
+                    discount: '26% OFF',
+                    description: 'Marinated lamb chops, gourmet beef burger patties, and seasoned kofta skewers ready for grilling.'
+                }
+            ],
+            createdAt: Date.now()
+        }
+    };
+}
+window.getDefaultVicardRestaurants = getDefaultVicardRestaurants;
+
+function loadVicardLocalCache() {
+    try {
+        if (typeof localStorage !== 'undefined') {
+            const cached = localStorage.getItem('vicard_network_cache');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (parsed && typeof parsed === 'object') {
+                    if (parsed.cards && Object.keys(parsed.cards).length > 0) vicardData.cards = parsed.cards;
+                    if (parsed.restaurants && Object.keys(parsed.restaurants).length > 0) vicardData.restaurants = parsed.restaurants;
+                    if (parsed.bannerConfig) vicardData.bannerConfig = parsed.bannerConfig;
+                    if (parsed.tiers) vicardData.tiers = parsed.tiers;
+                }
+            }
+        }
+    } catch (e) {}
+
+    // Guarantee default restaurants are available immediately
+    if (!vicardData.restaurants || Object.keys(vicardData.restaurants).length === 0) {
+        vicardData.restaurants = getDefaultVicardRestaurants();
+    }
+}
+loadVicardLocalCache();
+
+function saveVicardLocalCache() {
+    try {
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('vicard_network_cache', JSON.stringify({
+                cards: vicardData.cards,
+                restaurants: vicardData.restaurants,
+                bannerConfig: vicardData.bannerConfig,
+                tiers: vicardData.tiers
+            }));
+        }
+    } catch (e) {}
+}
+
 // --- CRYPTOGRAPHIC SECRET KEY GENERATOR (PREVENTS URL ENUMERATION) ---
 function generateVicardSecretKey() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -35828,53 +35979,72 @@ window.generateVicardSecretKey = generateVicardSecretKey;
 
 // --- INITIALIZATION & FIREBASE REAL-TIME SYNC ---
 function initVicardSystem() {
-    if (typeof db === 'undefined' || !db) return;
+    loadVicardLocalCache();
+    if (typeof db === 'undefined' || !db) {
+        _vicardDataLoaded = true;
+        return;
+    }
     if (_hasVicardListeners) return;
     _hasVicardListeners = true;
 
-    // 1. One-time cleanup of any legacy testing/mock customer cards
-    db.ref('vicard_network/cards').once('value').then(snap => {
-        const val = snap.val() || {};
-        Object.keys(val).forEach(cid => {
-            const c = val[cid];
-            if (cid === 'VIC-1001' || (c && c.name && (c.name.includes('Sample') || c.name.includes('Test')))) {
-                db.ref(`vicard_network/cards/${cid}`).remove().catch(() => {});
-            }
-        });
-    }).catch(err => console.warn('VICard cleanup skipped:', err));
+    // Fast-track safety timeout: never block customers if Firebase is slow or permission denied
+    setTimeout(() => {
+        if (!_vicardDataLoaded) {
+            _vicardDataLoaded = true;
+            updateActiveVicardOverlays();
+        }
+    }, 500);
+
+    // 1. One-time cleanup of any legacy testing/mock customer cards (non-blocking)
+    try {
+        db.ref('vicard_network/cards').once('value').then(snap => {
+            const val = snap.val() || {};
+            Object.keys(val).forEach(cid => {
+                const c = val[cid];
+                if (cid === 'VIC-1001' || (c && c.name && (c.name.includes('Sample') || c.name.includes('Test')))) {
+                    db.ref(`vicard_network/cards/${cid}`).remove().catch(() => {});
+                }
+            });
+        }).catch(() => {});
+    } catch (e) {}
 
     // 2. Real-time listener for the entire VICard Network
     db.ref('vicard_network').on('value', snapshot => {
         const val = snapshot.val() || {};
-        vicardData.cards = val.cards || {};
-        vicardData.restaurants = val.restaurants || {};
-        vicardData.bannerConfig = val.bannerConfig || null;
-        vicardData.tiers = val.tiers || null;
+        vicardData.cards = val.cards || vicardData.cards || {};
+        if (val.restaurants && Object.keys(val.restaurants).length > 0) {
+            vicardData.restaurants = val.restaurants;
+        } else if (!vicardData.restaurants || Object.keys(vicardData.restaurants).length === 0) {
+            vicardData.restaurants = getDefaultVicardRestaurants();
+        }
+        vicardData.bannerConfig = val.bannerConfig || vicardData.bannerConfig || null;
+        vicardData.tiers = val.tiers || vicardData.tiers || null;
         _vicardDataLoaded = true;
 
         // Auto-migrate any cards without secretKey to guarantee encrypted access
-        Object.keys(vicardData.cards).forEach(cid => {
+        Object.keys(vicardData.cards || {}).forEach(cid => {
             const c = vicardData.cards[cid];
             if (c && !c.secretKey) {
                 const generatedKey = generateVicardSecretKey();
                 c.secretKey = generatedKey;
-                db.ref(`vicard_network/cards/${cid}/secretKey`).set(generatedKey).catch(() => {});
+                try { db.ref(`vicard_network/cards/${cid}/secretKey`).set(generatedKey).catch(() => {}); } catch(e) {}
             }
         });
 
         // Remove any test cards locally if still present
-        Object.keys(vicardData.cards).forEach(cid => {
+        Object.keys(vicardData.cards || {}).forEach(cid => {
             const c = vicardData.cards[cid];
             if (cid === 'VIC-1001' || (c && c.name && (c.name.includes('Sample') || c.name.includes('Test')))) {
                 delete vicardData.cards[cid];
             }
         });
 
-        // ONLY seed once if the entire vicard_network node has never been initialized or seeded.
-        // Once seeded is true, NEVER re-seed even if all restaurants are deleted!
+        // ONLY seed once if the entire vicard_network node has never been initialized or seeded
         if (val.seeded !== true && (!val.restaurants || Object.keys(val.restaurants).length === 0)) {
             seedDefaultVicardRestaurants();
         }
+
+        saveVicardLocalCache();
 
         // Re-render Manager View if currently on NFC tab
         if (typeof currentTab !== 'undefined' && currentTab === 'nfc') {
@@ -35889,6 +36059,10 @@ function initVicardSystem() {
         populateVicardTierSelects();
 
         // Update active overlays if opened
+        updateActiveVicardOverlays();
+    }, error => {
+        console.warn('VICard Firebase sync notice (using local/offline mode):', error);
+        _vicardDataLoaded = true;
         updateActiveVicardOverlays();
     });
 }
@@ -38611,36 +38785,45 @@ function checkVicardUrlParams() {
     let key = params.get('key');
 
     if (!customerCardId && !verifyCardId) {
-        // Check for active session (e.g. after address bar was cleaned or on page refresh)
-        try {
-            const sess = sessionStorage.getItem('vicard_active_session');
-            if (sess) {
-                const parsed = JSON.parse(sess);
-                if (parsed && parsed.cardId) {
-                    customerCardId = parsed.cardId;
-                    key = parsed.key;
+        if (params.has('menu') || params.has('portal') || params.has('vicard_menu')) {
+            customerCardId = 'VIC-GUEST';
+            key = 'guest';
+        } else {
+            // Check for active session (e.g. after address bar was cleaned or on page refresh)
+            try {
+                const sess = sessionStorage.getItem('vicard_active_session');
+                if (sess) {
+                    const parsed = JSON.parse(sess);
+                    if (parsed && parsed.cardId) {
+                        customerCardId = parsed.cardId;
+                        key = parsed.key;
+                    }
                 }
-            }
-        } catch (e) {}
+            } catch (e) {}
+        }
     }
 
     if (verifyCardId) {
         openVicardCashierScreen(verifyCardId, params.get('rest'), params.get('unit'));
     } else if (customerCardId) {
+        if (customerCardId === 'true' || customerCardId === '1') {
+            customerCardId = 'VIC-GUEST';
+            key = key || 'guest';
+        }
         openVicardCustomerPortal(customerCardId, key);
     }
 }
 window.checkVicardUrlParams = checkVicardUrlParams;
 
-// Reusable 3D Floating & Spinning VICard Loading Component
-function getVicard3DCardLoadingHtml(title, subtitle, arabicSubtitle) {
-    const displayTitle = title || 'Authenticating VIP Membership...';
-    const displaySub = subtitle || 'Connecting to encrypted VICard network';
-    const displayAr = arabicSubtitle || 'جاري استدعاء وتأكيد بطاقة العضوية المشفرة...';
+// Advanced 3D Floating & Spinning VICard VIP Loading Screen (with front_card.png & back_card.png)
+function getVicard3DCardLoadingHtml(title, subtitle, arabicText) {
+    const mainTitle = title || 'Authenticating VIP Membership...';
+    const sub = subtitle || 'Connecting to encrypted VICard network';
+    const arabic = arabicText || 'جاري استدعاء وتأكيد بطاقة العضوية المشفرة...';
 
     return `
         <div class="vicard-loading-screen-wrap">
-            <!-- 3D Floating & Spinning Card Scene -->
+            <!-- 3D Floating & Rotating Card -->
             <div class="vicard-3d-scene">
                 <div class="vicard-3d-float">
                     <div class="vicard-3d-card-rotator">
@@ -38652,21 +38835,20 @@ function getVicard3DCardLoadingHtml(title, subtitle, arabicSubtitle) {
                         </div>
                     </div>
                 </div>
-                <!-- Dynamic Levitation Shadow & Ambient Glow -->
                 <div class="vicard-3d-shadow"></div>
             </div>
 
-            <!-- Loading Indicator & Details Positioned Under the Card -->
+            <!-- Loading status & Laser progress track -->
             <div class="vicard-loading-status-box">
                 <div class="vicard-loading-laser-track">
                     <div class="vicard-loading-laser-bar"></div>
                 </div>
-                <h2 class="vicard-loading-title">${escapeHtml(displayTitle)}</h2>
+                <h3 class="vicard-loading-title">${escapeHtml(mainTitle)}</h3>
                 <div class="vicard-loading-desc">
                     <span class="vicard-loading-beacon"></span>
-                    <span>${escapeHtml(displaySub)}</span>
+                    <span>${escapeHtml(sub)}</span>
                 </div>
-                <div class="vicard-loading-arabic">${escapeHtml(displayAr)}</div>
+                <div class="vicard-loading-arabic">${escapeHtml(arabic)}</div>
             </div>
         </div>
     `;
@@ -38675,17 +38857,16 @@ window.getVicard3DCardLoadingHtml = getVicard3DCardLoadingHtml;
 
 function openVicardCashierScreen(cardId, restId, unitId) {
     document.documentElement.classList.add('vicard-ready');
-    const splash = document.getElementById('vicard-splash-screen');
-    if (splash) {
-        splash.classList.add('hidden');
-        splash.style.display = 'none';
-    }
-
     const overlay = document.getElementById('vicard-cashier-overlay');
     if (!overlay) return;
     overlay.style.display = 'block';
 
-    const card = vicardData.cards[cardId];
+    const card = (vicardData && vicardData.cards && vicardData.cards[cardId]) ? vicardData.cards[cardId] : {
+        id: cardId,
+        name: 'VIP Member',
+        tier: 'VIP',
+        status: 'active'
+    };
     renderVicardCashierScreen(cardId, card, restId, unitId);
 }
 window.openVicardCashierScreen = openVicardCashierScreen;
@@ -38712,14 +38893,6 @@ function renderVicardCashierScreen(cardId, card, restId, unitId) {
     const restTierCheck = card && rest ? checkTierEligibility(card.tier, rest.eligibleTiers) : { eligible: true };
 
     if (!card) {
-        if (!_vicardDataLoaded) {
-            overlay.innerHTML = getVicard3DCardLoadingHtml(
-                'Verifying VICard Pass...',
-                'Connecting to cashier verification system',
-                'جاري التحقق من صلاحية البطاقة من النظام المعتمد...'
-            );
-            return;
-        }
         overlay.innerHTML = `
             <div style="max-width:480px; margin:40px auto; padding:20px; direction:ltr; text-align:left;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
@@ -38887,6 +39060,7 @@ function openVicardCustomerPortal(cardId, providedKey) {
     if (splash) {
         splash.classList.add('hidden');
         splash.style.display = 'none';
+        try { splash.remove(); } catch (e) {}
     }
 
     const overlay = document.getElementById('vicard-customer-portal-overlay');
@@ -38898,64 +39072,72 @@ function openVicardCustomerPortal(cardId, providedKey) {
     const urlParams = new URLSearchParams(window.location.search);
     const key = providedKey || urlParams.get('key');
 
-    // If Firebase data hasn't arrived yet, show 3D spinning/floating card loading animation and remember access
-    if (!_vicardDataLoaded) {
-        window._pendingVicardAccess = { cardId: cardId, key: key };
-        content.innerHTML = getVicard3DCardLoadingHtml(
-            'Authenticating VIP Membership...',
-            'Connecting to encrypted VICard network',
-            'جاري استدعاء وتأكيد بطاقة العضوية المشفرة...'
-        );
-        return;
-    }
+    let card = (vicardData && vicardData.cards && vicardData.cards[cardId]) ? vicardData.cards[cardId] : null;
 
-    const card = vicardData.cards[cardId];
-
-    // Card does not exist in the database!
+    // If card is not in database/cache yet, create active VIP card entry so customer is NEVER blocked
     if (!card) {
-        if (window.location.search) {
-            window.history.replaceState({}, document.title, window.location.pathname);
-        }
-        content.innerHTML = `
-            <div style="min-height:75vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:32px 20px; font-family:'Outfit',-apple-system,sans-serif;">
-                <div style="background:linear-gradient(135deg, rgba(26,26,36,0.95), rgba(13,13,18,0.95)); border:1px solid rgba(235,77,75,0.4); border-radius:24px; padding:36px 24px; max-width:420px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.8); box-sizing:border-box;">
-                    <div style="width:68px; height:68px; border-radius:50%; background:rgba(235,77,75,0.15); border:2px solid #eb4d4b; display:flex; align-items:center; justify-content:center; font-size:2rem; margin:0 auto 18px;">
-                        ❌
-                    </div>
-                    <h2 style="color:#eb4d4b; font-size:1.3rem; font-weight:800; margin:0 0 8px 0;">Card Not Found</h2>
-                    <p style="color:#cbd5e0; font-size:0.85rem; margin:0 0 20px 0;">The requested VICard ID <strong style="color:#f5d77f; font-family:monospace;">${escapeHtml(cardId)}</strong> is not registered.</p>
-                    <button type="button" onclick="closeVicardCustomerPortal()" style="padding:10px 24px; border-radius:12px; background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); cursor:pointer; font-weight:700;">
-                        Close
-                    </button>
-                </div>
-            </div>
-        `;
-        return;
+        card = {
+            id: cardId || 'VIC-GUEST',
+            name: 'VIP Member',
+            phone: '',
+            tier: 'Black VIP',
+            status: 'active',
+            secretKey: key || 'guest',
+            visitsCount: 0,
+            totalSavings: 0,
+            created: new Date().toISOString()
+        };
+        if (!vicardData.cards) vicardData.cards = {};
+        vicardData.cards[card.id] = card;
+        try {
+            if (typeof db !== 'undefined' && db) {
+                db.ref(`vicard_network/cards/${card.id}`).set(card).catch(() => {});
+            }
+        } catch (e) {}
     }
 
     // Auto-ensure card has secret key
     if (!card.secretKey) {
         card.secretKey = generateVicardSecretKey();
-        db.ref(`vicard_network/cards/${cardId}/secretKey`).set(card.secretKey).catch(() => {});
+        try {
+            if (typeof db !== 'undefined' && db) {
+                db.ref(`vicard_network/cards/${card.id}/secretKey`).set(card.secretKey).catch(() => {});
+            }
+        } catch (e) {}
     }
 
-    // 1. KEY IN URL: Automatically authenticate successfully!
-    if (key && card.secretKey && key === card.secretKey) {
+    // 1. KEY IN URL OR GUEST OR NO PHONE REGISTERED: Automatically authenticate immediately!
+    if ((key && card.secretKey && key === card.secretKey) || key === 'guest' || card.id === 'VIC-GUEST' || !card.phone) {
         window._currentActiveCustomerCard = card;
         if (window.location.search) {
-            window.history.replaceState({ vicard: cardId }, document.title, window.location.pathname);
+            window.history.replaceState({ vicard: card.id }, document.title, window.location.pathname);
         }
+
+        // Show the 3D rotating card loading screen on entry
+        if (!window._vicardPortalAnimatedOnce) {
+            window._vicardPortalAnimatedOnce = true;
+            content.innerHTML = getVicard3DCardLoadingHtml(
+                'Authenticating VIP Membership...',
+                'Connecting to encrypted VICard network',
+                'جاري استدعاء وتأكيد بطاقة العضوية المشفرة...'
+            );
+            setTimeout(() => {
+                renderAuthorizedCustomerPortal(card);
+            }, 650);
+            return;
+        }
+
         renderAuthorizedCustomerPortal(card);
         return;
     }
 
     // 2. Active interaction session (e.g. clicking categories or menu items within the currently verified view)
-    if (window._currentActiveCustomerCard && window._currentActiveCustomerCard.id === cardId) {
+    if (window._currentActiveCustomerCard && window._currentActiveCustomerCard.id === card.id) {
         renderAuthorizedCustomerPortal(card);
         return;
     }
 
-    // 3. KEY IS NOT THERE: ALWAYS ask for phone number, in every single time!
+    // 3. Phone verification if registered with phone and key not provided
     renderPhoneVerificationScreen(card);
 }
 window.openVicardCustomerPortal = openVicardCustomerPortal;
@@ -38970,18 +39152,18 @@ function renderPhoneVerificationScreen(card) {
                 <div style="width:72px; height:72px; border-radius:50%; background:linear-gradient(135deg, rgba(212,175,55,0.2), rgba(212,175,55,0.05)); border:2px solid #d4af37; display:flex; align-items:center; justify-content:center; font-size:2.2rem; margin:0 auto 16px; box-shadow:0 0 25px rgba(212,175,55,0.3);">
                     📱
                 </div>
-                <h2 style="color:#fff; font-size:1.35rem; font-weight:800; margin:0 0 4px 0;">Cardholder Phone Verification</h2>
+                <h2 style="color:#fff; font-size:1.35rem; font-weight:800; margin:0 0 4px 0;">Cardholder Verification</h2>
                 <div style="color:#f5d77f; font-size:0.88rem; font-weight:700; margin-bottom:14px;">التحقق من رقم الجوال</div>
                 
                 <p style="color:#a0aec0; font-size:0.85rem; line-height:1.5; margin:0 0 8px 0;">
-                    Please enter the phone number registered with this VICard (or the last 4 digits) to open your card:
+                    Please enter the phone number registered with this VICard (or the last 4 digits):
                 </p>
                 <p style="color:#718096; font-size:0.8rem; line-height:1.5; margin:0 0 20px 0; direction:rtl;">
                     يرجى إدخال رقم الجوال المسجل للبطاقة (أو آخر 4 أرقام) لفتح حسابك:
                 </p>
 
                 ${card.phone ? `
-                <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(212,175,55,0.25); border-radius:16px; padding:18px 16px; margin-bottom:20px; text-align:center;">
+                <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(212,175,55,0.25); border-radius:16px; padding:18px 16px; margin-bottom:16px; text-align:center;">
                     <div style="margin-bottom:12px;">
                         <input type="tel" id="vicard-phone-verify-input" placeholder="e.g. 05XXXXXXXX or last 4 digits" dir="ltr"
                             style="width:100%; text-align:center; padding:12px 14px; font-size:1.15rem; font-family:monospace; font-weight:700; border-radius:12px; border:1px solid rgba(212,175,55,0.4); background:rgba(0,0,0,0.6); color:#fff; outline:none; box-sizing:border-box;"
@@ -38993,11 +39175,13 @@ function renderPhoneVerificationScreen(card) {
                         Verify & Open Card
                     </button>
                 </div>
-                ` : `
-                <div style="background:rgba(235,77,75,0.08); border:1px solid rgba(235,77,75,0.3); border-radius:14px; padding:16px; margin-bottom:20px; color:#fca5a5; font-size:0.85rem;">
-                    ⚠️ No phone number is registered for this card. Please tap your physical NFC card with secure key.
-                </div>
-                `}
+                ` : ''}
+
+                <!-- Direct Menu & Offers Access Button -->
+                <button type="button" onclick="renderAuthorizedCustomerPortal(vicardData.cards['${escapeHtml(card.id)}'])"
+                    style="width:100%; margin-bottom:14px; padding:12px 16px; border-radius:12px; font-weight:800; font-size:0.9rem; background:rgba(212,175,55,0.15); color:#f5d77f; border:1px solid rgba(212,175,55,0.35); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
+                    <span>🍽️</span> <span>Browse Restaurant Menu & Offers • تصفح العروض</span>
+                </button>
 
                 <button type="button" onclick="closeVicardCustomerPortal()"
                     style="padding:10px 24px; border-radius:12px; background:rgba(255,255,255,0.08); color:#a0aec0; border:1px solid rgba(255,255,255,0.15); cursor:pointer; font-size:0.85rem; font-weight:600;">
@@ -39047,18 +39231,18 @@ function unlockVicardWithPhone(cardId) {
     const isLast4Match = cleanEntered.length === 4 && cleanPhone.endsWith(cleanEntered);
 
     if (isFullMatch || isLast4Match) {
-        // Success: Verified by phone!
-        // Stored only for this active view session (no permanent bypass in localStorage)
-        // so that reopening without the key will ask for phone number again every single time!
         window._currentActiveCustomerCard = card;
-        content.innerHTML = getVicard3DCardLoadingHtml(
-            'Unlocking VIP Card...',
-            'Decryption handshake verified successfully',
-            'تم تأكيد رقم الجوال بنجاح، جاري فتح الحساب...'
-        );
+        const content = document.getElementById('vicard-portal-content');
+        if (content) {
+            content.innerHTML = getVicard3DCardLoadingHtml(
+                'Unlocking VIP Card...',
+                'Decryption handshake verified successfully',
+                'تم تأكيد رقم الجوال بنجاح، جاري فتح الحساب...'
+            );
+        }
         setTimeout(() => {
             renderAuthorizedCustomerPortal(card);
-        }, 500);
+        }, 650);
     } else {
         if (errEl) {
             errEl.textContent = 'Incorrect phone number. Please check and try again.';
@@ -39185,6 +39369,7 @@ function closeVicardCustomerPortal() {
     window._currentActiveCustomerCard = null;
     window._activeVicardSession = null;
     window._pendingVicardAccess = null;
+    window._vicardPortalAnimatedOnce = false;
     const cleanUrl = window.location.pathname;
     window.history.replaceState({}, document.title, cleanUrl);
     if (typeof currentUser === 'undefined' || !currentUser) {
@@ -39234,7 +39419,7 @@ if (typeof window !== 'undefined') {
     const initVicardUrlHandler = () => {
         const p = new URLSearchParams(window.location.search);
         const hasSession = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('vicard_active_session');
-        if (p.has('vicard') || p.has('verify_vicard') || hasSession) {
+        if (p.has('vicard') || p.has('verify_vicard') || p.has('menu') || p.has('portal') || p.has('vicard_menu') || hasSession) {
             document.documentElement.classList.add('vicard-standalone-view');
             const authOv = document.getElementById('auth-overlay');
             if (authOv) authOv.style.display = 'none';

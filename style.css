@@ -6161,9 +6161,7 @@ html.vicard-standalone-view #login-screen,
 html.vicard-standalone-view #auth-screen,
 html.vicard-standalone-view .company-bar,
 html.vicard-standalone-view .navbar,
-html.vicard-standalone-view #toast-container,
-html.vicard-standalone-view .view-section,
-html.vicard-standalone-view > body > *:not(#vicard-splash-screen):not(#vicard-customer-portal-overlay):not(#vicard-cashier-overlay):not(#vicard-redeem-modal) {
+html.vicard-standalone-view > body > *:not(#vicard-customer-portal-overlay):not(#vicard-cashier-overlay):not(#vicard-redeem-modal):not(#vicard-image-lightbox-modal) {
     display: none !important;
     visibility: hidden !important;
     opacity: 0 !important;
@@ -6172,343 +6170,6 @@ html.vicard-standalone-view > body > *:not(#vicard-splash-screen):not(#vicard-cu
 
 #vicard-redeem-modal {
     z-index: 100000000 !important;
-}
-
-/* Show Splash Screen when in standalone mode until data is ready */
-html.vicard-standalone-view:not(.vicard-ready) #vicard-splash-screen:not(.hidden) {
-    display: flex !important;
-}
-html.vicard-standalone-view.vicard-ready #vicard-splash-screen,
-#vicard-splash-screen.hidden {
-    display: none !important;
-}
-
-/* ========================================================================== */
-/* ADVANCED CYBER-LUXURY NFC CONTACTLESS LOADING SCREEN                       */
-/* ========================================================================== */
-.vicard-splash-container {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    background: radial-gradient(circle at 50% 40%, #151824 0%, #08090e 70%, #030406 100%) !important;
-    z-index: 99999999 !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    justify-content: center !important;
-    overflow: hidden !important;
-    padding: 24px !important;
-    box-sizing: border-box !important;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
-    user-select: none !important;
-}
-
-/* Ambient Radial Glow in background */
-.vicard-splash-ambient-glow {
-    position: absolute;
-    width: 550px;
-    height: 550px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(212, 175, 55, 0.16) 0%, rgba(212, 175, 55, 0.04) 50%, transparent 70%);
-    filter: blur(50px);
-    pointer-events: none;
-    animation: vicardAmbientBreathe 4s infinite alternate ease-in-out;
-}
-
-@keyframes vicardAmbientBreathe {
-    0% { transform: scale(0.85); opacity: 0.6; }
-    100% { transform: scale(1.15); opacity: 1; }
-}
-
-/* Concentric Radar NFC Waves Container */
-.vicard-nfc-radar-wrap {
-    position: relative;
-    width: 280px;
-    height: 200px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 28px;
-}
-
-/* Concentric Expanding NFC Waves */
-.vicard-nfc-wave {
-    position: absolute;
-    border-radius: 50%;
-    border: 1.5px solid rgba(212, 175, 55, 0.4);
-    box-shadow: 0 0 15px rgba(212, 175, 55, 0.2);
-    pointer-events: none;
-    opacity: 0;
-    transform: scale(0.5);
-    animation: vicardRadarPulse 2.8s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
-}
-
-.vicard-nfc-wave.wave-1 {
-    width: 220px;
-    height: 220px;
-    animation-delay: 0s;
-}
-
-.vicard-nfc-wave.wave-2 {
-    width: 320px;
-    height: 320px;
-    animation-delay: 0.9s;
-}
-
-.vicard-nfc-wave.wave-3 {
-    width: 420px;
-    height: 420px;
-    animation-delay: 1.8s;
-}
-
-@keyframes vicardRadarPulse {
-    0% {
-        transform: scale(0.4);
-        opacity: 0.85;
-        border-color: rgba(245, 215, 127, 0.8);
-    }
-    50% {
-        opacity: 0.4;
-    }
-    100% {
-        transform: scale(1.2);
-        opacity: 0;
-        border-color: rgba(212, 175, 55, 0);
-    }
-}
-
-/* 3D Perspective Floating Luxury Black Card */
-.vicard-splash-card {
-    position: relative;
-    width: 230px;
-    height: 140px;
-    border-radius: 14px;
-    background: linear-gradient(135deg, #1e222d 0%, #0d0f14 55%, #181c26 100%);
-    border: 1.5px solid rgba(212, 175, 55, 0.65);
-    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.85), 0 0 35px rgba(212, 175, 55, 0.25);
-    transform: perspective(700px) rotateX(10deg) rotateY(-8deg);
-    animation: vicardCardFloat 3.5s ease-in-out infinite alternate;
-    padding: 14px 16px;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    overflow: hidden;
-    z-index: 2;
-}
-
-@keyframes vicardCardFloat {
-    0% {
-        transform: perspective(700px) rotateX(10deg) rotateY(-8deg) translateY(0px);
-        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.85), 0 0 25px rgba(212, 175, 55, 0.2);
-    }
-    100% {
-        transform: perspective(700px) rotateX(6deg) rotateY(4deg) translateY(-10px);
-        box-shadow: 0 30px 60px rgba(0, 0, 0, 0.95), 0 0 45px rgba(212, 175, 55, 0.4);
-    }
-}
-
-/* Holographic Glare sweep across the card */
-.vicard-splash-card-glare {
-    position: absolute;
-    top: -50%;
-    left: -100%;
-    width: 70%;
-    height: 200%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), rgba(212, 175, 55, 0.45), transparent);
-    transform: rotate(25deg);
-    pointer-events: none;
-    animation: vicardCardHoloGlare 2.4s infinite ease-in-out;
-}
-
-@keyframes vicardCardHoloGlare {
-    0% { left: -100%; }
-    100% { left: 160%; }
-}
-
-/* Card Elements */
-.vicard-splash-card-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.vicard-splash-chip {
-    width: 32px;
-    height: 24px;
-    border-radius: 5px;
-    background: linear-gradient(135deg, #ffd700 0%, #d4af37 50%, #996515 100%);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    position: relative;
-}
-
-.vicard-splash-chip::after {
-    content: '';
-    position: absolute;
-    top: 5px;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: rgba(0, 0, 0, 0.35);
-}
-
-.vicard-splash-nfc-icon {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-}
-
-.vicard-splash-nfc-icon span {
-    display: block;
-    border-right: 2px solid #f5d77f;
-    border-top: 2px solid transparent;
-    border-bottom: 2px solid transparent;
-    border-radius: 50%;
-}
-
-.vicard-splash-nfc-icon span:nth-child(1) { height: 8px; width: 4px; }
-.vicard-splash-nfc-icon span:nth-child(2) { height: 13px; width: 5px; }
-.vicard-splash-nfc-icon span:nth-child(3) { height: 18px; width: 6px; }
-
-.vicard-splash-card-mid {
-    margin-top: 4px;
-}
-
-.vicard-splash-card-logo {
-    font-size: 1.15rem;
-    font-weight: 900;
-    letter-spacing: 2.5px;
-    background: linear-gradient(135deg, #ffffff 0%, #f5d77f 50%, #d4af37 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-
-.vicard-splash-card-sub {
-    font-size: 0.55rem;
-    color: #94a3b8;
-    letter-spacing: 1.2px;
-    font-weight: 700;
-    text-transform: uppercase;
-}
-
-.vicard-splash-card-bottom {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-}
-
-.vicard-splash-card-num {
-    font-size: 0.68rem;
-    color: #cbd5e1;
-    letter-spacing: 2px;
-    font-family: monospace;
-}
-
-.vicard-splash-card-tier {
-    font-size: 0.65rem;
-    font-weight: 800;
-    color: #000;
-    background: linear-gradient(135deg, #f5d77f, #d4af37);
-    padding: 2px 7px;
-    border-radius: 4px;
-    letter-spacing: 0.8px;
-}
-
-/* Status Block Below Card */
-.vicard-splash-status-block {
-    text-align: center;
-    max-width: 380px;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    z-index: 2;
-}
-
-.vicard-splash-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    padding: 4px 14px;
-    border-radius: 20px;
-    background: rgba(212, 175, 55, 0.08);
-    border: 1px solid rgba(212, 175, 55, 0.3);
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 1.2px;
-    color: #f5d77f;
-    text-transform: uppercase;
-}
-
-.vicard-splash-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: #10b981;
-    box-shadow: 0 0 8px #10b981;
-    animation: vicardDotPulse 1.2s infinite ease-in-out;
-}
-
-@keyframes vicardDotPulse {
-    0%, 100% { opacity: 0.4; transform: scale(0.9); }
-    50% { opacity: 1; transform: scale(1.2); }
-}
-
-.vicard-splash-title {
-    font-size: 1.5rem;
-    font-weight: 900;
-    letter-spacing: 2px;
-    background: linear-gradient(135deg, #ffffff 0%, #f5d77f 60%, #d4af37 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-
-.vicard-splash-step {
-    font-size: 0.88rem;
-    font-weight: 600;
-    color: #e2e8f0;
-    min-height: 22px;
-    transition: all 0.3s ease;
-}
-
-.vicard-splash-arabic {
-    font-size: 0.8rem;
-    color: #94a3b8;
-    direction: rtl;
-}
-
-/* High-Tech Glowing Laser Progress Bar */
-.vicard-splash-progress-track {
-    width: 260px;
-    height: 5px;
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 10px;
-    overflow: hidden;
-    position: relative;
-    margin-top: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.vicard-splash-progress-fill {
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, #d4af37, #f5d77f, #ffffff);
-    box-shadow: 0 0 12px rgba(245, 215, 127, 0.8);
-    border-radius: 10px;
-    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.vicard-splash-meta {
-    width: 260px;
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.65rem;
-    color: #64748b;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    margin-top: 2px;
 }
 
 /* ========================================================================== */
@@ -7008,7 +6669,7 @@ html.vicard-standalone-view.vicard-ready #vicard-splash-screen,
 }
 
 .vicard-3d-face.back {
-    background-image: url('back_card.jpg');
+    background-image: url('back_card.png');
     transform: rotateY(180deg);
     z-index: 1;
 }
@@ -7139,6 +6800,21 @@ html.vicard-standalone-view.vicard-ready #vicard-splash-screen,
     font-size: 0.8rem;
     margin-top: 4px;
     direction: rtl;
+}
+
+.vicard-mini-spinner {
+    width: 38px;
+    height: 38px;
+    border: 3px solid rgba(212, 175, 55, 0.2);
+    border-top-color: #d4af37;
+    border-radius: 50%;
+    animation: vicardSpin 0.8s linear infinite;
+    margin: 0 auto 12px auto;
+}
+
+@keyframes vicardSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 /* ========================================================================== */
