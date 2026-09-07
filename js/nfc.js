@@ -36,6 +36,7 @@ function getDefaultVicardRestaurants() {
             reviews: '420+',
             distance: '1.2 km',
             active: true,
+            cashierPin: '1234',
             units: [
                 {
                     id: 'unit_b1',
@@ -78,6 +79,7 @@ function getDefaultVicardRestaurants() {
             reviews: '310+',
             distance: '2.5 km',
             active: true,
+            cashierPin: '2345',
             units: [
                 {
                     id: 'unit_f1',
@@ -111,6 +113,7 @@ function getDefaultVicardRestaurants() {
             reviews: '180+',
             distance: '3.8 km',
             active: true,
+            cashierPin: '3456',
             units: [
                 {
                     id: 'unit_m1',
@@ -993,6 +996,7 @@ function renderVicardRestaurants() {
                                             return `<span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: rgba(235,77,75,0.15); color: #fca5a5; border: 1px solid rgba(235,77,75,0.3);">🚫 Restricted (Not Available Right Now)</span>`;
                                         }
                                     })()}
+                                    <span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: rgba(212,175,55,0.15); color: #f5d77f; border: 1px solid rgba(212,175,55,0.3); margin-left: 4px;">🔒 Cashier PIN: <strong style="font-family: monospace; letter-spacing: 1px;">${escapeHtml(r.cashierPin || '1234')}</strong></span>
                                 </div>
                             </div>
                         </div>
@@ -1059,8 +1063,10 @@ function openAddRestaurantModal() {
     }
     const ratingInput = document.getElementById('vicard-rest-rating');
     const reviewsInput = document.getElementById('vicard-rest-reviews');
+    const pinInput = document.getElementById('vicard-rest-cashier-pin');
     if (ratingInput) ratingInput.value = '4.9';
     if (reviewsInput) reviewsInput.value = '350+';
+    if (pinInput) pinInput.value = '1234';
     if (modalTitle) modalTitle.textContent = '➕ Add Partner Restaurant';
     if (submitBtn) submitBtn.textContent = 'Save Restaurant';
 
@@ -1086,6 +1092,7 @@ function openEditRestaurantModal(restId) {
     const locInput = document.getElementById('vicard-rest-location');
     const ratingInput = document.getElementById('vicard-rest-rating');
     const reviewsInput = document.getElementById('vicard-rest-reviews');
+    const pinInput = document.getElementById('vicard-rest-cashier-pin');
     const logoPreview = document.getElementById('vicard-rest-logo-preview');
     const coverPreview = document.getElementById('vicard-rest-cover-preview');
     const modalTitle = document.getElementById('vicard-restaurant-modal-title');
@@ -1099,6 +1106,7 @@ function openEditRestaurantModal(restId) {
     if (locInput) locInput.value = rest.location || '';
     if (ratingInput) ratingInput.value = rest.rating || '4.9';
     if (reviewsInput) reviewsInput.value = rest.reviews || '350+';
+    if (pinInput) pinInput.value = rest.cashierPin || '1234';
 
     if (logoPreview) {
         if (rest.logo && (rest.logo.startsWith('http') || rest.logo.startsWith('data:') || rest.logo.endsWith('.png') || rest.logo.endsWith('.jpg') || rest.logo.endsWith('.jpeg'))) {
@@ -1188,6 +1196,7 @@ function handleSaveVicardRestaurant(e) {
     const locInput = document.getElementById('vicard-rest-location');
     const ratingInput = document.getElementById('vicard-rest-rating');
     const reviewsInput = document.getElementById('vicard-rest-reviews');
+    const pinInput = document.getElementById('vicard-rest-cashier-pin');
 
     if (!nameInput) return;
     const existingRestId = idInput ? idInput.value.trim() : '';
@@ -1198,6 +1207,7 @@ function handleSaveVicardRestaurant(e) {
     const location = locInput ? locInput.value.trim() : '';
     const rating = ratingInput ? ratingInput.value.trim() : '4.9';
     const reviews = reviewsInput ? reviewsInput.value.trim() : '350+';
+    const cashierPin = pinInput && pinInput.value.trim() ? pinInput.value.trim() : '1234';
     const selectedTiers = Array.from(document.querySelectorAll('.vicard-rest-tier-cb:checked')).map(cb => cb.value);
     const tiersToSave = selectedTiers.length > 0 ? selectedTiers : ['none'];
 
@@ -1216,6 +1226,7 @@ function handleSaveVicardRestaurant(e) {
         rest.location = location;
         rest.rating = rating || '4.9';
         rest.reviews = reviews || '350+';
+        rest.cashierPin = cashierPin;
         rest.eligibleTiers = tiersToSave;
         rest.updatedAt = Date.now();
 
@@ -1227,6 +1238,7 @@ function handleSaveVicardRestaurant(e) {
             location: rest.location,
             rating: rest.rating,
             reviews: rest.reviews,
+            cashierPin: rest.cashierPin,
             eligibleTiers: tiersToSave,
             updatedAt: rest.updatedAt
         };
@@ -1260,6 +1272,7 @@ function handleSaveVicardRestaurant(e) {
         location: location,
         rating: rating || '4.9',
         reviews: reviews || '350+',
+        cashierPin: cashierPin,
         eligibleTiers: tiersToSave,
         active: true,
         units: [],
@@ -3152,6 +3165,9 @@ function renderVicardCashierScreen(cardId, card, restId, unitId) {
         return;
     }
 
+    const requiredPin = rest ? (rest.cashierPin || '1234') : '1234';
+    const isDeviceRemembered = restId && (localStorage.getItem('vicard_cashier_device_' + restId) === requiredPin);
+
     // Active Card Verified Screen
     overlay.innerHTML = `
         <div style="max-width:500px; margin:20px auto; padding:16px; direction:ltr; text-align:left;">
@@ -3209,7 +3225,33 @@ function renderVicardCashierScreen(cardId, card, restId, unitId) {
                     </div>
                 </div>
 
-                <button type="button" onclick="confirmVicardCashierVisit('${card.id}')"
+                ${isDeviceRemembered ? `
+                    <div style="background:rgba(46,213,115,0.12); border:1px solid rgba(46,213,115,0.4); border-radius:12px; padding:10px 14px; margin-bottom:14px; display:flex; align-items:center; justify-content:center; gap:8px;">
+                        <span style="font-size:1.1rem;">🛡️</span>
+                        <span style="color:#2ed573; font-size:0.85rem; font-weight:800;">Authorized Cashier Station • جهاز الكاشير معتمد</span>
+                    </div>
+                ` : `
+                    <div style="background:linear-gradient(135deg, rgba(212,175,55,0.1), rgba(212,175,55,0.03)); border:1.5px solid rgba(212,175,55,0.4); border-radius:14px; padding:16px 14px; margin-bottom:16px; text-align:center;">
+                        <label style="display:block; font-size:0.88rem; font-weight:800; color:#f5d77f; margin-bottom:4px;">
+                            🔒 Cashier 4-Digit PIN (رمز الكاشير السري) *
+                        </label>
+                        <p style="color:#a0aec0; font-size:0.76rem; margin:0 0 10px 0;">
+                            Only restaurant cashier staff can confirm this offer. Customers cannot self-confirm.
+                        </p>
+                        <div style="display:flex; justify-content:center; margin-bottom:8px;">
+                            <input type="password" id="vicard-cashier-pin-input" maxlength="4" placeholder="••••"
+                                style="width:140px; text-align:center; padding:8px 10px; font-size:1.5rem; font-family:monospace; font-weight:900; letter-spacing:8px; border-radius:10px; border:2px solid #d4af37; background:rgba(0,0,0,0.7); color:#fff; outline:none; box-sizing:border-box;"
+                                onkeyup="if (event.key === 'Enter') confirmVicardCashierVisit('${card.id}', '${escapeHtml(restId || '')}')">
+                        </div>
+                        <div id="vicard-cashier-pin-error" style="display:none; color:#eb4d4b; font-size:0.82rem; font-weight:700; margin-bottom:8px;"></div>
+                        <label style="display:inline-flex; align-items:center; gap:6px; font-size:0.78rem; color:#cbd5e1; cursor:pointer; user-select:none;">
+                            <input type="checkbox" id="vicard-cashier-remember-device" checked style="accent-color:#d4af37; width:15px; height:15px; cursor:pointer;">
+                            <span>Remember this cashier device (تذكر هذا الجهاز)</span>
+                        </label>
+                    </div>
+                `}
+
+                <button type="button" onclick="confirmVicardCashierVisit('${card.id}', '${escapeHtml(restId || '')}')"
                     style="width:100%; padding:14px; border-radius:12px; font-size:0.95rem; font-weight:800; background:linear-gradient(135deg, #10b981, #059669); color:#fff; border:none; cursor:pointer; box-shadow:0 4px 14px rgba(16,185,129,0.35);">
                     ✅ Confirm Discount & Log Visit
                 </button>
@@ -3234,9 +3276,38 @@ function calculateVicardDiscount() {
 }
 window.calculateVicardDiscount = calculateVicardDiscount;
 
-function confirmVicardCashierVisit(cardId) {
+function confirmVicardCashierVisit(cardId, restId) {
     const card = vicardData.cards[cardId];
     if (!card) return;
+
+    const rest = (vicardData.restaurants && restId) ? vicardData.restaurants[restId] : null;
+    const requiredPin = rest ? (rest.cashierPin || '1234') : '1234';
+    const isDeviceRemembered = restId && (localStorage.getItem('vicard_cashier_device_' + restId) === requiredPin);
+
+    if (!isDeviceRemembered) {
+        const pinInput = document.getElementById('vicard-cashier-pin-input');
+        const errEl = document.getElementById('vicard-cashier-pin-error');
+        const enteredPin = pinInput ? pinInput.value.trim() : '';
+
+        if (!enteredPin || enteredPin !== requiredPin) {
+            if (errEl) {
+                errEl.textContent = '❌ Incorrect Cashier PIN. Staff verification required. رمز الكاشير غير صحيح';
+                errEl.style.display = 'block';
+            }
+            if (pinInput) {
+                pinInput.focus();
+                pinInput.select();
+            }
+            return;
+        }
+
+        const rememberCb = document.getElementById('vicard-cashier-remember-device');
+        if (rememberCb && rememberCb.checked && restId) {
+            try {
+                localStorage.setItem('vicard_cashier_device_' + restId, requiredPin);
+            } catch (e) {}
+        }
+    }
 
     const billInput = document.getElementById('vicard-cashier-bill');
     const pctInput = document.getElementById('vicard-cashier-pct');
