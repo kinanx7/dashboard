@@ -1391,7 +1391,8 @@ auth.onAuthStateChanged((user) => {
             return;
         }
         const vicardUrlParams = new URLSearchParams(window.location.search);
-        if (vicardUrlParams.has('vicard') || vicardUrlParams.has('verify_vicard')) {
+        const hasActiveVicardSession = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('vicard_active_session');
+        if (vicardUrlParams.has('vicard') || vicardUrlParams.has('verify_vicard') || hasActiveVicardSession) {
             document.documentElement.classList.add('vicard-standalone-view');
             overlay.style.display = 'none';
             if (typeof initVicardSystem === 'function') initVicardSystem();

@@ -1391,7 +1391,8 @@ auth.onAuthStateChanged((user) => {
             return;
         }
         const vicardUrlParams = new URLSearchParams(window.location.search);
-        if (vicardUrlParams.has('vicard') || vicardUrlParams.has('verify_vicard')) {
+        const hasActiveVicardSession = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('vicard_active_session');
+        if (vicardUrlParams.has('vicard') || vicardUrlParams.has('verify_vicard') || hasActiveVicardSession) {
             document.documentElement.classList.add('vicard-standalone-view');
             overlay.style.display = 'none';
             if (typeof initVicardSystem === 'function') initVicardSystem();
@@ -35785,7 +35786,6 @@ async function saveSallaDirectToken() {
 }
 window.saveSallaDirectToken = saveSallaDirectToken;
 
-
 /**
  * ============================================================
  * VICard (Very Important Card) NFC Business Ecosystem Module
@@ -35807,6 +35807,24 @@ var vicardActiveCategory = 'all';    // 'all' | 'burgers' | 'fresh' | 'meats' | 
 var _hasVicardListeners = false;
 var _vicardRedeemTimerInterval = null;
 var _vicardDataLoaded = false;
+var _activeVicardSession = null;
+var _pendingVicardAccess = null;
+
+// --- CRYPTOGRAPHIC SECRET KEY GENERATOR (PREVENTS URL ENUMERATION) ---
+function generateVicardSecretKey() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+        const bytes = new Uint8Array(24);
+        window.crypto.getRandomValues(bytes);
+        return Array.from(bytes, b => chars[b % chars.length]).join('');
+    }
+    let key = '';
+    for (let i = 0; i < 24; i++) {
+        key += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return key;
+}
+window.generateVicardSecretKey = generateVicardSecretKey;
 
 // --- INITIALIZATION & FIREBASE REAL-TIME SYNC ---
 function initVicardSystem() {
@@ -35834,6 +35852,16 @@ function initVicardSystem() {
         vicardData.tiers = val.tiers || null;
         _vicardDataLoaded = true;
 
+        // Auto-migrate any cards without secretKey to guarantee encrypted access
+        Object.keys(vicardData.cards).forEach(cid => {
+            const c = vicardData.cards[cid];
+            if (c && !c.secretKey) {
+                const generatedKey = generateVicardSecretKey();
+                c.secretKey = generatedKey;
+                db.ref(`vicard_network/cards/${cid}/secretKey`).set(generatedKey).catch(() => {});
+            }
+        });
+
         // Remove any test cards locally if still present
         Object.keys(vicardData.cards).forEach(cid => {
             const c = vicardData.cards[cid];
@@ -35856,6 +35884,9 @@ function initVicardSystem() {
                 renderNfcSection();
             }
         }
+
+        // Populate Tiers Select in Manager View
+        populateVicardTierSelects();
 
         // Update active overlays if opened
         updateActiveVicardOverlays();
@@ -36069,6 +36100,9 @@ function renderNfcSection() {
 
     // 3. Render Issued Customer Cards Table
     filterVicardCustomers();
+
+    // 4. Populate Membership Tiers Dropdown
+    populateVicardTierSelects();
 }
 window.renderNfcSection = renderNfcSection;
 
@@ -36097,9 +36131,11 @@ function handleCreateVicard(e) {
         randomNum = Math.floor(1000 + Math.random() * 9000);
     }
     const cardId = 'VIC-' + randomNum;
+    const secretKey = generateVicardSecretKey();
 
     const newCard = {
         id: cardId,
+        secretKey: secretKey,
         name: name,
         phone: phone || '',
         tier: tier,
@@ -36229,7 +36265,7 @@ function filterVicardCustomers() {
 
     tableBody.innerHTML = cards.map(c => {
         const isActive = c.status === 'active';
-        const cardUrl = buildVicardUrl(c.id);
+        const cardUrl = buildVicardUrl(c.id, c.secretKey);
 
         const statusBadge = isActive
             ? `<span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; background: rgba(46, 213, 115, 0.15); color: #2ed573; border: 1px solid rgba(46, 213, 115, 0.3);"><span style="width: 7px; height: 7px; border-radius: 50%; background: #2ed573; box-shadow: 0 0 8px #2ed573;"></span> Active</span>`
@@ -36239,11 +36275,46 @@ function filterVicardCustomers() {
             ? `<button type="button" onclick="toggleVicardStatus('${c.id}')" style="padding: 6px 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 700; background: rgba(235, 77, 75, 0.15); color: #eb4d4b; border: 1px solid rgba(235, 77, 75, 0.3); cursor: pointer; transition: all 0.2s;" title="Deactivate Card">⏹️ Deactivate</button>`
             : `<button type="button" onclick="toggleVicardStatus('${c.id}')" style="padding: 6px 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 700; background: rgba(46, 213, 115, 0.15); color: #2ed573; border: 1px solid rgba(46, 213, 115, 0.3); cursor: pointer; transition: all 0.2s;" title="Activate Card">▶️ Activate</button>`;
 
+        const tierObj = Object.values(getVicardTiers()).find(t => t.name === c.tier || t.id === c.tier);
+        const tierIcon = tierObj ? tierObj.icon : '🏅';
+        const tierRank = getTierRank(c.tier);
+
+        // Tier theme colors for sleek VIP HUD presentation
+        let tierColor = '#f5d77f';
+        let tierBorder = 'rgba(212,175,55,0.45)';
+        let tierBg = 'rgba(212,175,55,0.12)';
+        if (tierRank === 1) {
+            tierColor = '#e2e8f0';
+            tierBorder = 'rgba(192,192,192,0.45)';
+            tierBg = 'rgba(192,192,192,0.1)';
+        } else if (tierRank === 2) {
+            tierColor = '#ffd700';
+            tierBorder = 'rgba(255,215,0,0.5)';
+            tierBg = 'rgba(255,215,0,0.12)';
+        } else if (tierRank === 3) {
+            tierColor = '#38bdf8';
+            tierBorder = 'rgba(56,189,248,0.5)';
+            tierBg = 'rgba(56,189,248,0.12)';
+        } else if (tierRank >= 4) {
+            tierColor = '#f5d77f';
+            tierBorder = 'rgba(212,175,55,0.6)';
+            tierBg = 'linear-gradient(135deg, rgba(212,175,55,0.2) 0%, rgba(10,10,15,0.8) 100%)';
+        }
+
         return `
             <tr style="border-bottom: 1px solid var(--border-color); transition: background 0.15s ease;">
-                <td style="padding: 12px;">
-                    <span style="font-family: monospace; font-weight: 800; font-size: 0.95rem; color: #f5d77f; background: rgba(212,175,55,0.1); padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(212,175,55,0.25);">${c.id}</span>
-                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 3px;">${c.tier || 'Black VIP'}</div>
+                <td style="padding: 12px; min-width: 175px;">
+                    <div class="vicard-hud-cell">
+                        <div class="vicard-hud-id-badge">
+                            <span class="chip-icon">💳</span>
+                            <span>${escapeHtml(c.id)}</span>
+                        </div>
+                        <div class="vicard-hud-tier-badge" style="border-color: ${tierBorder}; background: ${tierBg};">
+                            <span>${tierIcon}</span>
+                            <span class="vicard-hud-tier-name" style="color: ${tierColor};">${escapeHtml(c.tier || 'Black VIP')}</span>
+                            <span class="vicard-hud-rank-pill" style="color: ${tierColor}; border-color: ${tierBorder};">Rank ${tierRank}</span>
+                        </div>
+                    </div>
                 </td>
                 <td style="padding: 12px;">
                     <strong style="color: var(--text-main); font-size: 0.95rem;">${escapeHtml(c.name)}</strong>
@@ -36263,6 +36334,12 @@ function filterVicardCustomers() {
                 </td>
                 <td style="padding: 12px; text-align: right;">
                     <div style="display: inline-flex; gap: 6px;">
+                        <button type="button" onclick="openEditVicardCustomerModal('${c.id}')" style="padding: 6px 10px; border-radius: 8px; font-size: 0.8rem; background: rgba(212,175,55,0.2); color: #f5d77f; border: 1px solid rgba(212,175,55,0.4); cursor: pointer; font-weight: 700;" title="Edit Customer & Membership Tier">
+                            ✏️ Edit
+                        </button>
+                        <button type="button" onclick="openVicardCustomerPortal('${c.id}', '${c.secretKey || ''}')" style="padding: 6px 10px; border-radius: 8px; font-size: 0.8rem; background: rgba(212,175,55,0.15); color: #f5d77f; border: 1px solid rgba(212,175,55,0.3); cursor: pointer;" title="Preview Customer Portal">
+                            👁️ View
+                        </button>
                         <button type="button" onclick="copyVicardUrl('${cardUrl}')" style="padding: 6px 10px; border-radius: 8px; font-size: 0.8rem; background: var(--input-bg); color: var(--text-main); border: 1px solid var(--border-color); cursor: pointer;" title="Copy NFC Link">
                             🔗 Link
                         </button>
@@ -36280,10 +36357,109 @@ function filterVicardCustomers() {
 }
 window.filterVicardCustomers = filterVicardCustomers;
 
+// --- EDIT CUSTOMER CARD & MEMBERSHIP TIER ---
+function openEditVicardCustomerModal(cardId) {
+    const card = vicardData.cards ? vicardData.cards[cardId] : null;
+    if (!card) {
+        alert('Customer card not found.');
+        return;
+    }
+
+    const modal = document.getElementById('vicard-edit-customer-modal');
+    const idInput = document.getElementById('vicard-edit-cust-id');
+    const idDisplay = document.getElementById('vicard-edit-cust-id-display');
+    const nameInput = document.getElementById('vicard-edit-cust-name');
+    const phoneInput = document.getElementById('vicard-edit-cust-phone');
+    const tierSelect = document.getElementById('vicard-edit-cust-tier');
+    const statusSelect = document.getElementById('vicard-edit-cust-status');
+
+    if (idInput) idInput.value = card.id;
+    if (idDisplay) idDisplay.textContent = `${card.id} — ${card.name}`;
+    if (nameInput) nameInput.value = card.name || '';
+    if (phoneInput) phoneInput.value = card.phone || '';
+    if (statusSelect) statusSelect.value = card.status === 'deactivated' ? 'deactivated' : 'active';
+
+    if (tierSelect) {
+        const tiers = Object.values(getVicardTiers()).sort((a, b) => (b.rank || 0) - (a.rank || 0));
+        tierSelect.innerHTML = tiers.map(t => `
+            <option value="${escapeHtml(t.name)}" ${(card.tier === t.name || card.tier === t.id) ? 'selected' : ''}>
+                ${t.icon || '🏅'} ${escapeHtml(t.name)} (Rank ${t.rank || 1} • SAR ${t.minSpend || 0}+)
+            </option>
+        `).join('');
+    }
+
+    if (modal) modal.style.display = 'flex';
+}
+window.openEditVicardCustomerModal = openEditVicardCustomerModal;
+
+function closeEditVicardCustomerModal() {
+    const modal = document.getElementById('vicard-edit-customer-modal');
+    if (modal) modal.style.display = 'none';
+}
+window.closeEditVicardCustomerModal = closeEditVicardCustomerModal;
+
+function handleSaveEditVicardCustomer(e) {
+    if (e && e.preventDefault) e.preventDefault();
+
+    const idInput = document.getElementById('vicard-edit-cust-id');
+    const nameInput = document.getElementById('vicard-edit-cust-name');
+    const phoneInput = document.getElementById('vicard-edit-cust-phone');
+    const tierSelect = document.getElementById('vicard-edit-cust-tier');
+    const statusSelect = document.getElementById('vicard-edit-cust-status');
+
+    if (!idInput) return;
+    const cardId = idInput.value.trim();
+    const card = vicardData.cards ? vicardData.cards[cardId] : null;
+    if (!card) return;
+
+    const newName = nameInput ? nameInput.value.trim() : card.name;
+    const newPhone = phoneInput ? phoneInput.value.trim() : card.phone;
+    const newTier = tierSelect ? tierSelect.value.trim() : card.tier;
+    const newStatus = statusSelect ? statusSelect.value : card.status;
+
+    if (!newName) {
+        alert('Please enter the customer name.');
+        return;
+    }
+
+    card.name = newName;
+    card.phone = newPhone;
+    card.tier = newTier;
+    card.status = newStatus;
+    card.updatedAt = Date.now();
+
+    const updateData = {
+        name: card.name,
+        phone: card.phone,
+        tier: card.tier,
+        status: card.status,
+        updatedAt: card.updatedAt
+    };
+
+    if (typeof db !== 'undefined' && db) {
+        db.ref(`vicard_network/cards/${cardId}`).update(updateData).catch(console.error);
+    }
+
+    closeEditVicardCustomerModal();
+    filterVicardCustomers();
+    if (currentVicardSubTab === 'customer') renderCustomerWebsite();
+    if (window._currentActiveCustomerCard && window._currentActiveCustomerCard.id === cardId) {
+        window._currentActiveCustomerCard = card;
+        renderAuthorizedCustomerPortal(card);
+    }
+
+    if (typeof showToast === 'function') {
+        showToast(`Updated customer ${card.name} (${card.id}) — Tier: ${card.tier}`);
+    } else {
+        alert(`✅ Successfully updated ${card.name}!\nAssigned Tier: ${card.tier}`);
+    }
+}
+window.handleSaveEditVicardCustomer = handleSaveEditVicardCustomer;
+
 // Modal showing created card details & NFC Tools instructions
 function showVicardCreatedModal(card) {
     if (!card) return;
-    const directUrl = buildVicardUrl(card.id);
+    const directUrl = buildVicardUrl(card.id, card.secretKey);
     const modal = document.getElementById('vicard-created-modal');
     if (!modal) return;
 
@@ -36326,10 +36502,14 @@ function copyVicardUrl(url) {
 }
 window.copyVicardUrl = copyVicardUrl;
 
-function buildVicardUrl(cardId) {
+function buildVicardUrl(cardId, secretKey) {
     const origin = window.location.origin || (window.location.protocol + '//' + window.location.host);
     const path = window.location.pathname || '';
-    return `${origin}${path}?vicard=${encodeURIComponent(cardId)}`;
+    let url = `${origin}${path}?vicard=${encodeURIComponent(cardId)}`;
+    if (secretKey) {
+        url += `&key=${encodeURIComponent(secretKey)}`;
+    }
+    return url;
 }
 
 function buildVerificationUrl(cardId, restId, unitId) {
@@ -36410,7 +36590,24 @@ function renderVicardRestaurants() {
                             <div>
                                 <h4 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: var(--text-main);">${escapeHtml(r.name)}</h4>
                                 <div style="font-size: 0.78rem; color: #d4af37; font-weight: 600;">${escapeHtml(r.category || 'Dining')}</div>
-                                ${r.location ? `<div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 2px;">📍 ${escapeHtml(r.location)}</div>` : ''}
+                                ${r.location ? `<div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 2px;">📍 ${escapeHtml(r.location)} • ⭐ ${r.rating || '4.9'} (${r.reviews || '350+'})</div>` : `<div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 2px;">⭐ ${r.rating || '4.9'} (${r.reviews || '350+'})</div>`}
+                                <div style="margin-top: 5px;">
+                                    ${(() => {
+                                        const lowestPlatRank = getLowestPlatformTierRank();
+                                        const activeTiers = (r.eligibleTiers || []).filter(t => t && t !== 'none' && t !== '__none__');
+                                        if (activeTiers.length > 0) {
+                                            const minRestRank = Math.min(...activeTiers.map(t => getTierRank(t)));
+                                            const isLowestRankChecked = minRestRank <= lowestPlatRank;
+                                            if (isLowestRankChecked) {
+                                                return `<span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: rgba(46,213,115,0.12); color: #2ed573; border: 1px solid rgba(46,213,115,0.3);">🌐 All Tiers (Rank ${minRestRank}+)</span>`;
+                                            } else {
+                                                return `<span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: rgba(212,175,55,0.15); color: #f5d77f; border: 1px solid rgba(212,175,55,0.3);">🏅 ${activeTiers.map(tid => (getVicardTiers()[tid]?.name || tid)).join(', ')} (Rank ${minRestRank}+) • Base Tier Restricted</span>`;
+                                            }
+                                        } else {
+                                            return `<span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: rgba(235,77,75,0.15); color: #fca5a5; border: 1px solid rgba(235,77,75,0.3);">🚫 Restricted (Not Available Right Now)</span>`;
+                                        }
+                                    })()}
+                                </div>
                             </div>
                         </div>
 
@@ -36474,8 +36671,14 @@ function openAddRestaurantModal() {
         coverPreview.style.display = 'none';
         coverPreview.src = '';
     }
+    const ratingInput = document.getElementById('vicard-rest-rating');
+    const reviewsInput = document.getElementById('vicard-rest-reviews');
+    if (ratingInput) ratingInput.value = '4.9';
+    if (reviewsInput) reviewsInput.value = '350+';
     if (modalTitle) modalTitle.textContent = '➕ Add Partner Restaurant';
     if (submitBtn) submitBtn.textContent = 'Save Restaurant';
+
+    populateVicardRestTiersCheckboxes(Object.keys(getVicardTiers()));
 
     if (modal) modal.style.display = 'flex';
 }
@@ -36495,6 +36698,8 @@ function openEditRestaurantModal(restId) {
     const coverInput = document.getElementById('vicard-rest-cover');
     const catInput = document.getElementById('vicard-rest-category');
     const locInput = document.getElementById('vicard-rest-location');
+    const ratingInput = document.getElementById('vicard-rest-rating');
+    const reviewsInput = document.getElementById('vicard-rest-reviews');
     const logoPreview = document.getElementById('vicard-rest-logo-preview');
     const coverPreview = document.getElementById('vicard-rest-cover-preview');
     const modalTitle = document.getElementById('vicard-restaurant-modal-title');
@@ -36506,6 +36711,8 @@ function openEditRestaurantModal(restId) {
     if (coverInput) coverInput.value = rest.cover || '';
     if (catInput) catInput.value = rest.category || '';
     if (locInput) locInput.value = rest.location || '';
+    if (ratingInput) ratingInput.value = rest.rating || '4.9';
+    if (reviewsInput) reviewsInput.value = rest.reviews || '350+';
 
     if (logoPreview) {
         if (rest.logo && (rest.logo.startsWith('http') || rest.logo.startsWith('data:') || rest.logo.endsWith('.png') || rest.logo.endsWith('.jpg') || rest.logo.endsWith('.jpeg'))) {
@@ -36529,6 +36736,12 @@ function openEditRestaurantModal(restId) {
 
     if (modalTitle) modalTitle.textContent = `✏️ Edit Restaurant: ${rest.name}`;
     if (submitBtn) submitBtn.textContent = '💾 Update Restaurant';
+
+    const existingTiers = Array.isArray(rest.eligibleTiers)
+        ? rest.eligibleTiers.filter(t => t !== 'none' && t !== '__none__')
+        : (rest.eligibleTiers !== undefined ? [] : Object.keys(getVicardTiers()));
+
+    populateVicardRestTiersCheckboxes(existingTiers);
 
     if (modal) modal.style.display = 'flex';
 }
@@ -36587,6 +36800,8 @@ function handleSaveVicardRestaurant(e) {
     const coverInput = document.getElementById('vicard-rest-cover');
     const catInput = document.getElementById('vicard-rest-category');
     const locInput = document.getElementById('vicard-rest-location');
+    const ratingInput = document.getElementById('vicard-rest-rating');
+    const reviewsInput = document.getElementById('vicard-rest-reviews');
 
     if (!nameInput) return;
     const existingRestId = idInput ? idInput.value.trim() : '';
@@ -36595,6 +36810,10 @@ function handleSaveVicardRestaurant(e) {
     const cover = coverInput ? coverInput.value.trim() : '';
     const category = catInput ? catInput.value.trim() : 'Gourmet Dining';
     const location = locInput ? locInput.value.trim() : '';
+    const rating = ratingInput ? ratingInput.value.trim() : '4.9';
+    const reviews = reviewsInput ? reviewsInput.value.trim() : '350+';
+    const selectedTiers = Array.from(document.querySelectorAll('.vicard-rest-tier-cb:checked')).map(cb => cb.value);
+    const tiersToSave = selectedTiers.length > 0 ? selectedTiers : ['none'];
 
     if (!name) {
         alert('Please enter restaurant name.');
@@ -36609,6 +36828,9 @@ function handleSaveVicardRestaurant(e) {
         if (cover) rest.cover = cover;
         rest.category = category;
         rest.location = location;
+        rest.rating = rating || '4.9';
+        rest.reviews = reviews || '350+';
+        rest.eligibleTiers = tiersToSave;
         rest.updatedAt = Date.now();
 
         const updateData = {
@@ -36617,6 +36839,9 @@ function handleSaveVicardRestaurant(e) {
             cover: rest.cover || '',
             category: rest.category,
             location: rest.location,
+            rating: rest.rating,
+            reviews: rest.reviews,
+            eligibleTiers: tiersToSave,
             updatedAt: rest.updatedAt
         };
 
@@ -36647,6 +36872,9 @@ function handleSaveVicardRestaurant(e) {
         cover: cover || '',
         category: category,
         location: location,
+        rating: rating || '4.9',
+        reviews: reviews || '350+',
+        eligibleTiers: tiersToSave,
         active: true,
         units: [],
         createdAt: Date.now()
@@ -36772,6 +37000,7 @@ function openEditUnitModal(restId, unitIndex) {
     if (origPriceInput) origPriceInput.value = unit.originalPrice !== undefined ? unit.originalPrice : '';
     if (offerPriceInput) offerPriceInput.value = unit.offerPrice !== undefined ? unit.offerPrice : '';
     if (discountInput) discountInput.value = unit.discount || '';
+    if (discountInput && !discountInput.value) calculateVicardUnitDiscount();
     if (descInput) descInput.value = unit.description || '';
 
     if (preview) {
@@ -36793,6 +37022,63 @@ function closeVicardUnitModal() {
     if (modal) modal.style.display = 'none';
 }
 window.closeVicardUnitModal = closeVicardUnitModal;
+
+function calculateVicardUnitDiscount() {
+    const origInput = document.getElementById('vicard-unit-orig-price');
+    const offerInput = document.getElementById('vicard-unit-offer-price');
+    const discountInput = document.getElementById('vicard-unit-discount');
+    if (!origInput || !offerInput || !discountInput) return;
+
+    const origPrice = parseFloat(origInput.value);
+    const offerPrice = parseFloat(offerInput.value);
+
+    if (!isNaN(origPrice) && !isNaN(offerPrice) && origPrice > 0 && offerPrice > 0) {
+        if (origPrice > offerPrice) {
+            const pct = Math.round(((origPrice - offerPrice) / origPrice) * 100);
+            discountInput.value = `${pct}% OFF`;
+        } else {
+            discountInput.value = '';
+        }
+    }
+}
+window.calculateVicardUnitDiscount = calculateVicardUnitDiscount;
+
+function calculateVicardOfferDiscount() {
+    const discInput = document.getElementById('vicard-offer-discount');
+    const pctInput = document.getElementById('vicard-offer-percent');
+    if (!discInput || !pctInput) return;
+
+    const pct = parseFloat(pctInput.value);
+    if (!isNaN(pct) && pct > 0) {
+        discInput.value = `${pct}% OFF`;
+    }
+}
+window.calculateVicardOfferDiscount = calculateVicardOfferDiscount;
+
+if (typeof document !== 'undefined') {
+    const bindDiscountInputs = () => {
+        const orig = document.getElementById('vicard-unit-orig-price');
+        const offer = document.getElementById('vicard-unit-offer-price');
+        if (orig) {
+            orig.addEventListener('input', calculateVicardUnitDiscount);
+            orig.addEventListener('change', calculateVicardUnitDiscount);
+        }
+        if (offer) {
+            offer.addEventListener('input', calculateVicardUnitDiscount);
+            offer.addEventListener('change', calculateVicardUnitDiscount);
+        }
+        const pct = document.getElementById('vicard-offer-percent');
+        if (pct) {
+            pct.addEventListener('input', calculateVicardOfferDiscount);
+            pct.addEventListener('change', calculateVicardOfferDiscount);
+        }
+    };
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bindDiscountInputs);
+    } else {
+        bindDiscountInputs();
+    }
+}
 
 function handleVicardUnitImageFileSelect(event) {
     const file = event.target.files && event.target.files[0];
@@ -37103,25 +37389,172 @@ window.saveVicardHeroBanner = saveVicardHeroBanner;
 
 // --- MEMBERSHIP TIERS MANAGEMENT (MANAGER VIEW) ---
 var defaultVicardTiers = {
-    'silver': { id: 'silver', name: 'Silver VIP', icon: '🥈', minSpend: 0, perks: '10% Base Cashback', gradient: 'linear-gradient(135deg, #9ca3af, #4b5563)' },
-    'gold': { id: 'gold', name: 'Gold VIP', icon: '👑', minSpend: 500, perks: '15% Discount + Free Soft Drink', gradient: 'linear-gradient(135deg, #f59e0b, #d97706)' },
-    'platinum': { id: 'platinum', name: 'Platinum Elite', icon: '💎', minSpend: 1500, perks: '25% Discount + Priority Seating', gradient: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' },
-    'black': { id: 'black', name: 'Black VIP Founder', icon: '✨', minSpend: 3000, perks: '35% Discount + Chef Welcome Plate', gradient: 'linear-gradient(135deg, #18181b, #000000)' }
+    'silver': { id: 'silver', name: 'Silver VIP', icon: '🥈', rank: 1, minSpend: 0, perks: '10% Base Cashback', gradient: 'linear-gradient(135deg, #9ca3af, #4b5563)' },
+    'gold': { id: 'gold', name: 'Gold VIP', icon: '👑', rank: 2, minSpend: 500, perks: '15% Discount + Free Soft Drink', gradient: 'linear-gradient(135deg, #f59e0b, #d97706)' },
+    'platinum': { id: 'platinum', name: 'Platinum Elite', icon: '💎', rank: 3, minSpend: 1500, perks: '25% Discount + Priority Seating', gradient: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' },
+    'black': { id: 'black', name: 'Black VIP Founder', icon: '✨', rank: 4, minSpend: 3000, perks: '35% Discount + Chef Welcome Plate', gradient: 'linear-gradient(135deg, #18181b, #000000)' }
 };
 
 function getVicardTiers() {
     if (vicardData.tiers && Object.keys(vicardData.tiers).length > 0) {
+        // Ensure every tier has a numeric rank
+        Object.keys(vicardData.tiers).forEach(k => {
+            const t = vicardData.tiers[k];
+            if (t && (t.rank === undefined || t.rank === null)) {
+                t.rank = k === 'black' ? 4 : (k === 'platinum' ? 3 : (k === 'gold' ? 2 : 1));
+            }
+        });
         return vicardData.tiers;
     }
     return defaultVicardTiers;
 }
 window.getVicardTiers = getVicardTiers;
 
+function getTierRank(tierIdentifier) {
+    if (!tierIdentifier) return 1;
+    const tiers = getVicardTiers();
+    const norm = String(tierIdentifier).toLowerCase().trim();
+
+    if (tiers[norm] && tiers[norm].rank !== undefined) {
+        return parseInt(tiers[norm].rank, 10) || 1;
+    }
+    for (const key of Object.keys(tiers)) {
+        const t = tiers[key];
+        const tName = (t.name || '').toLowerCase();
+        const tId = (t.id || '').toLowerCase();
+        if (tId === norm || tName === norm || norm.includes(tId) || tName.includes(norm)) {
+            if (t.rank !== undefined && t.rank !== null && !isNaN(t.rank)) {
+                return parseInt(t.rank, 10);
+            }
+            if (t.minSpend !== undefined) {
+                return t.minSpend >= 3000 ? 4 : (t.minSpend >= 1500 ? 3 : (t.minSpend >= 500 ? 2 : 1));
+            }
+        }
+    }
+    if (norm.includes('black') || norm.includes('founder')) return 4;
+    if (norm.includes('platinum') || norm.includes('elite')) return 3;
+    if (norm.includes('gold')) return 2;
+    if (norm.includes('silver')) return 1;
+    return 1;
+}
+window.getTierRank = getTierRank;
+
+function getLowestPlatformTierRank() {
+    const tiers = Object.values(getVicardTiers());
+    if (!tiers || tiers.length === 0) return 1;
+    const ranks = tiers.map(t => {
+        if (t.rank !== undefined && t.rank !== null && !isNaN(t.rank)) {
+            return parseInt(t.rank, 10);
+        }
+        return getTierRank(t.id || t.name);
+    });
+    return Math.min(...ranks);
+}
+window.getLowestPlatformTierRank = getLowestPlatformTierRank;
+
+function checkTierEligibility(customerTier, requiredTiers) {
+    const custRank = getTierRank(customerTier);
+    const tiers = getVicardTiers();
+    const lowestPlatformRank = getLowestPlatformTierRank();
+
+    const cleanTiers = Array.isArray(requiredTiers) 
+        ? requiredTiers.filter(t => t && t !== 'none' && t !== '__none__')
+        : [];
+
+    // If no valid tiers were selected/checked for this restaurant:
+    // The lowest rank was NOT checkboxed! Thus the restaurant is restricted and not available.
+    if (cleanTiers.length === 0) {
+        return {
+            eligible: false,
+            isLowestRankUnchecked: true,
+            notAvailableReason: 'This restaurant is not available right now',
+            customerRank: custRank,
+            minRequiredRank: 9999,
+            requiredTierNames: ['None (Restricted)']
+        };
+    }
+
+    const reqRanks = cleanTiers.map(tId => getTierRank(tId));
+    const minReqRank = Math.min(...reqRanks);
+
+    // If the minimum required rank among the checked tiers is greater than the lowest rank in the system,
+    // then the lowest rank was NOT checkboxed!
+    const isLowestRankUnchecked = minReqRank > lowestPlatformRank;
+    const isEligible = custRank >= minReqRank;
+
+    const requiredTierNames = cleanTiers.map(tId => {
+        const found = tiers[tId] || Object.values(tiers).find(t => t.id === tId || t.name === tId);
+        return found ? `${found.icon || '🏅'} ${found.name}` : tId;
+    });
+
+    return {
+        eligible: isEligible,
+        isLowestRankUnchecked: isLowestRankUnchecked,
+        notAvailableReason: (!isEligible && isLowestRankUnchecked) ? 'This restaurant is not available right now' : '',
+        customerRank: custRank,
+        minRequiredRank: minReqRank,
+        requiredTierNames: requiredTierNames
+    };
+}
+window.checkTierEligibility = checkTierEligibility;
+
+function populateVicardRestTiersCheckboxes(selectedTiers = []) {
+    const container = document.getElementById('vicard-rest-tiers-container');
+    if (!container) return;
+
+    const tiers = Object.values(getVicardTiers()).sort((a, b) => (a.rank || 0) - (b.rank || 0));
+    const selList = Array.isArray(selectedTiers) ? selectedTiers.filter(t => t !== 'none' && t !== '__none__') : [];
+
+    container.innerHTML = tiers.map(t => {
+        const isChecked = selList.includes(t.id) || selList.includes(t.name);
+        return `
+            <div class="vicard-tier-checkbox-chip" onclick="toggleVicardTierChip(this, event)" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 10px; cursor: pointer; user-select: none; transition: all 0.2s; font-size: 0.85rem; font-weight: 700; ${isChecked ? 'background: rgba(212,175,55,0.22); border: 1.5px solid #d4af37; color: #fff;' : 'background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); color: var(--text-muted);'}">
+                <input type="checkbox" class="vicard-rest-tier-cb" value="${t.id}" ${isChecked ? 'checked' : ''} style="accent-color: #d4af37; cursor: pointer; width: 16px; height: 16px; pointer-events: none;">
+                <span style="pointer-events: none;">${t.icon || '🏅'} ${escapeHtml(t.name)}</span>
+                <span style="pointer-events: none; font-size: 0.72rem; color: #d4af37; font-family: monospace;">(Rank ${t.rank || 1})</span>
+            </div>
+        `;
+    }).join('');
+}
+window.populateVicardRestTiersCheckboxes = populateVicardRestTiersCheckboxes;
+
+function toggleVicardTierChip(chip, event) {
+    if (event) event.stopPropagation();
+    const cb = chip.querySelector('.vicard-rest-tier-cb');
+    if (!cb) return;
+    cb.checked = !cb.checked;
+    if (cb.checked) {
+        chip.style.background = 'rgba(212,175,55,0.22)';
+        chip.style.border = '1.5px solid #d4af37';
+        chip.style.color = '#fff';
+    } else {
+        chip.style.background = 'rgba(255,255,255,0.04)';
+        chip.style.border = '1px solid var(--border-color)';
+        chip.style.color = 'var(--text-muted)';
+    }
+}
+window.toggleVicardTierChip = toggleVicardTierChip;
+
+function toggleVicardTierChipStyle(cb) {
+    const chip = cb.closest('.vicard-tier-checkbox-chip') || cb.closest('label');
+    if (!chip) return;
+    if (cb.checked) {
+        chip.style.background = 'rgba(212,175,55,0.22)';
+        chip.style.border = '1.5px solid #d4af37';
+        chip.style.color = '#fff';
+    } else {
+        chip.style.background = 'rgba(255,255,255,0.04)';
+        chip.style.border = '1px solid var(--border-color)';
+        chip.style.color = 'var(--text-muted)';
+    }
+}
+window.toggleVicardTierChipStyle = toggleVicardTierChipStyle;
+
 function renderVicardTiersManager() {
     const container = document.getElementById('vicard-tiers-table-container');
     if (!container) return;
 
-    const tiers = Object.values(getVicardTiers()).sort((a, b) => (a.minSpend || 0) - (b.minSpend || 0));
+    const tiers = Object.values(getVicardTiers()).sort((a, b) => (b.rank || 0) - (a.rank || 0));
 
     container.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 10px;">
@@ -37132,7 +37565,10 @@ function renderVicardTiersManager() {
                             ${t.icon || '🏅'}
                         </div>
                         <div>
-                            <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-main);">${escapeHtml(t.name)}</div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-main);">${escapeHtml(t.name)}</div>
+                                <span style="background: rgba(212,175,55,0.2); color: #f5d77f; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 800; border: 1px solid rgba(212,175,55,0.35);">Rank ${t.rank || 1}</span>
+                            </div>
                             <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
                                 <span style="color: #d4af37; font-weight: 700;">Min Spend: SAR ${t.minSpend || 0}</span> • <span>${escapeHtml(t.perks || 'VIP Perks')}</span>
                             </div>
@@ -37148,6 +37584,21 @@ function renderVicardTiersManager() {
     `;
 }
 window.renderVicardTiersManager = renderVicardTiersManager;
+
+function populateVicardTierSelects() {
+    const tierSelect = document.getElementById('vicard-cust-tier');
+    if (!tierSelect) return;
+
+    const currentVal = tierSelect.value;
+    const tiers = Object.values(getVicardTiers()).sort((a, b) => (b.rank || 0) - (a.rank || 0));
+
+    tierSelect.innerHTML = tiers.map(t => `
+        <option value="${escapeHtml(t.name)}" ${currentVal === t.name || (!currentVal && (t.id === 'black' || t.name.includes('Black'))) ? 'selected' : ''}>
+            ${t.icon || '🏅'} ${escapeHtml(t.name)} (Rank ${t.rank || 1} • SAR ${t.minSpend ? t.minSpend + '+' : '0'})
+        </option>
+    `).join('');
+}
+window.populateVicardTierSelects = populateVicardTierSelects;
 
 function openVicardTiersModal() {
     const modal = document.getElementById('vicard-tiers-modal');
@@ -37171,6 +37622,7 @@ function openVicardTierEditModal(tierId) {
     const titleEl = document.getElementById('vicard-tier-edit-title');
     const origIdInput = document.getElementById('vicard-tier-edit-orig-id');
     const idInput = document.getElementById('vicard-tier-id-input');
+    const rankInput = document.getElementById('vicard-tier-rank-input');
     const nameInput = document.getElementById('vicard-tier-name-input');
     const iconInput = document.getElementById('vicard-tier-icon-input');
     const minSpendInput = document.getElementById('vicard-tier-minspend-input');
@@ -37186,6 +37638,7 @@ function openVicardTierEditModal(tierId) {
             idInput.value = tierId;
             idInput.disabled = true;
         }
+        if (rankInput) rankInput.value = t.rank !== undefined ? t.rank : getTierRank(tierId);
         if (nameInput) nameInput.value = t.name || '';
         if (iconInput) iconInput.value = t.icon || '🏅';
         if (minSpendInput) minSpendInput.value = t.minSpend !== undefined ? t.minSpend : 0;
@@ -37198,6 +37651,8 @@ function openVicardTierEditModal(tierId) {
             idInput.value = '';
             idInput.disabled = false;
         }
+        const maxRank = Math.max(...Object.values(getVicardTiers()).map(t => t.rank || 0), 0);
+        if (rankInput) rankInput.value = maxRank + 1;
         if (nameInput) nameInput.value = '';
         if (iconInput) iconInput.value = '🏅';
         if (minSpendInput) minSpendInput.value = 0;
@@ -37227,6 +37682,7 @@ function saveVicardTier(e) {
         return;
     }
 
+    const rank = parseInt(document.getElementById('vicard-tier-rank-input')?.value, 10) || 1;
     const name = (document.getElementById('vicard-tier-name-input')?.value || '').trim();
     const icon = (document.getElementById('vicard-tier-icon-input')?.value || '').trim() || '🏅';
     const minSpend = parseFloat(document.getElementById('vicard-tier-minspend-input')?.value) || 0;
@@ -37236,6 +37692,7 @@ function saveVicardTier(e) {
     vicardData.tiers = { ...getVicardTiers() };
     vicardData.tiers[tierId] = {
         id: tierId,
+        rank: rank,
         name: name || tierId,
         icon: icon,
         minSpend: minSpend,
@@ -37249,16 +37706,19 @@ function saveVicardTier(e) {
             .then(() => {
                 closeVicardTierEditModal();
                 renderVicardTiersManager();
+                populateVicardTierSelects();
                 if (currentVicardSubTab === 'customer') renderCustomerWebsite();
             })
             .catch(err => {
                 console.error('Error saving tier:', err);
                 closeVicardTierEditModal();
                 renderVicardTiersManager();
+                populateVicardTierSelects();
             });
     } else {
         closeVicardTierEditModal();
         renderVicardTiersManager();
+        populateVicardTierSelects();
     }
 }
 window.saveVicardTier = saveVicardTier;
@@ -37274,6 +37734,7 @@ function deleteVicardTier(tierId) {
     }
 
     renderVicardTiersManager();
+    populateVicardTierSelects();
     if (currentVicardSubTab === 'customer') renderCustomerWebsite();
 }
 window.deleteVicardTier = deleteVicardTier;
@@ -37314,39 +37775,131 @@ function filterVicardCategory(cat) {
     }
     const custOverlay = document.getElementById('vicard-customer-portal-overlay');
     if (custOverlay && custOverlay.style.display === 'block') {
-        const params = new URLSearchParams(window.location.search);
-        const cardId = params.get('vicard');
-        if (cardId) openVicardCustomerPortal(cardId);
+        if (window._currentActiveCustomerCard) {
+            renderAuthorizedCustomerPortal(window._currentActiveCustomerCard);
+        }
     }
 }
 window.filterVicardCategory = filterVicardCategory;
 
+// --- TOAST NOTIFICATION FOR MOBILE NAVIGATION & APP GUARD ---
+function showVicardPortalToast(msg, duration = 2200) {
+    let toast = document.getElementById('vicard-portal-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'vicard-portal-toast';
+        toast.className = 'vicard-portal-toast';
+        document.body.appendChild(toast);
+    }
+    toast.innerHTML = msg;
+    toast.classList.add('show');
+
+    if (window._vicardToastTimeout) clearTimeout(window._vicardToastTimeout);
+    window._vicardToastTimeout = setTimeout(() => {
+        toast.classList.remove('show');
+    }, duration);
+}
+window.showVicardPortalToast = showVicardPortalToast;
+
+// Dynamic Exit / Back Button updater in the Customer Portal top bar
+function updateVicardPortalExitButton() {
+    const btn = document.getElementById('vicard-portal-top-exit-btn');
+    if (!btn) return;
+    if (activeWebsiteRestId) {
+        btn.style.display = 'inline-flex';
+        btn.innerHTML = '← Main Offers';
+        btn.title = 'Back to All Restaurant Offers';
+        btn.style.background = 'rgba(212,175,55,0.18)';
+        btn.style.borderColor = 'rgba(212,175,55,0.45)';
+        btn.style.color = '#f5d77f';
+    } else {
+        // User requested: "exit button in the early menu is useless since there is no where to ecxit since i am already in the main page so remove it"
+        btn.style.display = 'none';
+    }
+}
+window.updateVicardPortalExitButton = updateVicardPortalExitButton;
+
+// Handle clicking the Exit ✖ / Main Offers button
+function handleVicardPortalExitButtonClick() {
+    const modal = document.getElementById('vicard-redeem-modal');
+    if (modal && modal.style.display === 'flex') {
+        closeVicardRedeemModal(true);
+    }
+
+    // 1. If currently inside a restaurant menu/storefront:
+    // Automatically take customer back to the main page of the offers on first click!
+    if (activeWebsiteRestId) {
+        viewAllRestaurantsOnWebsite(false);
+        return;
+    }
+
+    // 2. If already on the main page of the offers:
+    // Reset search query, reset category filter to all, and scroll smoothly to top
+    vicardSearchQuery = '';
+    vicardActiveCategory = 'all';
+    const searchInput = document.getElementById('vicard-site-search');
+    if (searchInput) searchInput.value = '';
+
+    if (window._currentActiveCustomerCard) {
+        renderAuthorizedCustomerPortal(window._currentActiveCustomerCard);
+    }
+
+    const overlay = document.getElementById('vicard-customer-portal-overlay');
+    if (overlay) {
+        overlay.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    showVicardPortalToast('🍽️ Main Offers Directory • All Partners');
+}
+window.handleVicardPortalExitButtonClick = handleVicardPortalExitButtonClick;
+
 // --- PROFESSIONAL CUSTOMER WEBSITE VIEW (HUNGERSTATION / KEETA ELITE THEME) ---
-function previewRestaurantOnCustomerSite(restId) {
+function previewRestaurantOnCustomerSite(restId, fromHistory) {
     activeWebsiteRestId = restId;
-    if (currentVicardSubTab === 'customer') {
-        renderCustomerWebsite();
+    if (!fromHistory) {
+        try {
+            history.pushState({ vicardApp: true, vicardView: 'restaurant', restId: restId }, document.title);
+        } catch (e) {}
     }
     const custOverlay = document.getElementById('vicard-customer-portal-overlay');
     if (custOverlay && custOverlay.style.display === 'block') {
-        const params = new URLSearchParams(window.location.search);
-        const cardId = params.get('vicard');
-        if (cardId) openVicardCustomerPortal(cardId);
+        if (window._currentActiveCustomerCard) {
+            renderAuthorizedCustomerPortal(window._currentActiveCustomerCard);
+        }
+        custOverlay.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+        // Switch from Manager Hub to Customer View to immediately display the preview!
+        switchNfcSubTab('customer');
+        renderCustomerWebsite();
+        const container = document.getElementById('nfc-customer-website-content');
+        if (container) {
+            container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     }
+    updateVicardPortalExitButton();
 }
 window.previewRestaurantOnCustomerSite = previewRestaurantOnCustomerSite;
 
-function viewAllRestaurantsOnWebsite() {
+function viewAllRestaurantsOnWebsite(fromHistory) {
     activeWebsiteRestId = null;
+    if (!fromHistory) {
+        try {
+            if (history.state && history.state.vicardView === 'restaurant') {
+                history.replaceState({ vicardApp: true, vicardView: 'directory' }, document.title);
+            }
+        } catch (e) {}
+    }
     if (currentVicardSubTab === 'customer') {
         renderCustomerWebsite();
     }
     const custOverlay = document.getElementById('vicard-customer-portal-overlay');
     if (custOverlay && custOverlay.style.display === 'block') {
-        const params = new URLSearchParams(window.location.search);
-        const cardId = params.get('vicard');
-        if (cardId) openVicardCustomerPortal(cardId);
+        if (window._currentActiveCustomerCard) {
+            renderAuthorizedCustomerPortal(window._currentActiveCustomerCard);
+        }
+        custOverlay.scrollTo({ top: 0, behavior: 'smooth' });
     }
+    updateVicardPortalExitButton();
 }
 window.viewAllRestaurantsOnWebsite = viewAllRestaurantsOnWebsite;
 
@@ -37456,10 +38009,14 @@ function generateRestaurantsDirectoryWebsiteHtml(rests, card) {
         const featuredDealTitle = featuredDeal ? featuredDeal.name : (r.offers && r.offers[0] ? r.offers[0].title : 'Exclusive VIP Member Privileges');
         const featuredDealSub = featuredDeal && featuredDeal.offerPrice ? `VIP Price: SAR ${featuredDeal.offerPrice} ${featuredDeal.originalPrice ? '(was SAR ' + featuredDeal.originalPrice + ')' : ''}` : 'Show pass at checkout';
 
+        const tierCheck = checkTierEligibility(card ? card.tier : null, r.eligibleTiers);
+        const isTierLocked = !tierCheck.eligible;
+        const isNotAvailableRightNow = isTierLocked && tierCheck.isLowestRankUnchecked;
+
         const coverSrc = r.cover || (r.name.toLowerCase().includes('burger') ? 'burgeroov_cover.jpg' : (r.name.toLowerCase().includes('fresh') ? 'mvcfresh_cover.jpg' : (r.name.toLowerCase().includes('meat') ? 'mvcmeat_cover.jpg' : 'burgeroov_cover.jpg')));
 
         return `
-            <div class="keeta-card" onclick="previewRestaurantOnCustomerSite('${r.id}')">
+            <div class="keeta-card" onclick="previewRestaurantOnCustomerSite('${r.id}')" style="${isTierLocked ? 'position: relative;' : ''}">
                 <!-- Cover Image Container (16:9 ratio) -->
                 <div class="keeta-card-media">
                     <img src="${coverSrc}" class="keeta-card-img" alt="${escapeHtml(r.name)}" onerror="this.src='burgeroov_cover.jpg'">
@@ -37467,13 +38024,19 @@ function generateRestaurantsDirectoryWebsiteHtml(rests, card) {
 
                     <!-- Overlaid Badges (Hungerstation / Keeta style) -->
                     <div class="keeta-badge-top-left">
-                        <span class="keeta-promo-badge">🔥 ${escapeHtml(topDiscount)} with VICard</span>
+                        ${isNotAvailableRightNow
+                            ? `<span class="keeta-promo-badge" style="background: rgba(235, 77, 75, 0.95); border: 1px solid #eb4d4b; color: #fff;">Not Available Right Now</span>`
+                            : (isTierLocked
+                                ? `<span class="keeta-promo-badge" style="background: rgba(235, 77, 75, 0.9); border: 1px solid #eb4d4b; color: #fff;">Requires ${tierCheck.requiredTierNames.join(' or ')}</span>`
+                                : (r.eligibleTiers && r.eligibleTiers.length > 0
+                                    ? `<span class="keeta-promo-badge" style="background: linear-gradient(135deg, rgba(212,175,55,0.4), rgba(212,175,55,0.15)); border: 1px solid #d4af37; color: #f5d77f;">👑 VIP Unlocked</span>`
+                                    : `<span class="keeta-promo-badge">🔥 ${escapeHtml(topDiscount)} with VICard</span>`))}
                     </div>
                     <div class="keeta-badge-top-right">
                         <span class="keeta-rating-badge">⭐ ${r.rating || '4.9'} <span class="keeta-reviews-count">(${r.reviews || '350+'})</span></span>
                     </div>
                     <div class="keeta-badge-bottom-left">
-                        <span class="keeta-info-chip">📍 ${escapeHtml(r.location || 'Riyadh')} • ${r.distance || '1-3 km'}</span>
+                        <span class="keeta-info-chip">📍 ${escapeHtml(r.location || 'Riyadh')}</span>
                     </div>
                     <div class="keeta-badge-bottom-right">
                         <span class="keeta-verified-chip">🛡️ Verified Partner</span>
@@ -37513,9 +38076,9 @@ function generateRestaurantsDirectoryWebsiteHtml(rests, card) {
                         <div class="keeta-units-count">
                             <span>🍽️</span> <strong>${units.length}</strong> Exclusive Deals Available
                         </div>
-                        <button type="button" class="keeta-view-btn">
-                            <span>View Menu</span>
-                            <span class="keeta-arrow">➔</span>
+                        <button type="button" class="keeta-view-btn ${isNotAvailableRightNow ? 'unavailable' : (isTierLocked ? 'locked' : '')}" ${isTierLocked ? 'style="background: rgba(235, 77, 75, 0.15); color: #fca5a5; border: 1px solid rgba(235, 77, 75, 0.35);"' : ''}>
+                            <span>${isNotAvailableRightNow ? 'Not Available' : (isTierLocked ? `${tierCheck.requiredTierNames[0] || 'VIP'} Only` : 'View Menu')}</span>
+                            ${(!isNotAvailableRightNow && !isTierLocked) ? '<span class="keeta-arrow">➔</span>' : ''}
                         </button>
                     </div>
                 </div>
@@ -37628,6 +38191,10 @@ function generateRestaurantsDirectoryWebsiteHtml(rests, card) {
 // Restaurant Menu Website HTML (Keeta / Hungerstation Storefront View)
 function generateRestaurantMenuWebsiteHtml(restaurant, card) {
     const isActive = card && card.status === 'active';
+    const tierCheck = checkTierEligibility(card ? card.tier : null, restaurant.eligibleTiers);
+    const isTierLocked = !tierCheck.eligible;
+    const isNotAvailableRightNow = isTierLocked && tierCheck.isLowestRankUnchecked;
+
     const units = Array.isArray(restaurant.units) && restaurant.units.length > 0
         ? restaurant.units
         : (Array.isArray(restaurant.offers) ? restaurant.offers.map(off => ({
@@ -37669,7 +38236,7 @@ function generateRestaurantMenuWebsiteHtml(restaurant, card) {
                             <span class="keeta-storefront-badge">🛡️ Official VIP Partner</span>
                         </div>
                         <div class="keeta-storefront-meta">
-                            <span>⭐ ${restaurant.rating || '4.9'} (${restaurant.reviews || '350+'} reviews)</span>
+                            <span>⭐ ${restaurant.rating || '4.9'} (${restaurant.reviews ? (restaurant.reviews.includes('review') ? restaurant.reviews : restaurant.reviews + (restaurant.reviews.endsWith('+') ? ' reviews' : ' reviews')) : '350+ reviews'})</span>
                             <span>•</span>
                             <span>${escapeHtml(restaurant.category || 'Gourmet Dining')}</span>
                             ${restaurant.location ? `<span>•</span><span>📍 ${escapeHtml(restaurant.location)}</span>` : ''}
@@ -37677,6 +38244,30 @@ function generateRestaurantMenuWebsiteHtml(restaurant, card) {
                     </div>
                 </div>
             </div>
+
+            <!-- Locked Tier Banner if Customer Rank is insufficient -->
+            ${isNotAvailableRightNow ? `
+                <div style="margin: 16px 20px 0; padding: 16px 20px; border-radius: 16px; background: rgba(235,77,75,0.16); border: 1.5px solid rgba(235,77,75,0.45); color: #fff; display: flex; align-items: center; gap: 14px; box-shadow: 0 8px 24px rgba(235,77,75,0.15);">
+                    <div>
+                        <h3 style="margin: 0 0 4px 0; font-size: 1.05rem; font-weight: 800; color: #fca5a5;">This restaurant is not available right now</h3>
+                        <div style="font-size: 0.85rem; color: #cbd5e0; line-height: 1.4;">هذا المطعم غير متاح حالياً لعضويتك. Offers and menu discounts for ${escapeHtml(restaurant.name)} are currently not available for your membership tier.</div>
+                    </div>
+                </div>
+            ` : (isTierLocked ? `
+                <div style="margin: 16px 20px 0; padding: 14px 18px; border-radius: 14px; background: rgba(235,77,75,0.12); border: 1.5px solid rgba(235,77,75,0.4); color: #fca5a5; font-size: 0.88rem; display: flex; align-items: center; gap: 12px;">
+                    <div>
+                        <strong style="color: #fff; font-size: 0.95rem;">Exclusive Partner Tier Requirement</strong>
+                        <div style="margin-top: 3px; line-height: 1.4;">This partner's offers require <strong>${tierCheck.requiredTierNames.join(' or ')}</strong> (Rank ${tierCheck.minRequiredRank}+). Your card has <strong>${card ? card.tier : 'None'}</strong> (Rank ${tierCheck.customerRank}). All higher tiers automatically unlock lower-tier offers!</div>
+                    </div>
+                </div>
+            ` : (restaurant.eligibleTiers && restaurant.eligibleTiers.length > 0 ? `
+                <div style="margin: 16px 20px 0; padding: 12px 18px; border-radius: 14px; background: rgba(212,175,55,0.1); border: 1.5px solid rgba(212,175,55,0.35); color: #f5d77f; font-size: 0.88rem; display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 1.4rem;">👑</span>
+                    <div>
+                        <strong style="color: #fff;">VIP Privilege Unlocked:</strong> Your tier (<strong>${card ? card.tier : 'VIP'}</strong>) meets the requirement for ${escapeHtml(restaurant.name)}!
+                    </div>
+                </div>
+            ` : ''))}
 
             <!-- Keeta-Style Menu Dishes List (Horizontal Cards) -->
             <div class="keeta-dishes-section">
@@ -37716,12 +38307,12 @@ function generateRestaurantMenuWebsiteHtml(restaurant, card) {
                                     </div>
 
                                     <div class="keeta-dish-visual">
-                                        <div class="keeta-dish-img-wrap">
+                                        <div class="keeta-dish-img-wrap" onclick="event.stopPropagation(); openVicardImageLightbox('${dishImg}', '${escapeHtml(u.name)}')" title="🔍 Click to zoom photo" style="cursor: zoom-in;">
                                             <img src="${dishImg}" class="keeta-dish-img" alt="${escapeHtml(u.name)}" onerror="this.src='burgeroov_cover.jpg'">
                                         </div>
-                                        <button type="button" class="keeta-dish-redeem-btn" onclick="event.stopPropagation(); handleApplyUnitOffer('${safeCardId}', '${safeRestId}', '${safeUnitId}')">
-                                            <span>Get Offer</span>
-                                            <span class="keeta-btn-plus">+</span>
+                                        <button type="button" class="keeta-dish-redeem-btn ${isNotAvailableRightNow ? 'unavailable' : (isTierLocked ? 'locked' : '')}" onclick="event.stopPropagation(); handleApplyUnitOffer('${safeCardId}', '${safeRestId}', '${safeUnitId}')">
+                                            <span>${isNotAvailableRightNow ? 'Not Available' : (isTierLocked ? 'Locked' : 'Get Offer')}</span>
+                                            ${(!isNotAvailableRightNow && !isTierLocked) ? '<span class="keeta-btn-plus">+</span>' : ''}
                                         </button>
                                     </div>
                                 </div>
@@ -37732,6 +38323,36 @@ function generateRestaurantMenuWebsiteHtml(restaurant, card) {
             </div>
         </div>
     `;
+}
+
+// --- FULL-SCREEN DISH & RESTAURANT IMAGE LIGHTBOX ZOOM MODAL ---
+function openVicardImageLightbox(imgUrl, title) {
+    if (!imgUrl) return;
+    const modal = document.getElementById('vicard-image-lightbox-modal');
+    const img = document.getElementById('vicard-lightbox-img');
+    const caption = document.getElementById('vicard-lightbox-caption');
+    if (!modal || !img) return;
+
+    img.src = imgUrl;
+    if (caption) caption.textContent = title || '';
+    modal.style.display = 'flex';
+}
+window.openVicardImageLightbox = openVicardImageLightbox;
+
+function closeVicardImageLightbox() {
+    const modal = document.getElementById('vicard-image-lightbox-modal');
+    if (modal) modal.style.display = 'none';
+}
+window.closeVicardImageLightbox = closeVicardImageLightbox;
+
+if (typeof window !== 'undefined' && !window._vicardEscListenerAttached) {
+    window._vicardEscListenerAttached = true;
+    window.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeVicardImageLightbox();
+            closeVicardRedeemModal();
+        }
+    });
 }
 
 // --- APPLY OFFER & GENERATE VERIFICATION QR CODE ---
@@ -37798,6 +38419,17 @@ function handleApplyUnitOffer(cardId, restId, unitId) {
     // Check card status
     if (card && card.status && card.status !== 'active') {
         showVicardDeactivatedAlert(card || { id: cardId, name: 'Cardholder' });
+        return;
+    }
+
+    // Check tier eligibility! Higher tier gets all lower tier offers!
+    const tierCheck = checkTierEligibility(card ? card.tier : null, rest ? rest.eligibleTiers : null);
+    if (!tierCheck.eligible) {
+        if (tierCheck.isLowestRankUnchecked) {
+            alert(`🚫 This restaurant is not available right now.\n\nهذا المطعم غير متاح حالياً.\n\nExclusive offers and discounts at ${rest ? rest.name : 'this restaurant'} are currently not available for your membership tier (${card ? card.tier : 'Member'}).`);
+        } else {
+            alert(`🔒 Exclusive VIP Partner Offer!\n\nOffers at ${rest ? rest.name : 'this restaurant'} are reserved for ${tierCheck.requiredTierNames.join(' or ')} members and higher (Rank ${tierCheck.minRequiredRank}+).\n\nYour current card tier: ${card ? card.tier : 'None'} (Rank ${tierCheck.customerRank}).\n\nPlease upgrade your membership to unlock this exclusive dining offer!`);
+        }
         return;
     }
 
@@ -37884,32 +38516,162 @@ function openVicardUnitQrModal(card, rest, unit) {
     }, 1000);
 
     modal.style.display = 'flex';
+    // Push history state so phone back button goes 1 page behind (closes modal instead of app)
+    try {
+        history.pushState({ vicardApp: true, vicardView: 'redeem_modal' }, document.title);
+    } catch (e) {}
 }
 window.openVicardUnitQrModal = openVicardUnitQrModal;
 
-function closeVicardRedeemModal() {
+var _vicardIsClosingRedeemModal = false;
+
+function closeVicardRedeemModal(fromHistory) {
     const modal = document.getElementById('vicard-redeem-modal');
     if (modal) modal.style.display = 'none';
     if (_vicardRedeemTimerInterval) {
         clearInterval(_vicardRedeemTimerInterval);
         _vicardRedeemTimerInterval = null;
     }
+    // If closed via button click, pop history entry to keep phone back button synchronized
+    // Mark _vicardIsClosingRedeemModal so popstate stays right on the restaurant page!
+    if (!fromHistory) {
+        try {
+            if (history.state && history.state.vicardView === 'redeem_modal') {
+                _vicardIsClosingRedeemModal = true;
+                history.back();
+            }
+        } catch (e) {}
+    }
 }
 window.closeVicardRedeemModal = closeVicardRedeemModal;
+
+// --- PHONE HARDWARE / BROWSER BACK BUTTON NAVIGATION ENGINE ---
+var _vicardLastBackPressTime = 0;
+var _vicardHistoryInitialized = false;
+
+function initVicardHistoryNavigation() {
+    if (typeof window === 'undefined' || window._vicardHistoryListenerAttached) return;
+    window._vicardHistoryListenerAttached = true;
+
+    window.addEventListener('popstate', function(e) {
+        // If popstate was triggered by closeVicardRedeemModal, ignore it so customer stays on restaurant page!
+        if (_vicardIsClosingRedeemModal) {
+            _vicardIsClosingRedeemModal = false;
+            return;
+        }
+
+        const custOverlay = document.getElementById('vicard-customer-portal-overlay');
+        const isOverlayOpen = custOverlay && custOverlay.style.display === 'block';
+
+        if (!isOverlayOpen) return;
+
+        const modal = document.getElementById('vicard-redeem-modal');
+        const isModalOpen = modal && modal.style.display === 'flex';
+
+        // 1. If QR redemption pass modal is open -> Close modal and stay on the restaurant menu!
+        if (isModalOpen) {
+            closeVicardRedeemModal(true);
+            return;
+        }
+
+        // 2. If customer is viewing a restaurant menu -> Go back 1 page behind to the Main Page of Offers!
+        if (activeWebsiteRestId) {
+            viewAllRestaurantsOnWebsite(true);
+            return;
+        }
+
+        // 3. If already on the Main Page of Offers -> Guard against suddenly closing the app on phone!
+        const now = Date.now();
+        if (now - _vicardLastBackPressTime < 2500) {
+            // Second back press within 2.5s allows exit
+            _vicardLastBackPressTime = 0;
+            if (typeof currentUser !== 'undefined' && currentUser) {
+                closeVicardCustomerPortal();
+            } else {
+                document.documentElement.classList.remove('vicard-standalone-view');
+                if (custOverlay) custOverlay.style.display = 'none';
+            }
+        } else {
+            // First back press on main directory: prevent sudden app exit & notify customer
+            _vicardLastBackPressTime = now;
+            try {
+                history.pushState({ vicardApp: true, vicardView: 'directory' }, document.title);
+            } catch (err) {}
+            showVicardPortalToast('Press back again to exit • اضغط رجوع مرة أخرى للخروج', 2400);
+        }
+    });
+}
+window.initVicardHistoryNavigation = initVicardHistoryNavigation;
 
 // --- CASHIER VERIFICATION OVERLAY & LOGGING ---
 function checkVicardUrlParams() {
     const params = new URLSearchParams(window.location.search);
     const verifyCardId = params.get('verify_vicard');
-    const customerCardId = params.get('vicard');
+    let customerCardId = params.get('vicard');
+    let key = params.get('key');
+
+    if (!customerCardId && !verifyCardId) {
+        // Check for active session (e.g. after address bar was cleaned or on page refresh)
+        try {
+            const sess = sessionStorage.getItem('vicard_active_session');
+            if (sess) {
+                const parsed = JSON.parse(sess);
+                if (parsed && parsed.cardId) {
+                    customerCardId = parsed.cardId;
+                    key = parsed.key;
+                }
+            }
+        } catch (e) {}
+    }
 
     if (verifyCardId) {
         openVicardCashierScreen(verifyCardId, params.get('rest'), params.get('unit'));
     } else if (customerCardId) {
-        openVicardCustomerPortal(customerCardId);
+        openVicardCustomerPortal(customerCardId, key);
     }
 }
 window.checkVicardUrlParams = checkVicardUrlParams;
+
+// Reusable 3D Floating & Spinning VICard Loading Component
+function getVicard3DCardLoadingHtml(title, subtitle, arabicSubtitle) {
+    const displayTitle = title || 'Authenticating VIP Membership...';
+    const displaySub = subtitle || 'Connecting to encrypted VICard network';
+    const displayAr = arabicSubtitle || 'جاري استدعاء وتأكيد بطاقة العضوية المشفرة...';
+
+    return `
+        <div class="vicard-loading-screen-wrap">
+            <!-- 3D Floating & Spinning Card Scene -->
+            <div class="vicard-3d-scene">
+                <div class="vicard-3d-float">
+                    <div class="vicard-3d-card-rotator">
+                        <div class="vicard-3d-face front">
+                            <div class="vicard-3d-glare"></div>
+                        </div>
+                        <div class="vicard-3d-face back">
+                            <div class="vicard-3d-glare"></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Dynamic Levitation Shadow & Ambient Glow -->
+                <div class="vicard-3d-shadow"></div>
+            </div>
+
+            <!-- Loading Indicator & Details Positioned Under the Card -->
+            <div class="vicard-loading-status-box">
+                <div class="vicard-loading-laser-track">
+                    <div class="vicard-loading-laser-bar"></div>
+                </div>
+                <h2 class="vicard-loading-title">${escapeHtml(displayTitle)}</h2>
+                <div class="vicard-loading-desc">
+                    <span class="vicard-loading-beacon"></span>
+                    <span>${escapeHtml(displaySub)}</span>
+                </div>
+                <div class="vicard-loading-arabic">${escapeHtml(displayAr)}</div>
+            </div>
+        </div>
+    `;
+}
+window.getVicard3DCardLoadingHtml = getVicard3DCardLoadingHtml;
 
 function openVicardCashierScreen(cardId, restId, unitId) {
     document.documentElement.classList.add('vicard-ready');
@@ -37947,16 +38709,15 @@ function renderVicardCashierScreen(cardId, card, restId, unitId) {
         const found = rest.units.find(u => u.id === unitId || u.name === unitId);
         if (found) unitName = found.name;
     }
+    const restTierCheck = card && rest ? checkTierEligibility(card.tier, rest.eligibleTiers) : { eligible: true };
 
     if (!card) {
         if (!_vicardDataLoaded) {
-            overlay.innerHTML = `
-                <div style="max-width:480px; margin:60px auto; padding:20px; direction:ltr; text-align:center;">
-                    <div style="font-size:3.5rem; margin-bottom:14px; animation:vicardRadarPulse 1.8s infinite;">🛡️</div>
-                    <h2 style="color:#f5d77f; font-size:1.4rem; font-weight:900; margin:0 0 8px 0;">Verifying VICard...</h2>
-                    <p style="color:#a0aec0; font-size:0.9rem; margin:0;">Connecting to VICard Secure Network</p>
-                </div>
-            `;
+            overlay.innerHTML = getVicard3DCardLoadingHtml(
+                'Verifying VICard Pass...',
+                'Connecting to cashier verification system',
+                'جاري التحقق من صلاحية البطاقة من النظام المعتمد...'
+            );
             return;
         }
         overlay.innerHTML = `
@@ -38023,8 +38784,17 @@ function renderVicardCashierScreen(cardId, card, restId, unitId) {
                 <div style="background:rgba(0,0,0,0.4); border:1px solid rgba(46,213,115,0.3); border-radius:14px; padding:14px; margin:16px 0;">
                     <div style="font-size:1.25rem; font-weight:900; color:#fff;">${escapeHtml(card.name)}</div>
                     <div style="font-family:monospace; font-size:1rem; font-weight:800; color:#f5d77f; margin-top:2px;">${card.id}</div>
+                    <div style="font-size:0.85rem; color:#d4af37; font-weight:700; margin-top:4px;">🏅 Tier: ${escapeHtml(card.tier || 'Black VIP')} (Rank ${getTierRank(card.tier)})</div>
                     ${card.phone ? `<div style="font-size:0.85rem; color:#a0aec0; margin-top:4px;">📞 ${escapeHtml(card.phone)}</div>` : ''}
                 </div>
+
+                ${!restTierCheck.eligible ? `
+                    <div style="background:rgba(235,77,75,0.18); border:1.5px solid #eb4d4b; border-radius:12px; padding:10px 14px; margin:14px 0; color:#fca5a5; font-size:0.85rem; line-height:1.4;">
+                        ${restTierCheck.isLowestRankUnchecked
+                            ? `🚫 <strong>Restaurant Not Available Right Now:</strong> هذا المطعم غير متاح حالياً لهذا المستوى. Offers for this restaurant are currently not available for ${card.tier || 'this'} tier.`
+                            : `⚠️ <strong>Tier Warning:</strong> This partner requires <strong>${restTierCheck.requiredTierNames.join(' or ')}</strong> (Rank ${restTierCheck.minRequiredRank}+). Customer has <strong>${card.tier || 'None'}</strong> (Rank ${restTierCheck.customerRank}).`}
+                    </div>
+                ` : ''}
 
                 <!-- Selected Unit / Deal Badge -->
                 <div style="background:rgba(212,175,55,0.12); border:1px solid rgba(212,175,55,0.3); border-radius:12px; padding:10px 14px; display:inline-block; font-size:0.9rem; color:#f5d77f; font-weight:800;">
@@ -38108,8 +38878,10 @@ function confirmVicardCashierVisit(cardId) {
 }
 window.confirmVicardCashierVisit = confirmVicardCashierVisit;
 
-// --- CUSTOMER DIRECT PORTAL (WHEN SCANNING NFC WITH PHONE: ?vicard=VIC-XXXX) ---
-function openVicardCustomerPortal(cardId) {
+// --- CUSTOMER DIRECT PORTAL (WHEN SCANNING NFC WITH PHONE: ?vicard=VIC-XXXX&key=...) ---
+var _currentActiveCustomerCard = null;
+
+function openVicardCustomerPortal(cardId, providedKey) {
     document.documentElement.classList.add('vicard-ready');
     const splash = document.getElementById('vicard-splash-screen');
     if (splash) {
@@ -38123,15 +38895,186 @@ function openVicardCustomerPortal(cardId) {
 
     overlay.style.display = 'block';
 
-    const card = vicardData.cards[cardId] || {
-        id: cardId,
-        name: 'VICard Member',
-        phone: '',
-        tier: 'Black VIP',
-        status: 'active',
-        visitsCount: 0,
-        totalSavings: 0
-    };
+    const urlParams = new URLSearchParams(window.location.search);
+    const key = providedKey || urlParams.get('key');
+
+    // If Firebase data hasn't arrived yet, show 3D spinning/floating card loading animation and remember access
+    if (!_vicardDataLoaded) {
+        window._pendingVicardAccess = { cardId: cardId, key: key };
+        content.innerHTML = getVicard3DCardLoadingHtml(
+            'Authenticating VIP Membership...',
+            'Connecting to encrypted VICard network',
+            'جاري استدعاء وتأكيد بطاقة العضوية المشفرة...'
+        );
+        return;
+    }
+
+    const card = vicardData.cards[cardId];
+
+    // Card does not exist in the database!
+    if (!card) {
+        if (window.location.search) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+        content.innerHTML = `
+            <div style="min-height:75vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:32px 20px; font-family:'Outfit',-apple-system,sans-serif;">
+                <div style="background:linear-gradient(135deg, rgba(26,26,36,0.95), rgba(13,13,18,0.95)); border:1px solid rgba(235,77,75,0.4); border-radius:24px; padding:36px 24px; max-width:420px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.8); box-sizing:border-box;">
+                    <div style="width:68px; height:68px; border-radius:50%; background:rgba(235,77,75,0.15); border:2px solid #eb4d4b; display:flex; align-items:center; justify-content:center; font-size:2rem; margin:0 auto 18px;">
+                        ❌
+                    </div>
+                    <h2 style="color:#eb4d4b; font-size:1.3rem; font-weight:800; margin:0 0 8px 0;">Card Not Found</h2>
+                    <p style="color:#cbd5e0; font-size:0.85rem; margin:0 0 20px 0;">The requested VICard ID <strong style="color:#f5d77f; font-family:monospace;">${escapeHtml(cardId)}</strong> is not registered.</p>
+                    <button type="button" onclick="closeVicardCustomerPortal()" style="padding:10px 24px; border-radius:12px; background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); cursor:pointer; font-weight:700;">
+                        Close
+                    </button>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    // Auto-ensure card has secret key
+    if (!card.secretKey) {
+        card.secretKey = generateVicardSecretKey();
+        db.ref(`vicard_network/cards/${cardId}/secretKey`).set(card.secretKey).catch(() => {});
+    }
+
+    // 1. KEY IN URL: Automatically authenticate successfully!
+    if (key && card.secretKey && key === card.secretKey) {
+        window._currentActiveCustomerCard = card;
+        if (window.location.search) {
+            window.history.replaceState({ vicard: cardId }, document.title, window.location.pathname);
+        }
+        renderAuthorizedCustomerPortal(card);
+        return;
+    }
+
+    // 2. Active interaction session (e.g. clicking categories or menu items within the currently verified view)
+    if (window._currentActiveCustomerCard && window._currentActiveCustomerCard.id === cardId) {
+        renderAuthorizedCustomerPortal(card);
+        return;
+    }
+
+    // 3. KEY IS NOT THERE: ALWAYS ask for phone number, in every single time!
+    renderPhoneVerificationScreen(card);
+}
+window.openVicardCustomerPortal = openVicardCustomerPortal;
+
+function renderPhoneVerificationScreen(card) {
+    const content = document.getElementById('vicard-portal-content');
+    if (!content) return;
+
+    content.innerHTML = `
+        <div style="min-height:75vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:32px 16px; font-family:'Outfit',-apple-system,sans-serif;">
+            <div style="background:linear-gradient(135deg, rgba(26,26,36,0.98), rgba(13,13,18,0.98)); border:1px solid rgba(212,175,55,0.4); border-radius:24px; padding:36px 24px; max-width:440px; width:100%; box-shadow:0 25px 70px rgba(0,0,0,0.85); box-sizing:border-box;">
+                <div style="width:72px; height:72px; border-radius:50%; background:linear-gradient(135deg, rgba(212,175,55,0.2), rgba(212,175,55,0.05)); border:2px solid #d4af37; display:flex; align-items:center; justify-content:center; font-size:2.2rem; margin:0 auto 16px; box-shadow:0 0 25px rgba(212,175,55,0.3);">
+                    📱
+                </div>
+                <h2 style="color:#fff; font-size:1.35rem; font-weight:800; margin:0 0 4px 0;">Cardholder Phone Verification</h2>
+                <div style="color:#f5d77f; font-size:0.88rem; font-weight:700; margin-bottom:14px;">التحقق من رقم الجوال</div>
+                
+                <p style="color:#a0aec0; font-size:0.85rem; line-height:1.5; margin:0 0 8px 0;">
+                    Please enter the phone number registered with this VICard (or the last 4 digits) to open your card:
+                </p>
+                <p style="color:#718096; font-size:0.8rem; line-height:1.5; margin:0 0 20px 0; direction:rtl;">
+                    يرجى إدخال رقم الجوال المسجل للبطاقة (أو آخر 4 أرقام) لفتح حسابك:
+                </p>
+
+                ${card.phone ? `
+                <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(212,175,55,0.25); border-radius:16px; padding:18px 16px; margin-bottom:20px; text-align:center;">
+                    <div style="margin-bottom:12px;">
+                        <input type="tel" id="vicard-phone-verify-input" placeholder="e.g. 05XXXXXXXX or last 4 digits" dir="ltr"
+                            style="width:100%; text-align:center; padding:12px 14px; font-size:1.15rem; font-family:monospace; font-weight:700; border-radius:12px; border:1px solid rgba(212,175,55,0.4); background:rgba(0,0,0,0.6); color:#fff; outline:none; box-sizing:border-box;"
+                            onkeyup="if (event.key === 'Enter') unlockVicardWithPhone('${escapeHtml(card.id)}')">
+                    </div>
+                    <div id="vicard-phone-verify-error" style="display:none; color:#eb4d4b; font-size:0.82rem; font-weight:600; margin-bottom:12px;"></div>
+                    <button type="button" onclick="unlockVicardWithPhone('${escapeHtml(card.id)}')"
+                        style="width:100%; padding:12px; border-radius:12px; font-weight:800; font-size:0.95rem; background:linear-gradient(135deg, #d4af37, #aa771c); color:#000; border:none; cursor:pointer; box-shadow:0 4px 15px rgba(212,175,55,0.3); transition:opacity 0.2s;">
+                        Verify & Open Card
+                    </button>
+                </div>
+                ` : `
+                <div style="background:rgba(235,77,75,0.08); border:1px solid rgba(235,77,75,0.3); border-radius:14px; padding:16px; margin-bottom:20px; color:#fca5a5; font-size:0.85rem;">
+                    ⚠️ No phone number is registered for this card. Please tap your physical NFC card with secure key.
+                </div>
+                `}
+
+                <button type="button" onclick="closeVicardCustomerPortal()"
+                    style="padding:10px 24px; border-radius:12px; background:rgba(255,255,255,0.08); color:#a0aec0; border:1px solid rgba(255,255,255,0.15); cursor:pointer; font-size:0.85rem; font-weight:600;">
+                    ✖ Exit
+                </button>
+            </div>
+        </div>
+    `;
+    setTimeout(() => {
+        const inp = document.getElementById('vicard-phone-verify-input');
+        if (inp) inp.focus();
+    }, 100);
+}
+window.renderPhoneVerificationScreen = renderPhoneVerificationScreen;
+
+function unlockVicardWithPhone(cardId) {
+    const input = document.getElementById('vicard-phone-verify-input');
+    const errEl = document.getElementById('vicard-phone-verify-error');
+    if (!input || !cardId) return;
+
+    const entered = input.value.trim();
+    if (!entered) {
+        if (errEl) {
+            errEl.textContent = 'Please enter your phone number or last 4 digits.';
+            errEl.style.display = 'block';
+        }
+        input.focus();
+        return;
+    }
+
+    const card = vicardData.cards[cardId];
+    if (!card || !card.phone) {
+        if (errEl) {
+            errEl.textContent = 'No phone number registered for this card.';
+            errEl.style.display = 'block';
+        }
+        return;
+    }
+
+    const cleanEntered = String(entered).replace(/\D/g, '');
+    const cleanPhone = String(card.phone).replace(/\D/g, '');
+
+    const normEntered = cleanEntered.replace(/^0+/, '').replace(/^966/, '');
+    const normPhone = cleanPhone.replace(/^0+/, '').replace(/^966/, '');
+
+    const isFullMatch = normEntered.length >= 6 && (normPhone === normEntered || normPhone.endsWith(normEntered) || normEntered.endsWith(normPhone));
+    const isLast4Match = cleanEntered.length === 4 && cleanPhone.endsWith(cleanEntered);
+
+    if (isFullMatch || isLast4Match) {
+        // Success: Verified by phone!
+        // Stored only for this active view session (no permanent bypass in localStorage)
+        // so that reopening without the key will ask for phone number again every single time!
+        window._currentActiveCustomerCard = card;
+        content.innerHTML = getVicard3DCardLoadingHtml(
+            'Unlocking VIP Card...',
+            'Decryption handshake verified successfully',
+            'تم تأكيد رقم الجوال بنجاح، جاري فتح الحساب...'
+        );
+        setTimeout(() => {
+            renderAuthorizedCustomerPortal(card);
+        }, 500);
+    } else {
+        if (errEl) {
+            errEl.textContent = 'Incorrect phone number. Please check and try again.';
+            errEl.style.display = 'block';
+        }
+        input.focus();
+        input.select();
+    }
+}
+window.unlockVicardWithPhone = unlockVicardWithPhone;
+
+function renderAuthorizedCustomerPortal(card) {
+    const content = document.getElementById('vicard-portal-content');
+    if (!content) return;
+
+    window._currentActiveCustomerCard = card;
 
     let rests = Object.values(vicardData.restaurants || {}).filter(r => r.active !== false);
     if (rests.length === 0) {
@@ -38217,20 +39160,38 @@ function openVicardCustomerPortal(cardId) {
         ];
     }
 
+    initVicardHistoryNavigation();
+    if (!_vicardHistoryInitialized) {
+        _vicardHistoryInitialized = true;
+        try {
+            history.replaceState({ vicardApp: true, vicardView: 'root' }, document.title);
+            history.pushState({ vicardApp: true, vicardView: 'directory' }, document.title);
+        } catch (e) {}
+    }
+
     if (activeWebsiteRestId && (vicardData.restaurants[activeWebsiteRestId] || rests.find(r => r.id === activeWebsiteRestId))) {
         const targetRest = vicardData.restaurants[activeWebsiteRestId] || rests.find(r => r.id === activeWebsiteRestId);
         content.innerHTML = generateRestaurantMenuWebsiteHtml(targetRest, card);
     } else {
         content.innerHTML = generateRestaurantsDirectoryWebsiteHtml(rests, card);
     }
+    updateVicardPortalExitButton();
 }
-window.openVicardCustomerPortal = openVicardCustomerPortal;
+window.renderAuthorizedCustomerPortal = renderAuthorizedCustomerPortal;
 
 function closeVicardCustomerPortal() {
     const overlay = document.getElementById('vicard-customer-portal-overlay');
     if (overlay) overlay.style.display = 'none';
+    window._currentActiveCustomerCard = null;
+    window._activeVicardSession = null;
+    window._pendingVicardAccess = null;
     const cleanUrl = window.location.pathname;
     window.history.replaceState({}, document.title, cleanUrl);
+    if (typeof currentUser === 'undefined' || !currentUser) {
+        const authOv = document.getElementById('auth-overlay');
+        if (authOv) authOv.style.display = 'flex';
+        document.documentElement.classList.remove('vicard-standalone-view');
+    }
 }
 window.closeVicardCustomerPortal = closeVicardCustomerPortal;
 
@@ -38238,8 +39199,13 @@ function updateActiveVicardOverlays() {
     const custOverlay = document.getElementById('vicard-customer-portal-overlay');
     if (custOverlay && custOverlay.style.display === 'block') {
         const params = new URLSearchParams(window.location.search);
-        const cardId = params.get('vicard');
-        if (cardId) openVicardCustomerPortal(cardId);
+        let cardId = params.get('vicard');
+        let key = params.get('key');
+        if (cardId) {
+            openVicardCustomerPortal(cardId, key);
+        } else if (window._currentActiveCustomerCard) {
+            renderAuthorizedCustomerPortal(window._currentActiveCustomerCard);
+        }
     }
     const cashierOverlay = document.getElementById('vicard-cashier-overlay');
     if (cashierOverlay && cashierOverlay.style.display === 'block') {
@@ -38267,7 +39233,8 @@ function escapeHtml(str) {
 if (typeof window !== 'undefined') {
     const initVicardUrlHandler = () => {
         const p = new URLSearchParams(window.location.search);
-        if (p.has('vicard') || p.has('verify_vicard')) {
+        const hasSession = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('vicard_active_session');
+        if (p.has('vicard') || p.has('verify_vicard') || hasSession) {
             document.documentElement.classList.add('vicard-standalone-view');
             const authOv = document.getElementById('auth-overlay');
             if (authOv) authOv.style.display = 'none';
@@ -38278,8 +39245,12 @@ if (typeof window !== 'undefined') {
         }
     };
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initVicardUrlHandler);
+        document.addEventListener('DOMContentLoaded', () => {
+            initVicardUrlHandler();
+            populateVicardTierSelects();
+        });
     } else {
         initVicardUrlHandler();
+        populateVicardTierSelects();
     }
 }

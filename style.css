@@ -5704,6 +5704,40 @@ mark.search-highlight,
     box-shadow: 0 6px 18px rgba(212, 175, 55, 0.4);
 }
 
+.keeta-view-btn.unavailable {
+    background: rgba(235, 77, 75, 0.16) !important;
+    color: #fca5a5 !important;
+    border: 1px solid rgba(235, 77, 75, 0.35) !important;
+    box-shadow: none !important;
+    cursor: not-allowed !important;
+    font-size: 0.76rem !important;
+    padding: 7px 12px !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+}
+
+.keeta-view-btn.unavailable:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.keeta-view-btn.locked {
+    background: rgba(235, 77, 75, 0.16) !important;
+    color: #fca5a5 !important;
+    border: 1px solid rgba(235, 77, 75, 0.35) !important;
+    box-shadow: none !important;
+    cursor: not-allowed !important;
+    font-size: 0.76rem !important;
+    padding: 7px 12px !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+}
+
+.keeta-view-btn.locked:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
 /* ========================================================
    KEETA / HUNGERSTATION RESTAURANT MENU VIEW
    ======================================================== */
@@ -6044,6 +6078,53 @@ mark.search-highlight,
 .keeta-dish-redeem-btn:hover {
     transform: scale(1.03);
     box-shadow: 0 6px 14px rgba(212, 175, 55, 0.4);
+}
+
+.keeta-dish-redeem-btn.unavailable {
+    background: rgba(235, 77, 75, 0.16) !important;
+    color: #fca5a5 !important;
+    border: 1px solid rgba(235, 77, 75, 0.35) !important;
+    box-shadow: none !important;
+    cursor: not-allowed !important;
+    font-size: 0.72rem !important;
+    padding: 6px 4px !important;
+    white-space: nowrap !important;
+    width: 100% !important;
+    max-width: 100px !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    letter-spacing: -0.2px;
+}
+
+.keeta-dish-redeem-btn.unavailable:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.keeta-dish-redeem-btn.locked {
+    background: rgba(235, 77, 75, 0.16) !important;
+    color: #fca5a5 !important;
+    border: 1px solid rgba(235, 77, 75, 0.35) !important;
+    box-shadow: none !important;
+    cursor: not-allowed !important;
+    font-size: 0.74rem !important;
+    padding: 6px 4px !important;
+    white-space: nowrap !important;
+    width: 100% !important;
+    max-width: 100px !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+}
+
+.keeta-dish-redeem-btn.locked:hover {
+    transform: none !important;
+    box-shadow: none !important;
 }
 
 .keeta-btn-plus {
@@ -6543,8 +6624,8 @@ html.vicard-standalone-view.vicard-ready #vicard-splash-screen,
 /* PARTNER RESTAURANTS: CLEAN CARD FOOTER & ADJUSTING BUTTONS                 */
 /* ========================================================================== */
 .vicard-rest-card-footer {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr auto !important;
+    display: flex !important;
+    align-items: center !important;
     gap: 8px !important;
     margin-top: 14px !important;
     padding-top: 12px !important;
@@ -6554,8 +6635,22 @@ html.vicard-standalone-view.vicard-ready #vicard-splash-screen,
     width: 100% !important;
 }
 
-.vicard-rest-card-footer > * {
+.vicard-rest-card-footer .vicard-btn-action.view {
+    flex: 1 1 auto !important;
     min-width: 0 !important;
+}
+
+.vicard-rest-card-footer .vicard-btn-action.edit {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+}
+
+.vicard-rest-card-footer .vicard-btn-action.delete {
+    flex: 0 0 38px !important;
+    width: 38px !important;
+    min-width: 38px !important;
+    padding: 7px 0 !important;
+    justify-content: center !important;
 }
 
 .vicard-btn-action {
@@ -6610,24 +6705,573 @@ html.vicard-standalone-view.vicard-ready #vicard-splash-screen,
     transform: translateY(-1px) !important;
 }
 
-/* Executive Header and Grid Responsiveness */
+/* Executive Header and Grid Responsiveness (Phone & Tablet) */
 @media (max-width: 900px) {
     .nfc-hud-stats-grid {
         grid-template-columns: repeat(2, 1fr) !important;
     }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
+    #view-nfc {
+        padding: 0 10px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
+    }
+    .nfc-grid-responsive {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        gap: 16px !important;
+    }
+    .nfc-grid-responsive > div,
+    .nfc-grid-responsive > .card,
+    #nfc-subview-manager .card {
+        position: static !important;
+        top: auto !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        padding: 16px 12px !important;
+        border-radius: 14px !important;
+    }
+    #nfc-subview-manager {
+        padding-bottom: 120px !important; /* Ample clearance above fixed bottom navbar */
+        width: 100% !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
+    }
+    #vicard-restaurants-grid {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        gap: 14px !important;
+    }
+    #vicard-restaurants-grid .card {
+        width: 100% !important;
+        box-sizing: border-box !important;
+        padding: 16px 12px !important;
+    }
     .vicard-rest-card-footer {
-        grid-template-columns: 1fr 1fr !important;
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 8px !important;
+        padding-top: 10px !important;
+        margin-top: 12px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
-    .vicard-btn-action.delete {
-        grid-column: 1 / -1 !important;
+    .vicard-rest-card-footer .vicard-btn-action.view {
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
     }
-    .nfc-hud-stats-grid {
-        grid-template-columns: 1fr !important;
+    .vicard-rest-card-footer .vicard-btn-action.edit {
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+    }
+    .vicard-rest-card-footer .vicard-btn-action.delete {
+        flex: 0 0 38px !important;
+        width: 38px !important;
+        min-width: 38px !important;
+        height: 38px !important;
+        padding: 7px 0 !important;
+        justify-content: center !important;
+    }
+    .vicard-btn-action {
+        font-size: 0.78rem !important;
+        padding: 8px 6px !important;
+    }
+    .keeta-card-footer {
+        gap: 8px !important;
+        flex-wrap: nowrap !important;
+    }
+    .keeta-units-count {
+        font-size: 0.72rem !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        min-width: 0 !important;
+        flex: 1 1 auto !important;
+    }
+    .keeta-view-btn {
+        font-size: 0.76rem !important;
+        padding: 7px 10px !important;
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
     }
 }
 
+@media (max-width: 480px) {
+    .nfc-hud-stats-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 8px !important;
+    }
+}
 
+/* ========================================================================== */
+/* DISH & RESTAURANT IMAGE LIGHTBOX ZOOM MODAL                                */
+/* ========================================================================== */
+.vicard-lightbox-overlay {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(0, 0, 0, 0.92) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+    z-index: 200000000 !important;
+    display: none;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 20px !important;
+    box-sizing: border-box !important;
+    animation: vicardFadeIn 0.22s ease-out !important;
+}
 
+.vicard-lightbox-box {
+    position: relative !important;
+    max-width: 90vw !important;
+    max-height: 90vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    animation: vicardZoomIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.vicard-lightbox-close {
+    position: absolute !important;
+    top: -16px !important;
+    right: -16px !important;
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 50% !important;
+    background: linear-gradient(135deg, #eb4d4b, #c0392b) !important;
+    border: 2px solid #ffffff !important;
+    color: #ffffff !important;
+    font-size: 1.25rem !important;
+    font-weight: 900 !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7), 0 0 15px rgba(235, 77, 75, 0.5) !important;
+    z-index: 20 !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.vicard-lightbox-close:hover {
+    transform: scale(1.1) rotate(90deg) !important;
+}
+
+.vicard-lightbox-img-wrap {
+    border-radius: 20px !important;
+    overflow: hidden !important;
+    border: 2px solid rgba(212, 175, 55, 0.5) !important;
+    box-shadow: 0 25px 70px rgba(0, 0, 0, 0.95), 0 0 35px rgba(212, 175, 55, 0.2) !important;
+    background: #08080c !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    max-height: 76vh !important;
+}
+
+#vicard-lightbox-img {
+    max-width: 86vw !important;
+    max-height: 72vh !important;
+    object-fit: contain !important;
+    display: block !important;
+    border-radius: 18px !important;
+    cursor: zoom-out !important;
+}
+
+.vicard-lightbox-caption {
+    margin-top: 14px !important;
+    font-size: 1.1rem !important;
+    font-weight: 800 !important;
+    color: #f5d77f !important;
+    text-align: center !important;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9) !important;
+    font-family: 'Outfit', -apple-system, sans-serif !important;
+    max-width: 80vw !important;
+}
+
+@keyframes vicardZoomIn {
+    from {
+        opacity: 0;
+        transform: scale(0.85);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* ========================================================================== */
+/* ADVANCED 3D FLOATING & SPINNING VICARD VIP LOADING SCREEN                  */
+/* ========================================================================== */
+
+.vicard-loading-screen-wrap {
+    min-height: 75vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 30px 16px;
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    user-select: none;
+    box-sizing: border-box;
+}
+
+/* 3D Perspective Scene Container */
+.vicard-3d-scene {
+    perspective: 1200px;
+    width: 290px;
+    height: 182px;
+    position: relative;
+    margin: 0 auto 36px auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@media (max-width: 480px) {
+    .vicard-3d-scene {
+        width: 250px;
+        height: 157px;
+    }
+}
+
+/* Floating / Levitation Wrapper */
+.vicard-3d-float {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    animation: vicard3DFloat 3.6s ease-in-out infinite;
+    transform-style: preserve-3d;
+}
+
+@keyframes vicard3DFloat {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-16px);
+    }
+}
+
+/* 3D Spinning Card Flipping Container */
+.vicard-3d-card-rotator {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    animation: vicard3DSpin 7s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+    will-change: transform;
+}
+
+@keyframes vicard3DSpin {
+    0% {
+        transform: rotateX(8deg) rotateY(0deg) rotateZ(-2deg);
+    }
+    50% {
+        transform: rotateX(4deg) rotateY(180deg) rotateZ(2deg);
+    }
+    100% {
+        transform: rotateX(8deg) rotateY(360deg) rotateZ(-2deg);
+    }
+}
+
+/* Card Faces (Front & Back) */
+.vicard-3d-face {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 16px;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    border: 1.5px solid rgba(212, 175, 55, 0.5);
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.85), 0 0 35px rgba(212, 175, 55, 0.25);
+    overflow: hidden;
+}
+
+.vicard-3d-face.front {
+    background-image: url('front_card.png');
+    z-index: 2;
+}
+
+.vicard-3d-face.back {
+    background-image: url('back_card.jpg');
+    transform: rotateY(180deg);
+    z-index: 1;
+}
+
+/* Dynamic Holographic Glare / Light Reflection */
+.vicard-3d-glare {
+    position: absolute;
+    top: -50%;
+    left: -120%;
+    width: 80%;
+    height: 200%;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.15) 35%,
+        rgba(212, 175, 55, 0.35) 50%,
+        rgba(255, 255, 255, 0.15) 65%,
+        transparent 100%
+    );
+    transform: rotate(25deg);
+    pointer-events: none;
+    animation: vicardHoloSweep 3.5s infinite ease-in-out;
+}
+
+@keyframes vicardHoloSweep {
+    0% { left: -120%; }
+    100% { left: 160%; }
+}
+
+/* Levitation Shadow & Ambient Aura */
+.vicard-3d-shadow {
+    position: absolute;
+    bottom: -32px;
+    left: 10%;
+    width: 80%;
+    height: 24px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(212, 175, 55, 0.35) 0%, rgba(0, 0, 0, 0.85) 50%, transparent 75%);
+    filter: blur(12px);
+    pointer-events: none;
+    animation: vicardShadowBreathe 3.6s ease-in-out infinite;
+}
+
+@keyframes vicardShadowBreathe {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 0.8;
+        filter: blur(10px);
+    }
+    50% {
+        transform: scale(0.72);
+        opacity: 0.35;
+        filter: blur(18px);
+    }
+}
+
+/* Loading Elements Under the 3D Card */
+.vicard-loading-status-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 440px;
+    width: 100%;
+}
+
+.vicard-loading-laser-track {
+    width: 220px;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+    margin-bottom: 18px;
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.2);
+}
+
+.vicard-loading-laser-bar {
+    position: absolute;
+    top: 0;
+    left: -40%;
+    width: 40%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, #ffd700, #fff, #ffd700, transparent);
+    box-shadow: 0 0 12px #ffd700;
+    animation: vicardLaserMove 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes vicardLaserMove {
+    0% { left: -40%; }
+    100% { left: 100%; }
+}
+
+.vicard-loading-title {
+    font-size: 1.35rem;
+    font-weight: 800;
+    margin: 0 0 8px 0;
+    background: linear-gradient(135deg, #ffffff 0%, #f5d77f 50%, #d4af37 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 0.5px;
+}
+
+.vicard-loading-desc {
+    color: #a0aec0;
+    font-size: 0.88rem;
+    margin: 0 0 6px 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.vicard-loading-beacon {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #2ed573;
+    box-shadow: 0 0 10px #2ed573;
+    animation: vicardBeaconPulse 1.4s infinite;
+}
+
+@keyframes vicardBeaconPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.4); opacity: 0.5; }
+}
+
+.vicard-loading-arabic {
+    color: #718096;
+    font-size: 0.8rem;
+    margin-top: 4px;
+    direction: rtl;
+}
+
+/* ========================================================================== */
+/* CUSTOMER TABLE HUD BADGE & PILL STYLING                                    */
+/* ========================================================================== */
+
+.vicard-hud-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 175px;
+    white-space: nowrap;
+}
+
+.vicard-hud-id-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Space Grotesk', -apple-system, monospace;
+    font-weight: 800;
+    font-size: 0.95rem;
+    letter-spacing: 0.5px;
+    color: #ffffff;
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.22) 0%, rgba(20, 20, 30, 0.6) 100%);
+    padding: 4px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(212, 175, 55, 0.45);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    width: fit-content;
+}
+
+.vicard-hud-id-badge .chip-icon {
+    font-size: 0.85rem;
+}
+
+.vicard-hud-tier-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: rgba(15, 17, 26, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    width: fit-content;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.vicard-hud-tier-name {
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+}
+
+.vicard-hud-rank-pill {
+    font-size: 0.68rem;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(212, 175, 55, 0.15);
+    color: #f5d77f;
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+/* Glassmorphism Exit Button */
+.vicard-overlay-exit-btn {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    color: #cbd5e0 !important;
+    border-radius: 20px !important;
+    padding: 6px 16px !important;
+    font-size: 0.82rem !important;
+    cursor: pointer !important;
+    font-weight: 600 !important;
+    backdrop-filter: blur(8px) !important;
+    transition: all 0.2s ease !important;
+}
+
+.vicard-overlay-exit-btn:hover {
+    background: rgba(255, 255, 255, 0.16) !important;
+    color: #fff !important;
+    border-color: rgba(212, 175, 55, 0.5) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Mobile Portal Feedback Toast */
+.vicard-portal-toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: linear-gradient(135deg, rgba(20, 20, 30, 0.96), rgba(10, 10, 18, 0.96));
+    border: 1px solid rgba(212, 175, 55, 0.5);
+    color: #f5d77f;
+    padding: 10px 22px;
+    border-radius: 25px;
+    font-size: 0.86rem;
+    font-weight: 700;
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85), 0 0 20px rgba(212, 175, 55, 0.25);
+    z-index: 100000002;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.vicard-portal-toast.show {
+    opacity: 1 !important;
+    transform: translateX(-50%) translateY(0) !important;
+}
+
+/* Ensure VICard modals fit on all PC and laptop viewports without pressing F11 */
+#vicard-restaurant-modal .modal-content,
+#vicard-unit-modal .modal-content {
+    max-height: 86vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+#vicard-restaurant-modal form,
+#vicard-unit-modal form {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+}
