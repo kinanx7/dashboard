@@ -2646,21 +2646,21 @@ function generateRestaurantMenuWebsiteHtml(restaurant, card) {
 
             <!-- Locked Tier Banner if Customer Rank is insufficient -->
             ${isNotAvailableRightNow ? `
-                <div style="margin: 16px 20px 0; padding: 16px 20px; border-radius: 16px; background: rgba(235,77,75,0.16); border: 1.5px solid rgba(235,77,75,0.45); color: #fff; display: flex; align-items: center; gap: 14px; box-shadow: 0 8px 24px rgba(235,77,75,0.15);">
+                <div class="vicard-tier-banner-msg" style="margin: 16px 20px 0; padding: 16px 20px; border-radius: 16px; background: rgba(235,77,75,0.16); border: 1.5px solid rgba(235,77,75,0.45); color: #fff; display: flex; align-items: center; gap: 14px; box-shadow: 0 8px 24px rgba(235,77,75,0.15);">
                     <div>
                         <h3 style="margin: 0 0 4px 0; font-size: 1.05rem; font-weight: 800; color: #fca5a5;">This restaurant is not available right now</h3>
                         <div style="font-size: 0.85rem; color: #cbd5e0; line-height: 1.4;">هذا المطعم غير متاح حالياً لعضويتك. Offers and menu discounts for ${escapeHtml(restaurant.name)} are currently not available for your membership tier.</div>
                     </div>
                 </div>
             ` : (isTierLocked ? `
-                <div style="margin: 16px 20px 0; padding: 14px 18px; border-radius: 14px; background: rgba(235,77,75,0.12); border: 1.5px solid rgba(235,77,75,0.4); color: #fca5a5; font-size: 0.88rem; display: flex; align-items: center; gap: 12px;">
+                <div class="vicard-tier-banner-msg" style="margin: 16px 20px 0; padding: 14px 18px; border-radius: 14px; background: rgba(235,77,75,0.12); border: 1.5px solid rgba(235,77,75,0.4); color: #fca5a5; font-size: 0.88rem; display: flex; align-items: center; gap: 12px;">
                     <div>
                         <strong style="color: #fff; font-size: 0.95rem;">Exclusive Partner Tier Requirement</strong>
                         <div style="margin-top: 3px; line-height: 1.4;">This partner's offers require <strong>${tierCheck.requiredTierNames.join(' or ')}</strong> (Rank ${tierCheck.minRequiredRank}+). Your card has <strong>${card ? card.tier : 'None'}</strong> (Rank ${tierCheck.customerRank}). All higher tiers automatically unlock lower-tier offers!</div>
                     </div>
                 </div>
             ` : (restaurant.eligibleTiers && restaurant.eligibleTiers.length > 0 ? `
-                <div style="margin: 16px 20px 0; padding: 12px 18px; border-radius: 14px; background: rgba(212,175,55,0.1); border: 1.5px solid rgba(212,175,55,0.35); color: #f5d77f; font-size: 0.88rem; display: flex; align-items: center; gap: 10px;">
+                <div class="vicard-tier-banner-msg" style="margin: 16px 20px 0; padding: 12px 18px; border-radius: 14px; background: rgba(212,175,55,0.1); border: 1.5px solid rgba(212,175,55,0.35); color: #f5d77f; font-size: 0.88rem; display: flex; align-items: center; gap: 10px;">
                     <span style="font-size: 1.4rem;">👑</span>
                     <div>
                         <strong style="color: #fff;">VIP Privilege Unlocked:</strong> Your tier (<strong>${card ? card.tier : 'VIP'}</strong>) meets the requirement for ${escapeHtml(restaurant.name)}!

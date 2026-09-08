@@ -1,18 +1,19 @@
 /**
- * VICard 12-Inch Tablet Responsive Layout & Style Controller (js/style.js)
- * Optimized for iPad Pro 12.9" / 11", Samsung Galaxy Tab S8+/S9+ 12.4", Surface Pro
- * Viewports: 769px - 1280px (Landscape & Portrait)
+ * VICard Tablet Responsive Layout & Style Controller (js/style.js)
+ * Optimized for Samsung Galaxy Tab S9+ / S8+ (12.4"), iPad Pro 12.9" / 11", Surface Pro
+ * Viewports: up to 1400px (Landscape & Portrait)
  */
 
 (function () {
     'use strict';
 
     const VICARD_TABLET_CONFIG = {
-        minWidth: 769,
-        maxWidth: 1280,
+        minWidth: 320,
+        maxWidth: 1400,
         breakpoints: {
+            mobileMax: 768,
             tabletPortraitMax: 960,
-            tabletLandscapeMax: 1280
+            tabletLandscapeMax: 1400
         },
         banner: {
             portraitHeight: 260,
@@ -22,88 +23,123 @@
     };
 
     /**
-     * Checks if current viewport matches tablet specifications
+     * Checks if current viewport matches tablet/touch specifications (<= 1400px)
      */
     function isVicardTabletViewport() {
-        const width = window.innerWidth;
-        return width >= VICARD_TABLET_CONFIG.minWidth && width <= VICARD_TABLET_CONFIG.maxWidth;
+        return window.innerWidth <= VICARD_TABLET_CONFIG.maxWidth;
     }
 
     /**
-     * Applies dynamic layout adjustments for 12-inch tablet devices
+     * Applies dynamic layout adjustments for tablet devices
      * Eliminates horizontal scrolling, side empty areas, and improper grids.
      */
     function applyVicardTabletLayout() {
         const isTablet = isVicardTabletViewport();
-        const isPortrait = window.innerWidth <= VICARD_TABLET_CONFIG.breakpoints.tabletPortraitMax;
 
-        // Prevent body and document sideways scrolling on tablet
+        // 1. Prevent body and document sideways scrolling on tablet & mobile
         if (isTablet) {
             document.documentElement.style.overflowX = 'hidden';
             document.body.style.overflowX = 'hidden';
             document.documentElement.style.maxWidth = '100%';
             document.body.style.maxWidth = '100%';
-        }
 
-        // 1. Enforce Full-Width Single Column on #view-nfc
-        const viewNfc = document.getElementById('view-nfc');
-        if (viewNfc) {
-            if (isTablet) {
-                viewNfc.style.display = 'block';
-                viewNfc.style.gridTemplateColumns = '1fr';
-                viewNfc.style.maxWidth = '100%';
-                viewNfc.style.width = '100%';
-                viewNfc.style.padding = '0 16px 40px 16px';
-                viewNfc.style.margin = '0 auto';
-                viewNfc.style.boxSizing = 'border-box';
-                viewNfc.style.overflowX = 'hidden';
-            } else if (window.innerWidth <= 768) {
-                viewNfc.style.display = 'block';
-                viewNfc.style.maxWidth = '100%';
-                viewNfc.style.padding = '0 10px 40px 10px';
-            } else {
-                viewNfc.style.maxWidth = '1550px';
+            const appWrapper = document.getElementById('app-wrapper');
+            if (appWrapper) {
+                appWrapper.style.width = '100%';
+                appWrapper.style.maxWidth = '100%';
+                appWrapper.style.overflowX = 'hidden';
+                appWrapper.style.boxSizing = 'border-box';
             }
         }
 
-        // 2. Adjust NFC Manager Grid (.nfc-grid-responsive)
+        // 2. Department Tabs Bar: Natural Multi-Line Wrapping (No horizontal cutoff)
+        const tabsContainer = document.getElementById('department-tabs-container');
+        if (tabsContainer) {
+            tabsContainer.style.display = 'flex';
+            tabsContainer.style.flexWrap = 'wrap';
+            tabsContainer.style.overflowX = 'visible';
+            tabsContainer.style.overflowY = 'visible';
+            tabsContainer.style.width = '100%';
+            tabsContainer.style.boxSizing = 'border-box';
+            tabsContainer.style.justifyContent = 'center';
+            tabsContainer.style.gap = '8px';
+        }
+
+        // 3. View Section Width Container
+        const viewNfc = document.getElementById('view-nfc');
+        if (viewNfc) {
+            if (window.innerWidth <= 768) {
+                viewNfc.style.maxWidth = '100%';
+                viewNfc.style.width = '100%';
+                viewNfc.style.padding = '0 10px 40px 10px';
+                viewNfc.style.boxSizing = 'border-box';
+                viewNfc.style.overflowX = 'hidden';
+            } else {
+                viewNfc.style.maxWidth = '1550px';
+                viewNfc.style.width = '100%';
+                viewNfc.style.padding = '0 20px 40px 20px';
+                viewNfc.style.display = '';
+                viewNfc.style.gridTemplateColumns = '1fr';
+            }
+        }
+
+        // 4. NFC Manager Grid: 2 Columns on PC (360px 1fr), Stacked on Mobile
         const nfcGrid = document.querySelector('.nfc-grid-responsive');
         if (nfcGrid) {
-            if (isTablet) {
+            if (window.innerWidth <= 768) {
+                nfcGrid.style.display = 'flex';
+                nfcGrid.style.flexDirection = 'column';
+                nfcGrid.style.gap = '16px';
                 nfcGrid.style.width = '100%';
                 nfcGrid.style.maxWidth = '100%';
                 nfcGrid.style.boxSizing = 'border-box';
-                if (isPortrait) {
-                    nfcGrid.style.display = 'flex';
-                    nfcGrid.style.flexDirection = 'column';
-                    nfcGrid.style.gap = '20px';
-                } else {
-                    nfcGrid.style.display = 'grid';
-                    nfcGrid.style.gridTemplateColumns = '310px minmax(0, 1fr)';
-                    nfcGrid.style.gap = '18px';
+
+                const firstCard = nfcGrid.querySelector('.card:first-child');
+                if (firstCard) {
+                    firstCard.style.position = 'relative';
+                    firstCard.style.top = 'auto';
+                    firstCard.style.width = '100%';
+                    firstCard.style.boxSizing = 'border-box';
                 }
-            } else if (window.innerWidth <= 768) {
-                nfcGrid.style.display = 'flex';
-                nfcGrid.style.flexDirection = 'column';
             } else {
                 nfcGrid.style.display = 'grid';
                 nfcGrid.style.gridTemplateColumns = '360px 1fr';
                 nfcGrid.style.gap = '24px';
+                nfcGrid.style.width = '100%';
+                nfcGrid.style.boxSizing = 'border-box';
             }
         }
 
-        // 3. Prevent Table Container Side Blowout in Manager Hub
+        // 5. Partner Restaurants Grid: Generous Card Width
+        const restsGrid = document.getElementById('vicard-restaurants-grid');
+        if (restsGrid && isTablet) {
+            restsGrid.style.display = 'grid';
+            restsGrid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(320px, 1fr))';
+            restsGrid.style.gap = '20px';
+            restsGrid.style.width = '100%';
+            restsGrid.style.boxSizing = 'border-box';
+        }
+
+        // 6. Prevent Table Container Side Blowout in Manager Hub
         const custTableWrap = document.querySelector('#vicard-customers-table-body');
         if (custTableWrap) {
             const tableCard = custTableWrap.closest('.card');
             if (tableCard) {
+                tableCard.style.width = '100%';
                 tableCard.style.maxWidth = '100%';
                 tableCard.style.boxSizing = 'border-box';
                 tableCard.style.overflow = 'hidden';
             }
+            const tableScrollWrap = custTableWrap.closest('div[style*="overflow-x"]');
+            if (tableScrollWrap) {
+                tableScrollWrap.style.width = '100%';
+                tableScrollWrap.style.maxWidth = '100%';
+                tableScrollWrap.style.boxSizing = 'border-box';
+                tableScrollWrap.style.webkitOverflowScrolling = 'touch';
+            }
         }
 
-        // 4. Standalone Customer Portal Overlay Sizing
+        // 7. Standalone Customer Portal Overlay Sizing
         const portalOverlay = document.getElementById('vicard-customer-portal-overlay');
         if (portalOverlay) {
             portalOverlay.style.width = '100%';
@@ -114,21 +150,18 @@
             const innerWrap = portalOverlay.querySelector('div');
             if (innerWrap) {
                 if (isTablet) {
-                    innerWrap.style.maxWidth = '1060px';
+                    innerWrap.style.maxWidth = '1080px';
                     innerWrap.style.width = '100%';
                     innerWrap.style.margin = '0 auto';
                     innerWrap.style.padding = '0 12px 60px 12px';
                     innerWrap.style.boxSizing = 'border-box';
-                } else if (window.innerWidth <= 768) {
-                    innerWrap.style.maxWidth = '540px';
-                    innerWrap.style.padding = '0 0 50px 0';
                 } else {
                     innerWrap.style.maxWidth = '1180px';
                 }
             }
         }
 
-        // 5. Cashier Overlay Container Sizing
+        // 8. Cashier Overlay Container Sizing
         const cashierOverlay = document.getElementById('vicard-cashier-overlay');
         if (cashierOverlay) {
             cashierOverlay.style.width = '100%';
@@ -149,7 +182,7 @@
             }
         }
 
-        // 6. Smooth centering of active category tab
+        // 9. Smooth centering of active category tab in customer portal
         const activeTab = document.querySelector('.keeta-cat-pill.active, .keeta-category-pill.active');
         if (activeTab && activeTab.parentElement) {
             const carousel = activeTab.parentElement;
@@ -170,10 +203,8 @@
             const originalSwitchTab = window.switchTab;
             window.switchTab = function (tab) {
                 const result = originalSwitchTab.apply(this, arguments);
-                if (tab === 'nfc') {
-                    setTimeout(applyVicardTabletLayout, 10);
-                    setTimeout(applyVicardTabletLayout, 100);
-                }
+                setTimeout(applyVicardTabletLayout, 10);
+                setTimeout(applyVicardTabletLayout, 100);
                 return result;
             };
             window.switchTab.__vicardTabletHooked = true;
