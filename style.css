@@ -7840,3 +7840,420 @@ html.vicard-standalone-view > body > *:not(#vicard-customer-portal-overlay):not(
     100% { transform: translateY(-8px) scale(1.1); }
 }
 
+/* =========================================================
+   VICARD VIP CUSTOMER HEADER ACTIONS, PROFILE & INFO LIGHTBOX
+   ========================================================= */
+
+.keeta-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.keeta-header-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.18) 0%, rgba(255, 255, 255, 0.05) 100%);
+    border: 1px solid rgba(212, 175, 55, 0.45);
+    color: #f5d77f;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    transition: all 0.2s ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.keeta-header-action-btn:hover {
+    transform: translateY(-2px);
+    border-color: rgba(212, 175, 55, 0.85);
+    background: linear-gradient(135deg, rgba(212, 175, 55, 0.28) 0%, rgba(255, 255, 255, 0.12) 100%);
+    box-shadow: 0 6px 20px rgba(212, 175, 55, 0.35);
+    color: #ffffff;
+}
+
+.keeta-header-action-btn:active {
+    transform: translateY(0) scale(0.97);
+}
+
+.keeta-header-action-btn .btn-icon {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.keeta-header-action-btn .btn-text {
+    font-weight: 800;
+    line-height: 1;
+}
+
+/* Quick Subscription Days Buttons */
+.vicard-sub-add-btn {
+    transition: all 0.18s ease;
+    user-select: none;
+}
+
+.vicard-sub-add-btn:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.2);
+    box-shadow: 0 6px 16px rgba(212, 175, 55, 0.3);
+}
+
+.vicard-sub-add-btn:active {
+    transform: translateY(0);
+}
+
+/* Info Card Lightbox Animation & Styling */
+.vicard-info-lightbox-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 95vw;
+    max-height: 94vh;
+    border-radius: 22px;
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.95), 0 0 40px rgba(212, 175, 55, 0.35);
+    animation: vicardPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    background: transparent;
+}
+
+.vicard-info-lightbox-img {
+    display: block;
+    height: 92vh;
+    width: auto;
+    max-width: 95vw;
+    object-fit: contain;
+    border-radius: 22px;
+    border: 2px solid #d4af37;
+    background: #0d0d14;
+}
+
+.vicard-info-lightbox-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: rgba(14, 14, 22, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 2px solid rgba(212, 175, 55, 0.9);
+    color: #f5d77f;
+    font-size: 1.25rem;
+    font-weight: 900;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 60;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.85);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vicard-info-lightbox-close:hover {
+    transform: scale(1.12);
+    background: #d4af37;
+    color: #000;
+    border-color: #ffffff;
+    box-shadow: 0 8px 28px rgba(212, 175, 55, 0.7);
+}
+
+.vicard-info-lightbox-close:active {
+    transform: scale(0.94);
+}
+
+/* Advanced Executive VIP Profile Card Styling */
+.vicard-lux-card-identity {
+    position: relative;
+    border-radius: 20px;
+    padding: 22px 20px 18px;
+    background: radial-gradient(circle at 85% 15%, rgba(212, 175, 55, 0.15) 0%, transparent 60%),
+                linear-gradient(135deg, #181826 0%, #0d0d15 100%);
+    border: 1.5px solid rgba(212, 175, 55, 0.45);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.75), inset 0 1px 1px rgba(255, 255, 255, 0.12);
+    overflow: hidden;
+}
+
+.vicard-lux-card-identity::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+    transform: skewX(-25deg);
+    pointer-events: none;
+    animation: vicardShimmer 6s infinite ease-in-out;
+}
+
+@keyframes vicardShimmer {
+    0% { left: -100%; }
+    20%, 100% { left: 200%; }
+}
+
+/* Executive Metallic Monogram Crest */
+.vicard-lux-monogram {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #ffe58f 0%, #d4af37 40%, #8d6e1b 85%, #5a440d 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: #121218;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+    box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.6), inset 0 -2px 4px rgba(0, 0, 0, 0.5);
+    border: 1.5px solid #fff5c0;
+    flex-shrink: 0;
+    font-family: 'Cinzel', 'Georgia', serif;
+    letter-spacing: 0.5px;
+}
+
+/* Contactless EMV Smart Chip (Realistic Golden Microchip) */
+.vicard-lux-emv-chip {
+    width: 38px;
+    height: 28px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #e8c86d 0%, #caa443 50%, #9e7925 100%);
+    border: 1px solid #ffe99b;
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.4), 0 3px 8px rgba(0, 0, 0, 0.4);
+    position: relative;
+    flex-shrink: 0;
+}
+
+.vicard-lux-emv-chip::before {
+    content: '';
+    position: absolute;
+    top: 5px;
+    left: 7px;
+    right: 7px;
+    bottom: 5px;
+    border: 1px solid rgba(90, 68, 13, 0.55);
+    border-radius: 3px;
+}
+
+.vicard-lux-emv-chip::after {
+    content: '';
+    position: absolute;
+    top: 13px;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: rgba(90, 68, 13, 0.55);
+}
+
+/* Foiled Luxury Customer Name */
+.vicard-lux-name-foil {
+    font-size: 1.25rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, #ffffff 0%, #fae69e 45%, #d4af37 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+    line-height: 1.2;
+    letter-spacing: 0.4px;
+}
+
+/* Pulsating Emerald Active VIP Badge */
+.vicard-lux-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(16, 185, 129, 0.14);
+    border: 1.5px solid rgba(16, 185, 129, 0.5);
+    color: #10b981;
+    font-size: 0.75rem;
+    font-weight: 800;
+    padding: 5px 12px;
+    border-radius: 20px;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    box-shadow: 0 0 14px rgba(16, 185, 129, 0.2);
+}
+
+.vicard-lux-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 8px #10b981;
+    animation: vicardPulseDot 1.8s infinite ease-in-out;
+}
+
+@keyframes vicardPulseDot {
+    0%, 100% { transform: scale(1); opacity: 1; box-shadow: 0 0 8px #10b981; }
+    50% { transform: scale(1.35); opacity: 0.7; box-shadow: 0 0 16px #10b981; }
+}
+
+/* Tier Rank Pill in Profile */
+.vicard-lux-tier-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(212, 175, 55, 0.45);
+    border-radius: 14px;
+    padding: 6px 14px;
+    margin-top: 6px;
+    backdrop-filter: blur(8px);
+}
+
+/* Membership Tier Modal: Icon Chips & Gradient Swatches */
+.tier-icon-picker-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 6px 0;
+}
+
+.tier-icon-chip {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1.5px solid rgba(255, 255, 255, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.tier-icon-chip:hover {
+    transform: translateY(-2px) scale(1.08);
+    border-color: rgba(212, 175, 55, 0.6);
+    background: rgba(212, 175, 55, 0.15);
+}
+
+.tier-icon-chip.active {
+    background: rgba(212, 175, 55, 0.25);
+    border-color: #d4af37;
+    box-shadow: 0 0 14px rgba(212, 175, 55, 0.5), inset 0 0 6px rgba(212, 175, 55, 0.3);
+    transform: scale(1.1);
+}
+
+.tier-gradient-swatches-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    padding: 6px 0;
+}
+
+.tier-gradient-swatch {
+    height: 36px;
+    border-radius: 10px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.tier-gradient-swatch:hover {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5);
+}
+
+.tier-gradient-swatch.active {
+    border-color: #ffffff;
+    box-shadow: 0 0 16px rgba(255, 255, 255, 0.6), 0 4px 12px rgba(0, 0, 0, 0.6);
+    transform: scale(1.08);
+}
+
+.tier-gradient-swatch.active::after {
+    content: '✓';
+    color: #ffffff;
+    font-size: 0.95rem;
+    font-weight: 900;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+#vicard-profile-modal .modal-content {
+    animation: vicardPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+#vicard-edit-customer-modal .modal-content {
+    animation: vicardPopIn 0.22s ease-out forwards;
+}
+
+/* Responsive Rules for Mobile Phone View */
+@media (max-width: 640px) {
+    .keeta-header-actions {
+        gap: 6px;
+    }
+
+    .keeta-header-action-btn {
+        padding: 6px 10px;
+        font-size: 0.76rem;
+        gap: 4px;
+        border-radius: 16px;
+    }
+
+    .keeta-header-action-btn .btn-icon {
+        font-size: 0.9rem;
+    }
+
+    #vicard-info-card-modal {
+        align-items: flex-start !important;
+        justify-content: center !important;
+        padding-top: calc(18px + env(safe-area-inset-top, 0px)) !important;
+        padding-bottom: 24px !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .vicard-info-lightbox-wrap {
+        margin-top: 8px;
+        max-width: 96vw;
+        max-height: 86vh;
+    }
+
+    .vicard-info-lightbox-img {
+        height: auto;
+        max-height: 84vh;
+        width: 100%;
+        max-width: 94vw;
+    }
+
+    .vicard-info-lightbox-close {
+        top: 10px;
+        right: 10px;
+        width: 36px;
+        height: 36px;
+        font-size: 1.1rem;
+    }
+
+    .tier-gradient-swatches-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+
+    #vicard-profile-modal .modal-content {
+        max-width: 95vw;
+        border-radius: 20px;
+    }
+
+    #vicard-edit-customer-modal .modal-content {
+        max-width: 95vw;
+        border-radius: 20px;
+    }
+}
+
+
+

@@ -5405,7 +5405,7 @@
                                             <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600;">Customer</th>
                                             <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600;">Phone</th>
                                             <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600;">Status</th>
-                                            <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600;">Visits</th>
+                                            <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600;">Visits & Savings</th>
                                             <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600; text-align: center;">Toggle Activation</th>
                                             <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600; text-align: right;">Actions</th>
                                         </tr>
@@ -7523,6 +7523,96 @@
         </div>
     </div>
 
+    <!-- 1b. Edit Customer Card & Subscription Modal -->
+    <div id="vicard-edit-customer-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); justify-content:center; align-items:center; z-index:999999; padding:16px;" onclick="if (event.target === this) closeEditVicardCustomerModal();">
+        <div class="modal-content" onclick="event.stopPropagation();" style="max-width:520px; width:100%; max-height:90vh; display:flex; flex-direction:column; border-radius:24px; padding:0; background:linear-gradient(135deg, #181824, #0f0f16); border:1px solid rgba(212,175,55,0.4); box-shadow:0 25px 70px rgba(0,0,0,0.9); color:#fff; overflow:hidden;">
+            <!-- Header -->
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 24px; border-bottom:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.02);">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:1.4rem;">✏️</span>
+                    <div>
+                        <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:#fff;">Edit Customer & Subscription</h3>
+                        <div id="vicard-edit-cust-id-display" style="font-size:0.78rem; font-family:monospace; color:#f5d77f; margin-top:2px;">VIC-XXXX</div>
+                    </div>
+                </div>
+                <button type="button" onclick="closeEditVicardCustomerModal()" style="background:none; border:none; color:#a0aec0; font-size:1.4rem; cursor:pointer;">✖</button>
+            </div>
+
+            <!-- Form -->
+            <form id="form-vicard-edit-customer" onsubmit="handleSaveEditVicardCustomer(event)" style="display:flex; flex-direction:column; flex:1; min-height:0; margin:0;">
+                <input type="hidden" id="vicard-edit-cust-id" value="">
+                <input type="hidden" id="vicard-edit-cust-sub-end" value="">
+
+                <div style="overflow-y:auto; -webkit-overflow-scrolling:touch; padding:20px 24px; flex:1; min-height:0; display:flex; flex-direction:column; gap:16px;">
+                    <div>
+                        <label style="display:block; font-size:0.85rem; font-weight:700; margin-bottom:6px; color:#cbd5e1;">Customer Full Name *</label>
+                        <input type="text" id="vicard-edit-cust-name" required placeholder="e.g. Kinan Al-Khatib"
+                            style="width:100%; padding:10px 14px; border-radius:12px; border:1px solid rgba(212,175,55,0.3); background:rgba(0,0,0,0.5); color:#fff; font-size:0.95rem; font-weight:700; box-sizing:border-box;">
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                        <div>
+                            <label style="display:block; font-size:0.85rem; font-weight:700; margin-bottom:6px; color:#cbd5e1;">Phone Number</label>
+                            <input type="tel" id="vicard-edit-cust-phone" placeholder="e.g. 0501234567" dir="ltr"
+                                style="width:100%; padding:10px 14px; border-radius:12px; border:1px solid rgba(255,255,255,0.15); background:rgba(0,0,0,0.5); color:#fff; font-size:0.9rem; font-family:monospace; box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:0.85rem; font-weight:700; margin-bottom:6px; color:#cbd5e1;">Card Status</label>
+                            <select id="vicard-edit-cust-status"
+                                style="width:100%; padding:10px 14px; border-radius:12px; border:1px solid rgba(255,255,255,0.15); background:#1e1e2d; color:#fff; font-size:0.9rem; font-weight:700; box-sizing:border-box;">
+                                <option value="active">🟢 Active</option>
+                                <option value="deactivated">🔴 Deactivated</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="display:block; font-size:0.85rem; font-weight:700; margin-bottom:6px; color:#cbd5e1;">Card Membership Tier & Rank</label>
+                        <select id="vicard-edit-cust-tier"
+                            style="width:100%; padding:10px 14px; border-radius:12px; border:1px solid rgba(212,175,55,0.3); background:#1e1e2d; color:#f5d77f; font-size:0.9rem; font-weight:700; box-sizing:border-box;">
+                        </select>
+                    </div>
+
+                    <!-- Subscription Days & Extension -->
+                    <div style="background:rgba(212,175,55,0.06); border:1px solid rgba(212,175,55,0.25); border-radius:16px; padding:16px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span style="font-size:0.88rem; font-weight:800; color:#f5d77f;">📅 Subscription End Date</span>
+                            <span id="vicard-edit-cust-sub-end-display" style="font-size:0.88rem; font-weight:800; color:#fff;">—</span>
+                        </div>
+                        <div style="font-size:0.75rem; color:#94a3b8; margin-bottom:12px;">
+                            Click to quickly add subscription days or extend customer membership:
+                        </div>
+
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+                            <button type="button" onclick="addSubscriptionDays(30)" class="vicard-sub-add-btn" style="flex:1; min-width:80px; padding:8px 12px; border-radius:10px; font-size:0.82rem; font-weight:800; background:rgba(212,175,55,0.18); color:#f5d77f; border:1px solid rgba(212,175,55,0.45); cursor:pointer; transition:all 0.15s ease;">+30 Days</button>
+                            <button type="button" onclick="addSubscriptionDays(60)" class="vicard-sub-add-btn" style="flex:1; min-width:80px; padding:8px 12px; border-radius:10px; font-size:0.82rem; font-weight:800; background:rgba(212,175,55,0.18); color:#f5d77f; border:1px solid rgba(212,175,55,0.45); cursor:pointer; transition:all 0.15s ease;">+60 Days</button>
+                            <button type="button" onclick="addSubscriptionDays(90)" class="vicard-sub-add-btn" style="flex:1; min-width:80px; padding:8px 12px; border-radius:10px; font-size:0.82rem; font-weight:800; background:rgba(212,175,55,0.18); color:#f5d77f; border:1px solid rgba(212,175,55,0.45); cursor:pointer; transition:all 0.15s ease;">+90 Days</button>
+                            <button type="button" onclick="addSubscriptionDays(365)" class="vicard-sub-add-btn" style="flex:1; min-width:80px; padding:8px 12px; border-radius:10px; font-size:0.82rem; font-weight:800; background:rgba(46,213,115,0.18); color:#2ed573; border:1px solid rgba(46,213,115,0.4); cursor:pointer; transition:all 0.15s ease;">+1 Year</button>
+                            <button type="button" onclick="resetSubscriptionToToday()" class="vicard-sub-add-btn" style="flex:1; min-width:110px; padding:8px 12px; border-radius:10px; font-size:0.82rem; font-weight:700; background:rgba(255,255,255,0.06); color:#cbd5e1; border:1px solid rgba(255,255,255,0.15); cursor:pointer; transition:all 0.15s ease;">Reset (30d)</button>
+                        </div>
+
+                        <!-- Auto-renew checkbox -->
+                        <div style="background:rgba(0,0,0,0.4); border-radius:10px; padding:10px 12px; border:1px solid rgba(255,255,255,0.06);">
+                            <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:0.84rem; font-weight:700; color:#fff; user-select:none;">
+                                <input type="checkbox" id="vicard-edit-cust-autorenew" checked style="width:18px; height:18px; accent-color:#d4af37; cursor:pointer;">
+                                <span>Auto-renew monthly until deactivated (تجديد تلقائي شهرياً حتى الإلغاء)</span>
+                            </label>
+                            <div style="font-size:0.73rem; color:#94a3b8; margin-top:4px; margin-left:28px;">
+                                When the subscription period ends, it automatically extends by 30 days and renews the monthly discount limit unless deactivated.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div style="display:flex; justify-content:flex-end; gap:10px; padding:16px 24px; border-top:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.02);">
+                    <button type="button" onclick="closeEditVicardCustomerModal()" class="btn-neutral" style="padding:10px 20px; border-radius:12px; font-weight:700;">Cancel</button>
+                    <button type="submit" class="btn-success" style="padding:10px 26px; border-radius:12px; font-weight:800; background:linear-gradient(135deg, #d4af37, #aa771c); color:#000; border:none; box-shadow:0 4px 15px rgba(212,175,55,0.3);">Save Customer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- 2. VICard Redeem / Verification QR Modal (Customer View) -->
     <div id="vicard-redeem-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); backdrop-filter:blur(10px); justify-content:center; align-items:center; z-index:100000000; padding:16px;" onclick="if (event.target === this) closeVicardRedeemModal();">
         <div class="modal-content" onclick="event.stopPropagation();" style="max-width:440px; width:100%; border-radius:24px; padding:28px 24px; background:linear-gradient(135deg, #1a1a24, #0d0d12); border:1px solid rgba(212,175,55,0.5); box-shadow:0 25px 70px rgba(0,0,0,0.9); color:#fff; text-align:center;">
@@ -7588,6 +7678,140 @@
             <div style="padding:14px 22px; border-top:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.02); text-align:right;">
                 <button type="button" onclick="closeVicardVisitHistoryModal()" style="padding:10px 22px; border-radius:12px; font-size:0.9rem; font-weight:800; background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); cursor:pointer;">Close</button>
             </div>
+        </div>
+    </div>
+
+    <!-- 2c. VICard Customer Profile & Subscription Modal -->
+    <div id="vicard-profile-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.88); backdrop-filter:blur(12px); justify-content:center; align-items:center; z-index:100000000; padding:16px;" onclick="if (event.target === this) closeVicardCustomerProfileModal();">
+        <div class="modal-content" onclick="event.stopPropagation();" style="max-width:460px; width:100%; border-radius:24px; padding:0; background:linear-gradient(135deg, #181824, #0d0d14); border:1.5px solid rgba(212,175,55,0.45); box-shadow:0 25px 70px rgba(0,0,0,0.9), 0 0 30px rgba(212,175,55,0.2); color:#fff; overflow:hidden;">
+            <!-- Header -->
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 22px; border-bottom:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.02);">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:1.3rem;">⚜️</span>
+                    <div>
+                        <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:#fff;">VICard Profile</h3>
+                        <div style="font-size:0.75rem; color:#f5d77f; margin-top:2px;">بيانات العضوية وحالة الاشتراك</div>
+                    </div>
+                </div>
+                <button type="button" onclick="closeVicardCustomerProfileModal()" style="background:none; border:none; color:#a0aec0; font-size:1.4rem; cursor:pointer;">✖</button>
+            </div>
+
+            <div style="padding:22px; display:flex; flex-direction:column; gap:16px;">
+                <!-- Identity Card (Advanced Executive VIP Metal & Smart Chip Styling) -->
+                <div class="vicard-lux-card-identity">
+                    <!-- Top Row: Monogram Crest + EMV Chip + Active Status -->
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <!-- Executive Titanium Monogram Seal -->
+                            <div class="vicard-lux-monogram" id="vicard-profile-monogram" title="VIP Member Monogram">
+                                <span id="vicard-profile-monogram-initial">K</span>
+                            </div>
+                            <!-- Contactless EMV Smart Chip -->
+                            <div class="vicard-lux-emv-chip" title="VICard Smart Contactless Chip"></div>
+                        </div>
+
+                        <!-- Pulsating Emerald Status Badge -->
+                        <div id="vicard-profile-status-badge" class="vicard-lux-status-badge">
+                            <span class="vicard-lux-status-dot"></span>
+                            <span id="vicard-profile-status-text">ACTIVE VIP</span>
+                        </div>
+                    </div>
+
+                    <!-- Middle Row: Customer Name & Card Number -->
+                    <div style="margin-bottom:14px;">
+                        <div id="vicard-profile-cust-name" class="vicard-lux-name-foil">VIP Member</div>
+                        <div style="display:flex; align-items:center; gap:6px; margin-top:4px;">
+                            <span style="font-size:0.7rem; color:#94a3b8; letter-spacing:1px; text-transform:uppercase; font-weight:700;">CARD NO:</span>
+                            <span id="vicard-profile-cust-id" style="font-size:0.88rem; font-family:'Courier New', monospace; color:#f5d77f; font-weight:800; letter-spacing:1.5px;">VIC • 8939</span>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Row: Sleek Tier Rank Capsule -->
+                    <div id="vicard-profile-tier-badge" class="vicard-lux-tier-pill">
+                        <span id="vicard-profile-tier-icon" style="font-size:1.15rem; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));">🥈</span>
+                        <span id="vicard-profile-tier-name" style="font-size:0.92rem; font-weight:800; color:#f5d77f; letter-spacing:0.3px;">Silver VIP</span>
+                        <span id="vicard-profile-tier-rank" style="font-size:0.72rem; font-weight:800; background:linear-gradient(135deg, #d4af37, #aa771c); color:#000; padding:2px 8px; border-radius:8px; margin-left:4px; box-shadow:0 2px 6px rgba(0,0,0,0.4);">Rank 2</span>
+                    </div>
+                </div>
+
+                <!-- Subscription Expiry & Renewal Box -->
+                <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:18px; padding:16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+                        <div>
+                            <div style="font-size:0.75rem; color:#94a3b8; text-transform:uppercase; font-weight:700;">Subscription End Date</div>
+                            <div id="vicard-profile-sub-end-date" style="font-size:1.05rem; font-weight:900; color:#fff; margin-top:2px;">—</div>
+                        </div>
+                        <div id="vicard-profile-sub-days-tag" style="background:rgba(212,175,55,0.15); border:1px solid rgba(212,175,55,0.35); color:#f5d77f; font-size:0.78rem; font-weight:800; padding:4px 10px; border-radius:12px;">
+                            30 days left
+                        </div>
+                    </div>
+                    <div id="vicard-profile-autorenew-notice" style="display:flex; align-items:center; gap:6px; font-size:0.78rem; color:#2ed573; font-weight:700; border-top:1px solid rgba(255,255,255,0.05); padding-top:10px;">
+                        <span>🔄</span> Auto-renews monthly until deactivated • يتجدد تلقائياً شهرياً
+                    </div>
+                </div>
+
+                <!-- Monthly Discounts & Offer Limit Balance -->
+                <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:18px; padding:16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span style="font-size:0.85rem; font-weight:800; color:#fff;">🎯 Monthly Offers Balance</span>
+                        <span id="vicard-profile-monthly-count" style="font-size:0.88rem; font-weight:900; color:#f5d77f;">0 / 10 used</span>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div style="width:100%; height:8px; background:rgba(255,255,255,0.1); border-radius:10px; overflow:hidden; margin-bottom:10px;">
+                        <div id="vicard-profile-monthly-progress" style="width:0%; height:100%; background:linear-gradient(90deg, #d4af37, #2ed573); border-radius:10px; transition:width 0.3s ease;"></div>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#94a3b8;">
+                        <span id="vicard-profile-monthly-rem">10 offers remaining this month</span>
+                        <span id="vicard-profile-renewal-date">Renews: —</span>
+                    </div>
+                </div>
+
+                <!-- Lifetime Spend & Savings Statistics -->
+                <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:18px; padding:16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                        <span style="font-size:0.85rem; font-weight:800; color:#fff;">📊 Lifetime VIP Statistics • إحصائيات العضوية</span>
+                        <button type="button" id="vicard-profile-history-btn" style="padding:4px 10px; border-radius:8px; font-size:0.75rem; font-weight:700; background:rgba(212,175,55,0.15); color:#f5d77f; border:1px solid rgba(212,175,55,0.35); cursor:pointer;">
+                            📜 History
+                        </button>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <div style="background:rgba(46,213,115,0.08); border:1px solid rgba(46,213,115,0.25); border-radius:14px; padding:12px; text-align:center;">
+                            <div style="font-size:0.7rem; color:#2ed573; text-transform:uppercase; font-weight:800; letter-spacing:0.5px;">Amount Saved (التوفير)</div>
+                            <div id="vicard-profile-total-saved" style="font-size:1.35rem; font-weight:900; color:#2ed573; margin-top:3px;">SAR 0</div>
+                        </div>
+                        <div style="background:rgba(212,175,55,0.08); border:1px solid rgba(212,175,55,0.25); border-radius:14px; padding:12px; text-align:center;">
+                            <div style="font-size:0.7rem; color:#f5d77f; text-transform:uppercase; font-weight:800; letter-spacing:0.5px;">Amount Spent (المصروف)</div>
+                            <div id="vicard-profile-total-spent" style="font-size:1.35rem; font-weight:900; color:#f5d77f; margin-top:3px;">SAR 0</div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05); font-size:0.78rem; color:#94a3b8;">
+                        <span>Total Restaurant Visits:</span>
+                        <strong id="vicard-profile-total-visits" style="color:#fff; font-size:0.92rem;">0 visits</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="padding:14px 22px; border-top:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.02); text-align:right;">
+                <button type="button" onclick="closeVicardCustomerProfileModal()" style="padding:10px 22px; border-radius:12px; font-size:0.9rem; font-weight:800; background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); cursor:pointer;">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2d. VICard Info Card Lightbox Modal (info_card.jpg) -->
+    <div id="vicard-info-card-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.92); backdrop-filter:blur(14px); justify-content:center; align-items:center; z-index:100000000; padding:12px; box-sizing:border-box;" onclick="if (event.target === this) closeVicardInfoCardModal();">
+        <div class="vicard-info-lightbox-wrap" onclick="event.stopPropagation();">
+            <!-- Close Button (cleanly inside the top-right corner, never clipped on phones or desktop) -->
+            <button type="button" class="vicard-info-lightbox-close" onclick="closeVicardInfoCardModal()" aria-label="Close" title="Close">
+                ✕
+            </button>
+
+            <!-- Card Image (no black letterbox margins, fills desktop beautifully and sharp, scaled responsively) -->
+            <img src="info_card.jpg?v=313" alt="VICard Information" class="vicard-info-lightbox-img">
         </div>
     </div>
 
@@ -7895,25 +8119,72 @@
                 </div>
                 <button type="button" onclick="closeVicardTierEditModal()" style="background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--text-muted);">✖</button>
             </div>
-            <form onsubmit="saveVicardTier(event)" style="padding:18px 20px;">
+            <form onsubmit="saveVicardTier(event)" style="padding:18px 20px; max-height:80vh; overflow-y:auto;">
                 <input type="hidden" id="vicard-tier-edit-orig-id" value="">
+
+                <!-- Live Tier Preview Card -->
+                <div id="vicard-tier-live-preview" style="background:linear-gradient(135deg, #d4af37, #aa771c); border-radius:14px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; color:#fff; border:1.5px solid rgba(255,255,255,0.3); box-shadow:0 8px 24px rgba(0,0,0,0.4); margin-bottom:16px; transition:all 0.25s ease;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <span id="vicard-tier-prev-icon" style="font-size:1.8rem; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));">🏅</span>
+                        <div>
+                            <div id="vicard-tier-prev-name" style="font-size:1.05rem; font-weight:900; text-shadow:0 1px 3px rgba(0,0,0,0.6);">Platinum VIP</div>
+                            <div style="font-size:0.75rem; opacity:0.85;">Tier Preview • معاينة مظهر الفئة</div>
+                        </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:0.78rem; font-weight:900; background:rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.25); color:#f5d77f; padding:4px 10px; border-radius:8px;">Rank <span id="vicard-tier-prev-rank">1</span></span>
+                        <span style="font-size:0.75rem; font-weight:800; background:rgba(0,0,0,0.35); padding:4px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.25);">VICard Tier</span>
+                    </div>
+                </div>
+
                 <div style="margin-bottom:12px;">
                     <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Tier ID / Code (Internal key, e.g. platinum)</label>
                     <input type="text" id="vicard-tier-id-input" required placeholder="e.g. platinum"
                         style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; box-sizing:border-box;">
                 </div>
-                <div style="display:grid; grid-template-columns:1fr 80px; gap:10px; margin-bottom:12px;">
+
+                <div style="display:grid; grid-template-columns:1fr 125px; gap:10px; margin-bottom:14px;">
                     <div>
                         <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Tier Display Name</label>
-                        <input type="text" id="vicard-tier-name-input" required placeholder="e.g. Platinum VIP"
+                        <input type="text" id="vicard-tier-name-input" required placeholder="e.g. Platinum VIP" oninput="updateVicardTierPreview()"
                             style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.9rem; font-weight:700; box-sizing:border-box;">
                     </div>
                     <div>
-                        <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Icon</label>
-                        <input type="text" id="vicard-tier-icon-input" required placeholder="✨"
-                            style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:1.1rem; text-align:center; box-sizing:border-box;">
+                        <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:#f5d77f;" title="Card Rank: higher number means higher VIP hierarchy">Tier Rank (الرتبة) *</label>
+                        <input type="number" id="vicard-tier-rank-input" required min="1" max="99" step="1" placeholder="1" oninput="updateVicardTierPreview()"
+                            style="width:100%; padding:9px 12px; border-radius:10px; border:1.5px solid rgba(212,175,55,0.6); background:var(--input-bg); color:#f5d77f; font-size:0.95rem; font-weight:900; text-align:center; box-sizing:border-box;">
                     </div>
                 </div>
+
+                <!-- Icon Selection Grid -->
+                <div style="margin-bottom:14px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <label style="font-size:0.85rem; font-weight:600; color:var(--text-muted);">Choose Tier Icon (اختر أيقونة الفئة)</label>
+                        <span style="font-size:0.78rem; color:#f5d77f;">Click an icon below:</span>
+                    </div>
+                    <div id="vicard-tier-icon-grid" class="tier-icon-picker-grid">
+                        <!-- Populated by JS / Static buttons -->
+                        <button type="button" class="tier-icon-chip" onclick="selectVicardTierIcon('👑', this)">👑</button>
+                        <button type="button" class="tier-icon-chip" onclick="selectVicardTierIcon('💎', this)">💎</button>
+                        <button type="button" class="tier-icon-chip" onclick="selectVicardTierIcon('🥇', this)">🥇</button>
+                        <button type="button" class="tier-icon-chip" onclick="selectVicardTierIcon('🥈', this)">🥈</button>
+                        <button type="button" class="tier-icon-chip" onclick="selectVicardTierIcon('🥉', this)">🥉</button>
+                        <button type="button" class="tier-icon-chip" onclick="selectVicardTierIcon('🏆', this)">🏆</button>
+                        <button type="button" class="tier-icon-chip" onclick="selectVicardTierIcon('🎖️', this)">🎖️</button>
+                        <button type="button" class="tier-icon-chip" onclick="selectVicardTierIcon('🛡️', this)">🛡️</button>
+                        <button type="button" class="tier-icon-chip" onclick="selectVicardTierIcon('⚜️', this)">⚜️</button>
+                        <button type="button" class="tier-icon-chip" onclick="selectVicardTierIcon('✨', this)">✨</button>
+                        <button type="button" class="tier-icon-chip" onclick="selectVicardTierIcon('🌟', this)">🌟</button>
+                        <button type="button" class="tier-icon-chip" onclick="selectVicardTierIcon('⚡', this)">⚡</button>
+                        <button type="button" class="tier-icon-chip" onclick="selectVicardTierIcon('💠', this)">💠</button>
+                        <button type="button" class="tier-icon-chip" onclick="selectVicardTierIcon('🔱', this)">🔱</button>
+                        <button type="button" class="tier-icon-chip" onclick="selectVicardTierIcon('🖤', this)">🖤</button>
+                        <button type="button" class="tier-icon-chip" onclick="selectVicardTierIcon('🔮', this)">🔮</button>
+                    </div>
+                    <input type="text" id="vicard-tier-icon-input" required placeholder="🏅" oninput="updateVicardTierPreview()"
+                        style="width:100%; padding:8px 12px; margin-top:6px; border-radius:8px; border:1px dashed var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.85rem; box-sizing:border-box;" title="Selected Icon (or type a custom emoji)">
+                </div>
+
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
                     <div>
                         <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Min Spend (SAR)</label>
@@ -7926,10 +8197,46 @@
                             style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.85rem; box-sizing:border-box;">
                     </div>
                 </div>
+
+                <div style="margin-bottom:14px;">
+                    <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">
+                        Monthly Discounts / Offers Limit (الحد الشهري لعدد الخصومات)
+                    </label>
+                    <input type="number" id="vicard-tier-monthly-limit-input" min="0" step="1" placeholder="e.g. 5 (0 for unlimited)"
+                        style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.9rem; box-sizing:border-box;">
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
+                        Number of discounts/offers a cardholder can claim per monthly renewal cycle. Set 0 for unlimited.
+                    </div>
+                </div>
+
+                <!-- Card Color / Gradient Swatches & Color Bar -->
                 <div style="margin-bottom:16px;">
-                    <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Card Color / Gradient</label>
-                    <input type="text" id="vicard-tier-gradient-input" placeholder="e.g. linear-gradient(135deg, #e5e7eb, #9ca3af)"
-                        style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.85rem; box-sizing:border-box;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <label style="font-size:0.85rem; font-weight:600; color:var(--text-muted);">Choose Card Color & Gradient (اختر لون وتدرج البطاقة)</label>
+                        <span style="font-size:0.78rem; color:#f5d77f;">Click a preset below:</span>
+                    </div>
+
+                    <div id="vicard-tier-swatches-grid" class="tier-gradient-swatches-grid">
+                        <button type="button" class="tier-gradient-swatch" title="Royal Gold" onclick="selectVicardTierGradient('linear-gradient(135deg, #d4af37, #aa771c)', this)" style="background:linear-gradient(135deg, #d4af37, #aa771c);"></button>
+                        <button type="button" class="tier-gradient-swatch" title="Obsidian Black" onclick="selectVicardTierGradient('linear-gradient(135deg, #2d3748, #0f172a)', this)" style="background:linear-gradient(135deg, #2d3748, #0f172a);"></button>
+                        <button type="button" class="tier-gradient-swatch" title="Titanium Silver" onclick="selectVicardTierGradient('linear-gradient(135deg, #e2e8f0, #94a3b8)', this)" style="background:linear-gradient(135deg, #e2e8f0, #94a3b8);"></button>
+                        <button type="button" class="tier-gradient-swatch" title="Bronze Amber" onclick="selectVicardTierGradient('linear-gradient(135deg, #f59e0b, #78350f)', this)" style="background:linear-gradient(135deg, #f59e0b, #78350f);"></button>
+                        <button type="button" class="tier-gradient-swatch" title="Emerald Velvet" onclick="selectVicardTierGradient('linear-gradient(135deg, #10b981, #065f46)', this)" style="background:linear-gradient(135deg, #10b981, #065f46);"></button>
+                        <button type="button" class="tier-gradient-swatch" title="Sapphire Elite" onclick="selectVicardTierGradient('linear-gradient(135deg, #3b82f6, #1e3a8a)', this)" style="background:linear-gradient(135deg, #3b82f6, #1e3a8a);"></button>
+                        <button type="button" class="tier-gradient-swatch" title="Ruby Crimson" onclick="selectVicardTierGradient('linear-gradient(135deg, #f43f5e, #9f1239)', this)" style="background:linear-gradient(135deg, #f43f5e, #9f1239);"></button>
+                        <button type="button" class="tier-gradient-swatch" title="Amethyst Violet" onclick="selectVicardTierGradient('linear-gradient(135deg, #a855f7, #581c87)', this)" style="background:linear-gradient(135deg, #a855f7, #581c87);"></button>
+                        <button type="button" class="tier-gradient-swatch" title="Rose Gold" onclick="selectVicardTierGradient('linear-gradient(135deg, #fb7185, #9f1239)', this)" style="background:linear-gradient(135deg, #fb7185, #9f1239);"></button>
+                        <button type="button" class="tier-gradient-swatch" title="Midnight Nebula" onclick="selectVicardTierGradient('linear-gradient(135deg, #6366f1, #1e1b4b)', this)" style="background:linear-gradient(135deg, #6366f1, #1e1b4b);"></button>
+                    </div>
+
+                    <!-- Color Bar & Custom Picker -->
+                    <div style="display:flex; align-items:center; gap:10px; margin-top:10px; background:rgba(255,255,255,0.03); padding:8px 12px; border-radius:10px; border:1px solid var(--border-color);">
+                        <label style="font-size:0.8rem; color:var(--text-muted); font-weight:600; flex:1;">Or Pick Custom Base Color (شريط اللون):</label>
+                        <input type="color" id="vicard-tier-color-bar" value="#d4af37" oninput="onVicardTierColorBarChange(this.value)" style="width:42px; height:32px; border:none; border-radius:6px; cursor:pointer; background:transparent; padding:0;">
+                    </div>
+
+                    <input type="text" id="vicard-tier-gradient-input" placeholder="linear-gradient(135deg, #d4af37, #aa771c)" oninput="updateVicardTierPreview()"
+                        style="width:100%; padding:8px 12px; margin-top:8px; border-radius:8px; border:1px dashed var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.82rem; box-sizing:border-box;" title="Selected Gradient CSS">
                 </div>
 
                 <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border-color); padding-top:14px;">
@@ -7944,16 +8251,24 @@
     <div id="vicard-customer-portal-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#08080c; z-index:9999999; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:20px 16px;">
         <div style="max-width:540px; margin:0 auto; padding-bottom:50px;">
             <!-- Top bar -->
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px;">
                 <div class="keeta-brand-logo" style="display:flex; align-items:center; gap:14px;">
-                    <img src="front_card.png?v=311" alt="VICard" class="keeta-brand-card-img" style="width:96px; height:58px; object-fit:cover; border-radius:8px; border:1.5px solid #d4af37; box-shadow:0 6px 18px rgba(0,0,0,0.55), 0 0 12px rgba(212,175,55,0.35); background:transparent; flex-shrink:0;">
+                    <img src="front_card.png?v=312" alt="VICard" class="keeta-brand-card-img" style="width:96px; height:58px; object-fit:cover; border-radius:8px; border:1.5px solid #d4af37; box-shadow:0 6px 18px rgba(0,0,0,0.55), 0 0 12px rgba(212,175,55,0.35); background:transparent; flex-shrink:0;">
                     <div>
                         <div class="keeta-brand-title" style="font-size:1.35rem; font-weight:900; background:linear-gradient(135deg, #ffffff 0%, #f7df94 40%, #d4af37 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:0.5px; line-height:1.15; display:flex; align-items:center; gap:6px;">
                             VICard <span class="keeta-brand-vip-badge" style="font-size:0.7rem; font-weight:800; background:rgba(212,175,55,0.18); border:1px solid rgba(212,175,55,0.4); color:#f5d77f; padding:2px 8px; border-radius:6px; -webkit-text-fill-color:initial; letter-spacing:0.8px;">VIP</span>
                         </div>
                     </div>
                 </div>
-                <button type="button" id="vicard-portal-top-exit-btn" onclick="handleVicardPortalExitButtonClick()" class="vicard-overlay-exit-btn" style="display:none;">Exit ✖</button>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <button type="button" onclick="openVicardCustomerProfileModal()" class="keeta-header-action-btn" title="View Profile & Subscription">
+                        <span class="btn-icon">👤</span> <span class="btn-text">Profile</span>
+                    </button>
+                    <button type="button" onclick="openVicardInfoCardModal()" class="keeta-header-action-btn" title="Card Benefits & Information">
+                        <span class="btn-icon">ℹ️</span> <span class="btn-text">Info</span>
+                    </button>
+                    <button type="button" id="vicard-portal-top-exit-btn" onclick="handleVicardPortalExitButtonClick()" class="vicard-overlay-exit-btn" style="display:none;">Exit ✖</button>
+                </div>
             </div>
 
             <!-- Dynamic Customer Portal Content populated by js/nfc.js -->
@@ -7990,8 +8305,8 @@
     </div>
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=311"></script>
-    <script src="app.js?v=311"></script>
+    <script src="translations.js?v=316"></script>
+    <script src="app.js?v=316"></script>
 </body>
 
 </html>
