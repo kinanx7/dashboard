@@ -6193,15 +6193,95 @@ html.vicard-standalone-view #login-screen,
 html.vicard-standalone-view #auth-screen,
 html.vicard-standalone-view .company-bar,
 html.vicard-standalone-view .navbar,
-html.vicard-standalone-view > body > *:not(#vicard-customer-portal-overlay):not(#vicard-cashier-overlay):not(#vicard-redeem-modal):not(#vicard-image-lightbox-modal) {
+html.vicard-standalone-view > body > *:not(#vicard-customer-portal-overlay):not(#vicard-cashier-overlay):not(#vicard-redeem-modal):not(#vicard-image-lightbox-modal):not(#vicard-profile-modal):not(#vicard-info-card-modal):not(#vicard-visit-history-modal):not(#vicard-splash-screen) {
     display: none !important;
     visibility: hidden !important;
     opacity: 0 !important;
     pointer-events: none !important;
 }
 
-#vicard-redeem-modal {
+#vicard-redeem-modal,
+#vicard-profile-modal,
+#vicard-info-card-modal,
+#vicard-visit-history-modal {
     z-index: 100000000 !important;
+}
+
+html.vicard-standalone-view #vicard-profile-modal,
+html.vicard-standalone-view #vicard-info-card-modal,
+html.vicard-standalone-view #vicard-visit-history-modal {
+    pointer-events: auto !important;
+}
+
+/* ========================================================================== */
+/* LUXURY CASHIER CONFIRMATION BUTTON & AUTH BADGE                            */
+/* ========================================================================== */
+.vicard-cashier-confirm-btn {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 16px 18px !important;
+    border-radius: 16px !important;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+    color: #ffffff !important;
+    border: 1.5px solid rgba(255, 255, 255, 0.25) !important;
+    cursor: pointer !important;
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.42), inset 0 1px 1px rgba(255, 255, 255, 0.35) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 4px !important;
+    text-align: center !important;
+    transition: transform 0.15s ease, box-shadow 0.2s ease !important;
+    user-select: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    margin-top: 4px !important;
+}
+
+.vicard-cashier-confirm-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 12px 28px rgba(16, 185, 129, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.45) !important;
+    background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+}
+
+.vicard-cashier-confirm-btn:active {
+    transform: translateY(0) scale(0.98) !important;
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35) !important;
+}
+
+.vicard-confirm-main-text {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    font-size: 1.05rem !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.3px !important;
+    color: #ffffff !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35) !important;
+    line-height: 1.25 !important;
+    flex-wrap: wrap !important;
+}
+
+.vicard-confirm-icon {
+    font-size: 1.2rem !important;
+    line-height: 1 !important;
+    flex-shrink: 0 !important;
+}
+
+.vicard-confirm-sub-text {
+    font-size: 0.82rem !important;
+    font-weight: 800 !important;
+    color: #d1fae5 !important;
+    letter-spacing: 0.2px !important;
+    line-height: 1.2 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+    opacity: 0.95 !important;
+}
+
+.keeta-header-action-btn * {
+    pointer-events: none !important;
 }
 
 /* ========================================================================== */

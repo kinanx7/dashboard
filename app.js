@@ -38781,148 +38781,168 @@ window.closeVicardImageLightbox = closeVicardImageLightbox;
 
 // --- CUSTOMER PROFILE & SUBSCRIPTION MODAL ---
 function openVicardCustomerProfileModal() {
-    let card = window._currentActiveCustomerCard;
-    if (!card) {
-        const p = new URLSearchParams(window.location.search);
-        const cardId = p.get('vicard');
-        if (cardId && vicardData && vicardData.cards && vicardData.cards[cardId]) {
-            card = vicardData.cards[cardId];
-        }
-    }
-    if (!card) {
-        const firstCard = (vicardData && vicardData.cards) ? Object.values(vicardData.cards)[0] : null;
-        card = firstCard || {
-            id: 'VIC-8939',
-            name: 'VIP Member',
-            status: 'active',
-            tier: 'Black VIP',
-            subscriptionEndDate: Date.now() + 30 * 86400000,
-            autoRenew: true
-        };
-    }
-
-    checkAndRenewSubscription(card);
-
     const modal = document.getElementById('vicard-profile-modal');
     if (!modal) return;
 
-    const nameEl = document.getElementById('vicard-profile-cust-name');
-    const idEl = document.getElementById('vicard-profile-cust-id');
-    const statusEl = document.getElementById('vicard-profile-status-badge');
-    const tierNameEl = document.getElementById('vicard-profile-tier-name');
-    const tierIconEl = document.getElementById('vicard-profile-tier-icon');
-    const tierRankEl = document.getElementById('vicard-profile-tier-rank');
-    const subEndEl = document.getElementById('vicard-profile-sub-end-date');
-    const subDaysEl = document.getElementById('vicard-profile-sub-days-tag');
-    const autoRenewEl = document.getElementById('vicard-profile-autorenew-notice');
-    const monthlyCountEl = document.getElementById('vicard-profile-monthly-count');
-    const monthlyProgEl = document.getElementById('vicard-profile-monthly-progress');
-    const monthlyRemEl = document.getElementById('vicard-profile-monthly-rem');
-    const renewalDateEl = document.getElementById('vicard-profile-renewal-date');
-
-    const isActive = card.status !== 'deactivated';
-    const subEnd = card.subscriptionEndDate || (Date.now() + 30 * 86400000);
-    const daysLeft = Math.max(0, Math.ceil((subEnd - Date.now()) / (1000 * 60 * 60 * 24)));
-    const tierRank = getTierRank(card.tier);
-    const tierObj = Object.values(getVicardTiers()).find(t => t.name === card.tier || t.id === card.tier) || {};
-    const monthlyLimit = tierObj.monthlyDiscountLimit !== undefined ? tierObj.monthlyDiscountLimit : 20;
-    const usedOffers = getCustomerMonthlyVisits(card);
-    const remainingOffers = monthlyLimit > 0 ? Math.max(0, monthlyLimit - usedOffers) : 'Unlimited';
-
-    const monogramInitialEl = document.getElementById('vicard-profile-monogram-initial');
-    if (monogramInitialEl) {
-        const rawName = (card.name || 'V').trim();
-        monogramInitialEl.textContent = rawName.charAt(0).toUpperCase() || 'V';
+    if (modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
     }
 
-    if (nameEl) nameEl.textContent = card.name || 'VIP Member';
-    if (idEl) {
-        const cleanId = String(card.id || 'VIC-8939').replace(/^VIC-?/i, '');
-        idEl.textContent = `VIC • ${cleanId}`;
-    }
-    if (statusEl) {
-        const statusTextEl = document.getElementById('vicard-profile-status-text');
-        if (statusTextEl) statusTextEl.textContent = isActive ? 'ACTIVE VIP' : 'SUSPENDED';
-        statusEl.style.color = isActive ? '#10b981' : '#eb4d4b';
-        statusEl.style.borderColor = isActive ? 'rgba(16, 185, 129, 0.5)' : 'rgba(235, 77, 75, 0.5)';
-        statusEl.style.background = isActive ? 'rgba(16, 185, 129, 0.14)' : 'rgba(235, 77, 75, 0.14)';
-    }
-    if (tierNameEl) tierNameEl.textContent = card.tier || tierObj.name || 'VIP Tier';
-    if (tierIconEl) tierIconEl.textContent = tierObj.icon || '🎖️';
-    if (tierRankEl) tierRankEl.textContent = `Rank ${tierRank}`;
-
-    if (subEndEl) subEndEl.textContent = new Date(subEnd).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
-    if (subDaysEl) {
-        subDaysEl.textContent = `${daysLeft} days remaining`;
-        subDaysEl.style.color = daysLeft > 5 ? '#f5d77f' : '#eb4d4b';
-    }
-
-    if (autoRenewEl) {
-        if (card.autoRenew !== false && isActive) {
-            autoRenewEl.innerHTML = `<span>🔄</span> Auto-renews monthly until deactivated • يتجدد تلقائياً شهرياً`;
-            autoRenewEl.style.color = '#2ed573';
-        } else {
-            autoRenewEl.innerHTML = `<span>⚠️</span> Auto-renewal suspended / deactivated (التجديد متوقف)`;
-            autoRenewEl.style.color = '#eb4d4b';
+    try {
+        let card = window._currentActiveCustomerCard;
+        if (!card) {
+            const p = new URLSearchParams(window.location.search);
+            const cardId = p.get('vicard');
+            if (cardId && vicardData && vicardData.cards && vicardData.cards[cardId]) {
+                card = vicardData.cards[cardId];
+            }
         }
-    }
-
-    if (monthlyCountEl) {
-        monthlyCountEl.textContent = monthlyLimit > 0 ? `${usedOffers} / ${monthlyLimit} used` : `${usedOffers} used (Unlimited)`;
-    }
-    if (monthlyProgEl) {
-        const pct = monthlyLimit > 0 ? Math.min(100, Math.round((usedOffers / monthlyLimit) * 100)) : 10;
-        monthlyProgEl.style.width = `${pct}%`;
-        monthlyProgEl.style.background = pct >= 100 ? '#eb4d4b' : 'linear-gradient(90deg, #d4af37, #2ed573)';
-    }
-    if (monthlyRemEl) {
-        if (monthlyLimit > 0) {
-            monthlyRemEl.textContent = remainingOffers === 0 ? '⚠️ Monthly offer limit reached' : `${remainingOffers} offers remaining`;
-            monthlyRemEl.style.color = remainingOffers === 0 ? '#eb4d4b' : '#94a3b8';
-        } else {
-            monthlyRemEl.textContent = 'Unlimited offers included';
+        if (!card) {
+            const firstCard = (vicardData && vicardData.cards) ? Object.values(vicardData.cards)[0] : null;
+            card = firstCard || {
+                id: 'VIC-8939',
+                name: 'VIP Member',
+                status: 'active',
+                tier: 'Black VIP',
+                subscriptionEndDate: Date.now() + 30 * 86400000,
+                autoRenew: true
+            };
         }
-    }
-    if (renewalDateEl) {
-        renewalDateEl.textContent = `Renews: ${new Date(subEnd).toLocaleDateString()}`;
+
+        checkAndRenewSubscription(card);
+
+        const nameEl = document.getElementById('vicard-profile-cust-name');
+        const idEl = document.getElementById('vicard-profile-cust-id');
+        const statusEl = document.getElementById('vicard-profile-status-badge');
+        const tierNameEl = document.getElementById('vicard-profile-tier-name');
+        const tierIconEl = document.getElementById('vicard-profile-tier-icon');
+        const tierRankEl = document.getElementById('vicard-profile-tier-rank');
+        const subEndEl = document.getElementById('vicard-profile-sub-end-date');
+        const subDaysEl = document.getElementById('vicard-profile-sub-days-tag');
+        const autoRenewEl = document.getElementById('vicard-profile-autorenew-notice');
+        const monthlyCountEl = document.getElementById('vicard-profile-monthly-count');
+        const monthlyProgEl = document.getElementById('vicard-profile-monthly-progress');
+        const monthlyRemEl = document.getElementById('vicard-profile-monthly-rem');
+        const renewalDateEl = document.getElementById('vicard-profile-renewal-date');
+
+        const isActive = card.status !== 'deactivated';
+        const subEnd = card.subscriptionEndDate || (Date.now() + 30 * 86400000);
+        const daysLeft = Math.max(0, Math.ceil((subEnd - Date.now()) / (1000 * 60 * 60 * 24)));
+        const tierRank = getTierRank(card.tier);
+        const tierObj = Object.values(getVicardTiers()).find(t => t.name === card.tier || t.id === card.tier) || {};
+        const monthlyLimit = tierObj.monthlyDiscountLimit !== undefined ? tierObj.monthlyDiscountLimit : 20;
+        const usedOffers = getCustomerMonthlyVisits(card);
+        const remainingOffers = monthlyLimit > 0 ? Math.max(0, monthlyLimit - usedOffers) : 'Unlimited';
+
+        const monogramInitialEl = document.getElementById('vicard-profile-monogram-initial');
+        if (monogramInitialEl) {
+            const rawName = (card.name || 'V').trim();
+            monogramInitialEl.textContent = rawName.charAt(0).toUpperCase() || 'V';
+        }
+
+        if (nameEl) nameEl.textContent = card.name || 'VIP Member';
+        if (idEl) {
+            const cleanId = String(card.id || 'VIC-8939').replace(/^VIC-?/i, '');
+            idEl.textContent = `VIC • ${cleanId}`;
+        }
+        if (statusEl) {
+            const statusTextEl = document.getElementById('vicard-profile-status-text');
+            if (statusTextEl) statusTextEl.textContent = isActive ? 'ACTIVE VIP' : 'SUSPENDED';
+            statusEl.style.color = isActive ? '#10b981' : '#eb4d4b';
+            statusEl.style.borderColor = isActive ? 'rgba(16, 185, 129, 0.5)' : 'rgba(235, 77, 75, 0.5)';
+            statusEl.style.background = isActive ? 'rgba(16, 185, 129, 0.14)' : 'rgba(235, 77, 75, 0.14)';
+        }
+        if (tierNameEl) tierNameEl.textContent = card.tier || tierObj.name || 'VIP Tier';
+        if (tierIconEl) tierIconEl.textContent = tierObj.icon || '🎖️';
+        if (tierRankEl) tierRankEl.textContent = `Rank ${tierRank}`;
+
+        if (subEndEl) subEndEl.textContent = new Date(subEnd).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+        if (subDaysEl) {
+            subDaysEl.textContent = `${daysLeft} days remaining`;
+            subDaysEl.style.color = daysLeft > 5 ? '#f5d77f' : '#eb4d4b';
+        }
+
+        if (autoRenewEl) {
+            if (card.autoRenew !== false && isActive) {
+                autoRenewEl.innerHTML = `<span>🔄</span> Auto-renews monthly until deactivated • يتجدد تلقائياً شهرياً`;
+                autoRenewEl.style.color = '#2ed573';
+            } else {
+                autoRenewEl.innerHTML = `<span>⚠️</span> Auto-renewal suspended / deactivated (التجديد متوقف)`;
+                autoRenewEl.style.color = '#eb4d4b';
+            }
+        }
+
+        if (monthlyCountEl) {
+            monthlyCountEl.textContent = monthlyLimit > 0 ? `${usedOffers} / ${monthlyLimit} used` : `${usedOffers} used (Unlimited)`;
+        }
+        if (monthlyProgEl) {
+            const pct = monthlyLimit > 0 ? Math.min(100, Math.round((usedOffers / monthlyLimit) * 100)) : 10;
+            monthlyProgEl.style.width = `${pct}%`;
+            monthlyProgEl.style.background = pct >= 100 ? '#eb4d4b' : 'linear-gradient(90deg, #d4af37, #2ed573)';
+        }
+        if (monthlyRemEl) {
+            if (monthlyLimit > 0) {
+                monthlyRemEl.textContent = remainingOffers === 0 ? '⚠️ Monthly offer limit reached' : `${remainingOffers} offers remaining`;
+                monthlyRemEl.style.color = remainingOffers === 0 ? '#eb4d4b' : '#94a3b8';
+            } else {
+                monthlyRemEl.textContent = 'Unlimited offers included';
+            }
+        }
+        if (renewalDateEl) {
+            renewalDateEl.textContent = `Renews: ${new Date(subEnd).toLocaleDateString()}`;
+        }
+
+        // Auto-update Lifetime Spent & Saved Stats
+        const totalSavedEl = document.getElementById('vicard-profile-total-saved');
+        const totalSpentEl = document.getElementById('vicard-profile-total-spent');
+        const totalVisitsEl = document.getElementById('vicard-profile-total-visits');
+        const historyBtn = document.getElementById('vicard-profile-history-btn');
+
+        if (totalSavedEl) totalSavedEl.textContent = `SAR ${Number(card.totalSavings || 0).toLocaleString()}`;
+        if (totalSpentEl) totalSpentEl.textContent = `SAR ${Number(card.totalSpend || card.totalSpent || 0).toLocaleString()}`;
+        if (totalVisitsEl) totalVisitsEl.textContent = `${card.visitsCount || 0} visits`;
+        if (historyBtn) {
+            historyBtn.onclick = () => {
+                closeVicardCustomerProfileModal();
+                showVicardCustomerVisitHistoryModal(card.id);
+            };
+        }
+    } catch (err) {
+        console.error('Error populating VICard profile modal:', err);
     }
 
-    // Auto-update Lifetime Spent & Saved Stats
-    const totalSavedEl = document.getElementById('vicard-profile-total-saved');
-    const totalSpentEl = document.getElementById('vicard-profile-total-spent');
-    const totalVisitsEl = document.getElementById('vicard-profile-total-visits');
-    const historyBtn = document.getElementById('vicard-profile-history-btn');
-
-    if (totalSavedEl) totalSavedEl.textContent = `SAR ${Number(card.totalSavings || 0).toLocaleString()}`;
-    if (totalSpentEl) totalSpentEl.textContent = `SAR ${Number(card.totalSpend || card.totalSpent || 0).toLocaleString()}`;
-    if (totalVisitsEl) totalVisitsEl.textContent = `${card.visitsCount || 0} visits`;
-    if (historyBtn) {
-        historyBtn.onclick = () => {
-            closeVicardCustomerProfileModal();
-            showVicardCustomerVisitHistoryModal(card.id);
-        };
-    }
-
-    modal.style.display = 'flex';
+    modal.style.setProperty('display', 'flex', 'important');
+    modal.style.setProperty('visibility', 'visible', 'important');
+    modal.style.setProperty('opacity', '1', 'important');
+    modal.style.setProperty('pointer-events', 'auto', 'important');
+    modal.style.setProperty('z-index', '100000000', 'important');
 }
 window.openVicardCustomerProfileModal = openVicardCustomerProfileModal;
 
 function closeVicardCustomerProfileModal() {
     const modal = document.getElementById('vicard-profile-modal');
-    if (modal) modal.style.display = 'none';
+    if (modal) modal.style.setProperty('display', 'none', 'important');
 }
 window.closeVicardCustomerProfileModal = closeVicardCustomerProfileModal;
 
 // --- INFO CARD LIGHTBOX MODAL ---
 function openVicardInfoCardModal() {
     const modal = document.getElementById('vicard-info-card-modal');
-    if (modal) modal.style.display = 'flex';
+    if (!modal) return;
+    if (modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+    }
+    modal.style.setProperty('display', 'flex', 'important');
+    modal.style.setProperty('visibility', 'visible', 'important');
+    modal.style.setProperty('opacity', '1', 'important');
+    modal.style.setProperty('pointer-events', 'auto', 'important');
+    modal.style.setProperty('z-index', '100000000', 'important');
 }
 window.openVicardInfoCardModal = openVicardInfoCardModal;
 
 function closeVicardInfoCardModal() {
     const modal = document.getElementById('vicard-info-card-modal');
-    if (modal) modal.style.display = 'none';
+    if (modal) modal.style.setProperty('display', 'none', 'important');
 }
 window.closeVicardInfoCardModal = closeVicardInfoCardModal;
 
@@ -39599,12 +39619,15 @@ function renderVicardCashierScreen(cardId, card, restId, unitId) {
                 </div>
 
                 ${isDeviceRemembered ? `
-                    <div style="background:rgba(46,213,115,0.12); border:1px solid rgba(46,213,115,0.4); border-radius:12px; padding:10px 14px; margin-bottom:14px; display:flex; align-items:center; justify-content:center; gap:8px;">
-                        <span style="font-size:1.1rem;">🛡️</span>
-                        <span style="color:#2ed573; font-size:0.85rem; font-weight:800;">Authorized Cashier Station • جهاز الكاشير معتمد</span>
+                    <div style="background:rgba(46,213,115,0.08); border:1.5px solid rgba(46,213,115,0.35); border-radius:14px; padding:12px 16px; margin-bottom:14px; display:flex; align-items:center; gap:12px; box-sizing:border-box;">
+                        <div style="width:38px; height:38px; border-radius:10px; background:rgba(46,213,115,0.18); display:flex; align-items:center; justify-content:center; font-size:1.25rem; flex-shrink:0;">🛡️</div>
+                        <div style="display:flex; flex-direction:column; gap:2px; text-align:left;">
+                            <div style="color:#2ed573; font-size:0.88rem; font-weight:800; letter-spacing:0.2px; line-height:1.2;">Authorized Cashier Station</div>
+                            <div style="color:#86efac; font-size:0.76rem; font-weight:700; line-height:1.2;">جهاز الكاشير معتمد رسمياً</div>
+                        </div>
                     </div>
                 ` : `
-                    <div style="background:linear-gradient(135deg, rgba(212,175,55,0.1), rgba(212,175,55,0.03)); border:1.5px solid rgba(212,175,55,0.4); border-radius:14px; padding:16px 14px; margin-bottom:16px; text-align:center;">
+                    <div style="background:linear-gradient(135deg, rgba(212,175,55,0.1), rgba(212,175,55,0.03)); border:1.5px solid rgba(212,175,55,0.4); border-radius:14px; padding:16px 14px; margin-bottom:16px; text-align:center; box-sizing:border-box;">
                         <label style="display:block; font-size:0.88rem; font-weight:800; color:#f5d77f; margin-bottom:4px;">
                             🔒 Cashier 4-Digit PIN (رمز الكاشير السري) *
                         </label>
@@ -39624,10 +39647,12 @@ function renderVicardCashierScreen(cardId, card, restId, unitId) {
                     </div>
                 `}
 
-                <button type="button" onclick="confirmVicardCashierVisit('${card.id}', '${escapeHtml(restId || '')}', '${escapeHtml(unitId || '')}')"
-                    style="width:100%; padding:15px; border-radius:14px; font-size:1rem; font-weight:900; background:linear-gradient(135deg, #10b981, #059669); color:#fff; border:none; cursor:pointer; box-shadow:0 6px 20px rgba(16,185,129,0.4); display:flex; align-items:center; justify-content:center; gap:8px; transition:transform 0.15s ease;">
-                    <span>✅ Confirm Discount & Apply Offer</span>
-                    <span style="font-size:0.85rem; opacity:0.9;">• تأكيد وتطبيق الخصم</span>
+                <button type="button" class="vicard-cashier-confirm-btn" onclick="confirmVicardCashierVisit('${card.id}', '${escapeHtml(restId || '')}', '${escapeHtml(unitId || '')}')">
+                    <div class="vicard-confirm-main-text">
+                        <span class="vicard-confirm-icon">✅</span>
+                        <span>Confirm Discount &amp; Apply Offer</span>
+                    </div>
+                    <div class="vicard-confirm-sub-text">تأكيد وتطبيق الخصم فوراً</div>
                 </button>
             </div>
         </div>
@@ -40305,7 +40330,11 @@ function showVicardCustomerVisitHistoryModal(cardId) {
 
     // Render immediately from memory
     renderHistoryContent(card);
-    modal.style.display = 'flex';
+    modal.style.setProperty('display', 'flex', 'important');
+    modal.style.setProperty('visibility', 'visible', 'important');
+    modal.style.setProperty('opacity', '1', 'important');
+    modal.style.setProperty('pointer-events', 'auto', 'important');
+    modal.style.setProperty('z-index', '100000000', 'important');
 
     // Fetch fresh records directly from Firebase asynchronously
     if (typeof db !== 'undefined' && db) {
@@ -40324,7 +40353,7 @@ window.showVicardCustomerVisitHistoryModal = showVicardCustomerVisitHistoryModal
 
 function closeVicardVisitHistoryModal() {
     const modal = document.getElementById('vicard-visit-history-modal');
-    if (modal) modal.style.display = 'none';
+    if (modal) modal.style.setProperty('display', 'none', 'important');
 }
 window.closeVicardVisitHistoryModal = closeVicardVisitHistoryModal;
 
