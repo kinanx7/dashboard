@@ -12,7 +12,7 @@ assert(
     indexHtml.includes('id="vicard-portal-top-exit-btn" onclick="handleVicardPortalExitButtonClick()"'),
     'Top exit button must have id vicard-portal-top-exit-btn and call handleVicardPortalExitButtonClick()'
 );
-assert(/app\.js\?v=(29[6-9]|30[0-9])/.test(indexHtml), 'Cache buster must be v=296 or higher');
+assert(/app\.js\?v=(29[6-9]|3[0-9]{2,})/.test(indexHtml), 'Cache buster must be v=296 or higher');
 console.log('✔ index.html exit button is wired to handleVicardPortalExitButtonClick()');
 
 // 2. Verify style.css Toast Styling

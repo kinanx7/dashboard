@@ -37,7 +37,7 @@ const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf
 
 assert(indexHtml.includes('Card ID & VIP Tier'), 'Table header must say Card ID & VIP Tier');
 assert(indexHtml.includes('vicard-overlay-exit-btn'), 'Exit buttons must have modern styling class');
-assert(/app\.js\?v=(30[0-9])/.test(indexHtml), 'Cache buster must be bumped to v=302 or higher');
+assert(/app\.js\?v=(3[0-9]{2,})/.test(indexHtml), 'Cache buster must be bumped to v=302 or higher');
 console.log('✔ index.html contains updated table header, exit button styling, and cache busters.');
 
 // 4. Verify Translations in translations.js

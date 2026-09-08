@@ -20,8 +20,8 @@ assert(html.includes('id="vicard-rest-rating"'), 'Missing vicard-rest-rating inp
 assert(html.includes('id="vicard-rest-reviews"'), 'Missing vicard-rest-reviews input in index.html');
 assert(html.includes('max-height:86vh'), 'Missing max-height on restaurant modal');
 assert(html.includes('overflow-y:auto'), 'Missing scrollable form body in restaurant modal');
-assert(/style\.css\?v=30[0-9]/.test(html), 'Cache buster style.css?v=300+ missing in index.html');
-assert(/app\.js\?v=30[0-9]/.test(html), 'Cache buster app.js?v=300+ missing in index.html');
+assert(/style\.css\?v=3[0-9]{2,}/.test(html), 'Cache buster style.css?v=300+ missing in index.html');
+assert(/app\.js\?v=3[0-9]{2,}/.test(html), 'Cache buster app.js?v=300+ missing in index.html');
 console.log('✔ [2] index.html verified: Rating/review inputs, sticky modal footer (no F11 needed), cache buster v=300 bumped');
 
 // 3. Check js/nfc.js & app.js

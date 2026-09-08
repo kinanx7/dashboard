@@ -5098,6 +5098,23 @@ mark.search-highlight,
     gap: 12px;
 }
 
+.keeta-brand-card-img {
+    width: 54px;
+    height: 34px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1.5px solid #d4af37;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 10px rgba(212, 175, 55, 0.35);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    flex-shrink: 0;
+    background: transparent !important;
+}
+
+.keeta-brand-card-img:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6), 0 0 14px rgba(212, 175, 55, 0.5);
+}
+
 .keeta-brand-icon {
     width: 42px;
     height: 42px;
@@ -5111,11 +5128,29 @@ mark.search-highlight,
 }
 
 .keeta-brand-title {
-    font-size: 1.15rem;
+    font-size: 1.25rem;
     font-weight: 900;
     letter-spacing: 0.5px;
-    color: #fff;
-    line-height: 1.1;
+    background: linear-gradient(135deg, #ffffff 0%, #f7df94 40%, #d4af37 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1.15;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.keeta-brand-vip-badge {
+    font-size: 0.65rem;
+    font-weight: 800;
+    background: rgba(212, 175, 55, 0.18);
+    border: 1px solid rgba(212, 175, 55, 0.4);
+    color: #f5d77f;
+    padding: 1px 6px;
+    border-radius: 5px;
+    -webkit-text-fill-color: initial;
+    letter-spacing: 0.8px;
+    text-shadow: none;
 }
 
 .keeta-brand-vip {
@@ -5126,11 +5161,7 @@ mark.search-highlight,
 }
 
 .keeta-brand-sub {
-    font-size: 0.68rem;
-    font-weight: 700;
-    color: #94a3b8;
-    letter-spacing: 1px;
-    margin-top: 2px;
+    display: none !important;
 }
 
 .keeta-header-right {
@@ -7584,5 +7615,222 @@ html.vicard-standalone-view > body > *:not(#vicard-customer-portal-overlay):not(
     .keeta-dishes-sub {
         font-size: 0.78rem !important;
     }
+
+    /* 8. QR Code Verification Modal: Elevated Position for Easy Cashier Scanning */
+    #vicard-redeem-modal {
+        align-items: flex-start !important;
+        padding: 24px 16px 20px 16px !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+
+    #vicard-redeem-modal .modal-content {
+        margin-top: 10px !important;
+        max-width: 390px !important;
+        width: 100% !important;
+        padding: 20px 18px 22px 18px !important;
+        border-radius: 24px !important;
+        box-shadow: 0 16px 50px rgba(0, 0, 0, 0.95), 0 0 30px rgba(212, 175, 55, 0.2) !important;
+    }
+
+    #vicard-redeem-modal #vicard-redeem-offer-title {
+        font-size: 1.15rem !important;
+        line-height: 1.3 !important;
+    }
+
+    #vicard-redeem-modal #vicard-redeem-qrcode {
+        min-width: 190px !important;
+        min-height: 190px !important;
+    }
+
+    #vicard-redeem-modal #vicard-redeem-qrcode canvas,
+    #vicard-redeem-modal #vicard-redeem-qrcode img {
+        width: 190px !important;
+        height: 190px !important;
+    }
+
+    /* 9. Advanced Food-Delivery Mobile Grids: 1-Column Comfort & 100% Legibility */
+    .keeta-restaurants-grid,
+    .keeta-dishes-grid {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* 10. Modern Horizontal Food-Delivery Dish Card on Mobile */
+    .keeta-dish-card {
+        width: 100% !important;
+        box-sizing: border-box !important;
+        padding: 16px 14px !important;
+        border-radius: 18px !important;
+        background: #151520 !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35) !important;
+    }
+
+    .keeta-dish-main {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: stretch !important;
+        justify-content: space-between !important;
+        gap: 14px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .keeta-dish-info {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+    }
+
+    .keeta-dish-badge-row {
+        display: flex !important;
+        gap: 6px !important;
+        align-items: center !important;
+        margin-bottom: 6px !important;
+        flex-wrap: wrap !important;
+    }
+
+    .keeta-dish-name {
+        font-size: 1.05rem !important;
+        font-weight: 800 !important;
+        color: #ffffff !important;
+        line-height: 1.35 !important;
+        margin: 0 0 6px 0 !important;
+        white-space: normal !important;
+        word-break: normal !important;
+    }
+
+    .keeta-dish-desc {
+        font-size: 0.82rem !important;
+        color: #94a3b8 !important;
+        line-height: 1.4 !important;
+        margin: 0 0 10px 0 !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+    }
+
+    .keeta-dish-price-row {
+        display: flex !important;
+        align-items: baseline !important;
+        gap: 8px !important;
+        flex-wrap: wrap !important;
+        margin-top: auto !important;
+    }
+
+    .keeta-price-offer {
+        font-size: 1.25rem !important;
+        font-weight: 900 !important;
+        color: #10b981 !important;
+    }
+
+    .keeta-price-orig {
+        font-size: 0.85rem !important;
+        color: #64748b !important;
+        text-decoration: line-through !important;
+    }
+
+    .keeta-price-label {
+        font-size: 0.68rem !important;
+        color: #f7df94 !important;
+        font-weight: 800 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+    }
+
+    .keeta-dish-visual {
+        width: 104px !important;
+        min-width: 104px !important;
+        flex-shrink: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 8px !important;
+    }
+
+    .keeta-dish-img-wrap {
+        width: 104px !important;
+        height: 94px !important;
+        border-radius: 14px !important;
+        overflow: hidden !important;
+        background: #0d0d12 !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    }
+
+    .keeta-dish-img {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+    }
+
+    .keeta-dish-redeem-btn {
+        width: 100% !important;
+        padding: 8px 10px !important;
+        font-size: 0.82rem !important;
+        font-weight: 800 !important;
+        border-radius: 12px !important;
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+        color: #000 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 4px !important;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35) !important;
+    }
+
+    /* 11. Restaurant Cards on Mobile: Full Width, No Truncation */
+    .keeta-card {
+        width: 100% !important;
+        border-radius: 20px !important;
+        box-sizing: border-box !important;
+    }
+
+    .keeta-card-media {
+        width: 100% !important;
+        height: 160px !important;
+        aspect-ratio: auto !important;
+    }
+
+    .keeta-card-header {
+        gap: 12px !important;
+    }
+
+    .keeta-card-logo {
+        width: 50px !important;
+        height: 50px !important;
+        border-radius: 12px !important;
+        flex-shrink: 0 !important;
+    }
+
+    .keeta-card-name {
+        font-size: 1.15rem !important;
+        font-weight: 800 !important;
+        color: #ffffff !important;
+        white-space: normal !important;
+        line-height: 1.3 !important;
+    }
+
+    .keeta-card-category {
+        font-size: 0.80rem !important;
+        color: #94a3b8 !important;
+    }
+}
+
+/* Keyframes for Realtime Celebration */
+@keyframes vicardPopIn {
+    0% { transform: scale(0.85); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes vicardBounce {
+    0% { transform: translateY(0) scale(1); }
+    100% { transform: translateY(-8px) scale(1.1); }
 }
 

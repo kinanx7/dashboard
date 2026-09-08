@@ -93,7 +93,7 @@
     <!-- QR Code Generator Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=308">
+    <link rel="stylesheet" href="style.css?v=310">
 </head>
 
 <body class="theme-burgeroov">
@@ -7536,10 +7536,11 @@
 
             <div id="vicard-redeem-offer-title" style="font-size:1.2rem; font-weight:800; color:#fff; margin-bottom:4px;">Special Offer</div>
             <div id="vicard-redeem-rest-name" style="font-size:0.85rem; color:#a0aec0; margin-bottom:10px;">Partner Restaurant</div>
-            <div style="display:flex; justify-content:center; align-items:center; gap:12px; margin-bottom:16px; font-size:0.85rem;">
+            <div style="display:flex; justify-content:center; align-items:center; gap:10px; margin-bottom:14px; font-size:0.85rem; flex-wrap:wrap;">
                 <span style="color:#d4af37; font-weight:700;">👤 <span id="vicard-redeem-customer-name">Customer</span></span>
                 <span style="color:#a0aec0;">•</span>
                 <span style="color:#f5d77f; font-family:monospace; font-weight:700;">💳 <span id="vicard-redeem-card-id">VIC-XXXX</span></span>
+                <span id="vicard-redeem-customer-tier" style="display:inline-block; font-size:0.72rem; font-weight:800; color:#f5d77f; background:rgba(212,175,55,0.18); border:1px solid rgba(212,175,55,0.4); padding:2px 8px; border-radius:10px;">👑 VIP Member</span>
             </div>
 
             <!-- QR Container -->
@@ -7912,9 +7913,13 @@
         <div style="max-width:540px; margin:0 auto; padding-bottom:50px;">
             <!-- Top bar -->
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <div style="width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg, #d4af37, #aa771c); display:flex; align-items:center; justify-content:center; font-size:1.2rem; box-shadow:0 2px 10px rgba(212,175,55,0.4);">💳</div>
-                    <span style="font-size:1.1rem; font-weight:900; background:linear-gradient(135deg, #fff, #d4af37); -webkit-background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:1px;">VICARD VIP</span>
+                <div class="keeta-brand-logo" style="display:flex; align-items:center; gap:12px;">
+                    <img src="front_card.png?v=310" alt="VICard" class="keeta-brand-card-img" style="width:54px; height:34px; object-fit:cover; border-radius:6px; border:1.5px solid #d4af37; box-shadow:0 4px 12px rgba(0,0,0,0.5), 0 0 10px rgba(212,175,55,0.3); background:transparent; flex-shrink:0;">
+                    <div>
+                        <div class="keeta-brand-title" style="font-size:1.25rem; font-weight:900; background:linear-gradient(135deg, #ffffff 0%, #f7df94 40%, #d4af37 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:0.5px; line-height:1.15; display:flex; align-items:center; gap:5px;">
+                            VICard <span class="keeta-brand-vip-badge" style="font-size:0.65rem; font-weight:800; background:rgba(212,175,55,0.18); border:1px solid rgba(212,175,55,0.4); color:#f5d77f; padding:1px 6px; border-radius:5px; -webkit-text-fill-color:initial; letter-spacing:0.8px;">VIP</span>
+                        </div>
+                    </div>
                 </div>
                 <button type="button" id="vicard-portal-top-exit-btn" onclick="handleVicardPortalExitButtonClick()" class="vicard-overlay-exit-btn" style="display:none;">Exit ✖</button>
             </div>
@@ -7953,8 +7958,8 @@
     </div>
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=308"></script>
-    <script src="app.js?v=308"></script>
+    <script src="translations.js?v=310"></script>
+    <script src="app.js?v=310"></script>
 </body>
 
 </html>

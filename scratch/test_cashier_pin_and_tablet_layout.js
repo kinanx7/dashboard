@@ -10,7 +10,7 @@ const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf
 
 assert(indexHtml.includes('id="vicard-rest-cashier-pin"'), 'Cashier PIN input must exist in index.html');
 assert(indexHtml.includes('pattern="\\d{4}"') || indexHtml.includes('pattern="[0-9]{4}"'), 'PIN input must enforce 4 digits pattern');
-assert(indexHtml.includes('app.js?v=308') || indexHtml.includes('app.js?v=307') || indexHtml.includes('app.js?v=306'), 'Cache buster must be bumped to v=308');
+assert(/app\.js\?v=3[0-9]{2,}/.test(indexHtml), 'Cache buster must be bumped to v=309 or higher');
 assert(indexHtml.includes('flex-wrap:wrap;'), 'Department tabs container must wrap naturally on PC');
 console.log('✔ index.html contains Cashier PIN input field, bumped cache-busters, and wrapping tabs.');
 

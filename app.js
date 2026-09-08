@@ -38280,10 +38280,9 @@ function generateRestaurantsDirectoryWebsiteHtml(rests, card) {
             <header class="keeta-header">
                 <div class="keeta-header-left">
                     <div class="keeta-brand-logo">
-                        <span class="keeta-brand-icon">💳</span>
+                        <img src="front_card.png?v=310" alt="VICard" class="keeta-brand-card-img">
                         <div>
-                            <div class="keeta-brand-title">VICARD <span class="keeta-brand-vip">VIP</span></div>
-                            <div class="keeta-brand-sub">MEMBER DINING NETWORK</div>
+                            <div class="keeta-brand-title">VICard <span class="keeta-brand-vip-badge">VIP</span></div>
                         </div>
                     </div>
                 </div>
@@ -38298,7 +38297,7 @@ function generateRestaurantsDirectoryWebsiteHtml(rests, card) {
                         <div class="keeta-member-avatar">${isActive ? '👑' : '⚠️'}</div>
                         <div class="keeta-member-info">
                             <div class="keeta-member-name">${escapeHtml(card.name)}</div>
-                            <div class="keeta-member-id">${card.id} • <span style="color:${isActive ? '#10b981' : '#ef4444'}; font-weight:800;">${isActive ? 'ACTIVE' : 'SUSPENDED'}</span></div>
+                            <div class="keeta-member-id">${card.id} • <span style="color:${isActive ? '#10b981' : '#ef4444'}; font-weight:800;">${isActive ? 'ACTIVE' : 'SUSPENDED'}</span> • <span style="color:#f5d77f; font-weight:800;">${escapeHtml(card.tier || 'Black VIP')}</span></div>
                         </div>
                     </div>
                 </div>
@@ -38630,6 +38629,81 @@ function showVicardDeactivatedAlert(card) {
     alert(`❌ Card Deactivated!\n\nVICard (${card.id}) for ${card.name} is currently suspended.\n\nOffers and menu discounts cannot be applied until reactivated by club management.`);
 }
 
+var _vicardRedeemModalOriginalHtml = null;
+var _vicardRedeemRef = null;
+var _vicardRedeemListener = null;
+
+function showVicardDiscountSuccessMessage(data, card, rest, unit) {
+    const modal = document.getElementById('vicard-redeem-modal');
+    if (!modal) return;
+    const contentEl = modal.querySelector('.modal-content');
+    if (!contentEl) return;
+
+    if (_vicardRedeemTimerInterval) {
+        clearInterval(_vicardRedeemTimerInterval);
+        _vicardRedeemTimerInterval = null;
+    }
+
+    const restName = (data && data.restName) || (rest && rest.name) || 'Partner Restaurant';
+    const discountAmount = data && typeof data.discountAmount === 'number' ? data.discountAmount : (data && data.savings ? data.savings : 0);
+    const itemName = (data && data.unitName) || (unit && unit.name) || 'Special Offer';
+
+    contentEl.innerHTML = `
+        <div class="vicard-congrats-card" style="padding: 12px 6px 8px 6px; text-align: center; animation: vicardPopIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+            <div style="display: flex; justify-content: flex-end; margin-bottom: 2px;">
+                <button type="button" onclick="closeVicardRedeemModal()" style="background: none; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer; padding: 4px;">✖</button>
+            </div>
+
+            <!-- Animated Celebration Icon -->
+            <div style="font-size: 3.8rem; line-height: 1; margin: 4px 0 14px 0; animation: vicardBounce 0.9s infinite alternate ease-in-out;">
+                🎉
+            </div>
+
+            <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(46, 213, 115, 0.15); border: 1px solid rgba(46, 213, 115, 0.45); color: #2ed573; padding: 4px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px;">
+                <span>✅</span> Verified by Cashier
+            </div>
+
+            <h2 style="font-size: 1.65rem; font-weight: 900; color: #f5d77f; margin: 0 0 8px 0; text-shadow: 0 0 25px rgba(212,175,55,0.45); letter-spacing: -0.3px;">
+                Enjoy your discount!
+            </h2>
+
+            <p style="font-size: 0.92rem; color: #cbd5e1; margin: 0 0 16px 0; line-height: 1.45;">
+                Your VIP discount has been successfully verified & applied at <strong style="color: #ffffff;">${escapeHtml(restName)}</strong>.
+            </p>
+
+            ${discountAmount > 0 ? `
+                <div style="background: linear-gradient(135deg, rgba(46, 213, 115, 0.16) 0%, rgba(16, 185, 129, 0.05) 100%); border: 1.5px solid rgba(46, 213, 115, 0.4); border-radius: 16px; padding: 14px 18px; margin-bottom: 16px; box-shadow: 0 4px 18px rgba(46, 213, 115, 0.15);">
+                    <div style="font-size: 0.75rem; color: #a7f3d0; text-transform: uppercase; font-weight: 800; letter-spacing: 0.6px;">You Saved Today</div>
+                    <div style="font-size: 1.7rem; font-weight: 900; color: #2ed573; margin-top: 2px;">SAR ${discountAmount}</div>
+                </div>
+            ` : ''}
+
+            <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 10px 14px; margin-bottom: 18px; font-size: 0.82rem; color: #94a3b8; display: flex; justify-content: space-around; align-items: center;">
+                <div>
+                    <span style="display: block; font-size: 0.7rem; color: #64748b;">ITEM</span>
+                    <strong style="color: #fff; font-size: 0.82rem;">${escapeHtml(itemName)}</strong>
+                </div>
+                <div style="width: 1px; height: 24px; background: rgba(255,255,255,0.1);"></div>
+                <div>
+                    <span style="display: block; font-size: 0.7rem; color: #64748b;">MEMBER CARD</span>
+                    <strong style="color: #f5d77f; font-family: monospace;">${card ? card.id : ''}</strong>
+                </div>
+            </div>
+
+            <button type="button" onclick="closeVicardRedeemModal()" style="width: 100%; padding: 14px; border-radius: 14px; font-size: 1rem; font-weight: 800; background: linear-gradient(135deg, #d4af37 0%, #aa771c 100%); color: #000; border: none; cursor: pointer; box-shadow: 0 6px 20px rgba(212,175,55,0.4); transition: transform 0.15s ease;">
+                Awesome, Thank You! ✨
+            </button>
+        </div>
+    `;
+
+    // Also update customer stats in memory and in UI if portal is active
+    if (card) {
+        card.visitsCount = (card.visitsCount || 0) + 1;
+        if (discountAmount > 0) card.totalSavings = (card.totalSavings || 0) + discountAmount;
+    }
+}
+window.showVicardDiscountSuccessMessage = showVicardDiscountSuccessMessage;
+
 function openVicardUnitQrModal(card, rest, unit) {
     const modal = document.getElementById('vicard-redeem-modal');
     if (!modal) {
@@ -38652,10 +38726,19 @@ function openVicardUnitQrModal(card, rest, unit) {
     modal.style.width = '100vw';
     modal.style.height = '100vh';
 
+    // Cache or restore original modal content so we can re-open fresh after celebration
+    const contentEl = modal.querySelector('.modal-content');
+    if (!_vicardRedeemModalOriginalHtml && contentEl) {
+        _vicardRedeemModalOriginalHtml = contentEl.innerHTML;
+    } else if (_vicardRedeemModalOriginalHtml && contentEl) {
+        contentEl.innerHTML = _vicardRedeemModalOriginalHtml;
+    }
+
     const restNameEl = document.getElementById('vicard-redeem-rest-name');
     const offerTitleEl = document.getElementById('vicard-redeem-offer-title');
     const custNameEl = document.getElementById('vicard-redeem-customer-name');
     const cardIdEl = document.getElementById('vicard-redeem-card-id');
+    const custTierEl = document.getElementById('vicard-redeem-customer-tier');
     const qrContainer = document.getElementById('vicard-redeem-qrcode');
     const timerEl = document.getElementById('vicard-redeem-timer');
 
@@ -38663,6 +38746,7 @@ function openVicardUnitQrModal(card, rest, unit) {
     if (offerTitleEl) offerTitleEl.textContent = `${unit.name} (SAR ${unit.offerPrice})`;
     if (custNameEl) custNameEl.textContent = card.name || 'VIP Member';
     if (cardIdEl) cardIdEl.textContent = card.id;
+    if (custTierEl) custTierEl.textContent = `👑 ${card.tier || 'VIP Member'}`;
 
     // Verification URL pointing to the cashier verification screen
     const verifyUrl = buildVerificationUrl(card.id, rest.id, unit.id || unit.name);
@@ -38703,6 +38787,24 @@ function openVicardUnitQrModal(card, rest, unit) {
         if (timerEl) timerEl.textContent = `${mins}:${secs}`;
     }, 1000);
 
+    // Attach realtime Firebase listener so customer phone automatically celebrates when cashier confirms
+    const modalOpenedAt = Date.now();
+    if (_vicardRedeemListener && _vicardRedeemRef) {
+        try { _vicardRedeemRef.off('value', _vicardRedeemListener); } catch (e) {}
+        _vicardRedeemListener = null;
+        _vicardRedeemRef = null;
+    }
+
+    if (typeof db !== 'undefined' && db && card && card.id) {
+        _vicardRedeemRef = db.ref(`vicard_network/cards/${card.id}/lastRedemption`);
+        _vicardRedeemListener = _vicardRedeemRef.on('value', snap => {
+            const data = snap.val();
+            if (data && data.timestamp && (data.timestamp >= modalOpenedAt - 3000)) {
+                showVicardDiscountSuccessMessage(data, card, rest, unit);
+            }
+        });
+    }
+
     modal.style.display = 'flex';
     // Push history state so phone back button goes 1 page behind (closes modal instead of app)
     try {
@@ -38720,6 +38822,14 @@ function closeVicardRedeemModal(fromHistory) {
         clearInterval(_vicardRedeemTimerInterval);
         _vicardRedeemTimerInterval = null;
     }
+
+    // Cleanly detach Firebase realtime redemption listener
+    if (_vicardRedeemListener && _vicardRedeemRef) {
+        try { _vicardRedeemRef.off('value', _vicardRedeemListener); } catch (e) {}
+        _vicardRedeemListener = null;
+        _vicardRedeemRef = null;
+    }
+
     // If closed via button click, pop history entry to keep phone back button synchronized
     // Mark _vicardIsClosingRedeemModal so popstate stays right on the restaurant page!
     if (!fromHistory) {
@@ -39030,7 +39140,7 @@ function renderVicardCashierScreen(cardId, card, restId, unitId) {
                         <div style="display:flex; justify-content:center; margin-bottom:8px;">
                             <input type="password" id="vicard-cashier-pin-input" maxlength="4" placeholder="••••"
                                 style="width:140px; text-align:center; padding:8px 10px; font-size:1.5rem; font-family:monospace; font-weight:900; letter-spacing:8px; border-radius:10px; border:2px solid #d4af37; background:rgba(0,0,0,0.7); color:#fff; outline:none; box-sizing:border-box;"
-                                onkeyup="if (event.key === 'Enter') confirmVicardCashierVisit('${card.id}', '${escapeHtml(restId || '')}')">
+                                onkeyup="if (event.key === 'Enter') confirmVicardCashierVisit('${card.id}', '${escapeHtml(restId || '')}', '${escapeHtml(unitName || '')}')">
                         </div>
                         <div id="vicard-cashier-pin-error" style="display:none; color:#eb4d4b; font-size:0.82rem; font-weight:700; margin-bottom:8px;"></div>
                         <label style="display:inline-flex; align-items:center; gap:6px; font-size:0.78rem; color:#cbd5e1; cursor:pointer; user-select:none;">
@@ -39040,7 +39150,7 @@ function renderVicardCashierScreen(cardId, card, restId, unitId) {
                     </div>
                 `}
 
-                <button type="button" onclick="confirmVicardCashierVisit('${card.id}', '${escapeHtml(restId || '')}')"
+                <button type="button" onclick="confirmVicardCashierVisit('${card.id}', '${escapeHtml(restId || '')}', '${escapeHtml(unitName || '')}')"
                     style="width:100%; padding:14px; border-radius:12px; font-size:0.95rem; font-weight:800; background:linear-gradient(135deg, #10b981, #059669); color:#fff; border:none; cursor:pointer; box-shadow:0 4px 14px rgba(16,185,129,0.35);">
                     ✅ Confirm Discount & Log Visit
                 </button>
@@ -39065,7 +39175,7 @@ function calculateVicardDiscount() {
 }
 window.calculateVicardDiscount = calculateVicardDiscount;
 
-function confirmVicardCashierVisit(cardId, restId) {
+function confirmVicardCashierVisit(cardId, restId, unitName) {
     const card = vicardData.cards[cardId];
     if (!card) return;
 
@@ -39104,17 +39214,35 @@ function confirmVicardCashierVisit(cardId, restId) {
     const bill = billInput ? parseFloat(billInput.value) || 0 : 0;
     const pct = pctInput ? parseFloat(pctInput.value) || 0 : 0;
     const discount = (bill * pct) / 100;
+    const discountAmount = Math.round(discount);
 
     const nextVisits = (card.visitsCount || 0) + 1;
-    const nextSavings = (card.totalSavings || 0) + Math.round(discount);
+    const nextSavings = (card.totalSavings || 0) + discountAmount;
 
     card.visitsCount = nextVisits;
     card.totalSavings = nextSavings;
 
+    const discountRecord = {
+        timestamp: Date.now(),
+        restId: restId || '',
+        restName: rest ? rest.name : 'Partner Restaurant',
+        unitName: unitName || '',
+        discountAmount: discountAmount,
+        savings: discountAmount,
+        bill: bill,
+        pct: pct
+    };
+
     db.ref(`vicard_network/cards/${cardId}`).update({
         visitsCount: nextVisits,
-        totalSavings: nextSavings
+        totalSavings: nextSavings,
+        lastRedemption: discountRecord
     }).then(() => {
+        // If customer QR modal is currently open in this window, trigger congratulations immediately
+        const redeemModal = document.getElementById('vicard-redeem-modal');
+        if (redeemModal && redeemModal.style.display !== 'none') {
+            showVicardDiscountSuccessMessage(discountRecord, card, rest, { name: unitName });
+        }
         alert(`🎉 Visit logged successfully!\n\nCustomer: ${card.name}\nTotal visits: ${nextVisits}\nTotal saved: SAR ${nextSavings}`);
         closeVicardCashierScreen();
     }).catch(err => {
