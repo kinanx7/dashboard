@@ -715,8 +715,15 @@ function filterVicardCustomers() {
                     ${statusBadge}
                 </td>
                 <td style="padding: 12px;">
-                    <strong style="color: var(--text-main);">${c.visitsCount || 0}</strong> <span style="font-size: 0.75rem; color: var(--text-muted);">visits</span>
-                    <div style="font-size: 0.75rem; color: #2ed573; font-weight: 600;">SAR ${c.totalSavings || 0} saved</div>
+                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                        <strong style="color: var(--text-main);">${c.visitsCount || 0}</strong> <span style="font-size: 0.75rem; color: var(--text-muted);">visits</span>
+                        <button type="button" onclick="showVicardCustomerVisitHistoryModal('${c.id}')" 
+                            style="padding: 2px 7px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: rgba(212, 175, 55, 0.15); color: #f5d77f; border: 1px solid rgba(212, 175, 55, 0.35); cursor: pointer; display: inline-flex; align-items: center; gap: 3px;" 
+                            title="View Visited Restaurants History">
+                            📜 History
+                        </button>
+                    </div>
+                    <div style="font-size: 0.75rem; color: #2ed573; font-weight: 600; margin-top: 2px;">SAR ${c.totalSavings || 0} saved</div>
                 </td>
                 <td style="padding: 12px; text-align: center;">
                     ${toggleBtn}
@@ -2491,7 +2498,7 @@ function generateRestaurantsDirectoryWebsiteHtml(rests, card) {
             <header class="keeta-header">
                 <div class="keeta-header-left">
                     <div class="keeta-brand-logo">
-                        <img src="front_card.png?v=310" alt="VICard" class="keeta-brand-card-img">
+                        <img src="front_card.png?v=311" alt="VICard" class="keeta-brand-card-img">
                         <div>
                             <div class="keeta-brand-title">VICard <span class="keeta-brand-vip-badge">VIP</span></div>
                         </div>
@@ -2899,6 +2906,10 @@ function showVicardDiscountSuccessMessage(data, card, rest, unit) {
                     <span style="display: block; font-size: 0.7rem; color: #64748b;">MEMBER CARD</span>
                     <strong style="color: #f5d77f; font-family: monospace;">${card ? card.id : ''}</strong>
                 </div>
+            </div>
+
+            <div style="background: rgba(46, 213, 115, 0.15); border: 1.5px solid rgba(46, 213, 115, 0.45); border-radius: 12px; padding: 10px 14px; margin-bottom: 16px; color: #2ed573; font-size: 0.95rem; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <span>👋</span> You can close the page now • يمكنك إغلاق الصفحة الآن
             </div>
 
             <button type="button" onclick="closeVicardRedeemModal()" style="width: 100%; padding: 14px; border-radius: 14px; font-size: 1rem; font-weight: 800; background: linear-gradient(135deg, #d4af37 0%, #aa771c 100%); color: #000; border: none; cursor: pointer; box-shadow: 0 6px 20px rgba(212,175,55,0.4); transition: transform 0.15s ease;">
@@ -3444,21 +3455,29 @@ function confirmVicardCashierVisit(cardId, restId, unitName) {
         pct: pct
     };
 
+    if (!card.visitHistory) card.visitHistory = [];
+    if (Array.isArray(card.visitHistory)) {
+        card.visitHistory.unshift(discountRecord);
+    } else if (typeof card.visitHistory === 'object') {
+        const vKey = 'v_' + Date.now();
+        card.visitHistory[vKey] = discountRecord;
+    }
+
     db.ref(`vicard_network/cards/${cardId}`).update({
         visitsCount: nextVisits,
         totalSavings: nextSavings,
         lastRedemption: discountRecord
-    }).then(() => {
-        // If customer QR modal is currently open in this window, trigger congratulations immediately
-        const redeemModal = document.getElementById('vicard-redeem-modal');
-        if (redeemModal && redeemModal.style.display !== 'none') {
-            showVicardDiscountSuccessMessage(discountRecord, card, rest, { name: unitName });
-        }
-        alert(`🎉 Visit logged successfully!\n\nCustomer: ${card.name}\nTotal visits: ${nextVisits}\nTotal saved: SAR ${nextSavings}`);
-        closeVicardCashierScreen();
-    }).catch(err => {
-        alert('Failed to log visit: ' + err.message);
     });
+    db.ref(`vicard_network/cards/${cardId}/visitHistory`).push(discountRecord);
+
+    // If customer QR modal is currently open in this window, trigger congratulations immediately
+    const redeemModal = document.getElementById('vicard-redeem-modal');
+    if (redeemModal && redeemModal.style.display !== 'none') {
+        showVicardDiscountSuccessMessage(discountRecord, card, rest, { name: unitName });
+    }
+
+    alert(`🎉 Discount applied successfully!\n\nYou can close the page now.\n(تم تطبيق الخصم بنجاح، يمكنك إغلاق الصفحة الآن)\n\nCustomer: ${card.name}\nRestaurant: ${discountRecord.restName}\nTotal visits: ${nextVisits}\nTotal saved: SAR ${nextSavings}`);
+    closeVicardCashierScreen();
 }
 window.confirmVicardCashierVisit = confirmVicardCashierVisit;
 
@@ -3534,7 +3553,7 @@ function openVicardCustomerPortal(cardId, providedKey) {
             );
             setTimeout(() => {
                 renderAuthorizedCustomerPortal(card);
-            }, 650);
+            }, 3000);
             return;
         }
 
@@ -3653,7 +3672,7 @@ function unlockVicardWithPhone(cardId) {
         }
         setTimeout(() => {
             renderAuthorizedCustomerPortal(card);
-        }, 650);
+        }, 3000);
     } else {
         if (errEl) {
             errEl.textContent = 'Incorrect phone number. Please check and try again.';
@@ -3824,6 +3843,121 @@ function escapeHtml(str) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
 }
+
+// --- CUSTOMER RESTAURANT VISIT HISTORY MODAL ---
+function showVicardCustomerVisitHistoryModal(cardId) {
+    const card = (vicardData && vicardData.cards) ? vicardData.cards[cardId] : null;
+    if (!card) {
+        alert('Card not found!');
+        return;
+    }
+
+    const modal = document.getElementById('vicard-visit-history-modal');
+    if (!modal) return;
+
+    if (modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+    }
+
+    const custInfoEl = document.getElementById('vicard-visit-history-cust-info');
+    const listEl = document.getElementById('vicard-visit-history-list');
+
+    if (custInfoEl) {
+        custInfoEl.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <div>
+                    <div style="font-weight:900; color:#fff; font-size:1.05rem;">${escapeHtml(card.name)}</div>
+                    <div style="font-family:monospace; color:#f5d77f; font-size:0.82rem; margin-top:2px;">${card.id} • <span style="color:#d4af37; font-weight:700;">${escapeHtml(card.tier || 'VIP Member')}</span></div>
+                </div>
+                <div style="display:flex; gap:14px; text-align:right;">
+                    <div>
+                        <div style="font-size:0.7rem; color:#94a3b8; text-transform:uppercase;">Visits</div>
+                        <div style="font-size:1.15rem; font-weight:900; color:#fff;">${card.visitsCount || 0}</div>
+                    </div>
+                    <div>
+                        <div style="font-size:0.7rem; color:#94a3b8; text-transform:uppercase;">Total Saved</div>
+                        <div style="font-size:1.15rem; font-weight:900; color:#2ed573;">SAR ${card.totalSavings || 0}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Collect visits list from card.visitHistory or card.visits or card.lastRedemption
+    let visits = [];
+    if (card.visitHistory) {
+        if (Array.isArray(card.visitHistory)) {
+            visits = [...card.visitHistory];
+        } else if (typeof card.visitHistory === 'object') {
+            visits = Object.values(card.visitHistory);
+        }
+    }
+    if (visits.length === 0 && card.lastRedemption) {
+        visits.push(card.lastRedemption);
+    }
+
+    // Sort by timestamp desc
+    visits.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    if (listEl) {
+        if (visits.length === 0) {
+            listEl.innerHTML = `
+                <div style="text-align:center; padding:35px 20px; color:#94a3b8;">
+                    <div style="font-size:2.5rem; margin-bottom:10px;">🍽️</div>
+                    <div style="font-weight:700; color:#fff; font-size:1rem;">No restaurant visits recorded yet</div>
+                    <div style="font-size:0.8rem; margin-top:4px;">Visits will appear here automatically when partner restaurants scan and verify this customer's VIP discounts.</div>
+                </div>
+            `;
+        } else {
+            listEl.innerHTML = `
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                    ${visits.map((v) => {
+                        const dateStr = v.timestamp ? new Date(v.timestamp).toLocaleString() : 'Recent Visit';
+                        const restName = v.restName || 'Partner Restaurant';
+                        const unitName = v.unitName || 'VIP Special Deal';
+                        const saved = typeof v.discountAmount === 'number' ? v.discountAmount : (v.savings || 0);
+
+                        return `
+                            <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:14px 16px;">
+                                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <span style="font-size:1.3rem;">🍽️</span>
+                                        <div>
+                                            <div style="font-weight:800; font-size:1rem; color:#fff;">${escapeHtml(restName)}</div>
+                                            <div style="font-size:0.75rem; color:#94a3b8; margin-top:2px;">${escapeHtml(unitName)}</div>
+                                        </div>
+                                    </div>
+                                    ${saved > 0 ? `
+                                        <span style="background:rgba(46,213,115,0.15); border:1px solid rgba(46,213,115,0.4); color:#2ed573; font-size:0.8rem; font-weight:800; padding:3px 10px; border-radius:20px;">
+                                            Saved SAR ${saved}
+                                        </span>
+                                    ` : `
+                                        <span style="background:rgba(212,175,55,0.15); border:1px solid rgba(212,175,55,0.35); color:#f5d77f; font-size:0.78rem; font-weight:800; padding:3px 8px; border-radius:12px;">
+                                            VIP Visit
+                                        </span>
+                                    `}
+                                </div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; color:#64748b; border-top:1px solid rgba(255,255,255,0.05); padding-top:8px; margin-top:8px;">
+                                    <span>📅 ${dateStr}</span>
+                                    <span style="color:#2ed573; font-weight:700;">✅ Verified by Cashier Staff</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+    }
+
+    modal.style.display = 'flex';
+}
+window.showVicardCustomerVisitHistoryModal = showVicardCustomerVisitHistoryModal;
+
+function closeVicardVisitHistoryModal() {
+    const modal = document.getElementById('vicard-visit-history-modal');
+    if (modal) modal.style.display = 'none';
+}
+window.closeVicardVisitHistoryModal = closeVicardVisitHistoryModal;
 
 // Auto-initialize when loaded or DOM ready
 if (typeof window !== 'undefined') {

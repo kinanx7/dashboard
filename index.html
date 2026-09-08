@@ -93,7 +93,7 @@
     <!-- QR Code Generator Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=310">
+    <link rel="stylesheet" href="style.css?v=311">
 </head>
 
 <body class="theme-burgeroov">
@@ -7559,6 +7559,38 @@
         </div>
     </div>
 
+    <!-- 2b. VICard Customer Visit History Modal -->
+    <div id="vicard-visit-history-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.88); backdrop-filter:blur(10px); justify-content:center; align-items:center; z-index:100000000; padding:16px;" onclick="if (event.target === this) closeVicardVisitHistoryModal();">
+        <div class="modal-content" onclick="event.stopPropagation();" style="max-width:540px; width:100%; max-height:86vh; display:flex; flex-direction:column; border-radius:24px; padding:0; background:linear-gradient(135deg, #181824, #0f0f16); border:1px solid rgba(212,175,55,0.4); box-shadow:0 25px 70px rgba(0,0,0,0.9); color:#fff; overflow:hidden;">
+            <!-- Header -->
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 22px; border-bottom:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.02);">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:1.4rem;">📜</span>
+                    <div>
+                        <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:#fff;">Customer Visit History</h3>
+                        <div style="font-size:0.75rem; color:#f5d77f; margin-top:2px;">سجل زيارات المطاعم والاستفادة من الخصومات</div>
+                    </div>
+                </div>
+                <button type="button" onclick="closeVicardVisitHistoryModal()" style="background:none; border:none; color:#a0aec0; font-size:1.4rem; cursor:pointer;">✖</button>
+            </div>
+
+            <!-- Customer Summary Pill -->
+            <div id="vicard-visit-history-cust-info" style="padding:14px 22px; background:rgba(212,175,55,0.06); border-bottom:1px solid rgba(212,175,55,0.15); font-size:0.85rem;">
+                <!-- Populated dynamically -->
+            </div>
+
+            <!-- Scrollable Visits List -->
+            <div id="vicard-visit-history-list" style="overflow-y:auto; -webkit-overflow-scrolling:touch; padding:18px 22px; flex:1; min-height:140px;">
+                <!-- Populated dynamically -->
+            </div>
+
+            <!-- Footer -->
+            <div style="padding:14px 22px; border-top:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.02); text-align:right;">
+                <button type="button" onclick="closeVicardVisitHistoryModal()" style="padding:10px 22px; border-radius:12px; font-size:0.9rem; font-weight:800; background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); cursor:pointer;">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 3. Add / Edit Partner Restaurant Modal -->
     <div id="vicard-restaurant-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); backdrop-filter:blur(6px); justify-content:center; align-items:center; z-index:999999; padding:16px; box-sizing:border-box;">
         <div class="modal-content" style="max-width:520px; width:100%; max-height:86vh; display:flex; flex-direction:column; border-radius:20px; padding:0; background:var(--card-bg); border:1px solid var(--border-color); box-shadow:0 14px 45px rgba(0,0,0,0.6); color:var(--text-main); overflow:hidden;">
@@ -7913,11 +7945,11 @@
         <div style="max-width:540px; margin:0 auto; padding-bottom:50px;">
             <!-- Top bar -->
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                <div class="keeta-brand-logo" style="display:flex; align-items:center; gap:12px;">
-                    <img src="front_card.png?v=310" alt="VICard" class="keeta-brand-card-img" style="width:54px; height:34px; object-fit:cover; border-radius:6px; border:1.5px solid #d4af37; box-shadow:0 4px 12px rgba(0,0,0,0.5), 0 0 10px rgba(212,175,55,0.3); background:transparent; flex-shrink:0;">
+                <div class="keeta-brand-logo" style="display:flex; align-items:center; gap:14px;">
+                    <img src="front_card.png?v=311" alt="VICard" class="keeta-brand-card-img" style="width:96px; height:58px; object-fit:cover; border-radius:8px; border:1.5px solid #d4af37; box-shadow:0 6px 18px rgba(0,0,0,0.55), 0 0 12px rgba(212,175,55,0.35); background:transparent; flex-shrink:0;">
                     <div>
-                        <div class="keeta-brand-title" style="font-size:1.25rem; font-weight:900; background:linear-gradient(135deg, #ffffff 0%, #f7df94 40%, #d4af37 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:0.5px; line-height:1.15; display:flex; align-items:center; gap:5px;">
-                            VICard <span class="keeta-brand-vip-badge" style="font-size:0.65rem; font-weight:800; background:rgba(212,175,55,0.18); border:1px solid rgba(212,175,55,0.4); color:#f5d77f; padding:1px 6px; border-radius:5px; -webkit-text-fill-color:initial; letter-spacing:0.8px;">VIP</span>
+                        <div class="keeta-brand-title" style="font-size:1.35rem; font-weight:900; background:linear-gradient(135deg, #ffffff 0%, #f7df94 40%, #d4af37 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:0.5px; line-height:1.15; display:flex; align-items:center; gap:6px;">
+                            VICard <span class="keeta-brand-vip-badge" style="font-size:0.7rem; font-weight:800; background:rgba(212,175,55,0.18); border:1px solid rgba(212,175,55,0.4); color:#f5d77f; padding:2px 8px; border-radius:6px; -webkit-text-fill-color:initial; letter-spacing:0.8px;">VIP</span>
                         </div>
                     </div>
                 </div>
@@ -7958,8 +7990,8 @@
     </div>
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=310"></script>
-    <script src="app.js?v=310"></script>
+    <script src="translations.js?v=311"></script>
+    <script src="app.js?v=311"></script>
 </body>
 
 </html>

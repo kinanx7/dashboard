@@ -5099,12 +5099,12 @@ mark.search-highlight,
 }
 
 .keeta-brand-card-img {
-    width: 54px;
-    height: 34px;
+    width: 96px;
+    height: 58px;
     object-fit: cover;
-    border-radius: 6px;
+    border-radius: 8px;
     border: 1.5px solid #d4af37;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 10px rgba(212, 175, 55, 0.35);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55), 0 0 12px rgba(212, 175, 55, 0.35);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     flex-shrink: 0;
     background: transparent !important;
@@ -7820,6 +7820,12 @@ html.vicard-standalone-view > body > *:not(#vicard-customer-portal-overlay):not(
     .keeta-card-category {
         font-size: 0.80rem !important;
         color: #94a3b8 !important;
+    }
+
+    .keeta-brand-card-img {
+        width: 76px !important;
+        height: 46px !important;
+        border-radius: 7px !important;
     }
 }
 
