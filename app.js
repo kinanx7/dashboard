@@ -2508,6 +2508,9 @@ window.toggleLangDropdown = function(event) {
     const sheet = document.getElementById('lang-dropdown-sheet');
     if (sheet) {
         sheet.classList.toggle('show');
+        if (sheet.classList.contains('show')) {
+            sheet.style.zIndex = '100005';
+        }
     }
 };
 
@@ -2538,8 +2541,8 @@ window.closeUserDropdown = function() {
     }
 };
 
-// Global click listener to close dropdowns when clicking outside
-document.addEventListener('click', function(e) {
+// Global click & touch listener to close dropdowns when clicking outside
+function handleDropdownOutsideInteraction(e) {
     const langContainer = document.getElementById('lang-selector-container');
     if (langContainer && !langContainer.contains(e.target)) {
         window.closeLangDropdown();
@@ -2548,7 +2551,9 @@ document.addEventListener('click', function(e) {
     if (userContainer && !userContainer.contains(e.target)) {
         window.closeUserDropdown();
     }
-});
+}
+document.addEventListener('click', handleDropdownOutsideInteraction);
+document.addEventListener('touchend', handleDropdownOutsideInteraction, { passive: true });
 
 
 
