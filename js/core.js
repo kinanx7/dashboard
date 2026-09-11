@@ -2145,7 +2145,17 @@ function listenToCloudData() {
 
         // 2. High-Efficiency Granular Sub-Node Listeners
         const subNodes = [
-            { key: 'workers', render: () => { applyUserRoles(); renderWorkers(); renderTasks(); if (typeof renderConstantTasksSection === 'function') renderConstantTasksSection(); if (typeof renderInquiriesSection === 'function') renderInquiriesSection(); } },
+            { key: 'workers', render: () => { 
+                applyUserRoles(); 
+                renderWorkers(); 
+                renderTasks(); 
+                if (typeof renderConstantTasksSection === 'function') renderConstantTasksSection(); 
+                if (typeof renderInquiriesSection === 'function') renderInquiriesSection(); 
+                if (typeof currentTab !== 'undefined' && currentTab === 'finance') {
+                    if (typeof renderFinanceTable === 'function') renderFinanceTable();
+                    if (typeof renderFinDetails === 'function') renderFinDetails();
+                }
+            } },
             { key: 'warehouse', render: () => { renderWarehouse(); checkStockAlerts(); } },
             { key: 'paymentRequests', render: () => { if (typeof renderPaymentRequests === 'function') renderPaymentRequests(); } },
             { key: 'taskAlerts', render: () => { if (typeof renderTaskAlerts === 'function') renderTaskAlerts(); } },
@@ -2456,6 +2466,10 @@ function applyTranslations() {
             }
         }
     });
+
+    if (typeof updateVicardLanguage === 'function') {
+        updateVicardLanguage();
+    }
 
     if (typeof applyDarkMode === "function") {
         applyDarkMode();

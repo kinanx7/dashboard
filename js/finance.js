@@ -307,14 +307,14 @@ function renderFinDetails() {
                         statusHtml = `<span class="viol-timer text-warning" data-deadline="${deadline}" style="font-size: 0.8rem;">${t('label-fix-within')}${h}h ${m}m ${s}s</span>`;
                         if (isFinAdmin) {
                             actionBtns = `
-                                    <button onclick="resolveViolation('${worker.id}', '${v.id}', 'waive')" class="btn-success" style="padding: 6px 12px; font-size: 0.75rem; margin-right: 4px;">${t('btn-fixed-waive')}</button>
-                                    <button onclick="resolveViolation('${worker.id}', '${v.id}', 'apply')" class="btn-danger" style="padding: 6px 12px; font-size: 0.75rem;">${t('btn-not-fixed-apply')}</button>
+                                    <button type="button" onclick="resolveViolation('${worker.id}', '${v.id}', 'waive')" class="btn-success" style="padding: 6px 12px; font-size: 0.75rem; margin-right: 4px; cursor: pointer;">${t('btn-fixed-waive')}</button>
+                                    <button type="button" onclick="resolveViolation('${worker.id}', '${v.id}', 'apply')" class="btn-danger" style="padding: 6px 12px; font-size: 0.75rem; cursor: pointer;">${t('btn-not-fixed-apply')}</button>
                                 `;
                         }
                     }
                 }
 
-                let delBtn = isFinAdmin ? `<button onclick="deleteDetailedViolation('${worker.id}', '${v.id}')" class="btn-outline-danger" style="padding: 4px 8px; font-size: 0.75rem;">${t('btn-remove')}</button>` : '';
+                let delBtn = isFinAdmin ? `<button type="button" onclick="deleteDetailedViolation('${worker.id}', '${v.id}')" class="btn-outline-danger" style="padding: 4px 8px; font-size: 0.75rem; cursor: pointer;">${t('btn-remove')}</button>` : '';
 
                 vDiv.innerHTML = `
                         <div class="flex-between" style="margin-bottom: 8px;"><span style="font-size: 0.8rem; color: var(--text-muted);">🕒 ${v.date}</span>${delBtn}</div>

@@ -93,7 +93,7 @@
     <!-- QR Code Generator Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=318">
+    <link rel="stylesheet" href="style.css?v=319">
 </head>
 
 <body class="theme-burgeroov">
@@ -5231,14 +5231,14 @@
                         </div>
                         <div>
                             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                                <h2 style="font-size: 1.3rem; font-weight: 700; margin: 0; color: var(--text-main); letter-spacing: -0.01em;">
-                                    VICard Management
+                                <h2 style="font-size: 1.3rem; font-weight: 700; margin: 0; color: var(--text-main); letter-spacing: -0.01em;" data-i18n="nfc-header-title">
+                                    💳 VICard (Very Important Card) NFC VIP Ecosystem
                                 </h2>
                                 <span style="font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: rgba(212,175,55,0.1); color: #d4af37; border: 1px solid rgba(212,175,55,0.25); letter-spacing: 0.04em; text-transform: uppercase;">
                                     NFC Network
                                 </span>
                             </div>
-                            <p style="margin: 3px 0 0 0; color: var(--text-muted); font-size: 0.84rem; font-weight: 400;">
+                            <p style="margin: 3px 0 0 0; color: var(--text-muted); font-size: 0.84rem; font-weight: 400;" data-i18n="nfc-header-desc">
                                 Issue customer cards, manage partner restaurant contracts, and verify live redemptions
                             </p>
                         </div>
@@ -5248,21 +5248,21 @@
                     <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                         <button type="button" class="btn" onclick="openVicardBannerModal()"
                             style="padding: 8px 14px; border-radius: 9px; font-size: 0.82rem; font-weight: 700; background: rgba(212,175,55,0.12); color: #d4af37; border: 1px solid rgba(212,175,55,0.3); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s ease;">
-                            <span>🎨</span> Edit Hero Banner
+                            <span>🎨</span> <span data-i18n="nfc-btn-edit-banner">Edit Hero Banner</span>
                         </button>
                         <button type="button" class="btn" onclick="openVicardTiersModal()"
                             style="padding: 8px 14px; border-radius: 9px; font-size: 0.82rem; font-weight: 700; background: rgba(59,130,246,0.12); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s ease;">
-                            <span>🏅</span> Manage Tiers
+                            <span>🏅</span> <span data-i18n="nfc-btn-manage-tiers">Manage Tiers</span>
                         </button>
 
                         <div class="nfc-view-switcher" style="display: inline-flex; align-items: center; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 3px; gap: 3px;">
                             <button type="button" id="nfc-view-btn-manager" onclick="switchNfcSubTab('manager')"
                                 style="padding: 7px 16px; border-radius: 7px; font-size: 0.82rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 6px; background: var(--card-bg); color: var(--text-main); box-shadow: 0 1px 3px rgba(0,0,0,0.18);">
-                                <span>🛠️</span> Manager Hub
+                                <span>🛠️</span> <span data-i18n="nfc-tab-manager">Manager Hub</span>
                             </button>
                             <button type="button" id="nfc-view-btn-customer" onclick="switchNfcSubTab('customer')"
                                 style="padding: 7px 16px; border-radius: 7px; font-size: 0.82rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 6px; background: transparent; color: var(--text-muted);">
-                                <span>🌐</span> Customer Preview
+                                <span>🌐</span> <span data-i18n="nfc-tab-customer">Customer Preview</span>
                             </button>
                         </div>
                     </div>
@@ -5271,22 +5271,22 @@
                 <!-- Executive HUD KPI Strip -->
                 <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border-color); width: 100%; box-sizing: border-box;" class="nfc-hud-stats-grid">
                     <div style="background: linear-gradient(145deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015)); padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.09); box-shadow: 0 4px 12px rgba(0,0,0,0.22); display: flex; flex-direction: column; justify-content: space-between; min-height: 72px; box-sizing: border-box;">
-                        <div style="font-size: 0.70rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">💳 Total Issued</div>
+                        <div style="font-size: 0.70rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;" data-i18n="nfc-stat-total-cards">💳 Total Issued</div>
                         <div id="vicard-stat-total" style="font-size: 1.55rem; font-weight: 900; color: #f8fafc; margin-top: 4px; font-variant-numeric: tabular-nums; line-height: 1.15;">0</div>
                     </div>
                     <div style="background: linear-gradient(145deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015)); padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.09); box-shadow: 0 4px 12px rgba(0,0,0,0.22); display: flex; flex-direction: column; justify-content: space-between; min-height: 72px; box-sizing: border-box;">
                         <div style="display: flex; align-items: center; justify-content: space-between;">
-                            <span style="font-size: 0.70rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">Active Cards</span>
+                            <span style="font-size: 0.70rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;" data-i18n="nfc-stat-active-cards">Active Cards</span>
                             <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981;"></span>
                         </div>
                         <div id="vicard-stat-active" style="font-size: 1.55rem; font-weight: 900; color: #10b981; margin-top: 4px; font-variant-numeric: tabular-nums; line-height: 1.15;">0</div>
                     </div>
                     <div style="background: linear-gradient(145deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015)); padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.09); box-shadow: 0 4px 12px rgba(0,0,0,0.22); display: flex; flex-direction: column; justify-content: space-between; min-height: 72px; box-sizing: border-box;">
-                        <div style="font-size: 0.70rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">🍽️ Partner Rests</div>
+                        <div style="font-size: 0.70rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;" data-i18n="nfc-stat-restaurants">🍽️ Partner Rests</div>
                         <div id="vicard-stat-restaurants" style="font-size: 1.55rem; font-weight: 900; color: #f5d77f; margin-top: 4px; font-variant-numeric: tabular-nums; line-height: 1.15;">0</div>
                     </div>
                     <div style="background: linear-gradient(145deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015)); padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.09); box-shadow: 0 4px 12px rgba(0,0,0,0.22); display: flex; flex-direction: column; justify-content: space-between; min-height: 72px; box-sizing: border-box;">
-                        <div style="font-size: 0.70rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">📜 Menu Units</div>
+                        <div style="font-size: 0.70rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;" data-i18n="nfc-stat-offers">📜 Menu Units</div>
                         <div id="vicard-stat-offers" style="font-size: 1.55rem; font-weight: 900; color: #38bdf8; margin-top: 4px; font-variant-numeric: tabular-nums; line-height: 1.15;">0</div>
                     </div>
                 </div>
@@ -5299,30 +5299,30 @@
                     <div class="card" style="border-radius: 18px; border: 1px solid var(--border-color); padding: 24px; position: sticky; top: 80px;">
                         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color);">
                             <span style="font-size: 1.4rem;">✨</span>
-                            <h3 style="font-size: 1.15rem; font-weight: 800; margin: 0; color: var(--text-main);">Issue New VICard</h3>
+                            <h3 style="font-size: 1.15rem; font-weight: 800; margin: 0; color: var(--text-main);" data-i18n="nfc-issue-title">Issue New VICard</h3>
                         </div>
 
                         <form id="form-create-vicard" onsubmit="handleCreateVicard(event)">
                             <div class="vicard-form-inputs-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 14px;">
                                 <div>
-                                    <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">
+                                    <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);" data-i18n="nfc-label-cust-name">
                                         Customer Full Name *
                                     </label>
-                                    <input type="text" id="vicard-cust-name" required placeholder="e.g. Kinan Al-Khatib"
+                                    <input type="text" id="vicard-cust-name" required placeholder="e.g. Kinan Al-Khatib" data-i18n-placeholder="nfc-ph-cust-name"
                                         style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.95rem; box-sizing: border-box;">
                                 </div>
 
                                 <div>
-                                    <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);">
+                                    <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);" data-i18n="nfc-label-cust-phone">
                                         Phone Number (Optional)
                                     </label>
-                                    <input type="tel" id="vicard-cust-phone" placeholder="e.g. 0501234567" dir="ltr"
+                                    <input type="tel" id="vicard-cust-phone" placeholder="e.g. 0501234567" data-i18n-placeholder="nfc-ph-cust-phone" dir="ltr"
                                         style="width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.95rem; box-sizing: border-box;">
                                 </div>
 
                                 <div>
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                                        <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin: 0;">
+                                        <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin: 0;" data-i18n="nfc-label-cust-tier">
                                             Card Membership Tier
                                         </label>
                                         <a href="javascript:void(0)" onclick="openVicardTiersModal()" style="font-size: 0.75rem; color: #d4af37; text-decoration: none; font-weight: 700;">⚙️ Manage Tiers</a>
@@ -5333,20 +5333,20 @@
                                 </div>
                             </div>
 
-                            <button type="submit" class="btn" style="width: 100%; padding: 12px; border-radius: 12px; font-size: 0.95rem; font-weight: 800; background: linear-gradient(135deg, #d4af37, #b8860b); color: #000; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(212,175,55,0.3); display: flex; align-items: center; justify-content: center; gap: 8px; white-space: normal; text-align: center;">
+                            <button type="submit" class="btn" style="width: 100%; padding: 12px; border-radius: 12px; font-size: 0.95rem; font-weight: 800; background: linear-gradient(135deg, #d4af37, #b8860b); color: #000; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(212,175,55,0.3); display: flex; align-items: center; justify-content: center; gap: 8px; white-space: normal; text-align: center;" data-i18n="nfc-btn-create-card">
                                 <span>⚡</span> Create VICard & Generate NFC URL
                             </button>
                         </form>
 
                         <!-- NFC Quick Guide Box -->
                         <div style="margin-top: 20px; padding: 14px; border-radius: 12px; background: rgba(212,175,55,0.06); border: 1px dashed rgba(212,175,55,0.3);">
-                            <div style="font-size: 0.82rem; font-weight: 700; color: #d4af37; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                            <div style="font-size: 0.82rem; font-weight: 700; color: #d4af37; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;" data-i18n="nfc-guide-title">
                                 <span>📲</span> How to write to NFC Card:
                             </div>
                             <ol style="margin: 0; padding-left: 18px; font-size: 0.78rem; color: var(--text-muted); line-height: 1.5;">
-                                <li>Open free app <strong>NFC Tools</strong> on your phone</li>
-                                <li>Select <strong>Write</strong> ➔ <strong>Add a record</strong> ➔ <strong>Custom URL / URI</strong></li>
-                                <li>Paste generated URL and tap <strong>Write</strong> against the card</li>
+                                <li data-i18n="nfc-guide-step1">Open free app <strong>NFC Tools</strong> on your phone</li>
+                                <li data-i18n="nfc-guide-step2">Select <strong>Write</strong> ➔ <strong>Add a record</strong> ➔ <strong>Custom URL / URI</strong></li>
+                                <li data-i18n="nfc-guide-step3">Paste generated URL and tap <strong>Write</strong> against the card</li>
                             </ol>
                         </div>
                     </div>
@@ -5359,12 +5359,12 @@
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <span style="font-size: 1.4rem;">🍽️</span>
                                     <div>
-                                        <h3 style="font-size: 1.15rem; font-weight: 800; margin: 0; color: var(--text-main);">Partner Restaurants & Menu Units</h3>
-                                        <div style="font-size: 0.8rem; color: var(--text-muted);">Manage contracted restaurants, logos, dish photos, and exclusive prices</div>
+                                        <h3 style="font-size: 1.15rem; font-weight: 800; margin: 0; color: var(--text-main);" data-i18n="nfc-rests-title">Partner Restaurants & Menu Units</h3>
+                                        <div style="font-size: 0.8rem; color: var(--text-muted);" data-i18n="nfc-rests-desc">Manage contracted restaurants, logos, dish photos, and exclusive prices</div>
                                     </div>
                                 </div>
                                 <button type="button" class="btn" onclick="openAddRestaurantModal()"
-                                    style="padding: 9px 18px; border-radius: 10px; font-size: 0.88rem; font-weight: 800; background: var(--primary); color: #fff; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                                    style="padding: 9px 18px; border-radius: 10px; font-size: 0.88rem; font-weight: 800; background: var(--primary); color: #fff; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px;" data-i18n="nfc-btn-add-restaurant">
                                     <span>➕</span> Add Restaurant
                                 </button>
                             </div>
@@ -5380,19 +5380,19 @@
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <span style="font-size: 1.4rem;">👥</span>
                                     <div>
-                                        <h3 style="font-size: 1.15rem; font-weight: 800; margin: 0; color: var(--text-main);">Issued Customer Cards</h3>
-                                        <div style="font-size: 0.8rem; color: var(--text-muted);">Activate, suspend, or delete customer cards with real-time Firebase sync</div>
+                                        <h3 style="font-size: 1.15rem; font-weight: 800; margin: 0; color: var(--text-main);" data-i18n="nfc-cards-title">Issued Customer Cards</h3>
+                                        <div style="font-size: 0.8rem; color: var(--text-muted);" data-i18n="nfc-cards-desc">Activate, suspend, or delete customer cards with real-time Firebase sync</div>
                                     </div>
                                 </div>
 
                                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                    <input type="text" id="vicard-cust-search" placeholder="🔍 Search name or VIC-ID..." oninput="filterVicardCustomers()"
+                                    <input type="text" id="vicard-cust-search" placeholder="🔍 Search name or VIC-ID..." data-i18n-placeholder="nfc-ph-search-cards" oninput="filterVicardCustomers()"
                                         style="padding: 8px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.85rem; width: 190px;">
                                     <select id="vicard-cust-filter-status" onchange="filterVicardCustomers()"
                                         style="padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-main); font-size: 0.85rem;">
-                                        <option value="all">All Status</option>
-                                        <option value="active">Active Only</option>
-                                        <option value="deactivated">Deactivated Only</option>
+                                        <option value="all" data-i18n="nfc-opt-all-status">All Status</option>
+                                        <option value="active" data-i18n="nfc-opt-active-only">Active Only</option>
+                                        <option value="deactivated" data-i18n="nfc-opt-deactive-only">Deactivated Only</option>
                                     </select>
                                 </div>
                             </div>
@@ -5402,12 +5402,12 @@
                                     <thead>
                                         <tr style="border-bottom: 1px solid var(--border-color); text-align: left; background: var(--card-bg);">
                                             <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600; min-width: 175px;" data-i18n="nfc-th-card-id">Card ID & VIP Tier</th>
-                                            <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600;">Customer</th>
-                                            <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600;">Phone</th>
-                                            <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600;">Status</th>
-                                            <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600;">Visits & Savings</th>
-                                            <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600; text-align: center;">Toggle Activation</th>
-                                            <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600; text-align: right;">Actions</th>
+                                            <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600;" data-i18n="nfc-th-customer">Customer</th>
+                                            <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600;" data-i18n="nfc-th-phone">Phone</th>
+                                            <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600;" data-i18n="nfc-th-status">Status</th>
+                                            <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600;" data-i18n="nfc-th-visits">Visits, Offers Left & Stats</th>
+                                            <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600; text-align: center;" data-i18n="nfc-th-toggle">Toggle Activation</th>
+                                            <th style="padding: 10px 12px; color: var(--text-muted); font-weight: 600; text-align: right;" data-i18n="nfc-th-actions">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="vicard-customers-table-body">
@@ -5427,7 +5427,7 @@
                     <div class="vicard-preview-select-wrap" style="display: flex; flex-direction: column; gap: 8px; width: 100%; box-sizing: border-box;">
                         <div class="vicard-preview-label" style="display: flex; align-items: center; gap: 8px;">
                             <span style="font-size: 1.2rem;">👁️</span>
-                            <span style="font-size: 0.82rem; font-weight: 800; color: #f5d77f; text-transform: uppercase; letter-spacing: 0.04em;">Previewing as VIP Cardholder:</span>
+                            <span style="font-size: 0.82rem; font-weight: 800; color: #f5d77f; text-transform: uppercase; letter-spacing: 0.04em;" data-i18n="nfc-preview-label">Previewing as VIP Cardholder:</span>
                         </div>
                         <select id="vicard-website-card-select" onchange="renderCustomerWebsite()"
                             style="padding: 10px 14px; border-radius: 12px; border: 1.5px solid rgba(212,175,55,0.45); background: #0c0d14; color: #ffffff; font-size: 0.9rem; font-weight: 700; width: 100%; min-width: 0; max-width: 100%; height: 44px; box-sizing: border-box;">
@@ -5437,7 +5437,7 @@
 
                     <button type="button" class="vicard-preview-return-btn" onclick="switchNfcSubTab('manager')"
                         style="padding: 10px 18px; border-radius: 12px; font-size: 0.86rem; font-weight: 800; background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.18); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 42px; box-sizing: border-box;">
-                        <span>👔</span> Return to Manager Hub
+                        <span>👔</span> <span data-i18n="nfc-btn-return-manager">Return to Manager Hub</span>
                     </button>
                 </div>
 
@@ -7682,122 +7682,133 @@
     </div>
 
     <!-- 2c. VICard Customer Profile & Subscription Modal -->
-    <div id="vicard-profile-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.88); backdrop-filter:blur(12px); justify-content:center; align-items:center; z-index:100000000; padding:16px;" onclick="if (event.target === this) closeVicardCustomerProfileModal();">
-        <div class="modal-content" onclick="event.stopPropagation();" style="max-width:460px; width:100%; border-radius:24px; padding:0; background:linear-gradient(135deg, #181824, #0d0d14); border:1.5px solid rgba(212,175,55,0.45); box-shadow:0 25px 70px rgba(0,0,0,0.9), 0 0 30px rgba(212,175,55,0.2); color:#fff; overflow:hidden;">
-            <!-- Header -->
-            <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 22px; border-bottom:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.02);">
+    <!-- 2c. VIP Member Profile & Subscription Modal (Professional Luxury Executive Edition) -->
+    <div id="vicard-profile-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); backdrop-filter:blur(10px); justify-content:center; align-items:center; z-index:100000000; padding:16px; box-sizing:border-box;" onclick="if (event.target === this) closeVicardCustomerProfileModal();">
+        <div class="modal-content" onclick="event.stopPropagation();" style="max-width:480px; width:100%; border-radius:20px; padding:0; background:#0d0e15; border:1px solid rgba(212,175,55,0.35); box-shadow:0 20px 60px rgba(0,0,0,0.9); color:#fff; overflow:hidden; font-family:'Outfit',-apple-system,BlinkMacSystemFont,sans-serif;">
+            
+            <!-- Modal Header -->
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.02);">
                 <div style="display:flex; align-items:center; gap:10px;">
-                    <span style="font-size:1.3rem;">⚜️</span>
+                    <div style="width:34px; height:34px; border-radius:10px; background:linear-gradient(135deg, rgba(212,175,55,0.25), rgba(212,175,55,0.05)); border:1px solid rgba(212,175,55,0.4); display:flex; align-items:center; justify-content:center; font-size:1.1rem; color:#f5d77f;">
+                        🛡️
+                    </div>
                     <div>
-                        <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:#fff;">VICard Profile</h3>
-                        <div style="font-size:0.75rem; color:#f5d77f; margin-top:2px;">بيانات العضوية وحالة الاشتراك</div>
+                        <h3 id="vicard-profile-title" style="margin:0; font-size:1.05rem; font-weight:800; color:#fff;" data-i18n="nfc-profile-modal-title">VIP Membership Profile</h3>
+                        <div id="vicard-profile-sub" style="font-size:0.75rem; color:#94a3b8; margin-top:2px;" data-i18n="nfc-profile-modal-subtitle">Cardholder Details & Privileges</div>
                     </div>
                 </div>
-                <button type="button" onclick="closeVicardCustomerProfileModal()" style="background:none; border:none; color:#a0aec0; font-size:1.4rem; cursor:pointer;">✖</button>
+                <button type="button" onclick="closeVicardCustomerProfileModal()" style="background:none; border:none; color:#94a3b8; font-size:1.3rem; cursor:pointer; padding:4px 8px; line-height:1;" title="Close">✕</button>
             </div>
 
-            <div style="padding:22px; display:flex; flex-direction:column; gap:16px;">
-                <!-- Identity Card (Advanced Executive VIP Metal & Smart Chip Styling) -->
-                <div class="vicard-lux-card-identity">
-                    <!-- Top Row: Monogram Crest + EMV Chip + Active Status -->
-                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            <!-- Executive Titanium Monogram Seal -->
-                            <div class="vicard-lux-monogram" id="vicard-profile-monogram" title="VIP Member Monogram">
-                                <span id="vicard-profile-monogram-initial">K</span>
+            <div style="padding:20px; display:flex; flex-direction:column; gap:16px; max-height:calc(90vh - 120px); overflow-y:auto;">
+                
+                <!-- 1. Executive Card Identity -->
+                <div style="background:linear-gradient(135deg, #181822 0%, #0f1017 100%); border:1px solid rgba(212,175,55,0.35); border-radius:16px; padding:18px 20px; position:relative; overflow:hidden;">
+                    <!-- Top Row: Chip + Status -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <div class="vicard-lux-monogram" id="vicard-profile-monogram" style="width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg, #d4af37, #8a6414); color:#000; font-weight:900; font-size:1.1rem; display:flex; align-items:center; justify-content:center;">
+                                <span id="vicard-profile-monogram-initial">V</span>
                             </div>
-                            <!-- Contactless EMV Smart Chip -->
-                            <div class="vicard-lux-emv-chip" title="VICard Smart Contactless Chip"></div>
+                            <div class="vicard-lux-emv-chip" title="EMV Smart Contactless Chip"></div>
                         </div>
 
-                        <!-- Pulsating Emerald Status Badge -->
-                        <div id="vicard-profile-status-badge" class="vicard-lux-status-badge">
-                            <span class="vicard-lux-status-dot"></span>
+                        <!-- Status Badge with strict LTR isolation -->
+                        <div id="vicard-profile-status-badge" style="display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:20px; font-size:0.75rem; font-weight:800; letter-spacing:0.5px; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.4); color:#10b981;" dir="ltr">
+                            <span style="width:7px; height:7px; border-radius:50%; background:#10b981; box-shadow:0 0 6px #10b981;"></span>
                             <span id="vicard-profile-status-text">ACTIVE VIP</span>
                         </div>
                     </div>
 
-                    <!-- Middle Row: Customer Name & Card Number -->
-                    <div style="margin-bottom:14px;">
-                        <div id="vicard-profile-cust-name" class="vicard-lux-name-foil">VIP Member</div>
-                        <div style="display:flex; align-items:center; gap:6px; margin-top:4px;">
-                            <span style="font-size:0.7rem; color:#94a3b8; letter-spacing:1px; text-transform:uppercase; font-weight:700;">CARD NO:</span>
-                            <span id="vicard-profile-cust-id" style="font-size:0.88rem; font-family:'Courier New', monospace; color:#f5d77f; font-weight:800; letter-spacing:1.5px;">VIC • 8939</span>
+                    <!-- Customer Name & Card Number -->
+                    <div style="margin-bottom:12px;">
+                        <div id="vicard-profile-cust-name" style="font-size:1.2rem; font-weight:800; color:#fff; letter-spacing:0.3px;">VIP Member</div>
+                        <div style="display:flex; align-items:center; gap:6px; margin-top:4px;" dir="ltr">
+                            <span style="font-size:0.72rem; color:#94a3b8; font-weight:700; letter-spacing:0.8px; text-transform:uppercase;" data-i18n="nfc-profile-card-id">CARD ID:</span>
+                            <span id="vicard-profile-cust-id" style="font-family:monospace; font-size:0.92rem; font-weight:800; color:#f5d77f; letter-spacing:1px;">VIC-8939</span>
                         </div>
                     </div>
 
-                    <!-- Bottom Row: Sleek Tier Rank Capsule -->
-                    <div id="vicard-profile-tier-badge" class="vicard-lux-tier-pill">
-                        <span id="vicard-profile-tier-icon" style="font-size:1.15rem; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));">🥈</span>
-                        <span id="vicard-profile-tier-name" style="font-size:0.92rem; font-weight:800; color:#f5d77f; letter-spacing:0.3px;">Silver VIP</span>
-                        <span id="vicard-profile-tier-rank" style="font-size:0.72rem; font-weight:800; background:linear-gradient(135deg, #d4af37, #aa771c); color:#000; padding:2px 8px; border-radius:8px; margin-left:4px; box-shadow:0 2px 6px rgba(0,0,0,0.4);">Rank 2</span>
-                    </div>
-                </div>
-
-                <!-- Subscription Expiry & Renewal Box -->
-                <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:18px; padding:16px;">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
-                        <div>
-                            <div style="font-size:0.75rem; color:#94a3b8; text-transform:uppercase; font-weight:700;">Subscription End Date</div>
-                            <div id="vicard-profile-sub-end-date" style="font-size:1.05rem; font-weight:900; color:#fff; margin-top:2px;">—</div>
+                    <!-- Tier Capsule -->
+                    <div style="display:flex; align-items:center; justify-content:space-between; border-top:1px solid rgba(255,255,255,0.06); padding-top:10px;">
+                        <div id="vicard-profile-tier-badge" style="display:inline-flex; align-items:center; gap:6px;">
+                            <span id="vicard-profile-tier-icon" style="font-size:1rem;">🏅</span>
+                            <strong id="vicard-profile-tier-name" style="font-size:0.88rem; color:#f5d77f; font-weight:800;">Black VIP</strong>
                         </div>
-                        <div id="vicard-profile-sub-days-tag" style="background:rgba(212,175,55,0.15); border:1px solid rgba(212,175,55,0.35); color:#f5d77f; font-size:0.78rem; font-weight:800; padding:4px 10px; border-radius:12px;">
-                            30 days left
-                        </div>
-                    </div>
-                    <div id="vicard-profile-autorenew-notice" style="display:flex; align-items:center; gap:6px; font-size:0.78rem; color:#2ed573; font-weight:700; border-top:1px solid rgba(255,255,255,0.05); padding-top:10px;">
-                        <span>🔄</span> Auto-renews monthly until deactivated • يتجدد تلقائياً شهرياً
+                        <span id="vicard-profile-tier-rank" dir="ltr" style="font-size:0.72rem; font-weight:800; background:rgba(212,175,55,0.18); border:1px solid rgba(212,175,55,0.4); color:#f5d77f; padding:2px 8px; border-radius:6px;">Rank 4</span>
                     </div>
                 </div>
 
-                <!-- Monthly Discounts & Offer Limit Balance -->
-                <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:18px; padding:16px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                        <span style="font-size:0.85rem; font-weight:800; color:#fff;">🎯 Monthly Offers Balance</span>
-                        <span id="vicard-profile-monthly-count" style="font-size:0.88rem; font-weight:900; color:#f5d77f;">0 / 10 used</span>
-                    </div>
-
-                    <!-- Progress Bar -->
-                    <div style="width:100%; height:8px; background:rgba(255,255,255,0.1); border-radius:10px; overflow:hidden; margin-bottom:10px;">
-                        <div id="vicard-profile-monthly-progress" style="width:0%; height:100%; background:linear-gradient(90deg, #d4af37, #2ed573); border-radius:10px; transition:width 0.3s ease;"></div>
-                    </div>
-
-                    <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#94a3b8;">
-                        <span id="vicard-profile-monthly-rem">10 offers remaining this month</span>
-                        <span id="vicard-profile-renewal-date">Renews: —</span>
-                    </div>
-                </div>
-
-                <!-- Lifetime Spend & Savings Statistics -->
-                <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:18px; padding:16px;">
+                <!-- 2. Financial & Lifetime Performance (Sorted & Clean 3-Card Grid) -->
+                <div style="background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); border-radius:16px; padding:16px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                        <span style="font-size:0.85rem; font-weight:800; color:#fff;">📊 Lifetime VIP Statistics • إحصائيات العضوية</span>
-                        <button type="button" id="vicard-profile-history-btn" style="padding:4px 10px; border-radius:8px; font-size:0.75rem; font-weight:700; background:rgba(212,175,55,0.15); color:#f5d77f; border:1px solid rgba(212,175,55,0.35); cursor:pointer;">
-                            📜 History
+                        <div style="font-size:0.78rem; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px;" id="vicard-profile-stats-title" data-i18n="nfc-profile-stats-title">Lifetime VIP Statistics</div>
+                        <button type="button" id="vicard-profile-history-btn" style="padding:4px 10px; border-radius:8px; font-size:0.75rem; font-weight:700; background:rgba(212,175,55,0.14); color:#f5d77f; border:1px solid rgba(212,175,55,0.35); cursor:pointer; display:inline-flex; align-items:center; gap:4px;" data-i18n="nfc-profile-btn-history">
+                            📜 Visit History
                         </button>
                     </div>
 
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                        <div style="background:rgba(46,213,115,0.08); border:1px solid rgba(46,213,115,0.25); border-radius:14px; padding:12px; text-align:center;">
-                            <div style="font-size:0.7rem; color:#2ed573; text-transform:uppercase; font-weight:800; letter-spacing:0.5px;">Amount Saved (التوفير)</div>
-                            <div id="vicard-profile-total-saved" style="font-size:1.35rem; font-weight:900; color:#2ed573; margin-top:3px;">SAR 0</div>
+                    <!-- 3-Column Metrics Grid -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+                        <!-- Total Saved -->
+                        <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.22); border-radius:12px; padding:12px 8px; text-align:center;">
+                            <div style="font-size:0.68rem; color:#10b981; font-weight:800; text-transform:uppercase; margin-bottom:4px;" id="vicard-profile-lbl-saved" data-i18n="nfc-profile-stat-saved">Total Saved</div>
+                            <div id="vicard-profile-total-saved" dir="ltr" style="font-size:1.15rem; font-weight:900; color:#10b981; font-variant-numeric:tabular-nums;">SAR 0</div>
                         </div>
-                        <div style="background:rgba(212,175,55,0.08); border:1px solid rgba(212,175,55,0.25); border-radius:14px; padding:12px; text-align:center;">
-                            <div style="font-size:0.7rem; color:#f5d77f; text-transform:uppercase; font-weight:800; letter-spacing:0.5px;">Amount Spent (المصروف)</div>
-                            <div id="vicard-profile-total-spent" style="font-size:1.35rem; font-weight:900; color:#f5d77f; margin-top:3px;">SAR 0</div>
+                        <!-- Total Spent -->
+                        <div style="background:rgba(212,175,55,0.08); border:1px solid rgba(212,175,55,0.25); border-radius:12px; padding:12px 8px; text-align:center;">
+                            <div style="font-size:0.68rem; color:#f5d77f; font-weight:800; text-transform:uppercase; margin-bottom:4px;" id="vicard-profile-lbl-spent" data-i18n="nfc-profile-stat-spent">Total Spent</div>
+                            <div id="vicard-profile-total-spent" dir="ltr" style="font-size:1.15rem; font-weight:900; color:#f5d77f; font-variant-numeric:tabular-nums;">SAR 0</div>
+                        </div>
+                        <!-- Total Visits -->
+                        <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:12px 8px; text-align:center;">
+                            <div style="font-size:0.68rem; color:#cbd5e1; font-weight:800; text-transform:uppercase; margin-bottom:4px;" id="vicard-profile-lbl-visits" data-i18n="nfc-profile-stat-visits">Visits</div>
+                            <div id="vicard-profile-total-visits" dir="ltr" style="font-size:1.15rem; font-weight:900; color:#f8fafc; font-variant-numeric:tabular-nums;">0</div>
                         </div>
                     </div>
 
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05); font-size:0.78rem; color:#94a3b8;">
-                        <span>Total Restaurant Visits:</span>
-                        <strong id="vicard-profile-total-visits" style="color:#fff; font-size:0.92rem;">0 visits</strong>
+                    <!-- Monthly Offers Usage / Balance Bar -->
+                    <div style="margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.06);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <span style="font-size:0.8rem; font-weight:700; color:#cbd5e1;" id="vicard-profile-monthly-title" data-i18n="nfc-profile-monthly-title">Monthly Offers Quota</span>
+                            <span id="vicard-profile-monthly-count" dir="ltr" style="font-size:0.82rem; font-weight:800; color:#38bdf8;">0 / 20 used</span>
+                        </div>
+                        
+                        <!-- Smooth Bar -->
+                        <div style="width:100%; height:6px; background:rgba(255,255,255,0.08); border-radius:10px; overflow:hidden; margin-bottom:6px;">
+                            <div id="vicard-profile-monthly-progress" style="width:0%; height:100%; background:linear-gradient(90deg, #38bdf8, #10b981); border-radius:10px; transition:width 0.3s ease;"></div>
+                        </div>
+
+                        <div style="display:flex; justify-content:space-between; font-size:0.74rem; color:#94a3b8;">
+                            <span id="vicard-profile-monthly-rem">20 offers remaining</span>
+                            <span id="vicard-profile-renewal-date" dir="ltr">Renews: —</span>
+                        </div>
                     </div>
                 </div>
+
+                <!-- 3. Subscription & Validity -->
+                <div style="background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.07); border-radius:16px; padding:16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+                        <div>
+                            <div style="font-size:0.72rem; color:#94a3b8; text-transform:uppercase; font-weight:700;" id="vicard-profile-lbl-sub-end" data-i18n="nfc-subscription-end">Subscription End Date</div>
+                            <div id="vicard-profile-sub-end-date" dir="ltr" style="font-size:0.95rem; font-weight:800; color:#fff; margin-top:2px;">—</div>
+                        </div>
+                        <div id="vicard-profile-sub-days-tag" dir="ltr" style="background:rgba(212,175,55,0.12); border:1px solid rgba(212,175,55,0.3); color:#f5d77f; font-size:0.76rem; font-weight:800; padding:3px 10px; border-radius:10px;">
+                            30 days left
+                        </div>
+                    </div>
+                    <div id="vicard-profile-autorenew-notice" style="display:flex; align-items:center; gap:6px; font-size:0.76rem; color:#10b981; font-weight:700; border-top:1px solid rgba(255,255,255,0.05); padding-top:8px;">
+                        <span>🔄</span> Auto-renews monthly until deactivated
+                    </div>
+                </div>
+
             </div>
 
-            <!-- Footer -->
-            <div style="padding:14px 22px; border-top:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.02); text-align:right;">
-                <button type="button" onclick="closeVicardCustomerProfileModal()" style="padding:10px 22px; border-radius:12px; font-size:0.9rem; font-weight:800; background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); cursor:pointer;">Close</button>
+            <!-- Modal Footer -->
+            <div style="padding:14px 20px; border-top:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.02); display:flex; justify-content:flex-end;">
+                <button type="button" onclick="closeVicardCustomerProfileModal()" style="padding:8px 24px; border-radius:10px; font-size:0.88rem; font-weight:700; background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.18); cursor:pointer;" data-i18n="nfc-profile-btn-close">
+                    Close
+                </button>
             </div>
         </div>
     </div>
@@ -8031,52 +8042,81 @@
         </div>
     </div>
 
-    <!-- 4b. HERO BANNER CUSTOMIZER MODAL -->
-    <div id="vicard-banner-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.75); z-index:999999; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(6px);">
-        <div style="background:var(--card-bg, #1a1a24); border:1px solid rgba(212,175,55,0.4); border-radius:18px; width:100%; max-width:540px; box-shadow:0 12px 40px rgba(0,0,0,0.6); overflow:hidden;">
-            <div style="padding:18px 22px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; background:linear-gradient(135deg, rgba(212,175,55,0.1), transparent);">
+    <!-- 4b. HERO BANNER CUSTOMIZER MODAL (Adjustable Image, Height & High-Contrast Headline) -->
+    <div id="vicard-banner-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.8); z-index:999999; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(6px); box-sizing:border-box;">
+        <div style="background:var(--card-bg, #14141e); border:1px solid rgba(212,175,55,0.4); border-radius:18px; width:100%; max-width:540px; box-shadow:0 16px 50px rgba(0,0,0,0.7); overflow:hidden;">
+            <div style="padding:16px 20px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; background:linear-gradient(135deg, rgba(212,175,55,0.1), transparent);">
                 <div style="display:flex; align-items:center; gap:10px;">
-                    <span style="font-size:1.4rem;">🎨</span>
-                    <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:var(--text-main);">Customize VICard Hero Banner</h3>
+                    <span style="font-size:1.3rem;">🎨</span>
+                    <h3 style="margin:0; font-size:1.1rem; font-weight:800; color:var(--text-main);" data-i18n="nfc-banner-modal-title">Customize Hero Banner</h3>
                 </div>
-                <button type="button" onclick="closeVicardBannerModal()" style="background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--text-muted);">✖</button>
+                <button type="button" onclick="closeVicardBannerModal()" style="background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--text-muted);">✕</button>
             </div>
-            <form onsubmit="saveVicardHeroBanner(event)" style="padding:20px 22px;">
-                <div style="margin-bottom:12px;">
-                    <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Badge / Top Tag</label>
-                    <input type="text" id="vicard-banner-badge-input" placeholder="e.g. ✨ VIP PRIVILEGES UNLOCKED"
-                        style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.9rem; box-sizing:border-box;">
+            <form onsubmit="saveVicardHeroBanner(event)" style="padding:18px 20px;">
+                <!-- 1. Image selection: Preset or Custom URL -->
+                <div style="margin-bottom:14px;">
+                    <label style="display:block; font-size:0.84rem; font-weight:700; margin-bottom:6px; color:var(--text-main);" data-i18n="nfc-banner-img-label">Banner Image (Preset, URL or Upload)</label>
+                    <div style="display:flex; gap:8px; margin-bottom:6px;">
+                        <select id="vicard-banner-preset-select" onchange="handleVicardBannerPresetChange(this.value)"
+                            style="padding:8px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.85rem; width:50%; box-sizing:border-box;">
+                            <option value="vicard_banner.jpg">Default Luxury Cover</option>
+                            <option value="burgeroov_cover.jpg">Burgeroov Grill Cover</option>
+                            <option value="mvcfresh_cover.jpg">MVC Fresh Juices Cover</option>
+                            <option value="mvcmeat_cover.jpg">MVC Meat Market Cover</option>
+                            <option value="custom">Custom URL / File</option>
+                        </select>
+                        <input type="text" id="vicard-banner-img-input" placeholder="Image URL or filename"
+                            style="padding:8px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.85rem; width:50%; box-sizing:border-box;">
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <label class="btn-neutral" style="padding:4px 10px; border-radius:8px; font-size:0.75rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                            <span>📁</span> Upload Image
+                            <input type="file" id="vicard-banner-file-input" accept="image/*" style="display:none;" onchange="handleVicardBannerFileUpload(event)">
+                        </label>
+                        <span id="vicard-banner-file-name" style="font-size:0.75rem; color:var(--text-muted);"></span>
+                    </div>
                 </div>
-                <div style="margin-bottom:12px;">
-                    <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Main Title</label>
-                    <input type="text" id="vicard-banner-title-input" required placeholder="e.g. Exclusive Dining Privileges"
-                        style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.95rem; font-weight:700; box-sizing:border-box;">
-                </div>
-                <div style="margin-bottom:12px;">
-                    <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Subtitle / Description</label>
-                    <textarea id="vicard-banner-sub-input" rows="2" placeholder="e.g. Flash your VICard at our top-tier partners across the city for VIP treatments & up to 30% instant cashback."
-                        style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.85rem; box-sizing:border-box; resize:vertical;"></textarea>
-                </div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+
+                <!-- 2. Image Focus & Height Controls -->
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
                     <div>
-                        <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Button Text (Optional)</label>
-                        <input type="text" id="vicard-banner-btn-text-input" placeholder="e.g. 🌟 Explore Top Offers"
-                            style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; box-sizing:border-box;">
+                        <label style="display:block; font-size:0.84rem; font-weight:700; margin-bottom:6px; color:var(--text-main);" data-i18n="nfc-banner-pos-label">Image Focus / Position</label>
+                        <select id="vicard-banner-pos-input" style="width:100%; padding:8px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.85rem; box-sizing:border-box;">
+                            <option value="center center">Center (Default)</option>
+                            <option value="center top">Top Focus</option>
+                            <option value="center bottom">Bottom Focus</option>
+                            <option value="center 25%">Upper Focus (25%)</option>
+                            <option value="center 75%">Lower Focus (75%)</option>
+                        </select>
                     </div>
                     <div>
-                        <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-muted);">Background Gradient Preset</label>
-                        <select id="vicard-banner-grad-input" style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; box-sizing:border-box;">
-                            <option value="gold-royal">👑 Royal Gold & Obsidian</option>
-                            <option value="emerald-luxury">💎 Emerald Luxury</option>
-                            <option value="sapphire-night">🌌 Sapphire Midnight</option>
-                            <option value="ruby-passion">🍷 Ruby Velvet</option>
+                        <label style="display:block; font-size:0.84rem; font-weight:700; margin-bottom:6px; color:var(--text-main);" data-i18n="nfc-banner-height-label">Banner Height</label>
+                        <select id="vicard-banner-height-input" style="width:100%; padding:8px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.85rem; box-sizing:border-box;">
+                            <option value="220px">Compact (220px)</option>
+                            <option value="260px" selected>Standard (260px)</option>
+                            <option value="300px">Large (300px)</option>
+                            <option value="360px">Cinematic (360px)</option>
                         </select>
                     </div>
                 </div>
 
+                <!-- 3. Main Title -->
+                <div style="margin-bottom:14px;">
+                    <label style="display:block; font-size:0.84rem; font-weight:700; margin-bottom:6px; color:var(--text-main);" data-i18n="nfc-banner-title-label">Main Title</label>
+                    <input type="text" id="vicard-banner-title-input" placeholder="e.g. Exclusive Dining Privileges / خصومات حصرية لعملاء VICard"
+                        style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.92rem; font-weight:700; box-sizing:border-box;">
+                </div>
+
+                <!-- 4. Subtitle / Description -->
+                <div style="margin-bottom:16px;">
+                    <label style="display:block; font-size:0.84rem; font-weight:700; margin-bottom:6px; color:var(--text-main);" data-i18n="nfc-banner-sub-label">Subtitle / Description</label>
+                    <textarea id="vicard-banner-sub-input" rows="2" placeholder="e.g. Flash your VICard at our top-tier partners across the city for VIP treatments..."
+                        style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.85rem; box-sizing:border-box; resize:vertical;"></textarea>
+                </div>
+
                 <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border-color); padding-top:14px;">
-                    <button type="button" onclick="closeVicardBannerModal()" class="btn-neutral" style="padding:8px 18px; border-radius:10px; font-weight:700;">Cancel</button>
-                    <button type="submit" class="btn-primary" style="padding:8px 22px; border-radius:10px; font-weight:700; background:linear-gradient(135deg, #d4af37, #aa771c); border:none; color:#000;">Save Banner</button>
+                    <button type="button" onclick="closeVicardBannerModal()" class="btn-neutral" style="padding:8px 18px; border-radius:10px; font-weight:700;" data-i18n="btn-cancel">Cancel</button>
+                    <button type="submit" class="btn-primary" style="padding:8px 22px; border-radius:10px; font-weight:700; background:linear-gradient(135deg, #d4af37, #aa771c); border:none; color:#000;" data-i18n="nfc-banner-btn-save">Save Banner</button>
                 </div>
             </form>
         </div>
@@ -8305,8 +8345,8 @@
     </div>
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=318"></script>
-    <script src="app.js?v=318"></script>
+    <script src="translations.js?v=321"></script>
+    <script src="app.js?v=321"></script>
 </body>
 
 </html>

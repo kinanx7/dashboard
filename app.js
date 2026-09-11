@@ -2145,7 +2145,17 @@ function listenToCloudData() {
 
         // 2. High-Efficiency Granular Sub-Node Listeners
         const subNodes = [
-            { key: 'workers', render: () => { applyUserRoles(); renderWorkers(); renderTasks(); if (typeof renderConstantTasksSection === 'function') renderConstantTasksSection(); if (typeof renderInquiriesSection === 'function') renderInquiriesSection(); } },
+            { key: 'workers', render: () => { 
+                applyUserRoles(); 
+                renderWorkers(); 
+                renderTasks(); 
+                if (typeof renderConstantTasksSection === 'function') renderConstantTasksSection(); 
+                if (typeof renderInquiriesSection === 'function') renderInquiriesSection(); 
+                if (typeof currentTab !== 'undefined' && currentTab === 'finance') {
+                    if (typeof renderFinanceTable === 'function') renderFinanceTable();
+                    if (typeof renderFinDetails === 'function') renderFinDetails();
+                }
+            } },
             { key: 'warehouse', render: () => { renderWarehouse(); checkStockAlerts(); } },
             { key: 'paymentRequests', render: () => { if (typeof renderPaymentRequests === 'function') renderPaymentRequests(); } },
             { key: 'taskAlerts', render: () => { if (typeof renderTaskAlerts === 'function') renderTaskAlerts(); } },
@@ -2456,6 +2466,10 @@ function applyTranslations() {
             }
         }
     });
+
+    if (typeof updateVicardLanguage === 'function') {
+        updateVicardLanguage();
+    }
 
     if (typeof applyDarkMode === "function") {
         applyDarkMode();
@@ -9158,48 +9172,130 @@ function saveViolationRecord(workerId, stats, record) {
     const vRule = document.getElementById('v-rule-select'); if (vRule) vRule.value = '';
     const vImg = document.getElementById('v-image'); if (vImg) vImg.value = '';
 
-    db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${monthKey}/violationsList`).set(stats.violationsList)
-        .then(() => {
-            if (typeof logActivity === 'function') {
-                logActivity('violation', worker.id, worker.name, `Added violation to ${worker.name}: "${record.reason || record.type}" (SAR ${record.amount})`);
-            }
-        })
-        .catch(err => console.error("Error saving violation record:", err));
+    // Immediate UI update
+    if (typeof renderFinDetails === 'function') renderFinDetails();
+    if (typeof renderFinanceTable === 'function') renderFinanceTable();
+    if (typeof renderSummaryTable === 'function') renderSummaryTable();
+
+    if (typeof db !== 'undefined' && db && typeof currentCompany !== 'undefined' && currentCompany) {
+        db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${monthKey}/violationsList`).set(stats.violationsList)
+            .then(() => {
+                if (typeof logActivity === 'function') {
+                    logActivity('violation', worker.id, worker.name, `Added violation to ${worker.name}: "${record.reason || record.type}" (SAR ${record.amount})`);
+                }
+            })
+            .catch(err => console.error("Error saving violation record:", err));
+    }
 }
 
 function deleteDetailedViolation(workerId, violationId) {
     if (!confirm("Are you sure you want to remove this violation?")) return;
-    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const workers = companyData.workers || [];
+    const workerIndex = workers.findIndex(w => String(w.id) === String(workerId));
     if (workerIndex !== -1) {
-        const worker = getCompanyData().workers[workerIndex];
-        const stats = getMonthlyStats(worker, currentGlobalMonth);
-        stats.violationsList = stats.violationsList.filter(v => v.id !== violationId);
+        const worker = workers[workerIndex];
+        const monthKey = (typeof currentGlobalMonth !== 'undefined' && currentGlobalMonth) ? currentGlobalMonth : new Date().toISOString().slice(0, 7);
+        let targetMonth = monthKey;
+        let stats = typeof getMonthlyStats === 'function' ? getMonthlyStats(worker, targetMonth) : (worker.monthlyStats ? worker.monthlyStats[targetMonth] : null);
+        let hasV = stats && stats.violationsList && stats.violationsList.some(v => String(v.id) === String(violationId));
 
-        db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/violationsList`).set(stats.violationsList)
-            .then(() => {
-                if (typeof logActivity === 'function') {
-                    logActivity('violation', worker.id, worker.name, `Deleted violation record from ${worker.name}`);
+        if (!hasV && worker.monthlyStats) {
+            for (const m in worker.monthlyStats) {
+                if (worker.monthlyStats[m]?.violationsList?.some(v => String(v.id) === String(violationId))) {
+                    targetMonth = m;
+                    stats = worker.monthlyStats[m];
+                    break;
                 }
-            })
-            .catch(err => console.error("Error deleting violation record:", err));
+            }
+        }
+
+        if (stats && stats.violationsList) {
+            stats.violationsList = stats.violationsList.filter(v => String(v.id) !== String(violationId));
+        }
+
+        // Immediate UI update
+        if (typeof renderFinDetails === 'function') renderFinDetails();
+        if (typeof renderFinanceTable === 'function') renderFinanceTable();
+        if (typeof renderSummaryTable === 'function') renderSummaryTable();
+
+        if (typeof db !== 'undefined' && db && typeof currentCompany !== 'undefined' && currentCompany) {
+            db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${targetMonth}/violationsList`).set(stats.violationsList)
+                .then(() => {
+                    if (typeof logActivity === 'function') {
+                        logActivity('violation', worker.id, worker.name, `Deleted violation record from ${worker.name}`);
+                    }
+                })
+                .catch(err => console.error("Error deleting violation record:", err));
+        }
     }
 }
 
 function resolveViolation(workerId, violationId, action) {
-    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
-    if (workerIndex !== -1) {
-        const worker = getCompanyData().workers[workerIndex];
-        const stats = getMonthlyStats(worker, currentGlobalMonth);
-        const v = stats.violationsList.find(v => v.id === violationId);
-        if (v) {
-            if (action === 'waive') v.status = 'waived';
-            if (action === 'apply') v.status = 'active';
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const workers = companyData.workers || [];
+    const workerIndex = workers.findIndex(w => String(w.id) === String(workerId));
+    if (workerIndex === -1) {
+        console.error("Worker not found for resolveViolation:", workerId);
+        return;
+    }
+    const worker = workers[workerIndex];
 
-            db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/violationsList`).set(stats.violationsList)
-                .catch(err => console.error("Error resolving violation:", err));
+    const monthKey = (typeof currentGlobalMonth !== 'undefined' && currentGlobalMonth) ? currentGlobalMonth : new Date().toISOString().slice(0, 7);
+    let targetMonth = monthKey;
+    let stats = typeof getMonthlyStats === 'function' ? getMonthlyStats(worker, targetMonth) : (worker.monthlyStats ? worker.monthlyStats[targetMonth] : null);
+    let v = (stats && stats.violationsList && Array.isArray(stats.violationsList)) 
+        ? stats.violationsList.find(item => String(item.id) === String(violationId)) 
+        : null;
+
+    // Search across all monthlyStats if not found in targetMonth
+    if (!v && worker.monthlyStats) {
+        for (const m in worker.monthlyStats) {
+            const mStats = worker.monthlyStats[m];
+            if (mStats && Array.isArray(mStats.violationsList)) {
+                const found = mStats.violationsList.find(item => String(item.id) === String(violationId));
+                if (found) {
+                    v = found;
+                    targetMonth = m;
+                    stats = mStats;
+                    break;
+                }
+            }
         }
     }
+
+    if (!v) {
+        console.warn("Violation record not found with ID:", violationId);
+        return;
+    }
+
+    if (action === 'waive') {
+        v.status = 'waived';
+    } else if (action === 'apply') {
+        v.status = 'active';
+    }
+
+    // Immediately update UI so button click has instant visual effect
+    if (typeof renderFinDetails === 'function') renderFinDetails();
+    if (typeof renderFinanceTable === 'function') renderFinanceTable();
+    if (typeof renderSummaryTable === 'function') renderSummaryTable();
+
+    // Persist to Firebase RTDB
+    if (typeof db !== 'undefined' && db && typeof currentCompany !== 'undefined' && currentCompany) {
+        db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${targetMonth}/violationsList`).set(stats.violationsList)
+            .then(() => {
+                if (typeof logActivity === 'function') {
+                    const actionLabel = action === 'waive' ? 'Fixed (Waived)' : 'Not Fixed (Penalty Applied)';
+                    logActivity('violation', worker.id, worker.name, `${actionLabel}: Violation for ${worker.name} "${v.reason || ''}" (SAR ${v.amount})`);
+                }
+            })
+            .catch(err => {
+                console.error("Error saving resolved violation to Firebase:", err);
+            });
+    }
 }
+window.resolveViolation = resolveViolation;
+window.deleteDetailedViolation = deleteDetailedViolation;
 
 // --- RANKS SYSTEM ---
 function manuallyUpdateRank(workerId, newRank) {
@@ -15590,14 +15686,14 @@ function renderFinDetails() {
                         statusHtml = `<span class="viol-timer text-warning" data-deadline="${deadline}" style="font-size: 0.8rem;">${t('label-fix-within')}${h}h ${m}m ${s}s</span>`;
                         if (isFinAdmin) {
                             actionBtns = `
-                                    <button onclick="resolveViolation('${worker.id}', '${v.id}', 'waive')" class="btn-success" style="padding: 6px 12px; font-size: 0.75rem; margin-right: 4px;">${t('btn-fixed-waive')}</button>
-                                    <button onclick="resolveViolation('${worker.id}', '${v.id}', 'apply')" class="btn-danger" style="padding: 6px 12px; font-size: 0.75rem;">${t('btn-not-fixed-apply')}</button>
+                                    <button type="button" onclick="resolveViolation('${worker.id}', '${v.id}', 'waive')" class="btn-success" style="padding: 6px 12px; font-size: 0.75rem; margin-right: 4px; cursor: pointer;">${t('btn-fixed-waive')}</button>
+                                    <button type="button" onclick="resolveViolation('${worker.id}', '${v.id}', 'apply')" class="btn-danger" style="padding: 6px 12px; font-size: 0.75rem; cursor: pointer;">${t('btn-not-fixed-apply')}</button>
                                 `;
                         }
                     }
                 }
 
-                let delBtn = isFinAdmin ? `<button onclick="deleteDetailedViolation('${worker.id}', '${v.id}')" class="btn-outline-danger" style="padding: 4px 8px; font-size: 0.75rem;">${t('btn-remove')}</button>` : '';
+                let delBtn = isFinAdmin ? `<button type="button" onclick="deleteDetailedViolation('${worker.id}', '${v.id}')" class="btn-outline-danger" style="padding: 4px 8px; font-size: 0.75rem; cursor: pointer;">${t('btn-remove')}</button>` : '';
 
                 vDiv.innerHTML = `
                         <div class="flex-between" style="margin-bottom: 8px;"><span style="font-size: 0.8rem; color: var(--text-muted);">🕒 ${v.date}</span>${delBtn}</div>
@@ -36464,6 +36560,15 @@ function filterVicardCustomers() {
         const tierObj = Object.values(getVicardTiers()).find(t => t.name === c.tier || t.id === c.tier);
         const tierIcon = tierObj ? tierObj.icon : '🏅';
         const tierRank = getTierRank(c.tier);
+        const monthlyLimit = tierObj && tierObj.monthlyDiscountLimit !== undefined ? tierObj.monthlyDiscountLimit : 20;
+        const usedOffers = getCustomerMonthlyVisits(c);
+        const remainingOffers = monthlyLimit > 0 ? Math.max(0, monthlyLimit - usedOffers) : 'Unlimited';
+
+        const offersBadge = monthlyLimit > 0
+            ? (remainingOffers === 0
+                ? `<span style="display: inline-flex; align-items: center; gap: 4px; background: rgba(235, 77, 75, 0.16); border: 1px solid rgba(235, 77, 75, 0.45); color: #ff6b6b; padding: 2px 8px; border-radius: 6px; font-size: 0.74rem; font-weight: 800; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.25);" title="Monthly offer limit reached">⚠️ 0 left this month (${usedOffers}/${monthlyLimit} used)</span>`
+                : `<span style="display: inline-flex; align-items: center; gap: 4px; background: rgba(56, 189, 248, 0.14); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; padding: 2px 8px; border-radius: 6px; font-size: 0.74rem; font-weight: 800; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.25);" title="${remainingOffers} offers left out of ${monthlyLimit} this month">🎯 <strong style="color: #fff;">${remainingOffers} left</strong> this month (${usedOffers}/${monthlyLimit} used)</span>`)
+            : `<span style="display: inline-flex; align-items: center; gap: 4px; background: rgba(56, 189, 248, 0.14); border: 1px solid rgba(56, 189, 248, 0.4); color: #38bdf8; padding: 2px 8px; border-radius: 6px; font-size: 0.74rem; font-weight: 800; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.25);">🎯 Unlimited offers (${usedOffers} used)</span>`;
 
         // Tier theme colors for sleek VIP HUD presentation
         let tierColor = '#f5d77f';
@@ -36519,6 +36624,9 @@ function filterVicardCustomers() {
                             title="View Visited Restaurants History">
                             📜 History
                         </button>
+                    </div>
+                    <div style="margin-top: 5px;">
+                        ${offersBadge}
                     </div>
                     <div style="margin-top: 5px; display: flex; gap: 6px; flex-wrap: wrap;">
                         <span style="display: inline-flex; align-items: center; gap: 4px; background: rgba(46, 213, 115, 0.14); border: 1px solid rgba(46, 213, 115, 0.38); color: #2ed573; padding: 2px 8px; border-radius: 6px; font-size: 0.74rem; font-weight: 800; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.25);">
@@ -36674,27 +36782,37 @@ window.checkAndRenewSubscription = checkAndRenewSubscription;
 
 function getCustomerMonthlyVisits(card) {
     if (!card) return 0;
-    const subEnd = card.subscriptionEndDate || (Date.now() + 30 * 86400000);
-    const cycleStart = subEnd - (30 * 24 * 60 * 60 * 1000);
+    const now = new Date();
+    const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    let count = 0;
+    let countFromHistory = 0;
     let visits = [];
     if (card.visitHistory) {
         if (Array.isArray(card.visitHistory)) visits = card.visitHistory;
         else if (typeof card.visitHistory === 'object') visits = Object.values(card.visitHistory);
+    } else if (card.visits) {
+        if (Array.isArray(card.visits)) visits = card.visits;
+        else if (typeof card.visits === 'object') visits = Object.values(card.visits);
+    }
+    if (visits.length === 0 && card.lastRedemption) {
+        visits.push(card.lastRedemption);
     }
 
     visits.forEach(v => {
-        if (v && v.timestamp && v.timestamp >= cycleStart) {
-            count++;
+        if (v && v.timestamp && v.timestamp >= startOfCurrentMonth) {
+            countFromHistory++;
         }
     });
 
-    if (count === 0 && card.monthlyVisitsUsed) {
-        count = card.monthlyVisitsUsed;
+    let countFromField = 0;
+    if (card.monthlyCycleKey === currentMonthKey && typeof card.monthlyVisitsUsed === 'number') {
+        countFromField = card.monthlyVisitsUsed;
+    } else if (typeof card.monthlyVisitsUsed === 'number' && !card.monthlyCycleKey) {
+        countFromField = card.monthlyVisitsUsed;
     }
 
-    return count;
+    return Math.max(countFromHistory, countFromField);
 }
 window.getCustomerMonthlyVisits = getCustomerMonthlyVisits;
 
@@ -37640,23 +37758,60 @@ function handleSaveVicardOffer(e) {
 window.handleSaveVicardOffer = handleSaveVicardOffer;
 
 // --- HERO BANNER CUSTOMIZER (MANAGER VIEW) ---
+function handleVicardBannerPresetChange(val) {
+    const imgInput = document.getElementById('vicard-banner-img-input');
+    if (!imgInput) return;
+    if (val !== 'custom') {
+        imgInput.value = val;
+    } else {
+        imgInput.value = '';
+        imgInput.focus();
+    }
+}
+window.handleVicardBannerPresetChange = handleVicardBannerPresetChange;
+
+function handleVicardBannerFileUpload(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    const nameEl = document.getElementById('vicard-banner-file-name');
+    if (nameEl) nameEl.textContent = file.name;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const imgInput = document.getElementById('vicard-banner-img-input');
+        if (imgInput) imgInput.value = e.target.result;
+        const presetSel = document.getElementById('vicard-banner-preset-select');
+        if (presetSel) presetSel.value = 'custom';
+    };
+    reader.readAsDataURL(file);
+}
+window.handleVicardBannerFileUpload = handleVicardBannerFileUpload;
+
 function openVicardBannerModal() {
     const modal = document.getElementById('vicard-banner-modal');
     if (!modal) return;
 
-    const badgeInput = document.getElementById('vicard-banner-badge-input');
+    const imgInput = document.getElementById('vicard-banner-img-input');
+    const presetSel = document.getElementById('vicard-banner-preset-select');
+    const posInput = document.getElementById('vicard-banner-pos-input');
+    const heightInput = document.getElementById('vicard-banner-height-input');
     const titleInput = document.getElementById('vicard-banner-title-input');
     const subInput = document.getElementById('vicard-banner-sub-input');
-    const btnTextInput = document.getElementById('vicard-banner-btn-text-input');
-    const gradInput = document.getElementById('vicard-banner-grad-input');
 
     const cfg = vicardData.bannerConfig || {};
+    const img = cfg.image || 'vicard_banner.jpg';
 
-    if (badgeInput) badgeInput.value = cfg.badge || '✨ VIP PRIVILEGES UNLOCKED';
-    if (titleInput) titleInput.value = cfg.title || 'Exclusive Dining Privileges';
-    if (subInput) subInput.value = cfg.subtitle || 'Flash your VICard at our top-tier partners across the city for VIP treatments & up to 30% instant cashback.';
-    if (btnTextInput) btnTextInput.value = cfg.btnText || '🌟 Explore Top Offers';
-    if (gradInput) gradInput.value = cfg.gradient || 'gold-royal';
+    if (imgInput) imgInput.value = img;
+    if (presetSel) {
+        if (['vicard_banner.jpg', 'burgeroov_cover.jpg', 'mvcfresh_cover.jpg', 'mvcmeat_cover.jpg'].includes(img)) {
+            presetSel.value = img;
+        } else {
+            presetSel.value = 'custom';
+        }
+    }
+    if (posInput) posInput.value = cfg.imagePosition || 'center center';
+    if (heightInput) heightInput.value = cfg.height || '260px';
+    if (titleInput) titleInput.value = cfg.title || '';
+    if (subInput) subInput.value = cfg.subtitle || '';
 
     modal.style.display = 'flex';
 }
@@ -37671,36 +37826,43 @@ window.closeVicardBannerModal = closeVicardBannerModal;
 function saveVicardHeroBanner(e) {
     if (e) e.preventDefault();
 
-    const badge = (document.getElementById('vicard-banner-badge-input')?.value || '').trim();
+    const image = (document.getElementById('vicard-banner-img-input')?.value || 'vicard_banner.jpg').trim();
+    const imagePosition = document.getElementById('vicard-banner-pos-input')?.value || 'center center';
+    const height = document.getElementById('vicard-banner-height-input')?.value || '260px';
     const title = (document.getElementById('vicard-banner-title-input')?.value || '').trim();
     const subtitle = (document.getElementById('vicard-banner-sub-input')?.value || '').trim();
-    const btnText = (document.getElementById('vicard-banner-btn-text-input')?.value || '').trim();
-    const gradient = document.getElementById('vicard-banner-grad-input')?.value || 'gold-royal';
 
     vicardData.bannerConfig = {
-        badge: badge || '✨ VIP PRIVILEGES UNLOCKED',
-        title: title || 'Exclusive Dining Privileges',
+        image: image || 'vicard_banner.jpg',
+        imagePosition: imagePosition,
+        height: height,
+        title: title,
         subtitle: subtitle,
-        btnText: btnText,
-        gradient: gradient,
         updatedAt: Date.now()
+    };
+
+    const notifySaved = () => {
+        closeVicardBannerModal();
+        if (typeof currentVicardSubTab !== 'undefined' && currentVicardSubTab === 'customer') {
+            if (typeof renderCustomerWebsite === 'function') renderCustomerWebsite();
+        }
+        const custOv = document.getElementById('vicard-customer-portal-overlay');
+        if (custOv && custOv.style.display === 'block' && window._currentActiveCustomerCard) {
+            if (typeof renderAuthorizedCustomerPortal === 'function') renderAuthorizedCustomerPortal(window._currentActiveCustomerCard);
+        }
     };
 
     if (typeof db !== 'undefined' && db) {
         db.ref('vicard_network/bannerConfig').set(vicardData.bannerConfig)
             .then(() => {
-                closeVicardBannerModal();
-                if (currentVicardSubTab === 'customer') renderCustomerWebsite();
-                alert('✅ Hero Banner updated successfully!');
+                notifySaved();
             })
             .catch(err => {
                 console.error('Error saving banner:', err);
-                closeVicardBannerModal();
-                if (currentVicardSubTab === 'customer') renderCustomerWebsite();
+                notifySaved();
             });
     } else {
-        closeVicardBannerModal();
-        if (currentVicardSubTab === 'customer') renderCustomerWebsite();
+        notifySaved();
     }
 }
 window.saveVicardHeroBanner = saveVicardHeroBanner;
@@ -38388,6 +38550,10 @@ window.renderCustomerWebsite = renderCustomerWebsite;
 // Main Directory Website HTML (Hungerstation / Keeta Style)
 function generateRestaurantsDirectoryWebsiteHtml(rests, card) {
     const isActive = card && card.status === 'active';
+    const tierObj = Object.values(getVicardTiers()).find(t => t.name === (card ? card.tier : null) || t.id === (card ? card.tier : null));
+    const monthlyLimit = tierObj && tierObj.monthlyDiscountLimit !== undefined ? tierObj.monthlyDiscountLimit : 20;
+    const usedOffers = card ? getCustomerMonthlyVisits(card) : 0;
+    const remainingOffers = monthlyLimit > 0 ? Math.max(0, monthlyLimit - usedOffers) : 'Unlimited';
 
     // Apply Search and Category Filters
     let filteredRests = rests.filter(r => {
@@ -38424,13 +38590,27 @@ function generateRestaurantsDirectoryWebsiteHtml(rests, card) {
         return true;
     });
 
+    const isAr = typeof currentAppLang !== 'undefined' && currentAppLang === 'ar';
+    const txtProfile = (typeof t === 'function' && t('nfc-btn-profile')) || (isAr ? 'الملف الشخصي' : 'Profile');
+    const txtInfo = (typeof t === 'function' && t('nfc-btn-info')) || (isAr ? 'معلومات' : 'Info');
+    const txtLocation = isAr ? 'الرياض، المملكة العربية السعودية' : 'Riyadh, Saudi Arabia';
+    const txtAllPartners = (typeof t === 'function' && t('nfc-pill-all-partners')) || (isAr ? 'جميع الشركاء' : 'All Partners');
+    const txtBurgers = (typeof t === 'function' && t('nfc-pill-burgers')) || (isAr ? 'برجر ومشاوي' : 'Burgers & Grills');
+    const txtFresh = (typeof t === 'function' && t('nfc-pill-fresh')) || (isAr ? 'عصائر وفواكه طازجة' : 'Fresh Juices & Fruits');
+    const txtMeats = (typeof t === 'function' && t('nfc-pill-meats')) || (isAr ? 'ملحمة وستيك' : 'Butchery & Steaks');
+    const txtDeals = (typeof t === 'function' && t('nfc-pill-deals')) || (isAr ? 'أفضل العروض (خصم 25%+)' : 'Top Deals (25%+ OFF)');
+    const txtSearchPlaceholder = (typeof t === 'function' && t('nfc-ph-search-site')) || (isAr ? 'ابحث عن المطاعم، البرجر، الستيك، العصائر...' : 'Search restaurants, smash burgers, prime steaks, cold juices...');
+    const txtVerifiedTitle = (typeof t === 'function' && t('nfc-verified-partners-title')) || (isAr ? 'المطاعم الشريكة المعتمدة' : 'Verified Partner Restaurants');
+    const txtVerifiedSub = (typeof t === 'function' && t('nfc-verified-partners-sub')) || (isAr ? 'اضغط على أي شريك لعرض الوجبات المتاحة وتوليد رمز التحقق للكاشير' : 'Tap any partner to view available menu units and generate cashier verification passes');
+    const txtPartnersCount = isAr ? `${filteredRests.length} مطعم شريك` : `${filteredRests.length} Partners`;
+
     const filteredRestsHtml = filteredRests.length === 0 ? `
         <div style="grid-column: 1/-1; text-align: center; padding: 60px 20px; background: rgba(255,255,255,0.02); border-radius: 20px; border: 1px dashed rgba(255,255,255,0.1);">
             <div style="font-size: 3rem; margin-bottom: 12px;">🔍</div>
-            <h3 style="color: #fff; font-size: 1.3rem; font-weight: 800; margin: 0 0 8px 0;">No Matching Restaurants</h3>
-            <p style="color: #94a3b8; font-size: 0.95rem; margin: 0 0 16px 0;">Try adjusting your search terms or filter category.</p>
+            <h3 style="color: #fff; font-size: 1.3rem; font-weight: 800; margin: 0 0 8px 0;">${isAr ? 'لا توجد مطاعم مطابقة' : 'No Matching Restaurants'}</h3>
+            <p style="color: #94a3b8; font-size: 0.95rem; margin: 0 0 16px 0;">${isAr ? 'يرجى تجربة كلمات بحث أخرى أو تغيير تصنيف المطاعم.' : 'Try adjusting your search terms or filter category.'}</p>
             <button type="button" onclick="clearVicardSearch(); filterVicardCategory('all');" class="btn-neutral" style="padding: 8px 18px; border-radius: 12px; font-weight: 700; cursor: pointer;">
-                Reset Filters
+                ${isAr ? 'إعادة ضبط الفلاتر' : 'Reset Filters'}
             </button>
         </div>
     ` : filteredRests.map(r => {
@@ -38533,47 +38713,48 @@ function generateRestaurantsDirectoryWebsiteHtml(rests, card) {
                 <div class="keeta-header-right">
                     <div class="keeta-location-pill">
                         <span>📍</span>
-                        <span>Riyadh, Saudi Arabia</span>
+                        <span>${escapeHtml(txtLocation)}</span>
                     </div>
 
                     <div class="keeta-header-actions">
                         <button type="button" class="keeta-header-action-btn" onclick="openVicardCustomerProfileModal()" title="View VIP Profile & Subscription">
-                            <span class="btn-icon">👤</span> <span class="btn-text">Profile</span>
+                            <span class="btn-icon">👤</span> <span class="btn-text">${escapeHtml(txtProfile)}</span>
                         </button>
                         <button type="button" class="keeta-header-action-btn" onclick="openVicardInfoCardModal()" title="VIP Card Guide & Information">
-                            <span class="btn-icon">ℹ️</span> <span class="btn-text">Info</span>
+                            <span class="btn-icon">ℹ️</span> <span class="btn-text">${escapeHtml(txtInfo)}</span>
                         </button>
                     </div>
 
                     <div class="keeta-member-chip" onclick="openVicardCustomerProfileModal()" title="Click to view VIP Profile & Subscription">
                         <div class="keeta-member-avatar">${isActive ? '👑' : '⚠️'}</div>
                         <div class="keeta-member-info">
-                            <div class="keeta-member-name">${escapeHtml(card.name)}</div>
-                            <div class="keeta-member-id">${card.id} • <span style="color:${isActive ? '#10b981' : '#ef4444'}; font-weight:800;">${isActive ? 'ACTIVE' : 'SUSPENDED'}</span> • <span style="color:#f5d77f; font-weight:800;">${escapeHtml(card.tier || 'Black VIP')}</span></div>
+                            <div class="keeta-member-name">${escapeHtml(card ? card.name : 'VIP Member')}</div>
+                            <div class="keeta-member-id" dir="ltr"><span style="font-family:monospace;">${card ? card.id : 'VIC-GUEST'}</span> • <span style="color:${isActive ? '#10b981' : '#ef4444'}; font-weight:800;">${isActive ? 'ACTIVE' : 'SUSPENDED'}</span> • <span style="color:#f5d77f; font-weight:800;">${escapeHtml((card && card.tier) || 'Black VIP')}</span> • <span style="color:#38bdf8; font-weight:800;">🎯 ${monthlyLimit > 0 ? `${remainingOffers} left (${usedOffers}/${monthlyLimit})` : 'Unlimited'}</span></div>
                         </div>
                     </div>
                 </div>
             </header>
 
-            <!-- 2. Hero Story Banner (using generated vicard_banner.jpg or custom config) -->
+            <!-- 2. Hero Story Banner (Image adjustable, high-contrast readable text, only main title & subtitle) -->
             ${(() => {
                 const b = vicardData.bannerConfig || {};
-                const badge = b.badge || '✨ EXCLUSIVE VIP PRIVILEGES';
-                const title = b.title || 'Unlock Secret Menus & Up to 40% OFF';
-                const sub = b.subtitle || "Show your physical VICard NFC card or generate instant QR verification passes at Riyadh's top partner dining spots.";
-                const btn = b.btnText || '';
+                const bannerImg = b.image || 'vicard_banner.jpg';
+                const bannerImgPos = b.imagePosition || 'center center';
+                const bannerHeight = b.height || '260px';
+                const defaultTitle = isAr ? 'خصومات حصرية لعملاء VICard' : 'Exclusive Dining Privileges';
+                const defaultSub = isAr
+                    ? 'استمتع بخصومات فورية وعروض حصرية عند إبراز بطاقة VICard الذكية لدى أرقى شركائنا في الرياض.'
+                    : 'Flash your VICard at our top-tier partners across the city for VIP treatments & up to 30% instant discounts.';
+                const title = b.title || defaultTitle;
+                const sub = b.subtitle || defaultSub;
+
                 return `
-                <div class="keeta-hero-banner">
-                    <img src="vicard_banner.jpg" class="keeta-hero-img" alt="VICard VIP Privileges" onerror="this.style.display='none'">
+                <div class="keeta-hero-banner" style="height:${escapeHtml(bannerHeight)}; min-height:${escapeHtml(bannerHeight)};">
+                    <img src="${escapeHtml(bannerImg)}" class="keeta-hero-img" alt="VICard VIP Privileges" style="object-position:${escapeHtml(bannerImgPos)};" onerror="this.src='vicard_banner.jpg'">
                     <div class="keeta-hero-overlay">
-                        <div class="keeta-hero-badge">${escapeHtml(badge)}</div>
-                        <h1 class="keeta-hero-heading">${escapeHtml(title)}</h1>
-                        <p class="keeta-hero-text">${escapeHtml(sub)}</p>
-                        <div class="keeta-hero-stats">
-                            <span class="keeta-stat-tag">🏆 ${rests.length} Premier Flagships</span>
-                            <span class="keeta-stat-tag">⚡ Instant Cashier Pass</span>
-                            <span class="keeta-stat-tag">💰 Guaranteed Savings</span>
-                            ${btn ? `<span class="keeta-stat-tag" style="background: rgba(212,175,55,0.3); color: #f5d77f; border-color: rgba(212,175,55,0.6);">${escapeHtml(btn)}</span>` : ''}
+                        <div class="keeta-hero-box">
+                            <h1 class="keeta-hero-heading">${escapeHtml(title)}</h1>
+                            <p class="keeta-hero-text">${escapeHtml(sub)}</p>
                         </div>
                     </div>
                 </div>
@@ -38585,7 +38766,7 @@ function generateRestaurantsDirectoryWebsiteHtml(rests, card) {
                 <div class="keeta-search-wrapper">
                     <span class="keeta-search-icon">🔍</span>
                     <input type="text" id="vicard-site-search" class="keeta-search-input"
-                        placeholder="Search restaurants, smash burgers, prime steaks, cold juices..."
+                        placeholder="${escapeHtml(txtSearchPlaceholder)}"
                         value="${escapeHtml(vicardSearchQuery)}"
                         oninput="handleVicardSearchInput(this.value)">
                     ${vicardSearchQuery ? `<button type="button" class="keeta-search-clear" onclick="clearVicardSearch()">✕</button>` : ''}
@@ -38593,19 +38774,19 @@ function generateRestaurantsDirectoryWebsiteHtml(rests, card) {
 
                 <div class="keeta-category-carousel">
                     <button type="button" class="keeta-cat-pill ${vicardActiveCategory === 'all' ? 'active' : ''}" onclick="filterVicardCategory('all')">
-                        <span>🔥</span> All Partners (${rests.length})
+                        <span>🔥</span> ${escapeHtml(txtAllPartners)} (${rests.length})
                     </button>
                     <button type="button" class="keeta-cat-pill ${vicardActiveCategory === 'burgers' ? 'active' : ''}" onclick="filterVicardCategory('burgers')">
-                        <span>🍔</span> Burgers & Grills
+                        <span>🍔</span> ${escapeHtml(txtBurgers)}
                     </button>
                     <button type="button" class="keeta-cat-pill ${vicardActiveCategory === 'fresh' ? 'active' : ''}" onclick="filterVicardCategory('fresh')">
-                        <span>🥗</span> Fresh Juices & Fruits
+                        <span>🥗</span> ${escapeHtml(txtFresh)}
                     </button>
                     <button type="button" class="keeta-cat-pill ${vicardActiveCategory === 'meats' ? 'active' : ''}" onclick="filterVicardCategory('meats')">
-                        <span>🥩</span> Butchery & Steaks
+                        <span>🥩</span> ${escapeHtml(txtMeats)}
                     </button>
                     <button type="button" class="keeta-cat-pill ${vicardActiveCategory === 'deals' ? 'active' : ''}" onclick="filterVicardCategory('deals')">
-                        <span>🏷️</span> Top Deals (25%+ OFF)
+                        <span>🏷️</span> ${escapeHtml(txtDeals)}
                     </button>
                 </div>
             </div>
@@ -38613,10 +38794,10 @@ function generateRestaurantsDirectoryWebsiteHtml(rests, card) {
             <!-- 4. Section Title -->
             <div class="keeta-section-header">
                 <div>
-                    <h2 class="keeta-section-title">Verified Partner Restaurants</h2>
-                    <p class="keeta-section-subtitle">Tap any partner to view available menu units and generate cashier verification passes</p>
+                    <h2 class="keeta-section-title">${escapeHtml(txtVerifiedTitle)}</h2>
+                    <p class="keeta-section-subtitle">${escapeHtml(txtVerifiedSub)}</p>
                 </div>
-                <div class="keeta-partners-count">${filteredRests.length} Partners</div>
+                <div class="keeta-partners-count">${escapeHtml(txtPartnersCount)}</div>
             </div>
 
             <!-- 5. Restaurant Cards Grid -->
@@ -38656,7 +38837,12 @@ function generateRestaurantMenuWebsiteHtml(restaurant, card) {
                     <span>←</span> Back to All Restaurants
                 </button>
                 <div class="keeta-menu-nav-title">${escapeHtml(restaurant.name)}</div>
-                <div class="keeta-menu-nav-tag">VIP Member Pass</div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <button type="button" class="keeta-header-action-btn" onclick="openVicardCustomerProfileModal()" title="View VIP Profile & Subscription" style="padding:4px 10px; font-size:0.75rem;">
+                        <span class="btn-icon">👤</span> <span class="btn-text">Profile</span>
+                    </button>
+                    <div class="keeta-menu-nav-tag">VIP Member Pass</div>
+                </div>
             </div>
 
             <!-- Restaurant Hero Banner -->
@@ -38816,6 +39002,7 @@ function openVicardCustomerProfileModal() {
 
         checkAndRenewSubscription(card);
 
+        const isAr = typeof currentAppLang !== 'undefined' && currentAppLang === 'ar';
         const nameEl = document.getElementById('vicard-profile-cust-name');
         const idEl = document.getElementById('vicard-profile-cust-id');
         const statusEl = document.getElementById('vicard-profile-status-badge');
@@ -38845,56 +39032,66 @@ function openVicardCustomerProfileModal() {
             monogramInitialEl.textContent = rawName.charAt(0).toUpperCase() || 'V';
         }
 
-        if (nameEl) nameEl.textContent = card.name || 'VIP Member';
+        if (nameEl) nameEl.textContent = card.name || (isAr ? 'عضو VIP' : 'VIP Member');
         if (idEl) {
             const cleanId = String(card.id || 'VIC-8939').replace(/^VIC-?/i, '');
-            idEl.textContent = `VIC • ${cleanId}`;
+            idEl.textContent = `VIC-${cleanId}`;
         }
         if (statusEl) {
             const statusTextEl = document.getElementById('vicard-profile-status-text');
-            if (statusTextEl) statusTextEl.textContent = isActive ? 'ACTIVE VIP' : 'SUSPENDED';
+            if (statusTextEl) {
+                statusTextEl.textContent = isActive 
+                    ? (isAr ? 'عضوية نشطة' : 'ACTIVE VIP') 
+                    : (isAr ? 'عضوية معلقة' : 'SUSPENDED');
+            }
             statusEl.style.color = isActive ? '#10b981' : '#eb4d4b';
-            statusEl.style.borderColor = isActive ? 'rgba(16, 185, 129, 0.5)' : 'rgba(235, 77, 75, 0.5)';
-            statusEl.style.background = isActive ? 'rgba(16, 185, 129, 0.14)' : 'rgba(235, 77, 75, 0.14)';
+            statusEl.style.borderColor = isActive ? 'rgba(16, 185, 129, 0.4)' : 'rgba(235, 77, 75, 0.4)';
+            statusEl.style.background = isActive ? 'rgba(16, 185, 129, 0.12)' : 'rgba(235, 77, 75, 0.12)';
         }
-        if (tierNameEl) tierNameEl.textContent = card.tier || tierObj.name || 'VIP Tier';
-        if (tierIconEl) tierIconEl.textContent = tierObj.icon || '🎖️';
-        if (tierRankEl) tierRankEl.textContent = `Rank ${tierRank}`;
+        if (tierNameEl) tierNameEl.textContent = card.tier || tierObj.name || (isAr ? 'فئة VIP' : 'VIP Tier');
+        if (tierIconEl) tierIconEl.textContent = tierObj.icon || '🏅';
+        if (tierRankEl) tierRankEl.textContent = isAr ? `المرتبة ${tierRank}` : `Rank ${tierRank}`;
 
-        if (subEndEl) subEndEl.textContent = new Date(subEnd).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+        if (subEndEl) {
+            subEndEl.textContent = new Date(subEnd).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        }
         if (subDaysEl) {
-            subDaysEl.textContent = `${daysLeft} days remaining`;
+            subDaysEl.textContent = isAr ? `${daysLeft} يوم متبقي` : `${daysLeft} days remaining`;
             subDaysEl.style.color = daysLeft > 5 ? '#f5d77f' : '#eb4d4b';
         }
 
         if (autoRenewEl) {
             if (card.autoRenew !== false && isActive) {
-                autoRenewEl.innerHTML = `<span>🔄</span> Auto-renews monthly until deactivated • يتجدد تلقائياً شهرياً`;
-                autoRenewEl.style.color = '#2ed573';
+                autoRenewEl.innerHTML = isAr ? `<span>🔄</span> يتجدد تلقائياً شهرياً حتى الإلغاء` : `<span>🔄</span> Auto-renews monthly until deactivated`;
+                autoRenewEl.style.color = '#10b981';
             } else {
-                autoRenewEl.innerHTML = `<span>⚠️</span> Auto-renewal suspended / deactivated (التجديد متوقف)`;
+                autoRenewEl.innerHTML = isAr ? `<span>⚠️</span> التجديد التلقائي متوقف` : `<span>⚠️</span> Auto-renewal suspended / deactivated`;
                 autoRenewEl.style.color = '#eb4d4b';
             }
         }
 
         if (monthlyCountEl) {
-            monthlyCountEl.textContent = monthlyLimit > 0 ? `${usedOffers} / ${monthlyLimit} used` : `${usedOffers} used (Unlimited)`;
+            monthlyCountEl.innerHTML = monthlyLimit > 0 
+                ? (isAr ? `<span dir="ltr">${usedOffers} / ${monthlyLimit}</span> مستخدم` : `<span dir="ltr">${usedOffers} / ${monthlyLimit}</span> used`)
+                : (isAr ? `<span dir="ltr">${usedOffers}</span> مستخدم (غير محدود)` : `<span dir="ltr">${usedOffers}</span> used (Unlimited)`);
         }
         if (monthlyProgEl) {
             const pct = monthlyLimit > 0 ? Math.min(100, Math.round((usedOffers / monthlyLimit) * 100)) : 10;
             monthlyProgEl.style.width = `${pct}%`;
-            monthlyProgEl.style.background = pct >= 100 ? '#eb4d4b' : 'linear-gradient(90deg, #d4af37, #2ed573)';
+            monthlyProgEl.style.background = pct >= 100 ? '#eb4d4b' : 'linear-gradient(90deg, #38bdf8, #10b981)';
         }
         if (monthlyRemEl) {
             if (monthlyLimit > 0) {
-                monthlyRemEl.textContent = remainingOffers === 0 ? '⚠️ Monthly offer limit reached' : `${remainingOffers} offers remaining`;
+                monthlyRemEl.textContent = remainingOffers === 0 
+                    ? (isAr ? '⚠️ تم استهلاك الحد الأقصى للعروض هذا الشهر' : '⚠️ Monthly offer limit reached') 
+                    : (isAr ? `متبقي ${remainingOffers} عرض هذا الشهر` : `${remainingOffers} offers remaining this month`);
                 monthlyRemEl.style.color = remainingOffers === 0 ? '#eb4d4b' : '#94a3b8';
             } else {
-                monthlyRemEl.textContent = 'Unlimited offers included';
+                monthlyRemEl.textContent = isAr ? 'عروض غير محدودة مشمولة' : 'Unlimited offers included';
             }
         }
         if (renewalDateEl) {
-            renewalDateEl.textContent = `Renews: ${new Date(subEnd).toLocaleDateString()}`;
+            renewalDateEl.textContent = isAr ? `تاريخ التجديد: ${new Date(subEnd).toLocaleDateString('ar-SA')}` : `Renews: ${new Date(subEnd).toLocaleDateString()}`;
         }
 
         // Auto-update Lifetime Spent & Saved Stats
@@ -38905,7 +39102,7 @@ function openVicardCustomerProfileModal() {
 
         if (totalSavedEl) totalSavedEl.textContent = `SAR ${Number(card.totalSavings || 0).toLocaleString()}`;
         if (totalSpentEl) totalSpentEl.textContent = `SAR ${Number(card.totalSpend || card.totalSpent || 0).toLocaleString()}`;
-        if (totalVisitsEl) totalVisitsEl.textContent = `${card.visitsCount || 0} visits`;
+        if (totalVisitsEl) totalVisitsEl.textContent = `${card.visitsCount || 0}`;
         if (historyBtn) {
             historyBtn.onclick = () => {
                 closeVicardCustomerProfileModal();
@@ -39573,6 +39770,13 @@ function renderVicardCashierScreen(cardId, card, restId, unitId) {
                     <div style="font-family:monospace; font-size:1rem; font-weight:800; color:#f5d77f; margin-top:2px;">${card.id}</div>
                     <div style="font-size:0.85rem; color:#d4af37; font-weight:700; margin-top:4px;">🏅 Tier: ${escapeHtml(card.tier || 'Black VIP')} (Rank ${getTierRank(card.tier)})</div>
                     ${card.phone ? `<div style="font-size:0.85rem; color:#a0aec0; margin-top:4px;">📞 ${escapeHtml(card.phone)}</div>` : ''}
+                    ${(() => {
+                        const tierObj = Object.values(getVicardTiers()).find(t => t.name === card.tier || t.id === card.tier) || {};
+                        const monthlyLimit = tierObj.monthlyDiscountLimit !== undefined ? tierObj.monthlyDiscountLimit : 20;
+                        const usedOffers = getCustomerMonthlyVisits(card);
+                        const remainingOffers = monthlyLimit > 0 ? Math.max(0, monthlyLimit - usedOffers) : 'Unlimited';
+                        return `<div style="font-size:0.82rem; color:#38bdf8; font-weight:800; margin-top:6px;">🎯 Monthly Offers: ${monthlyLimit > 0 ? `<span style="color:#fff;">${remainingOffers} left</span> this month (${usedOffers}/${monthlyLimit} used)` : 'Unlimited'}</div>`;
+                    })()}
                 </div>
 
                 ${!restTierCheck.eligible ? `
@@ -39735,6 +39939,11 @@ function confirmVicardCashierVisit(cardId, restId, unitId) {
     const amountSpent = Math.round(offerPrice);
     const amountSaved = Math.round(savings);
 
+    const now = new Date();
+    const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const prevMonthlyUsed = getCustomerMonthlyVisits(card);
+    const nextMonthlyUsed = prevMonthlyUsed + 1;
+
     const nextVisits = (card.visitsCount || 0) + 1;
     const nextSavings = (card.totalSavings || 0) + amountSaved;
     const nextSpend = (card.totalSpend || card.totalSpent || 0) + amountSpent;
@@ -39743,6 +39952,8 @@ function confirmVicardCashierVisit(cardId, restId, unitId) {
     card.totalSavings = nextSavings;
     card.totalSpend = nextSpend;
     card.totalSpent = nextSpend;
+    card.monthlyVisitsUsed = nextMonthlyUsed;
+    card.monthlyCycleKey = currentMonthKey;
 
     const discountRecord = {
         timestamp: Date.now(),
@@ -39772,9 +39983,25 @@ function confirmVicardCashierVisit(cardId, restId, unitId) {
             visitsCount: nextVisits,
             totalSavings: nextSavings,
             totalSpend: nextSpend,
+            monthlyVisitsUsed: nextMonthlyUsed,
+            monthlyCycleKey: currentMonthKey,
             lastRedemption: discountRecord
         }).catch(console.error);
         db.ref(`vicard_network/cards/${cardId}/visitHistory`).push(discountRecord).catch(console.error);
+    }
+
+    // Sync in-memory active customer card and profile modal if open
+    if (window._currentActiveCustomerCard && window._currentActiveCustomerCard.id === cardId) {
+        window._currentActiveCustomerCard.visitsCount = nextVisits;
+        window._currentActiveCustomerCard.totalSavings = nextSavings;
+        window._currentActiveCustomerCard.totalSpend = nextSpend;
+        window._currentActiveCustomerCard.totalSpent = nextSpend;
+        window._currentActiveCustomerCard.monthlyVisitsUsed = nextMonthlyUsed;
+        window._currentActiveCustomerCard.monthlyCycleKey = currentMonthKey;
+    }
+    const profileModal = document.getElementById('vicard-profile-modal');
+    if (profileModal && profileModal.style.display === 'flex') {
+        openVicardCustomerProfileModal();
     }
 
     // If customer QR modal is currently open in this window, trigger congratulations immediately
@@ -39872,14 +40099,29 @@ function openVicardCustomerPortal(cardId, providedKey) {
 
         setTimeout(() => {
             window._vicardLoadingActive = false;
-            const finalCard = (vicardData && vicardData.cards && vicardData.cards[cardId]) || card;
-            window._currentActiveCustomerCard = finalCard;
             try {
-                sessionStorage.setItem('vicard_active_session', JSON.stringify({ cardId: finalCard.id, key: finalCard.secretKey }));
-            } catch (e) {}
+                const finalCard = (vicardData && vicardData.cards && vicardData.cards[cardId]) || card;
+                window._currentActiveCustomerCard = finalCard;
+                try {
+                    sessionStorage.setItem('vicard_active_session', JSON.stringify({ cardId: finalCard.id, key: finalCard.secretKey }));
+                } catch (e) {}
 
-            renderAuthorizedCustomerPortal(finalCard);
-        }, 3000);
+                renderAuthorizedCustomerPortal(finalCard);
+            } catch (err) {
+                console.error('Error rendering authorized customer portal:', err);
+                const content = document.getElementById('vicard-portal-content');
+                if (content) {
+                    content.innerHTML = `
+                        <div style="padding:60px 20px; text-align:center; color:#fff;">
+                            <div style="font-size:3rem; margin-bottom:12px;">⚠️</div>
+                            <h3 style="margin:0 0 8px 0;">Could not load customer view</h3>
+                            <p style="color:#94a3b8; font-size:0.9rem;">${escapeHtml(err.message || 'An error occurred while loading')}</p>
+                            <button type="button" class="btn-primary" onclick="closeVicardCustomerPortal()" style="margin-top:16px; padding:10px 24px; border-radius:12px;">Close</button>
+                        </div>
+                    `;
+                }
+            }
+        }, 1500);
         return;
     }
 
@@ -39988,7 +40230,7 @@ function unlockVicardWithPhone(cardId) {
         }
         setTimeout(() => {
             renderAuthorizedCustomerPortal(card);
-        }, 3000);
+        }, 1500);
     } else {
         if (errEl) {
             errEl.textContent = 'Incorrect phone number. Please check and try again.';
@@ -40099,11 +40341,23 @@ function renderAuthorizedCustomerPortal(card) {
         } catch (e) {}
     }
 
-    if (activeWebsiteRestId && (vicardData.restaurants[activeWebsiteRestId] || rests.find(r => r.id === activeWebsiteRestId))) {
-        const targetRest = vicardData.restaurants[activeWebsiteRestId] || rests.find(r => r.id === activeWebsiteRestId);
-        content.innerHTML = generateRestaurantMenuWebsiteHtml(targetRest, card);
-    } else {
-        content.innerHTML = generateRestaurantsDirectoryWebsiteHtml(rests, card);
+    try {
+        if (activeWebsiteRestId && (vicardData.restaurants[activeWebsiteRestId] || rests.find(r => r.id === activeWebsiteRestId))) {
+            const targetRest = vicardData.restaurants[activeWebsiteRestId] || rests.find(r => r.id === activeWebsiteRestId);
+            content.innerHTML = generateRestaurantMenuWebsiteHtml(targetRest, card);
+        } else {
+            content.innerHTML = generateRestaurantsDirectoryWebsiteHtml(rests, card);
+        }
+    } catch (portalErr) {
+        console.error('Error generating portal HTML:', portalErr);
+        content.innerHTML = `
+            <div style="padding: 60px 20px; text-align: center; color: #fff;">
+                <div style="font-size: 3rem; margin-bottom: 12px;">⚠️</div>
+                <h3 style="margin: 0 0 8px 0;">Error Loading Menu</h3>
+                <p style="color: #f87171; font-size: 0.9rem;">${escapeHtml(portalErr.message || 'Unknown error occurred')}</p>
+                <button type="button" class="btn-primary" onclick="closeVicardCustomerPortal()" style="margin-top: 16px; padding: 10px 24px; border-radius: 12px;">Close</button>
+            </div>
+        `;
     }
     updateVicardPortalExitButton();
 }
@@ -40388,3 +40642,47 @@ if (typeof window !== 'undefined') {
         populateVicardTierSelects();
     }
 }
+
+// --- DYNAMIC MULTI-LANGUAGE NFC REFRESH HOOK ---
+function updateVicardLanguage() {
+    try {
+        // 1. Re-render Manager Hub customer cards table with localized labels
+        if (typeof filterVicardCustomers === 'function') {
+            filterVicardCustomers();
+        }
+        // 2. Re-render customer website if preview subtab is active
+        if (typeof currentVicardSubTab !== 'undefined' && currentVicardSubTab === 'customer') {
+            if (typeof renderCustomerWebsite === 'function') {
+                renderCustomerWebsite();
+            }
+        }
+        // 3. Re-render customer portal overlay if open
+        const custOverlay = document.getElementById('vicard-customer-portal-overlay');
+        if (custOverlay && custOverlay.style.display === 'block' && window._currentActiveCustomerCard) {
+            if (typeof renderAuthorizedCustomerPortal === 'function') {
+                renderAuthorizedCustomerPortal(window._currentActiveCustomerCard);
+            }
+        }
+        // 4. Refresh VIP Profile modal contents if open
+        const profModal = document.getElementById('vicard-profile-modal');
+        if (profModal && profModal.style.display !== 'none') {
+            if (typeof openVicardCustomerProfileModal === 'function') {
+                openVicardCustomerProfileModal();
+            }
+        }
+    } catch (e) {
+        console.warn('Error in updateVicardLanguage:', e);
+    }
+}
+window.updateVicardLanguage = updateVicardLanguage;
+
+function previewVicardCustomer(cardId) {
+    if (!cardId) return;
+    const card = (vicardData && vicardData.cards) ? vicardData.cards[cardId] : null;
+    if (card) {
+        window._currentActiveCustomerCard = card;
+        openVicardCustomerPortal(card.id, card.secretKey || '');
+    }
+}
+window.previewVicardCustomer = previewVicardCustomer;
+

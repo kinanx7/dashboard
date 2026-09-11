@@ -534,48 +534,130 @@ function saveViolationRecord(workerId, stats, record) {
     const vRule = document.getElementById('v-rule-select'); if (vRule) vRule.value = '';
     const vImg = document.getElementById('v-image'); if (vImg) vImg.value = '';
 
-    db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${monthKey}/violationsList`).set(stats.violationsList)
-        .then(() => {
-            if (typeof logActivity === 'function') {
-                logActivity('violation', worker.id, worker.name, `Added violation to ${worker.name}: "${record.reason || record.type}" (SAR ${record.amount})`);
-            }
-        })
-        .catch(err => console.error("Error saving violation record:", err));
+    // Immediate UI update
+    if (typeof renderFinDetails === 'function') renderFinDetails();
+    if (typeof renderFinanceTable === 'function') renderFinanceTable();
+    if (typeof renderSummaryTable === 'function') renderSummaryTable();
+
+    if (typeof db !== 'undefined' && db && typeof currentCompany !== 'undefined' && currentCompany) {
+        db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${monthKey}/violationsList`).set(stats.violationsList)
+            .then(() => {
+                if (typeof logActivity === 'function') {
+                    logActivity('violation', worker.id, worker.name, `Added violation to ${worker.name}: "${record.reason || record.type}" (SAR ${record.amount})`);
+                }
+            })
+            .catch(err => console.error("Error saving violation record:", err));
+    }
 }
 
 function deleteDetailedViolation(workerId, violationId) {
     if (!confirm("Are you sure you want to remove this violation?")) return;
-    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const workers = companyData.workers || [];
+    const workerIndex = workers.findIndex(w => String(w.id) === String(workerId));
     if (workerIndex !== -1) {
-        const worker = getCompanyData().workers[workerIndex];
-        const stats = getMonthlyStats(worker, currentGlobalMonth);
-        stats.violationsList = stats.violationsList.filter(v => v.id !== violationId);
+        const worker = workers[workerIndex];
+        const monthKey = (typeof currentGlobalMonth !== 'undefined' && currentGlobalMonth) ? currentGlobalMonth : new Date().toISOString().slice(0, 7);
+        let targetMonth = monthKey;
+        let stats = typeof getMonthlyStats === 'function' ? getMonthlyStats(worker, targetMonth) : (worker.monthlyStats ? worker.monthlyStats[targetMonth] : null);
+        let hasV = stats && stats.violationsList && stats.violationsList.some(v => String(v.id) === String(violationId));
 
-        db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/violationsList`).set(stats.violationsList)
-            .then(() => {
-                if (typeof logActivity === 'function') {
-                    logActivity('violation', worker.id, worker.name, `Deleted violation record from ${worker.name}`);
+        if (!hasV && worker.monthlyStats) {
+            for (const m in worker.monthlyStats) {
+                if (worker.monthlyStats[m]?.violationsList?.some(v => String(v.id) === String(violationId))) {
+                    targetMonth = m;
+                    stats = worker.monthlyStats[m];
+                    break;
                 }
-            })
-            .catch(err => console.error("Error deleting violation record:", err));
+            }
+        }
+
+        if (stats && stats.violationsList) {
+            stats.violationsList = stats.violationsList.filter(v => String(v.id) !== String(violationId));
+        }
+
+        // Immediate UI update
+        if (typeof renderFinDetails === 'function') renderFinDetails();
+        if (typeof renderFinanceTable === 'function') renderFinanceTable();
+        if (typeof renderSummaryTable === 'function') renderSummaryTable();
+
+        if (typeof db !== 'undefined' && db && typeof currentCompany !== 'undefined' && currentCompany) {
+            db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${targetMonth}/violationsList`).set(stats.violationsList)
+                .then(() => {
+                    if (typeof logActivity === 'function') {
+                        logActivity('violation', worker.id, worker.name, `Deleted violation record from ${worker.name}`);
+                    }
+                })
+                .catch(err => console.error("Error deleting violation record:", err));
+        }
     }
 }
 
 function resolveViolation(workerId, violationId, action) {
-    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
-    if (workerIndex !== -1) {
-        const worker = getCompanyData().workers[workerIndex];
-        const stats = getMonthlyStats(worker, currentGlobalMonth);
-        const v = stats.violationsList.find(v => v.id === violationId);
-        if (v) {
-            if (action === 'waive') v.status = 'waived';
-            if (action === 'apply') v.status = 'active';
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const workers = companyData.workers || [];
+    const workerIndex = workers.findIndex(w => String(w.id) === String(workerId));
+    if (workerIndex === -1) {
+        console.error("Worker not found for resolveViolation:", workerId);
+        return;
+    }
+    const worker = workers[workerIndex];
 
-            db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${currentGlobalMonth}/violationsList`).set(stats.violationsList)
-                .catch(err => console.error("Error resolving violation:", err));
+    const monthKey = (typeof currentGlobalMonth !== 'undefined' && currentGlobalMonth) ? currentGlobalMonth : new Date().toISOString().slice(0, 7);
+    let targetMonth = monthKey;
+    let stats = typeof getMonthlyStats === 'function' ? getMonthlyStats(worker, targetMonth) : (worker.monthlyStats ? worker.monthlyStats[targetMonth] : null);
+    let v = (stats && stats.violationsList && Array.isArray(stats.violationsList)) 
+        ? stats.violationsList.find(item => String(item.id) === String(violationId)) 
+        : null;
+
+    // Search across all monthlyStats if not found in targetMonth
+    if (!v && worker.monthlyStats) {
+        for (const m in worker.monthlyStats) {
+            const mStats = worker.monthlyStats[m];
+            if (mStats && Array.isArray(mStats.violationsList)) {
+                const found = mStats.violationsList.find(item => String(item.id) === String(violationId));
+                if (found) {
+                    v = found;
+                    targetMonth = m;
+                    stats = mStats;
+                    break;
+                }
+            }
         }
     }
+
+    if (!v) {
+        console.warn("Violation record not found with ID:", violationId);
+        return;
+    }
+
+    if (action === 'waive') {
+        v.status = 'waived';
+    } else if (action === 'apply') {
+        v.status = 'active';
+    }
+
+    // Immediately update UI so button click has instant visual effect
+    if (typeof renderFinDetails === 'function') renderFinDetails();
+    if (typeof renderFinanceTable === 'function') renderFinanceTable();
+    if (typeof renderSummaryTable === 'function') renderSummaryTable();
+
+    // Persist to Firebase RTDB
+    if (typeof db !== 'undefined' && db && typeof currentCompany !== 'undefined' && currentCompany) {
+        db.ref(`companies/${currentCompany}/workers/${workerIndex}/monthlyStats/${targetMonth}/violationsList`).set(stats.violationsList)
+            .then(() => {
+                if (typeof logActivity === 'function') {
+                    const actionLabel = action === 'waive' ? 'Fixed (Waived)' : 'Not Fixed (Penalty Applied)';
+                    logActivity('violation', worker.id, worker.name, `${actionLabel}: Violation for ${worker.name} "${v.reason || ''}" (SAR ${v.amount})`);
+                }
+            })
+            .catch(err => {
+                console.error("Error saving resolved violation to Firebase:", err);
+            });
+    }
 }
+window.resolveViolation = resolveViolation;
+window.deleteDetailedViolation = deleteDetailedViolation;
 
 // --- RANKS SYSTEM ---
 function manuallyUpdateRank(workerId, newRank) {
