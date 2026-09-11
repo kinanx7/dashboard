@@ -7816,10 +7816,12 @@ html.vicard-standalone-view #vicard-visit-history-modal {
         display: flex !important;
         align-items: center !important;
         justify-content: space-between !important;
-        gap: 10px !important;
-        margin-bottom: 14px !important;
+        gap: 6px !important;
+        margin-bottom: 12px !important;
         width: 100% !important;
+        max-width: 100% !important;
         box-sizing: border-box !important;
+        overflow: hidden !important;
     }
 
     /* Title hidden on mobile as it is immediately displayed 10px below in the hero banner */
@@ -7828,15 +7830,15 @@ html.vicard-standalone-view #vicard-visit-history-modal {
     }
 
     .keeta-back-btn {
-        padding: 8px 14px !important;
-        border-radius: 12px !important;
-        font-size: 0.82rem !important;
+        padding: 6px 10px !important;
+        border-radius: 10px !important;
+        font-size: 0.78rem !important;
         font-weight: 700 !important;
         white-space: nowrap !important;
         display: inline-flex !important;
         align-items: center !important;
-        gap: 6px !important;
-        min-height: 38px !important;
+        gap: 4px !important;
+        min-height: 32px !important;
         flex-shrink: 0 !important;
         box-sizing: border-box !important;
     }
@@ -7845,9 +7847,9 @@ html.vicard-standalone-view #vicard-visit-history-modal {
         background: linear-gradient(135deg, rgba(212, 175, 55, 0.25), rgba(212, 175, 55, 0.1)) !important;
         color: #fce79a !important;
         border: 1px solid rgba(212, 175, 55, 0.45) !important;
-        padding: 6px 14px !important;
+        padding: 4px 8px !important;
         border-radius: 100px !important;
-        font-size: 0.74rem !important;
+        font-size: 0.70rem !important;
         font-weight: 800 !important;
         white-space: nowrap !important;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;

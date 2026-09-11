@@ -93,7 +93,7 @@
     <!-- QR Code Generator Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=325">
+    <link rel="stylesheet" href="style.css?v=326">
 </head>
 
 <body class="theme-burgeroov">
@@ -8300,27 +8300,6 @@
     <!-- 5. FULL-SCREEN STANDALONE CUSTOMER PORTAL OVERLAY (?vicard=VIC-XXXX) -->
     <div id="vicard-customer-portal-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#08080c; z-index:9999999; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:20px 16px;">
         <div style="max-width:540px; margin:0 auto; padding-bottom:50px;">
-            <!-- Top bar -->
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px;">
-                <div class="keeta-brand-logo" style="display:flex; align-items:center; gap:14px;">
-                    <img src="front_card.png?v=312" alt="VICard" class="keeta-brand-card-img" style="width:96px; height:58px; object-fit:cover; border-radius:8px; border:1.5px solid #d4af37; box-shadow:0 6px 18px rgba(0,0,0,0.55), 0 0 12px rgba(212,175,55,0.35); background:transparent; flex-shrink:0;">
-                    <div>
-                        <div class="keeta-brand-title" style="font-size:1.35rem; font-weight:900; background:linear-gradient(135deg, #ffffff 0%, #f7df94 40%, #d4af37 100%); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:0.5px; line-height:1.15; display:flex; align-items:center; gap:6px;">
-                            VICard <span class="keeta-brand-vip-badge" style="font-size:0.7rem; font-weight:800; background:rgba(212,175,55,0.18); border:1px solid rgba(212,175,55,0.4); color:#f5d77f; padding:2px 8px; border-radius:6px; -webkit-text-fill-color:initial; letter-spacing:0.8px;">VIP</span>
-                        </div>
-                    </div>
-                </div>
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <button type="button" onclick="openVicardCustomerProfileModal()" class="keeta-header-action-btn" title="View Profile & Subscription">
-                        <span class="btn-icon">👤</span> <span class="btn-text">Profile</span>
-                    </button>
-                    <button type="button" onclick="openVicardInfoCardModal()" class="keeta-header-action-btn" title="Card Benefits & Information">
-                        <span class="btn-icon">ℹ️</span> <span class="btn-text">Info</span>
-                    </button>
-                    <button type="button" id="vicard-portal-top-exit-btn" onclick="handleVicardPortalExitButtonClick()" class="vicard-overlay-exit-btn" style="display:none;">Exit ✖</button>
-                </div>
-            </div>
-
             <!-- Dynamic Customer Portal Content populated by js/nfc.js -->
             <div id="vicard-portal-content"></div>
         </div>
@@ -8356,7 +8335,7 @@
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
     <script src="translations.js?v=321"></script>
-    <script src="app.js?v=325"></script>
+    <script src="app.js?v=326"></script>
 </body>
 
 </html>

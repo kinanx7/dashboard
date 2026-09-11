@@ -38844,11 +38844,11 @@ function generateRestaurantMenuWebsiteHtml(restaurant, card) {
                     <span>←</span> Back to All Restaurants
                 </button>
                 <div class="keeta-menu-nav-title">${escapeHtml(restaurant.name)}</div>
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <button type="button" class="keeta-header-action-btn" onclick="openVicardCustomerProfileModal()" title="View VIP Profile & Subscription" style="padding:4px 10px; font-size:0.75rem;">
+                <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                    <button type="button" class="keeta-header-action-btn" onclick="openVicardCustomerProfileModal()" title="View VIP Profile & Subscription" style="padding:5px 8px; font-size:0.72rem; gap:3px;">
                         <span class="btn-icon">👤</span> <span class="btn-text">Profile</span>
                     </button>
-                    <div class="keeta-menu-nav-tag">VIP Member Pass</div>
+                    <div class="keeta-menu-nav-tag" onclick="openVicardCustomerProfileModal()" style="cursor:pointer;" title="VIP Member Pass">👑 VIP</div>
                 </div>
             </div>
 
