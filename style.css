@@ -892,9 +892,21 @@ body {
 #view-learning.active-view,
 #view-contracts.active-view,
 #view-tracking.active-view,
-#view-salla.active-view,
+#view-salla.active-view {
+    grid-template-columns: 1fr;
+}
+
 #view-nfc.active-view {
     grid-template-columns: 1fr;
+    max-width: 1680px !important;
+    width: calc(100% - 80px) !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+}
+
+[dir="rtl"] #view-nfc.active-view {
+    margin: 0 auto !important;
 }
 
 #attendance-table {
@@ -1016,10 +1028,14 @@ body:not(.role-admin):not(.perm-drivers) #view-drivers.active-view {
     justify-content: space-between;
     align-items: center;
     box-shadow: var(--shadow-sm);
-    margin: 0 auto 20px;
-    max-width: 1400px;
-    width: calc(100% - 40px);
-    margin-top: 24px;
+    margin: 24px auto 20px auto;
+    max-width: 1680px;
+    width: calc(100% - 80px);
+    box-sizing: border-box;
+}
+
+[dir="rtl"] .month-bar {
+    margin: 24px auto 20px auto;
 }
 
 .month-bar h2 {
@@ -5269,6 +5285,7 @@ mark.search-highlight,
     letter-spacing: 0.5px;
     background: linear-gradient(135deg, #ffffff 0%, #f7df94 40%, #d4af37 100%);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
     line-height: 1.15;
     display: flex;
@@ -5292,6 +5309,7 @@ mark.search-highlight,
 .keeta-brand-vip {
     background: linear-gradient(135deg, #d4af37, #f7df94);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
     font-weight: 900;
 }
@@ -6166,6 +6184,7 @@ mark.search-highlight,
     line-height: 1.4;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
@@ -6653,7 +6672,9 @@ html.vicard-standalone-view #vicard-visit-history-modal {
 @media (max-width: 768px) {
     #view-nfc {
         padding: 0 10px !important;
+        margin: 0 !important;
         width: 100% !important;
+        max-width: 100% !important;
         box-sizing: border-box !important;
         overflow-x: hidden !important;
     }
@@ -7074,6 +7095,7 @@ html.vicard-standalone-view #vicard-visit-history-modal {
     margin: 0 0 8px 0;
     background: linear-gradient(135deg, #ffffff 0%, #f5d77f 50%, #d4af37 100%);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
     letter-spacing: 0.5px;
 }
@@ -7997,6 +8019,7 @@ html.vicard-standalone-view #vicard-visit-history-modal {
         margin: 0 0 10px 0 !important;
         display: -webkit-box !important;
         -webkit-line-clamp: 2 !important;
+        line-clamp: 2 !important;
         -webkit-box-orient: vertical !important;
         overflow: hidden !important;
     }
@@ -8342,6 +8365,7 @@ html.vicard-standalone-view #vicard-visit-history-modal {
     font-weight: 900;
     background: linear-gradient(135deg, #ffffff 0%, #fae69e 45%, #d4af37 100%);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
     text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
     line-height: 1.2;
@@ -8539,6 +8563,281 @@ html.vicard-standalone-view #vicard-visit-history-modal {
         border-radius: 20px;
     }
 }
+
+/* ========================================================================== */
+/* KEETA CUSTOMER VIEW: TRUE MOBILE PHONE DISPLAY & OVERWRITE RESOLUTION       */
+/* ========================================================================== */
+
+.keeta-header {
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    z-index: 10 !important;
+    overflow: visible !important;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.keeta-header-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    gap: 12px;
+    box-sizing: border-box;
+}
+
+.keeta-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+    /* Full-width container in display area */
+    #nfc-subview-customer {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .keeta-customer-app {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        padding-bottom: 40px !important;
+    }
+
+    /* Customer Preview Toolbar */
+    .vicard-preview-toolbar {
+        padding: 12px 14px !important;
+        margin-bottom: 14px !important;
+        gap: 10px !important;
+    }
+
+    .vicard-preview-actions-row {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        flex-wrap: wrap !important;
+        width: 100% !important;
+    }
+
+    .vicard-preview-action-btn {
+        flex: 1 1 auto !important;
+        min-height: 38px !important;
+        padding: 6px 12px !important;
+        font-size: 0.78rem !important;
+        font-weight: 700 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 6px !important;
+        border-radius: 10px !important;
+        box-sizing: border-box !important;
+    }
+
+    /* 2-Row Stacked Customer App Header (Zero Overflow, Zero Clipping) */
+    .keeta-header {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        padding: 12px 14px !important;
+        background: rgba(18, 18, 26, 0.95) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 16px !important;
+        margin-bottom: 16px !important;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35) !important;
+        gap: 10px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        height: auto !important;
+        min-height: auto !important;
+        max-height: none !important;
+        position: relative !important;
+        top: auto !important;
+        left: auto !important;
+        right: auto !important;
+        z-index: 10 !important;
+        overflow: visible !important;
+    }
+
+    .keeta-header-top-row {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        width: 100% !important;
+        gap: 6px !important;
+        flex-wrap: nowrap !important;
+    }
+
+    .keeta-header-left {
+        display: flex !important;
+        align-items: center !important;
+        min-width: 0 !important;
+        flex-shrink: 1 !important;
+    }
+
+    .keeta-brand-logo {
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        min-width: 0 !important;
+    }
+
+    .keeta-brand-card-img {
+        width: 44px !important;
+        height: 28px !important;
+        border-radius: 5px !important;
+        flex-shrink: 0 !important;
+    }
+
+    .keeta-brand-title {
+        font-size: 0.88rem !important;
+        line-height: 1.2 !important;
+        white-space: nowrap !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+    }
+
+    .keeta-brand-vip-badge {
+        font-size: 0.58rem !important;
+        padding: 1px 4px !important;
+        border-radius: 4px !important;
+    }
+
+    .keeta-header-actions {
+        display: flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+        flex-shrink: 0 !important;
+    }
+
+    .keeta-location-pill {
+        display: none !important;
+    }
+
+    .keeta-header-action-btn {
+        padding: 5px 8px !important;
+        font-size: 0.72rem !important;
+        gap: 3px !important;
+        border-radius: 12px !important;
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
+    }
+
+    /* Executive Member Chip on Mobile: Full-Width Row (Never overlaps the Hero Banner) */
+    .keeta-member-chip {
+        width: 100% !important;
+        box-sizing: border-box !important;
+        padding: 8px 12px !important;
+        border-radius: 14px !important;
+        margin: 0 !important;
+        background: linear-gradient(135deg, rgba(212, 175, 55, 0.16), rgba(255, 255, 255, 0.05)) !important;
+        border: 1px solid rgba(212, 175, 55, 0.35) !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        cursor: pointer !important;
+    }
+
+    .keeta-member-avatar {
+        width: 28px !important;
+        height: 28px !important;
+        font-size: 0.95rem !important;
+        flex-shrink: 0 !important;
+    }
+
+    .keeta-member-info {
+        min-width: 0 !important;
+        flex: 1 !important;
+    }
+
+    .keeta-member-name {
+        font-size: 0.84rem !important;
+        font-weight: 800 !important;
+        color: #ffffff !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .keeta-member-id {
+        font-size: 0.70rem !important;
+        color: #94a3b8 !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+        line-height: 1.35 !important;
+        margin-top: 2px !important;
+    }
+
+    /* Hero Story Food Banner on Mobile: Clean, High Contrast & Isolated */
+    .keeta-hero-banner {
+        height: auto !important;
+        min-height: 190px !important;
+        border-radius: 18px !important;
+        margin-bottom: 16px !important;
+        position: relative !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+    }
+
+    .keeta-hero-overlay {
+        padding: 12px 14px !important;
+        position: relative !important;
+        min-height: 190px !important;
+        display: flex !important;
+        align-items: flex-end !important;
+        background: linear-gradient(0deg, rgba(8, 8, 14, 0.96) 0%, rgba(8, 8, 14, 0.75) 60%, rgba(8, 8, 14, 0.25) 100%) !important;
+        box-sizing: border-box !important;
+        width: 100% !important;
+    }
+
+    [dir="rtl"] .keeta-hero-overlay {
+        background: linear-gradient(0deg, rgba(8, 8, 14, 0.96) 0%, rgba(8, 8, 14, 0.75) 60%, rgba(8, 8, 14, 0.25) 100%) !important;
+        text-align: right !important;
+    }
+
+    .keeta-hero-box {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        padding: 12px 14px !important;
+        border-radius: 14px !important;
+        background: rgba(10, 10, 16, 0.82) !important;
+        backdrop-filter: blur(12px) !important;
+        -webkit-backdrop-filter: blur(12px) !important;
+        border: 1px solid rgba(212, 175, 55, 0.3) !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
+    }
+
+    .keeta-hero-heading {
+        font-size: 1.18rem !important;
+        font-weight: 900 !important;
+        line-height: 1.3 !important;
+        margin: 0 0 6px 0 !important;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9) !important;
+    }
+
+    .keeta-hero-text {
+        font-size: 0.80rem !important;
+        line-height: 1.45 !important;
+        color: #e2e8f0 !important;
+        margin: 0 !important;
+        text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9) !important;
+    }
+}
+
 
 
 

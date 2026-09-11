@@ -409,12 +409,14 @@ function switchNfcSubTab(tab) {
     currentVicardSubTab = tab;
     const viewMgr = document.getElementById('nfc-subview-manager');
     const viewCust = document.getElementById('nfc-subview-customer');
+    const execBanner = document.getElementById('nfc-executive-banner');
     const toggleBtn = document.getElementById('nfc-master-view-toggle');
     const btnMgr = document.getElementById('nfc-view-btn-manager');
     const btnCust = document.getElementById('nfc-view-btn-customer');
 
     if (tab === 'customer') {
         if (viewMgr) viewMgr.style.display = 'none';
+        if (execBanner) execBanner.style.display = 'none';
         if (viewCust) viewCust.style.display = 'block';
         if (toggleBtn) {
             toggleBtn.innerHTML = '<span>👔</span> Switch to Manager View';
@@ -428,8 +430,13 @@ function switchNfcSubTab(tab) {
             btnCust.style.boxShadow = '0 1px 4px rgba(0,0,0,0.18)';
         }
         renderCustomerWebsite();
+        const nfcView = document.getElementById('view-nfc');
+        if (nfcView && window.innerWidth <= 768) {
+            nfcView.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     } else {
         if (viewCust) viewCust.style.display = 'none';
+        if (execBanner) execBanner.style.display = 'block';
         if (viewMgr) viewMgr.style.display = 'block';
         if (toggleBtn) {
             toggleBtn.innerHTML = '<span>🌐</span> Switch to Customer View';
@@ -624,6 +631,7 @@ function filterVicardCustomers() {
     const tableBody = document.getElementById('vicard-customers-table-body');
 
     if (!tableBody) return;
+    if (typeof vicardData === 'undefined' || !vicardData || !vicardData.cards) return;
 
     const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
     const statusFilter = filterSelect ? filterSelect.value : 'all';
@@ -2810,23 +2818,22 @@ function generateRestaurantsDirectoryWebsiteHtml(rests, card) {
     return `
         <div class="keeta-customer-app">
             <!-- 1. Keeta/Hungerstation Top App Bar -->
-            <header class="keeta-header">
-                <div class="keeta-header-left">
-                    <div class="keeta-brand-logo">
-                        <img src="front_card.png?v=312" alt="VICard" class="keeta-brand-card-img">
-                        <div>
-                            <div class="keeta-brand-title">VICard <span class="keeta-brand-vip-badge">VIP</span></div>
+            <div class="keeta-header">
+                <div class="keeta-header-top-row">
+                    <div class="keeta-header-left">
+                        <div class="keeta-brand-logo">
+                            <img src="front_card.png?v=312" alt="VICard" class="keeta-brand-card-img">
+                            <div>
+                                <div class="keeta-brand-title">VICard <span class="keeta-brand-vip-badge">VIP</span></div>
+                            </div>
                         </div>
-                    </div>
-                </div>
-
-                <div class="keeta-header-right">
-                    <div class="keeta-location-pill">
-                        <span>📍</span>
-                        <span>${escapeHtml(txtLocation)}</span>
                     </div>
 
                     <div class="keeta-header-actions">
+                        <div class="keeta-location-pill">
+                            <span>📍</span>
+                            <span>${escapeHtml(txtLocation)}</span>
+                        </div>
                         <button type="button" class="keeta-header-action-btn" onclick="openVicardCustomerProfileModal()" title="View VIP Profile & Subscription">
                             <span class="btn-icon">👤</span> <span class="btn-text">${escapeHtml(txtProfile)}</span>
                         </button>
@@ -2834,16 +2841,16 @@ function generateRestaurantsDirectoryWebsiteHtml(rests, card) {
                             <span class="btn-icon">ℹ️</span> <span class="btn-text">${escapeHtml(txtInfo)}</span>
                         </button>
                     </div>
+                </div>
 
-                    <div class="keeta-member-chip" onclick="openVicardCustomerProfileModal()" title="Click to view VIP Profile & Subscription">
-                        <div class="keeta-member-avatar">${isActive ? '👑' : '⚠️'}</div>
-                        <div class="keeta-member-info">
-                            <div class="keeta-member-name">${escapeHtml(card ? card.name : 'VIP Member')}</div>
-                            <div class="keeta-member-id" dir="ltr"><span style="font-family:monospace;">${card ? card.id : 'VIC-GUEST'}</span> • <span style="color:${isActive ? '#10b981' : '#ef4444'}; font-weight:800;">${isActive ? 'ACTIVE' : 'SUSPENDED'}</span> • <span style="color:#f5d77f; font-weight:800;">${escapeHtml((card && card.tier) || 'Black VIP')}</span> • <span style="color:#38bdf8; font-weight:800;">🎯 ${monthlyLimit > 0 ? `${remainingOffers} left (${usedOffers}/${monthlyLimit})` : 'Unlimited'}</span></div>
-                        </div>
+                <div class="keeta-member-chip" onclick="openVicardCustomerProfileModal()" title="Click to view VIP Profile & Subscription">
+                    <div class="keeta-member-avatar">${isActive ? '👑' : '⚠️'}</div>
+                    <div class="keeta-member-info">
+                        <div class="keeta-member-name">${escapeHtml(card ? card.name : 'VIP Member')}</div>
+                        <div class="keeta-member-id" dir="ltr"><span style="font-family:monospace;">${card ? card.id : 'VIC-GUEST'}</span> • <span style="color:${isActive ? '#10b981' : '#ef4444'}; font-weight:800;">${isActive ? 'ACTIVE' : 'SUSPENDED'}</span> • <span style="color:#f5d77f; font-weight:800;">${escapeHtml((card && card.tier) || 'Black VIP')}</span> • <span style="color:#38bdf8; font-weight:800;">🎯 ${monthlyLimit > 0 ? `${remainingOffers} left (${usedOffers}/${monthlyLimit})` : 'Unlimited'}</span></div>
                     </div>
                 </div>
-            </header>
+            </div>
 
             <!-- 2. Hero Story Banner (Image adjustable, high-contrast readable text, only main title & subtitle) -->
             ${(() => {
