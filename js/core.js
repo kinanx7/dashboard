@@ -2671,8 +2671,14 @@ function listenToCloudData() {
             { key: 'warehouse', render: () => { renderWarehouse(); checkStockAlerts(); } },
             { key: 'whCategories', render: () => { renderWarehouse(); } },
             { key: 'paymentRequests', render: () => { if (typeof renderPaymentRequests === 'function') renderPaymentRequests(); } },
-            { key: 'taskAlerts', render: () => { if (typeof renderTaskAlerts === 'function') renderTaskAlerts(); } },
-            { key: 'trackedTasks', render: () => { if (typeof renderTrackedTasks === 'function') renderTrackedTasks(); } },
+            { key: 'taskAlerts', render: () => { 
+                if (typeof renderTaskAlerts === 'function') renderTaskAlerts(); 
+                if (typeof renderTasks === 'function') renderTasks(); 
+            } },
+            { key: 'trackedTasks', render: () => { 
+                if (typeof renderTrackedTasks === 'function') renderTrackedTasks(); 
+                if (typeof renderTasks === 'function') renderTasks(); 
+            } },
             { key: 'marketFeedback', render: () => { if (typeof renderMarketFeedback === 'function') renderMarketFeedback(); } },
             { key: 'jobCatalog', render: () => { if (typeof renderJobCatalog === 'function') renderJobCatalog(); } },
             { key: 'activeAnnouncement', render: () => { 
@@ -3087,20 +3093,22 @@ document.addEventListener('touchend', handleDropdownOutsideInteraction, { passiv
 
 
 function getVisibleWorkers() {
-    const workers = getCompanyData().workers;
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : null;
+    const workers = (data && data.workers) || [];
     if (!currentUser) return [];
 
     const email = currentUser.email.toLowerCase();
-    const admins = getCompanyData().admins || { "kinan,rahal@hotmail,com": true };
+    const admins = (data && data.admins) || { "kinan,rahal@hotmail,com": true };
     const isAdmin = email === 'kinan.rahal@hotmail.com' || admins[email.replace(/\./g, ',')] === true;
 
-    const worker = workers.find(w => w.email && w.email.toLowerCase() === email);
+    const worker = workers.find(w => w && w.email && w.email.toLowerCase() === email);
     const hasFinancePerm = worker && worker.permissions && worker.permissions.finance;
+    const hasTasksPerm = (worker && worker.permissions && (worker.permissions.tasks === true || worker.permissions.tasks === 'true')) || document.body.classList.contains('perm-tasks');
 
-    if (isAdmin || hasFinancePerm) {
+    if (isAdmin || hasFinancePerm || hasTasksPerm) {
         return workers;
     } else {
-        return workers.filter(w => w.email && w.email.toLowerCase() === email);
+        return workers.filter(w => w && w.email && w.email.toLowerCase() === email);
     }
 }
 

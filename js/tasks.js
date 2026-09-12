@@ -1000,6 +1000,8 @@ function seeTask(workerId, taskId) {
     const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
     if (workerIndex === -1) return;
     const worker = getCompanyData().workers[workerIndex];
+    if (!worker.jobs) worker.jobs = [];
+    else if (!Array.isArray(worker.jobs)) worker.jobs = Object.values(worker.jobs);
     const t = worker.jobs.find(j => j.id === taskId);
     if (t) {
         if (t.isTracked || t.trackedTaskId) {
@@ -1010,8 +1012,17 @@ function seeTask(workerId, taskId) {
         t.seenAt = Date.now();
         if (typeof renderTasks === 'function') renderTasks();
 
-        // Targeted write to worker jobs path
-        db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
+        const updates = {};
+        updates[`companies/${currentCompany}/workers/${workerIndex}/jobs`] = worker.jobs;
+        updates[`companies/${currentCompany}/taskAlerts/${taskId}`] = {
+            taskId: taskId,
+            workerId: workerId,
+            status: 'seen',
+            seenAt: t.seenAt,
+            updatedAt: Date.now()
+        };
+
+        db.ref().update(updates)
             .then(() => { if (typeof renderTasks === 'function') renderTasks(); })
             .catch(err => console.error("Error seeing task:", err));
     }
@@ -1021,6 +1032,8 @@ function completeTask(workerId, taskId) {
     const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
     if (workerIndex === -1) return;
     const worker = getCompanyData().workers[workerIndex];
+    if (!worker.jobs) worker.jobs = [];
+    else if (!Array.isArray(worker.jobs)) worker.jobs = Object.values(worker.jobs);
     const t = worker.jobs.find(j => j.id === taskId);
     if (t) {
         if (t.isTracked || t.trackedTaskId) {
@@ -1032,8 +1045,17 @@ function completeTask(workerId, taskId) {
         t.completedAt = Date.now();
         if (typeof renderTasks === 'function') renderTasks();
 
-        // Targeted write to worker jobs path
-        db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
+        const updates = {};
+        updates[`companies/${currentCompany}/workers/${workerIndex}/jobs`] = worker.jobs;
+        updates[`companies/${currentCompany}/taskAlerts/${taskId}`] = {
+            taskId: taskId,
+            workerId: workerId,
+            status: 'completed',
+            completedAt: t.completedAt,
+            updatedAt: Date.now()
+        };
+
+        db.ref().update(updates)
             .then(() => {
                 logActivity('task', worker.id, worker.name, `${worker.name} completed task: "${t.title}"`);
                 if (typeof renderTasks === 'function') renderTasks();
@@ -1153,6 +1175,14 @@ function getVisibleWorkers() {
     return [activeWorker];
 }
 window.getVisibleWorkers = getVisibleWorkers;
+
+function getWorkerJobsList(w) {
+    if (!w || !w.jobs) return [];
+    if (Array.isArray(w.jobs)) return w.jobs.filter(Boolean);
+    if (typeof w.jobs === 'object') return Object.values(w.jobs).filter(Boolean);
+    return [];
+}
+window.getWorkerJobsList = getWorkerJobsList;
 
 function renderTasks() {
     const isAr = currentAppLang === 'ar';
@@ -1324,7 +1354,7 @@ function renderTasks() {
     }
 
     visibleWorkers.forEach(w => {
-        (w.jobs || []).forEach(j => {
+        getWorkerJobsList(w).forEach(j => {
             const jTs = getJobTimestamp(j);
             if (passesDateFilter(jTs) && passesSearchFilter(j)) {
                 totalAssigned++;
@@ -1644,7 +1674,7 @@ function renderTasks() {
         if (!Array.isArray(constantTasks)) constantTasks = Object.values(constantTasks);
         constantTasks = constantTasks.filter(ct => ct && (ct.id || ct.title));
 
-        let jobs = worker.jobs ? [...worker.jobs] : [];
+        let jobs = getWorkerJobsList(worker);
 
         // For Manager/Admin view: Tracked tasks in progress show as Pending without revealing worker completion until spy confirms
         // Tracked tasks stay visible in Manager view as ⏳ Pending until completed.

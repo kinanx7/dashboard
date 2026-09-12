@@ -2671,8 +2671,14 @@ function listenToCloudData() {
             { key: 'warehouse', render: () => { renderWarehouse(); checkStockAlerts(); } },
             { key: 'whCategories', render: () => { renderWarehouse(); } },
             { key: 'paymentRequests', render: () => { if (typeof renderPaymentRequests === 'function') renderPaymentRequests(); } },
-            { key: 'taskAlerts', render: () => { if (typeof renderTaskAlerts === 'function') renderTaskAlerts(); } },
-            { key: 'trackedTasks', render: () => { if (typeof renderTrackedTasks === 'function') renderTrackedTasks(); } },
+            { key: 'taskAlerts', render: () => { 
+                if (typeof renderTaskAlerts === 'function') renderTaskAlerts(); 
+                if (typeof renderTasks === 'function') renderTasks(); 
+            } },
+            { key: 'trackedTasks', render: () => { 
+                if (typeof renderTrackedTasks === 'function') renderTrackedTasks(); 
+                if (typeof renderTasks === 'function') renderTasks(); 
+            } },
             { key: 'marketFeedback', render: () => { if (typeof renderMarketFeedback === 'function') renderMarketFeedback(); } },
             { key: 'jobCatalog', render: () => { if (typeof renderJobCatalog === 'function') renderJobCatalog(); } },
             { key: 'activeAnnouncement', render: () => { 
@@ -3087,20 +3093,22 @@ document.addEventListener('touchend', handleDropdownOutsideInteraction, { passiv
 
 
 function getVisibleWorkers() {
-    const workers = getCompanyData().workers;
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : null;
+    const workers = (data && data.workers) || [];
     if (!currentUser) return [];
 
     const email = currentUser.email.toLowerCase();
-    const admins = getCompanyData().admins || { "kinan,rahal@hotmail,com": true };
+    const admins = (data && data.admins) || { "kinan,rahal@hotmail,com": true };
     const isAdmin = email === 'kinan.rahal@hotmail.com' || admins[email.replace(/\./g, ',')] === true;
 
-    const worker = workers.find(w => w.email && w.email.toLowerCase() === email);
+    const worker = workers.find(w => w && w.email && w.email.toLowerCase() === email);
     const hasFinancePerm = worker && worker.permissions && worker.permissions.finance;
+    const hasTasksPerm = (worker && worker.permissions && (worker.permissions.tasks === true || worker.permissions.tasks === 'true')) || document.body.classList.contains('perm-tasks');
 
-    if (isAdmin || hasFinancePerm) {
+    if (isAdmin || hasFinancePerm || hasTasksPerm) {
         return workers;
     } else {
-        return workers.filter(w => w.email && w.email.toLowerCase() === email);
+        return workers.filter(w => w && w.email && w.email.toLowerCase() === email);
     }
 }
 
@@ -10170,6 +10178,8 @@ function seeTask(workerId, taskId) {
     const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
     if (workerIndex === -1) return;
     const worker = getCompanyData().workers[workerIndex];
+    if (!worker.jobs) worker.jobs = [];
+    else if (!Array.isArray(worker.jobs)) worker.jobs = Object.values(worker.jobs);
     const t = worker.jobs.find(j => j.id === taskId);
     if (t) {
         if (t.isTracked || t.trackedTaskId) {
@@ -10180,8 +10190,17 @@ function seeTask(workerId, taskId) {
         t.seenAt = Date.now();
         if (typeof renderTasks === 'function') renderTasks();
 
-        // Targeted write to worker jobs path
-        db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
+        const updates = {};
+        updates[`companies/${currentCompany}/workers/${workerIndex}/jobs`] = worker.jobs;
+        updates[`companies/${currentCompany}/taskAlerts/${taskId}`] = {
+            taskId: taskId,
+            workerId: workerId,
+            status: 'seen',
+            seenAt: t.seenAt,
+            updatedAt: Date.now()
+        };
+
+        db.ref().update(updates)
             .then(() => { if (typeof renderTasks === 'function') renderTasks(); })
             .catch(err => console.error("Error seeing task:", err));
     }
@@ -10191,6 +10210,8 @@ function completeTask(workerId, taskId) {
     const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
     if (workerIndex === -1) return;
     const worker = getCompanyData().workers[workerIndex];
+    if (!worker.jobs) worker.jobs = [];
+    else if (!Array.isArray(worker.jobs)) worker.jobs = Object.values(worker.jobs);
     const t = worker.jobs.find(j => j.id === taskId);
     if (t) {
         if (t.isTracked || t.trackedTaskId) {
@@ -10202,8 +10223,17 @@ function completeTask(workerId, taskId) {
         t.completedAt = Date.now();
         if (typeof renderTasks === 'function') renderTasks();
 
-        // Targeted write to worker jobs path
-        db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
+        const updates = {};
+        updates[`companies/${currentCompany}/workers/${workerIndex}/jobs`] = worker.jobs;
+        updates[`companies/${currentCompany}/taskAlerts/${taskId}`] = {
+            taskId: taskId,
+            workerId: workerId,
+            status: 'completed',
+            completedAt: t.completedAt,
+            updatedAt: Date.now()
+        };
+
+        db.ref().update(updates)
             .then(() => {
                 logActivity('task', worker.id, worker.name, `${worker.name} completed task: "${t.title}"`);
                 if (typeof renderTasks === 'function') renderTasks();
@@ -10323,6 +10353,14 @@ function getVisibleWorkers() {
     return [activeWorker];
 }
 window.getVisibleWorkers = getVisibleWorkers;
+
+function getWorkerJobsList(w) {
+    if (!w || !w.jobs) return [];
+    if (Array.isArray(w.jobs)) return w.jobs.filter(Boolean);
+    if (typeof w.jobs === 'object') return Object.values(w.jobs).filter(Boolean);
+    return [];
+}
+window.getWorkerJobsList = getWorkerJobsList;
 
 function renderTasks() {
     const isAr = currentAppLang === 'ar';
@@ -10494,7 +10532,7 @@ function renderTasks() {
     }
 
     visibleWorkers.forEach(w => {
-        (w.jobs || []).forEach(j => {
+        getWorkerJobsList(w).forEach(j => {
             const jTs = getJobTimestamp(j);
             if (passesDateFilter(jTs) && passesSearchFilter(j)) {
                 totalAssigned++;
@@ -10814,7 +10852,7 @@ function renderTasks() {
         if (!Array.isArray(constantTasks)) constantTasks = Object.values(constantTasks);
         constantTasks = constantTasks.filter(ct => ct && (ct.id || ct.title));
 
-        let jobs = worker.jobs ? [...worker.jobs] : [];
+        let jobs = getWorkerJobsList(worker);
 
         // For Manager/Admin view: Tracked tasks in progress show as Pending without revealing worker completion until spy confirms
         // Tracked tasks stay visible in Manager view as ⏳ Pending until completed.

@@ -598,6 +598,24 @@ app.post('/notify/prepare', async (req, res) => {
     }
 });
 
+// In-memory Task Notification Deduplication Cache
+const recentTaskDispatches = new Map();
+
+function shouldDispatchTaskNotification(cacheKey) {
+    if (!cacheKey) return true;
+    const now = Date.now();
+    // Prune entries older than 3 minutes
+    for (const [k, ts] of recentTaskDispatches.entries()) {
+        if (now - ts > 180000) recentTaskDispatches.delete(k);
+    }
+    if (recentTaskDispatches.has(cacheKey)) {
+        console.log(`[Task Notify Dedupe] Skipped duplicate alert for: ${cacheKey}`);
+        return false;
+    }
+    recentTaskDispatches.set(cacheKey, now);
+    return true;
+}
+
 // Dedicated HTTP API endpoint to trigger task assignment notifications (FCM & WhatsApp)
 app.post('/notify/task', async (req, res) => {
     try {
@@ -606,10 +624,16 @@ app.post('/notify/task', async (req, res) => {
             return res.status(400).json({ error: 'Missing recipient contact (phone or token)' });
         }
         const cKey = companyId || 'mvc';
-        const companyLabel = getCompanyLabel(cKey);
-        const tpls = companyTemplates[cKey] || {};
         const title = taskTitle || 'New task';
         const name = workerName || 'Worker';
+
+        const dedupeKey = `${cKey}_${workerId || workerPhone}_${taskNum || title}`;
+        if (!shouldDispatchTaskNotification(dedupeKey)) {
+            return res.json({ success: true, message: 'Notification already dispatched, duplicate skipped.' });
+        }
+
+        const companyLabel = getCompanyLabel(cKey);
+        const tpls = companyTemplates[cKey] || {};
 
         if (fcmToken) {
             safeSend({
@@ -799,6 +823,11 @@ function startNotificationListeners(companyId) {
 
                 for (const job of newJobs) {
                     const title = job.title || job.name || 'New task';
+                    const taskNum = job.taskNum || '';
+                    const dedupeKey = `${companyId}_${after.id || phone}_${taskNum || title}`;
+                    if (!shouldDispatchTaskNotification(dedupeKey)) {
+                        continue;
+                    }
                     
                     if (fcmToken) {
                         sends.push(safeSend({
