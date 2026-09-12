@@ -10014,7 +10014,32 @@ function ensureTaskNumbers() {
         }
     });
 }
-window.ensureTaskNumbers = ensureTaskNumbers;
+function dispatchTaskNotification(worker, taskTitle, taskNum) {
+    if (!worker) return;
+    try {
+        const config = typeof getCompanyData === 'function' ? (getCompanyData().messagingConfig || {}) : {};
+        const serverUrlInput = document.getElementById('wa-server-url');
+        const baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || config.serverUrl || 'https://burgeroov-notify.onrender.com';
+
+        fetch(`${baseUrl.replace(/\/+$/, '')}/notify/task`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                companyId: currentCompany,
+                workerId: worker.id,
+                workerPhone: worker.phone,
+                workerName: worker.name,
+                taskTitle: taskTitle,
+                taskNum: taskNum || '',
+                fcmToken: worker.fcmToken,
+                waAlertsEnabled: worker.waAlertsEnabled !== false
+            })
+        }).catch(err => console.warn('[Notify Task HTTP fallback error]:', err.message));
+    } catch(e) {
+        console.warn('[Notify Task HTTP error]:', e.message);
+    }
+}
+window.dispatchTaskNotification = dispatchTaskNotification;
 
 function assignTask() {
     const isAr = currentAppLang === 'ar';
@@ -10135,6 +10160,7 @@ function assignTask() {
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
         .then(() => {
             logActivity('task', worker.id, worker.name, `Assigned task ${assignedTaskNum} to ${worker.name}: "${text}"`);
+            dispatchTaskNotification(worker, text, assignedTaskNum);
             if (typeof renderTasks === 'function') renderTasks();
         })
         .catch(err => console.error("Error assigning task:", err));
@@ -11240,6 +11266,7 @@ function saveEditedTask() {
 
             db.ref().update(updates).then(() => {
                 logActivity('task', newWorker.id, newWorker.name, `Assigned task to ${newWorker.name}: "${newTitle}"`);
+                dispatchTaskNotification(newWorker, newTitle);
                 closeEditTaskModal();
                 renderAll();
             }).catch(err => console.error("Error reassigning general task to worker:", err));
@@ -13527,6 +13554,7 @@ function addTrackedTask() {
             if (typeof logActivity === 'function') {
                 logActivity('task_tracked', worker.id, worker.name, `Assigned tracked task "${title}" to ${worker.name} (Spy: ${spyWorker.name})`);
             }
+            dispatchTaskNotification(worker, `[Tracked] ${title}`, taskId);
             alert(isAr ? `تم إسناد المهمة المتتبعة "${title}" لـ ${worker.name} وتعيين ${spyWorker.name} كمراقب بنجاح!` : `Tracked task "${title}" assigned to ${worker.name} (Spy: ${spyWorker.name}) successfully!`);
             const form = document.getElementById('tracked-task-form');
             if (form) form.reset();

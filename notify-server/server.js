@@ -332,7 +332,15 @@ async function executeWhatsAppDispatch(phone, text, image = null) {
         return;
     }
     try {
-        let cleanPhone = phone.replace(/[^0-9]/g, '');
+        let cleanPhone = String(phone).replace(/[^0-9]/g, '');
+        // Normalize Saudi mobile numbers: 05XXXXXXXX -> 9665XXXXXXXX, 5XXXXXXXX -> 9665XXXXXXXX
+        if (cleanPhone.startsWith('05') && cleanPhone.length === 10) {
+            cleanPhone = '966' + cleanPhone.substring(1);
+        } else if (cleanPhone.startsWith('5') && cleanPhone.length === 9) {
+            cleanPhone = '966' + cleanPhone;
+        } else if (cleanPhone.startsWith('00')) {
+            cleanPhone = cleanPhone.substring(2);
+        }
         if (!cleanPhone.endsWith('@s.whatsapp.net')) {
             cleanPhone = `${cleanPhone}@s.whatsapp.net`;
         }
@@ -383,6 +391,28 @@ const prevState = {};
 const notifiedGeneralTasks = {};
 const isFirstGeneralTasksLoad = {};
 const companyTemplates = {};
+const activeCompanyListeners = new Set();
+const companyDirectoryCache = {
+    burgeroov: { name: 'Burgeroov' },
+    mvc: { name: 'MVC' },
+    mvcfresh: { name: 'MVC Fresh' }
+};
+
+function getCompanyLabel(companyId) {
+    if (companyDirectoryCache[companyId] && companyDirectoryCache[companyId].name) {
+        return companyDirectoryCache[companyId].name;
+    }
+    if (companyId === 'mvcfresh') return 'MVC Fresh';
+    if (companyId === 'mvc') return 'MVC';
+    if (companyId === 'burgeroov') return 'Burgeroov';
+    return companyId || 'Company';
+}
+
+function ensureCompanyListeners(companyId) {
+    if (!companyId || activeCompanyListeners.has(companyId)) return;
+    activeCompanyListeners.add(companyId);
+    startNotificationListeners(companyId);
+}
 
 // Helper to safely get preparing workers across all company nodes & formats
 async function getPreparingWorkersForCompany(companyId) {
@@ -499,7 +529,7 @@ async function sendPrepareOrderAlert(companyId, order) {
     }
     notifiedPrepareOrders[cacheKey] = true;
 
-    const companyLabel = companyId === 'mvcfresh' ? 'MVC Fresh' : (companyId === 'mvc' ? 'MVC' : 'Burgeroov');
+    const companyLabel = getCompanyLabel(companyId);
     const tpls = companyTemplates[companyId] || {};
 
     const prepWorkers = await getPreparingWorkersForCompany(companyId);
@@ -564,6 +594,49 @@ app.post('/notify/prepare', async (req, res) => {
         return res.json({ success: true, message: 'Prepare order notifications dispatched successfully.' });
     } catch (err) {
         console.error('[Notify Prepare Error]:', err.message);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// Dedicated HTTP API endpoint to trigger task assignment notifications (FCM & WhatsApp)
+app.post('/notify/task', async (req, res) => {
+    try {
+        const { companyId, workerId, workerPhone, workerName, taskTitle, taskNum, fcmToken, waAlertsEnabled } = req.body || {};
+        if (!workerPhone && !fcmToken) {
+            return res.status(400).json({ error: 'Missing recipient contact (phone or token)' });
+        }
+        const cKey = companyId || 'mvc';
+        const companyLabel = getCompanyLabel(cKey);
+        const tpls = companyTemplates[cKey] || {};
+        const title = taskTitle || 'New task';
+        const name = workerName || 'Worker';
+
+        if (fcmToken) {
+            safeSend({
+                token: fcmToken,
+                notification: {
+                    title: `📋 New Task Assigned [${companyLabel}]`,
+                    body: `${taskNum ? `[${taskNum}] ` : ''}${title} — tap to open your task board.`
+                },
+                data: { type: 'task', tab: 'tasks', workerName: name, companyId: cKey },
+                android: { priority: 'high', notification: { channelId: 'burgeroov_tasks' } },
+                apns: { payload: { aps: { sound: 'default', badge: 1 } } }
+            }, `[${cKey}] TASK HTTP → ${name}: "${title}"`);
+        }
+
+        if (workerPhone && waAlertsEnabled !== false) {
+            const rawTpl = tpls.task || '📋 *مهمة جديدة أسندت إليك [{company_name}]*\n\nالموظف: {worker_name}\nالمهمة: {task_title}\n\nيرجى فتح لوحة المهام للإنجاز.';
+            const waMsg = formatCustomTemplate(rawTpl, {
+                workerName: name,
+                taskTitle: `${taskNum ? `[${taskNum}] ` : ''}${title}`,
+                companyName: companyLabel
+            });
+            sendWhatsAppDirect(workerPhone, waMsg);
+        }
+
+        return res.json({ success: true, message: 'Task notification queued successfully.' });
+    } catch (err) {
+        console.error('[Notify Task Error]:', err.message);
         return res.status(500).json({ error: err.message });
     }
 });
@@ -691,7 +764,7 @@ function startNotificationListeners(companyId) {
         if (!workers) return;
 
         const sends = [];
-        const companyLabel = companyId === 'mvcfresh' ? 'MVC Fresh' : (companyId === 'mvc' ? 'MVC' : 'Burgeroov');
+        const companyLabel = getCompanyLabel(companyId);
         const tpls = companyTemplates[companyId] || {};
 
         let workerList = [];
@@ -708,7 +781,7 @@ function startNotificationListeners(companyId) {
             const phone      = after.phone;
             const waEnabled  = after.waAlertsEnabled !== false;
             const workerName = after.name || `Worker #${index}`;
-            const cacheKey   = `${companyId}_${index}`;
+            const cacheKey   = `${companyId}_${after.id || index}`;
             const before     = prevState[cacheKey] || null;
 
             prevState[cacheKey] = JSON.parse(JSON.stringify(after));
@@ -891,7 +964,7 @@ function startNotificationListeners(companyId) {
         if (!tasksObj) return;
 
         const sends = [];
-        const companyLabel = companyId === 'mvcfresh' ? 'MVC Fresh' : (companyId === 'mvc' ? 'MVC' : 'Burgeroov');
+        const companyLabel = getCompanyLabel(companyId);
 
         const [workersSnapshot, groupsSnapshot] = await Promise.all([
             db.ref(`companies/${companyId}/workers`).once('value'),
@@ -995,10 +1068,38 @@ function startNotificationListeners(companyId) {
     });
 }
 
-// Start listeners
-startNotificationListeners('burgeroov');
-startNotificationListeners('mvc');
-startNotificationListeners('mvcfresh');
+// ─── Dynamic Multi-Company Listeners Engine ────────────────────────────────
+['burgeroov', 'mvc', 'mvcfresh'].forEach(cId => ensureCompanyListeners(cId));
+
+// Listen to all companies registered in portal_companies
+db.ref('portal_companies').on('value', (snap) => {
+    const data = snap.val() || {};
+    Object.keys(data).forEach(cId => {
+        if (!cId) return;
+        if (!companyDirectoryCache[cId]) companyDirectoryCache[cId] = {};
+        if (data[cId].name) companyDirectoryCache[cId].name = data[cId].name;
+        ensureCompanyListeners(cId);
+    });
+});
+
+// Listen to public company directory
+db.ref('customerCodes/companyDirectory').on('value', (snap) => {
+    const data = snap.val() || {};
+    Object.keys(data).forEach(cId => {
+        if (!cId) return;
+        if (!companyDirectoryCache[cId]) companyDirectoryCache[cId] = {};
+        if (data[cId].name) companyDirectoryCache[cId].name = data[cId].name;
+        ensureCompanyListeners(cId);
+    });
+});
+
+// Listen to any root company node creation
+db.ref('companies').on('child_added', (snap) => {
+    const cId = snap.key;
+    if (cId && !['salla_shared'].includes(cId)) {
+        ensureCompanyListeners(cId);
+    }
+});
 
 // ─── Automated GMT+3 Task Cycle Server Dispatcher ────────────────────────────────
 function getGMT3ServerTime() {
@@ -1020,7 +1121,7 @@ function getGMT3ServerTime() {
 }
 
 async function runServerTaskCycleCheck() {
-    const companyKeys = ['burgeroov', 'mvc', 'mvcfresh'];
+    const companyKeys = [...new Set(['burgeroov', 'mvc', 'mvcfresh', ...activeCompanyListeners])];
     const { dateStr, timeStr, dayCode } = getGMT3ServerTime();
 
     for (const cKey of companyKeys) {
@@ -1078,7 +1179,7 @@ async function runServerTaskCycleCheck() {
                     await db.ref(`companies/${cKey}/workers/${wIndex}/jobs`).set(existingJobs);
 
                     if (worker.phone && worker.waAlertsEnabled !== false) {
-                        const companyLabel = cKey === 'mvcfresh' ? 'MVC Fresh' : (cKey === 'mvc' ? 'MVC' : 'Burgeroov');
+                        const companyLabel = getCompanyLabel(cKey);
                         const tpls = companyTemplates[cKey] || {};
                         const rawTpl = tpls.cycle || '🔁 *تنبيه مهمة دورية مجدولة [{company_name}]*\n\nالمهمة: {task_title}\nالموظف: {worker_name}\n\nيرجى فتح اللوحة والمتابعة!';
                         const waMsg = formatCustomTemplate(rawTpl, {
