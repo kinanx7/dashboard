@@ -986,8 +986,19 @@ function assignTask() {
     // RENDER IMMEDIATELY so the newly assigned task appears in the list below instantly (0ms)
     if (typeof renderTasks === 'function') renderTasks();
 
-    // Targeted write to worker jobs path (notify-server will automatically dispatch the customized template)
-    db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
+    const updates = {};
+    updates[`companies/${currentCompany}/workers/${workerIndex}/jobs`] = worker.jobs;
+    updates[`companies/${currentCompany}/taskAlerts/${assignedTaskNum}`] = {
+        taskId: assignedTaskNum,
+        workerId: worker.id,
+        workerName: worker.name,
+        title: text,
+        status: 'assigned',
+        assignedAt: Date.now(),
+        updatedAt: Date.now()
+    };
+
+    db.ref().update(updates)
         .then(() => {
             logActivity('task', worker.id, worker.name, `Assigned task ${assignedTaskNum} to ${worker.name}: "${text}"`);
             dispatchTaskNotification(worker, text, assignedTaskNum);
@@ -1908,6 +1919,15 @@ function acceptGeneralTask(taskId) {
     const updates = {};
     updates[`companies/${currentCompany}/workers/${myIndex}/jobs`] = myWorker.jobs;
     updates[`companies/${currentCompany}/generalTasks`] = data.generalTasks;
+    updates[`companies/${currentCompany}/taskAlerts/${task.id}`] = {
+        taskId: task.id,
+        workerId: myWorker.id,
+        workerName: myWorker.name,
+        title: task.title,
+        status: 'accepted',
+        acceptedAt: task.acceptedAt,
+        updatedAt: Date.now()
+    };
 
     db.ref().update(updates)
         .then(() => {
@@ -4408,6 +4428,15 @@ function addTrackedTask() {
     const updates = {};
     updates[`companies/${currentCompany}/trackedTasks/${taskId}`] = trackedTask;
     updates[`companies/${currentCompany}/workers/${workerIndex}/jobs`] = worker.jobs;
+    updates[`companies/${currentCompany}/taskAlerts/${taskId}`] = {
+        taskId: taskId,
+        workerId: worker.id,
+        workerName: worker.name,
+        title: title,
+        status: 'assigned',
+        assignedAt: Date.now(),
+        updatedAt: Date.now()
+    };
 
     db.ref().update(updates)
         .then(() => {

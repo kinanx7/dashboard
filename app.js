@@ -2658,15 +2658,17 @@ function listenToCloudData() {
         // 2. High-Efficiency Granular Sub-Node Listeners
         const subNodes = [
             { key: 'workers', render: () => { 
-                applyUserRoles(); 
-                renderWorkers(); 
-                renderTasks(); 
-                if (typeof renderConstantTasksSection === 'function') renderConstantTasksSection(); 
-                if (typeof renderInquiriesSection === 'function') renderInquiriesSection(); 
-                if (typeof currentTab !== 'undefined' && currentTab === 'finance') {
-                    if (typeof renderFinanceTable === 'function') renderFinanceTable();
-                    if (typeof renderFinDetails === 'function') renderFinDetails();
-                }
+                try { if (typeof applyUserRoles === 'function') applyUserRoles(); } catch(e) { console.error('applyUserRoles error:', e); }
+                try { if (typeof populateWorkerDropdowns === 'function') populateWorkerDropdowns(); } catch(e) { console.error('populateWorkerDropdowns error:', e); }
+                try { if (typeof renderTasks === 'function') renderTasks(); } catch(e) { console.error('renderTasks error:', e); }
+                try { if (typeof renderConstantTasksSection === 'function') renderConstantTasksSection(); } catch(e) { console.error('renderConstantTasksSection error:', e); }
+                try { if (typeof renderInquiriesSection === 'function') renderInquiriesSection(); } catch(e) { console.error('renderInquiriesSection error:', e); }
+                try {
+                    if (typeof currentTab !== 'undefined' && currentTab === 'finance') {
+                        if (typeof renderFinanceTable === 'function') renderFinanceTable();
+                        if (typeof renderFinDetails === 'function') renderFinDetails();
+                    }
+                } catch(e) { console.error('finance render error:', e); }
             } },
             { key: 'warehouse', render: () => { renderWarehouse(); checkStockAlerts(); } },
             { key: 'whCategories', render: () => { renderWarehouse(); } },
@@ -2745,20 +2747,26 @@ function listenToCloudData() {
         subNodes.forEach(node => {
             const nodeRef = db.ref(`companies/${currentCompany}/${node.key}`);
             nodeRef.on('value', snap => {
-                if (appData[currentCompany]) {
-                    let val = snap.val();
-                    if (arrayNodeKeys.includes(node.key)) {
-                        if (!val) val = [];
-                        else if (!Array.isArray(val) && typeof val === 'object') val = Object.values(val);
-                    } else {
-                        if (!val) val = {};
+                try {
+                    if (appData[currentCompany]) {
+                        let val = snap.val();
+                        if (arrayNodeKeys.includes(node.key)) {
+                            if (!val) val = [];
+                            else if (!Array.isArray(val) && typeof val === 'object') val = Object.values(val);
+                        } else {
+                            if (!val) val = {};
+                        }
+                        appData[currentCompany][node.key] = val;
+                        if (['workers', 'driverVolumeRewards', 'violationRules', 'salesLogs', 'costLogs', 'depositLogs', 'spendLogs', 'spendOrders'].includes(node.key)) {
+                            ensureArraysExist(appData[currentCompany]);
+                        }
                     }
-                    appData[currentCompany][node.key] = val;
-                    if (['workers', 'driverVolumeRewards', 'violationRules', 'salesLogs', 'costLogs', 'depositLogs', 'spendLogs', 'spendOrders'].includes(node.key)) {
-                        ensureArraysExist(appData[currentCompany]);
-                    }
+                    node.render();
+                } catch (nodeErr) {
+                    console.error(`[Real-Time SubNode ${node.key} Render Error]:`, nodeErr);
                 }
-                node.render();
+            }, (listenErr) => {
+                console.warn(`[Real-Time SubNode ${node.key} Listener Error]:`, listenErr);
             });
             activeGranularListeners.push(nodeRef);
         });
@@ -10164,8 +10172,19 @@ function assignTask() {
     // RENDER IMMEDIATELY so the newly assigned task appears in the list below instantly (0ms)
     if (typeof renderTasks === 'function') renderTasks();
 
-    // Targeted write to worker jobs path (notify-server will automatically dispatch the customized template)
-    db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
+    const updates = {};
+    updates[`companies/${currentCompany}/workers/${workerIndex}/jobs`] = worker.jobs;
+    updates[`companies/${currentCompany}/taskAlerts/${assignedTaskNum}`] = {
+        taskId: assignedTaskNum,
+        workerId: worker.id,
+        workerName: worker.name,
+        title: text,
+        status: 'assigned',
+        assignedAt: Date.now(),
+        updatedAt: Date.now()
+    };
+
+    db.ref().update(updates)
         .then(() => {
             logActivity('task', worker.id, worker.name, `Assigned task ${assignedTaskNum} to ${worker.name}: "${text}"`);
             dispatchTaskNotification(worker, text, assignedTaskNum);
@@ -11086,6 +11105,15 @@ function acceptGeneralTask(taskId) {
     const updates = {};
     updates[`companies/${currentCompany}/workers/${myIndex}/jobs`] = myWorker.jobs;
     updates[`companies/${currentCompany}/generalTasks`] = data.generalTasks;
+    updates[`companies/${currentCompany}/taskAlerts/${task.id}`] = {
+        taskId: task.id,
+        workerId: myWorker.id,
+        workerName: myWorker.name,
+        title: task.title,
+        status: 'accepted',
+        acceptedAt: task.acceptedAt,
+        updatedAt: Date.now()
+    };
 
     db.ref().update(updates)
         .then(() => {
@@ -13586,6 +13614,15 @@ function addTrackedTask() {
     const updates = {};
     updates[`companies/${currentCompany}/trackedTasks/${taskId}`] = trackedTask;
     updates[`companies/${currentCompany}/workers/${workerIndex}/jobs`] = worker.jobs;
+    updates[`companies/${currentCompany}/taskAlerts/${taskId}`] = {
+        taskId: taskId,
+        workerId: worker.id,
+        workerName: worker.name,
+        title: title,
+        status: 'assigned',
+        assignedAt: Date.now(),
+        updatedAt: Date.now()
+    };
 
     db.ref().update(updates)
         .then(() => {
