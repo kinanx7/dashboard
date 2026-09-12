@@ -9377,6 +9377,118 @@ html.vicard-standalone-view #vicard-visit-history-modal {
     }
 }
 
+/* --- OPS DIRECTORY TABLE BASE STYLES --- */
+.ops-manage-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.ops-btn-creds {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    color: #38bdf8;
+    border-color: rgba(56, 189, 248, 0.4);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 8px;
+    cursor: pointer;
+    background: transparent;
+    transition: all 0.2s ease;
+}
+
+.ops-btn-creds:hover {
+    background: rgba(56, 189, 248, 0.12);
+    border-color: #38bdf8;
+}
+
+.ops-btn-del {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+/* --- OPS DIRECTORY MOBILE PHONE RESPONSIVE --- */
+@media (max-width: 768px) {
+    #view-operations .table-container {
+        overflow-x: hidden !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    #ops-workers-table {
+        width: 100% !important;
+        max-width: 100% !important;
+        table-layout: fixed !important;
+        border-collapse: collapse !important;
+    }
+
+    #ops-workers-table th,
+    #ops-workers-table td {
+        padding: 8px 4px !important;
+        box-sizing: border-box !important;
+        vertical-align: middle !important;
+    }
+
+    /* Column 1: Employee & Role (48% width) */
+    #ops-workers-table th:first-child,
+    #ops-workers-table td.ops-worker-info-td {
+        width: 48% !important;
+        overflow: hidden !important;
+        word-break: break-word !important;
+    }
+
+    /* Column 2: Avg Perf (20% width) */
+    #ops-workers-table th:nth-child(2),
+    #ops-workers-table td.ops-worker-perf-td {
+        width: 20% !important;
+        text-align: center !important;
+        padding-left: 2px !important;
+        padding-right: 2px !important;
+    }
+
+    /* Column 3: Manage (32% width) - Stacked Vertically */
+    #ops-workers-table th:last-child,
+    #ops-workers-table td.ops-manage-td {
+        width: 32% !important;
+        text-align: center !important;
+        padding: 6px 4px !important;
+    }
+
+    .ops-manage-actions {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 5px !important;
+        width: 100% !important;
+        align-items: stretch !important;
+    }
+
+    .ops-btn-creds,
+    .ops-btn-del {
+        width: 100% !important;
+        padding: 5px 4px !important;
+        font-size: 0.72rem !important;
+        font-weight: 700 !important;
+        justify-content: center !important;
+        box-sizing: border-box !important;
+        border-radius: 6px !important;
+        min-height: 28px !important;
+        display: flex !important;
+        align-items: center !important;
+        white-space: nowrap !important;
+        line-height: 1.1 !important;
+    }
+}
+
+
 
 
 

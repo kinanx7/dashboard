@@ -15495,19 +15495,25 @@ function renderOpsWorkersTable() {
 
         const tr = document.createElement('tr');
         let html = `
-                    <td>
-                        <strong style="color:var(--text-main);">${worker.name}</strong><br>
-                        <span class="badge" style="margin-left:0;margin-top:6px;">${worker.role || t('label-staff')}</span>
+                    <td class="ops-worker-info-td">
+                        <strong style="color:var(--text-main); font-size:0.9rem;">${worker.name}</strong><br>
+                        <span class="badge" style="margin-left:0;margin-top:4px; font-size:0.72rem;">${worker.role || t('label-staff')}</span>
                         ${shiftSpan}
                     </td>
-                    <td><span class="badge" style="background: var(--primary); margin:0;">${avg}</span></td>`;
+                    <td class="ops-worker-perf-td" style="text-align:center;">
+                        <span class="badge" style="background:var(--primary); margin:0; font-size:0.8rem; padding:4px 8px;">${avg}</span>
+                    </td>`;
         if (isAdmin) {
             html += `
-                    <td class="admin-only" style="white-space: nowrap;">
-                        <button type="button" class="btn-outline" style="padding:6px 10px; font-size:0.8rem; margin-inline-end:6px; color:#38bdf8; border-color:rgba(56,189,248,0.4); display:inline-flex; align-items:center; gap:4px;" onclick="openWorkerPasswordModal('${worker.id}')" title="${isAr ? 'عرض وتعديل كلمة المرور وبيانات الدخول' : 'View & manage worker login password'}">
-                            🔑 ${isAr ? 'البيانات' : 'Credentials'}
-                        </button>
-                        <button class="btn-outline-danger" style="padding:6px 12px;font-size:0.8rem;" onclick="deleteWorker('${worker.id}')">${t('btn-delete-worker')}</button>
+                    <td class="admin-only ops-manage-td">
+                        <div class="ops-manage-actions">
+                            <button type="button" class="btn-outline ops-btn-creds" onclick="openWorkerPasswordModal('${worker.id}')" title="${isAr ? 'عرض وتعديل كلمة المرور وبيانات الدخول' : 'View & manage worker login password'}">
+                                🔑 <span>${isAr ? 'البيانات' : 'Credentials'}</span>
+                            </button>
+                            <button type="button" class="btn-outline-danger ops-btn-del" onclick="deleteWorker('${worker.id}')" title="${t('btn-delete-worker')}">
+                                🗑️ <span>${isAr ? 'حذف' : 'Delete'}</span>
+                            </button>
+                        </div>
                     </td>`;
         }
         tr.innerHTML = html;
