@@ -2579,6 +2579,14 @@ function postVaultNote() {
         updatedAt: Date.now()
     };
 
+    if (appData[currentCompany]) {
+        if (!appData[currentCompany].vaultNotes) appData[currentCompany].vaultNotes = {};
+        appData[currentCompany].vaultNotes[noteId] = noteObj;
+    }
+    if (typeof logActivity === 'function') {
+        logActivity('vault', 'general', 'Information Vault', isEditing ? `Updated information note "${noteObj.title}"` : `Created information note "${noteObj.title}"`);
+    }
+
     db.ref('companies/' + currentCompany + '/vaultNotes/' + noteId).set(noteObj)
         .then(() => {
             const successMsg = isEditing
@@ -3218,6 +3226,16 @@ window.copyVaultText = copyVaultText;
 
 function deleteVaultNote(noteId) {
     if (!confirm("Are you sure you want to delete this information note?")) return;
+
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const note = (data.vaultNotes && data.vaultNotes[noteId]);
+    if (appData[currentCompany] && appData[currentCompany].vaultNotes) {
+        delete appData[currentCompany].vaultNotes[noteId];
+    }
+    renderVaultNotes();
+    if (typeof logActivity === 'function') {
+        logActivity('vault_delete', 'general', 'Information Vault', `Deleted information note "${(note && note.title) || noteId}"`);
+    }
 
     db.ref('companies/' + currentCompany + '/vaultNotes/' + noteId).remove()
         .then(() => {

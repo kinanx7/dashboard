@@ -976,6 +976,13 @@ let portalCompanies = {
     'mvc': { id: 'mvc', name: 'MVC FRESH', logo: 'mvc.png', color: '#22c55e', createdAt: 1700000000001 },
     'mvcfresh': { id: 'mvcfresh', name: 'MVC Fresh', logo: 'mvcfresh.png', color: '#10b981', createdAt: 1700000000002 }
 };
+
+try {
+    const cachedPortal = JSON.parse(localStorage.getItem('mvc_portal_companies') || '{}');
+    if (cachedPortal && typeof cachedPortal === 'object' && Object.keys(cachedPortal).length > 0) {
+        portalCompanies = Object.assign({}, portalCompanies, cachedPortal);
+    }
+} catch (e) { }
 window.portalCompanies = portalCompanies;
 
 function initPortalCompaniesListener() {
@@ -984,6 +991,9 @@ function initPortalCompaniesListener() {
         if (snap.exists()) {
             const data = snap.val() || {};
             portalCompanies = Object.assign({}, portalCompanies, data);
+            try {
+                localStorage.setItem('mvc_portal_companies', JSON.stringify(portalCompanies));
+            } catch (e) { }
         } else {
             db.ref('portal_companies').set(portalCompanies).catch(err => {
                 console.warn("Could not seed portal_companies:", err);
@@ -992,6 +1002,9 @@ function initPortalCompaniesListener() {
         window.portalCompanies = portalCompanies;
         renderCompanySelectionHUD();
         updateCurrentCompanyHeader();
+        if (typeof syncAllCompaniesAndWorkersGlobally === 'function') {
+            syncAllCompaniesAndWorkersGlobally();
+        }
     });
 }
 window.initPortalCompaniesListener = initPortalCompaniesListener;
@@ -1210,10 +1223,14 @@ function saveCompanyModal() {
         if (!isEdit) {
             const userEmail = currentUser ? currentUser.email : 'kinan.rahal@hotmail.com';
             const sanitizedEmail = userEmail.replace(/\./g, ',');
+            const initActId = 'act-' + Date.now();
             const initialCompanyData = {
                 admins: { [sanitizedEmail]: true, 'kinan,rahal@hotmail,com': true },
                 branches: ['Main Branch'],
                 workers: [],
+                lateRules: [],
+                driverVolumeRewards: [],
+                taskGroups: [],
                 warehouse: [],
                 jobCatalog: [],
                 violationRules: [],
@@ -1222,6 +1239,23 @@ function saveCompanyModal() {
                 depositLogs: [],
                 spendLogs: [],
                 spendOrders: [],
+                attendance: {},
+                contracts: {},
+                reminders: {},
+                vaultNotes: {},
+                vaultFolders: {},
+                activityLogs: {
+                    [initActId]: {
+                        id: initActId,
+                        type: 'company',
+                        workerId: 'general',
+                        workerName: 'System',
+                        actorId: currentUser ? currentUser.email : 'kinan.rahal@hotmail.com',
+                        actorName: currentUser ? (currentUser.displayName || currentUser.email) : 'Admin',
+                        details: `Company "${name}" established and initialized.`,
+                        timestamp: Date.now()
+                    }
+                },
                 createdAt: Date.now()
             };
 
@@ -1237,12 +1271,21 @@ function saveCompanyModal() {
         }
 
         portalCompanies[slug] = Object.assign({}, portalCompanies[slug] || {}, companyData);
+        try {
+            localStorage.setItem('mvc_portal_companies', JSON.stringify(portalCompanies));
+            localStorage.setItem('selected_company', slug);
+        } catch (e) { }
+        window.portalCompanies = portalCompanies;
+        if (window.userActiveCompanies && !window.userActiveCompanies.includes(slug)) {
+            window.userActiveCompanies.push(slug);
+        }
+
         closeCompanyModal();
+        selectCompany(slug);
         renderCompanySelectionHUD();
         updateCurrentCompanyHeader();
-
-        if (currentCompany === slug) {
-            updateCurrentCompanyHeader();
+        if (typeof syncAllCompaniesAndWorkersGlobally === 'function') {
+            syncAllCompaniesAndWorkersGlobally();
         }
     }).catch(err => {
         console.error("Error saving company:", err);
@@ -1471,6 +1514,233 @@ function selectCompany(companyId) {
 window.selectCompany = selectCompany;
 window.showCompanySelectionHUD = showCompanySelectionHUD;
 
+// --- WORKER ACCESS SYNC & AUTO-HEALING ---
+function syncCompanyWorkersAccess(companyId) {
+    const cId = companyId || currentCompany;
+    if (!cId || typeof db === 'undefined') return;
+    const workers = (typeof getCompanyData === 'function' && getCompanyData().workers) || [];
+    if (!workers || workers.length === 0) return;
+    const compMeta = (portalCompanies && portalCompanies[cId]) || { id: cId, name: cId, logo: 'burgeroov.png', color: '#c5832b' };
+
+    const updates = {};
+    updates[`customerCodes/companyDirectory/${cId}`] = {
+        id: cId,
+        name: compMeta.name || cId,
+        logo: compMeta.logo || 'burgeroov.png',
+        color: compMeta.color || '#c5832b'
+    };
+
+    workers.forEach(w => {
+        if (w && w.email) {
+            const cleanEmail = w.email.trim().toLowerCase();
+            const key = cleanEmail.replace(/\./g, ',');
+            updates[`customerCodes/workerAccess/${key}/${cId}`] = true;
+            updates[`portal_companies/${cId}/workers/${key}`] = true;
+            updates[`companies/${cId}/users/${key}`] = w.id;
+        }
+    });
+    if (Object.keys(updates).length > 0) {
+        db.ref().update(updates).catch(e => console.warn('Workers access sync notice:', e.message));
+    }
+}
+window.syncCompanyWorkersAccess = syncCompanyWorkersAccess;
+
+function syncAllCompaniesAndWorkersGlobally() {
+    if (!currentUser || typeof db === 'undefined') return;
+    const email = (currentUser.email || '').toLowerCase();
+    const isKinan = email === 'kinan.rahal@hotmail.com';
+    if (!isKinan && currentUser.role !== 'admin') return;
+
+    db.ref('portal_companies').once('value').then(snap => {
+        const pData = (snap && snap.exists() && snap.val()) || {};
+        const allCompKeys = Array.from(new Set([
+            ...Object.keys(portalCompanies || {}),
+            ...Object.keys(pData),
+            'burgeroov', 'mvc', 'mvcfresh'
+        ]));
+
+        allCompKeys.forEach(cId => {
+            if (!cId) return;
+
+            Promise.all([
+                db.ref(`companies/${cId}/workers`).once('value').catch(() => null),
+                db.ref(`companies/${cId}/admins`).once('value').catch(() => null)
+            ]).then(([workersSnap, adminsSnap]) => {
+                const workers = parseWorkersSnap(workersSnap);
+                const admins = parseAdminsSnap(adminsSnap);
+                const compMeta = pData[cId] || portalCompanies[cId] || { id: cId, name: cId, logo: 'burgeroov.png', color: '#c5832b' };
+
+                const updates = {};
+                updates[`customerCodes/companyDirectory/${cId}`] = {
+                    id: cId,
+                    name: compMeta.name || cId,
+                    logo: compMeta.logo || 'burgeroov.png',
+                    color: compMeta.color || '#c5832b'
+                };
+
+                workers.forEach(w => {
+                    if (w && w.email) {
+                        const cleanW = w.email.trim().toLowerCase();
+                        const wKey = cleanW.replace(/\./g, ',');
+                        updates[`customerCodes/workerAccess/${wKey}/${cId}`] = true;
+                        updates[`portal_companies/${cId}/workers/${cleanW.replace(/\./g, ',')}`] = true;
+                        if (w.id) updates[`companies/${cId}/users/${wKey}`] = w.id;
+                    }
+                });
+
+                if (typeof admins === 'object') {
+                    Object.keys(admins).forEach(aKey => {
+                        if (admins[aKey]) {
+                            updates[`customerCodes/workerAccess/${aKey}/${cId}`] = true;
+                        }
+                    });
+                }
+
+                if (Object.keys(updates).length > 0) {
+                    db.ref().update(updates).then(() => {
+                        console.log(`✅ [Global Sync] Synced company "${cId}" with ${workers.length} workers to customerCodes`);
+                    }).catch(e => console.warn(`[Sync Warning ${cId}]:`, e.message));
+                }
+            });
+        });
+    }).catch(err => {
+        console.warn("Could not read portal_companies during global sync:", err);
+    });
+}
+window.syncAllCompaniesAndWorkersGlobally = syncAllCompaniesAndWorkersGlobally;
+
+function resolveUserActiveCompanies(email) {
+    if (!email || typeof db === 'undefined') return Promise.resolve([]);
+    const cleanEmail = email.trim().toLowerCase();
+    const sanitizedEmail = cleanEmail.replace(/\./g, ',');
+
+    // 1. Parallel query to Render Backend API (runs Firebase Admin SDK to bypass client rule limits)
+    const serverPromise = fetch(`https://burgeroov-notify.onrender.com/worker/resolve-companies?email=${encodeURIComponent(cleanEmail)}`)
+        .then(res => res.json().catch(() => null))
+        .catch(() => null);
+
+    // 2. Direct RTDB queries
+    const rtdbPromise = Promise.all([
+        db.ref('portal_companies').once('value').catch(() => null),
+        db.ref('customerCodes/companyDirectory').once('value').catch(() => null),
+        db.ref(`customerCodes/workerAccess/${sanitizedEmail}`).once('value').catch(() => null),
+        db.ref(`customerCodes/workerPasswords/${sanitizedEmail}`).once('value').catch(() => null)
+    ]).then(([portalSnap, dirSnap, accessSnap, pwdSnap]) => {
+        const compSet = new Set(['burgeroov', 'mvc', 'mvcfresh', ...Object.keys(portalCompanies || {})]);
+
+        if (portalSnap && portalSnap.exists()) {
+            const pData = portalSnap.val() || {};
+            Object.keys(pData).forEach(k => { if (k) compSet.add(k); });
+            portalCompanies = Object.assign({}, portalCompanies, pData);
+            window.portalCompanies = portalCompanies;
+        }
+
+        if (dirSnap && dirSnap.exists()) {
+            const dData = dirSnap.val() || {};
+            Object.keys(dData).forEach(k => { if (k) compSet.add(k); });
+            portalCompanies = Object.assign({}, portalCompanies, dData);
+            window.portalCompanies = portalCompanies;
+        }
+
+        if (accessSnap && accessSnap.exists()) {
+            const aData = accessSnap.val() || {};
+            Object.keys(aData).forEach(k => { if (aData[k]) compSet.add(k); });
+        }
+
+        if (pwdSnap && pwdSnap.exists()) {
+            const pVal = pwdSnap.val() || {};
+            if (pVal.company) compSet.add(pVal.company);
+        }
+
+        const compKeys = Array.from(compSet);
+        const adminPromises = compKeys.map(cId => db.ref(`companies/${cId}/admins`).once('value').catch(() => null));
+        const workerPromises = compKeys.map(cId => db.ref(`companies/${cId}/workers`).once('value').catch(() => null));
+        const userMappingPromises = compKeys.map(cId => db.ref(`companies/${cId}/users/${sanitizedEmail}`).once('value').catch(() => null));
+
+        return Promise.all([
+            Promise.all(adminPromises),
+            Promise.all(workerPromises),
+            Promise.all(userMappingPromises)
+        ]).then(([adminSnaps, workerSnaps, userMappingSnaps]) => {
+            let targetWorkerId = null;
+            if (pwdSnap && pwdSnap.exists() && pwdSnap.val()) {
+                const pwdVal = pwdSnap.val();
+                if (pwdVal.workerId) targetWorkerId = pwdVal.workerId;
+            }
+
+            const activeCompanies = [];
+
+            compKeys.forEach((cId, i) => {
+                const adminsList = parseAdminsSnap(adminSnaps[i]);
+                const workersList = parseWorkersSnap(workerSnaps[i]);
+                const userMapSnap = userMappingSnaps[i];
+
+                let inComp = false;
+
+                // 1. Admin check
+                if (adminsList[sanitizedEmail] === true) inComp = true;
+
+                // 2. Workers array check
+                if (!inComp) {
+                    if (typeof findMatchingWorker === 'function' && findMatchingWorker(workersList, cleanEmail, targetWorkerId)) {
+                        inComp = true;
+                    } else if (workersList.some(w => w && w.email && w.email.trim().toLowerCase() === cleanEmail)) {
+                        inComp = true;
+                    }
+                }
+
+                // 3. User mapping key
+                if (!inComp && userMapSnap && userMapSnap.exists() && userMapSnap.val()) {
+                    inComp = true;
+                }
+
+                // 4. Global worker access index
+                if (!inComp && accessSnap && accessSnap.exists() && accessSnap.val() && accessSnap.val()[cId] === true) {
+                    inComp = true;
+                }
+
+                // 5. Worker passwords company
+                if (!inComp && pwdSnap && pwdSnap.exists() && pwdSnap.val() && pwdSnap.val().company === cId) {
+                    inComp = true;
+                }
+
+                // 6. Portal companies workers node
+                if (!inComp && portalSnap && portalSnap.exists()) {
+                    const pComp = portalSnap.val()[cId];
+                    if (pComp && pComp.workers && pComp.workers[sanitizedEmail] === true) {
+                        inComp = true;
+                    }
+                }
+
+                if (inComp) {
+                    activeCompanies.push(cId);
+
+                    // Sync Firebase Auth password if an appPassword was set
+                    if (auth && auth.currentUser) {
+                        const matchedWorker = typeof findMatchingWorker === 'function'
+                            ? findMatchingWorker(workersList, cleanEmail, targetWorkerId)
+                            : workersList.find(w => w && w.email && w.email.trim().toLowerCase() === cleanEmail);
+                        if (matchedWorker && matchedWorker.appPassword) {
+                            auth.currentUser.updatePassword(matchedWorker.appPassword).catch(() => {});
+                        }
+                    }
+                }
+            });
+
+            return activeCompanies;
+        });
+    });
+
+    return Promise.all([serverPromise, rtdbPromise]).then(([serverResult, rtdbComps]) => {
+        const set = new Set(rtdbComps || []);
+        if (serverResult && serverResult.success && Array.isArray(serverResult.companies)) {
+            serverResult.companies.forEach(c => set.add(c));
+        }
+        return Array.from(set);
+    });
+}
+window.resolveUserActiveCompanies = resolveUserActiveCompanies;
+
 // --- AUTHENTICATION SYSTEM ---
 authMode = authMode || 'login';
 
@@ -1505,6 +1775,8 @@ auth.onAuthStateChanged((user) => {
             document.getElementById('auth-btn').style.display = 'block';
             overlay.style.display = 'none';
 
+            syncAllCompaniesAndWorkersGlobally();
+
             window.userActiveCompanies = Object.keys(portalCompanies || {});
             window.isMultiCompany = window.userActiveCompanies.length > 1;
             renderCompanySelectionHUD();
@@ -1527,68 +1799,26 @@ auth.onAuthStateChanged((user) => {
                 const savedCompany = localStorage.getItem('selected_company');
                 if (savedCompany && (portalCompanies[savedCompany] || savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
                     selectCompany(savedCompany);
+                } else if (savedCompany) {
+                    db.ref(`portal_companies/${savedCompany}`).once('value').then(snap => {
+                        if (snap.exists()) {
+                            portalCompanies[savedCompany] = snap.val();
+                            try { localStorage.setItem('mvc_portal_companies', JSON.stringify(portalCompanies)); } catch (e) { }
+                            window.portalCompanies = portalCompanies;
+                            selectCompany(savedCompany);
+                        } else {
+                            showCompanySelectionHUD();
+                        }
+                    }).catch(() => showCompanySelectionHUD());
                 } else {
                     showCompanySelectionHUD();
                 }
             }
         } else {
             // Dynamically check databases for worker membership across all portal companies
-            const sanitizedEmail = email.replace(/\./g, ',');
-            const compKeys = Object.keys(portalCompanies || { burgeroov: 1, mvc: 1, mvcfresh: 1 });
-            const adminPromises = compKeys.map(cId => db.ref(`companies/${cId}/admins`).once('value').catch(() => null));
-            const workerPromises = compKeys.map(cId => db.ref(`companies/${cId}/workers`).once('value').catch(() => null));
-
-            Promise.all([
-                ...adminPromises,
-                ...workerPromises,
-                db.ref(`customerCodes/workerPasswords/${sanitizedEmail}`).once('value').catch(() => null),
-                db.ref(`customerCodes/workerAccess/${sanitizedEmail}`).once('value').catch(() => null)
-            ]).then((results) => {
+            resolveUserActiveCompanies(email).then((activeCompanies) => {
                 document.getElementById('auth-loader').style.display = 'none';
                 document.getElementById('auth-btn').style.display = 'block';
-
-                const totalComps = compKeys.length;
-                const adminSnaps = results.slice(0, totalComps);
-                const workerSnaps = results.slice(totalComps, totalComps * 2);
-                const pwdSnap = results[totalComps * 2];
-                const accessSnap = results[totalComps * 2 + 1];
-
-                let targetWorkerId = null;
-                if (pwdSnap && pwdSnap.exists() && pwdSnap.val()) {
-                    const pwdVal = pwdSnap.val();
-                    if (pwdVal.workerId) {
-                        targetWorkerId = pwdVal.workerId;
-                        try { localStorage.setItem('mvc_worker_id_' + sanitizedEmail, targetWorkerId); } catch (e) { }
-                    }
-                }
-                if (!targetWorkerId && typeof localStorage !== 'undefined') {
-                    targetWorkerId = localStorage.getItem('mvc_worker_id_' + sanitizedEmail);
-                }
-
-                const activeCompanies = [];
-
-                compKeys.forEach((cId, i) => {
-                    const adminsList = parseAdminsSnap(adminSnaps[i]);
-                    const workersList = parseWorkersSnap(workerSnaps[i]);
-
-                    let inComp = adminsList[sanitizedEmail] === true ||
-                        (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(workersList, email, targetWorkerId) : workersList.some(w => w && w.email && w.email.toLowerCase() === email));
-
-                    if (accessSnap && accessSnap.exists() && accessSnap.val() && accessSnap.val()[cId] === true) inComp = true;
-                    if (pwdSnap && pwdSnap.exists() && pwdSnap.val() && pwdSnap.val().company === cId) inComp = true;
-
-                    if (inComp) {
-                        activeCompanies.push(cId);
-                        const matchedWorker = typeof findMatchingWorker === 'function' 
-                            ? findMatchingWorker(workersList, email, targetWorkerId)
-                            : workersList.find(w => w && w.email && w.email.toLowerCase() === email);
-                        if (matchedWorker && matchedWorker.appPassword) {
-                            user.updatePassword(matchedWorker.appPassword)
-                                .then(() => console.log(`[Auth] Firebase Auth password synchronized with assigned password for ${email}`))
-                                .catch(e => console.warn('[Auth] Password sync notice:', e.message));
-                        }
-                    }
-                });
 
                 window.userActiveCompanies = activeCompanies;
                 window.isMultiCompany = activeCompanies.length > 1;
@@ -1724,51 +1954,7 @@ function checkUnassignedUserAccess(isManualTrigger = false) {
     if (!currentUser || !currentUser.email) return;
 
     const email = currentUser.email.toLowerCase();
-    const sanitizedEmail = email.replace(/\./g, ',');
-
-    const compKeys = Object.keys(portalCompanies || { burgeroov: 1, mvc: 1, mvcfresh: 1 });
-    const adminPromises = compKeys.map(cId => db.ref(`companies/${cId}/admins`).once('value').catch(() => null));
-    const workerPromises = compKeys.map(cId => db.ref(`companies/${cId}/workers`).once('value').catch(() => null));
-
-    Promise.all([
-        ...adminPromises,
-        ...workerPromises,
-        db.ref(`customerCodes/workerPasswords/${sanitizedEmail}`).once('value').catch(() => null),
-        db.ref(`customerCodes/workerAccess/${sanitizedEmail}`).once('value').catch(() => null)
-    ]).then((results) => {
-        const totalComps = compKeys.length;
-        const adminSnaps = results.slice(0, totalComps);
-        const workerSnaps = results.slice(totalComps, totalComps * 2);
-        const pwdSnap = results[totalComps * 2];
-        const accessSnap = results[totalComps * 2 + 1];
-
-        let targetWorkerId = null;
-        if (pwdSnap && pwdSnap.exists() && pwdSnap.val()) {
-            const pwdVal = pwdSnap.val();
-            if (pwdVal.workerId) {
-                targetWorkerId = pwdVal.workerId;
-                try { localStorage.setItem('mvc_worker_id_' + sanitizedEmail, targetWorkerId); } catch (e) { }
-            }
-        }
-        if (!targetWorkerId && typeof localStorage !== 'undefined') {
-            targetWorkerId = localStorage.getItem('mvc_worker_id_' + sanitizedEmail);
-        }
-
-        const activeCompanies = [];
-
-        compKeys.forEach((cId, i) => {
-            const adminsList = parseAdminsSnap(adminSnaps[i]);
-            const workersList = parseWorkersSnap(workerSnaps[i]);
-
-            let inComp = adminsList[sanitizedEmail] === true ||
-                (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(workersList, email, targetWorkerId) : workersList.some(w => w && w.email && w.email.toLowerCase() === email));
-
-            if (accessSnap && accessSnap.exists() && accessSnap.val() && accessSnap.val()[cId] === true) inComp = true;
-            if (pwdSnap && pwdSnap.exists() && pwdSnap.val() && pwdSnap.val().company === cId) inComp = true;
-
-            if (inComp) activeCompanies.push(cId);
-        });
-
+    resolveUserActiveCompanies(email).then((activeCompanies) => {
         window.userActiveCompanies = activeCompanies;
 
         if (activeCompanies.length > 0) {
@@ -1782,6 +1968,11 @@ function checkUnassignedUserAccess(isManualTrigger = false) {
                 selectCompany(activeCompanies[0]);
             }
         } else if (isManualTrigger) {
+            alert(t('unassigned-still-pending') || "Your account is still pending assignment by the admin.");
+        }
+    }).catch((err) => {
+        console.error("Error in checkUnassignedUserAccess:", err);
+        if (isManualTrigger) {
             alert(t('unassigned-still-pending') || "Your account is still pending assignment by the admin.");
         }
     });
@@ -1915,6 +2106,10 @@ function applyUserRoles() {
 
     let isKinan = email === 'kinan.rahal@hotmail.com';
     let isAdmin = isKinan || admins[email.replace(/\./g, ',')] === true;
+
+    if (isAdmin) {
+        syncCompanyWorkersAccess(currentCompany);
+    }
 
 
     const swapBtn = document.getElementById('company-swap-btn');
@@ -2235,6 +2430,26 @@ function ensureArraysExist(data) {
     if (!data.generalTasks) data.generalTasks = [];
     data.generalTasks = data.generalTasks.filter(t => t && t.id);
 
+    if (data.lateRules && !Array.isArray(data.lateRules)) {
+        data.lateRules = Object.values(data.lateRules);
+    }
+    if (!data.lateRules) data.lateRules = [];
+
+    if (data.violationRules && !Array.isArray(data.violationRules)) {
+        data.violationRules = Object.values(data.violationRules);
+    }
+    if (!data.violationRules) data.violationRules = [];
+
+    if (data.driverVolumeRewards && !Array.isArray(data.driverVolumeRewards)) {
+        data.driverVolumeRewards = Object.values(data.driverVolumeRewards);
+    }
+    if (!data.driverVolumeRewards) data.driverVolumeRewards = [];
+
+    if (data.taskGroups && !Array.isArray(data.taskGroups)) {
+        data.taskGroups = Object.values(data.taskGroups);
+    }
+    if (!data.taskGroups) data.taskGroups = [];
+
     // Privacy & Management Data
     if (!data.deptPrivacy) data.deptPrivacy = { warehouse: 'restricted', drivers: 'restricted', finance: 'restricted', sales: 'restricted', costs: 'restricted', adverts: 'restricted' };
     if (!data.deptPrivacy.adverts) data.deptPrivacy.adverts = 'restricted';
@@ -2262,6 +2477,9 @@ function ensureArraysExist(data) {
     if (!data.custodyRequests) data.custodyRequests = {};
     if (!data.attendance) data.attendance = {};
     if (!data.activityLogs) data.activityLogs = {};
+    if (!data.reminders) data.reminders = {};
+    if (!data.vaultNotes) data.vaultNotes = {};
+    if (!data.vaultFolders) data.vaultFolders = {};
     if (!data.generalDeliveries) data.generalDeliveries = {};
     if (!data.marketProducts) data.marketProducts = {};
     if (!data.liveLocations) data.liveLocations = {};
@@ -2381,6 +2599,25 @@ function listenToCloudData() {
             saveData();
         }
 
+        // Auto-seed initial activity log entry if empty so Activity Log is never blank
+        if (!appData[currentCompany].activityLogs || Object.keys(appData[currentCompany].activityLogs).length === 0) {
+            const initActId = 'act-' + (appData[currentCompany].createdAt || Date.now());
+            const compName = (portalCompanies && portalCompanies[currentCompany] && portalCompanies[currentCompany].name) || currentCompany;
+            const initLog = {
+                id: initActId,
+                type: 'company',
+                workerId: 'general',
+                workerName: 'System',
+                actorId: currentUser ? currentUser.email : 'kinan.rahal@hotmail.com',
+                actorName: currentUser ? (currentUser.displayName || currentUser.email) : 'Admin',
+                details: `Company "${compName}" initialized for operations and management.`,
+                timestamp: appData[currentCompany].createdAt || Date.now()
+            };
+            if (!appData[currentCompany].activityLogs) appData[currentCompany].activityLogs = {};
+            appData[currentCompany].activityLogs[initActId] = initLog;
+            db.ref(`companies/${currentCompany}/activityLogs/${initActId}`).set(initLog).catch(() => {});
+        }
+
         applyUserRoles();
         if (typeof renderWorkerOperationsContractBanner === 'function') {
             renderWorkerOperationsContractBanner();
@@ -2432,6 +2669,7 @@ function listenToCloudData() {
                 }
             } },
             { key: 'warehouse', render: () => { renderWarehouse(); checkStockAlerts(); } },
+            { key: 'whCategories', render: () => { renderWarehouse(); } },
             { key: 'paymentRequests', render: () => { if (typeof renderPaymentRequests === 'function') renderPaymentRequests(); } },
             { key: 'taskAlerts', render: () => { if (typeof renderTaskAlerts === 'function') renderTaskAlerts(); } },
             { key: 'trackedTasks', render: () => { if (typeof renderTrackedTasks === 'function') renderTrackedTasks(); } },
@@ -2485,7 +2723,9 @@ function listenToCloudData() {
             { key: 'customAllowances', render: () => { if (typeof renderFinanceTable === 'function') renderFinanceTable(); } },
             { key: 'customDeductions', render: () => { if (typeof renderFinanceTable === 'function') renderFinanceTable(); } },
             { key: 'dailyLedger', render: () => { if (typeof renderDailyLedger === 'function') renderDailyLedger(); } },
-            { key: 'activityLog', render: () => { if (typeof renderActivityLog === 'function') renderActivityLog(); } },
+            { key: 'activityLogs', render: () => { if (typeof renderActivityLog === 'function') renderActivityLog(); } },
+            { key: 'vaultNotes', render: () => { if (typeof renderVaultNotes === 'function') renderVaultNotes(); } },
+            { key: 'vaultFolders', render: () => { if (typeof renderVaultNotes === 'function') renderVaultNotes(); } },
             { key: 'lateRules', render: () => { if (typeof renderAttendance === 'function') renderAttendance(); } },
             { key: 'driverVolumeRewards', render: () => { if (typeof renderFinanceTable === 'function') renderFinanceTable(); } },
             { key: 'rankSettings', render: () => { if (typeof renderRanks === 'function') renderRanks(); } },
@@ -2493,7 +2733,7 @@ function listenToCloudData() {
         ];
 
         const arrayNodeKeys = [
-            'workers', 'warehouse', 'driverVolumeRewards', 'branches', 'violationRules', 'jobCatalog',
+            'workers', 'warehouse', 'whCategories', 'driverVolumeRewards', 'branches', 'violationRules', 'jobCatalog',
             'salesLogs', 'depositLogs', 'spendLogs', 'spendOrders', 'costLogs', 'incomeSources', 'disabledSalesMethods'
         ];
         subNodes.forEach(node => {
@@ -3034,6 +3274,15 @@ function switchTab(tab) {
         });
     });
 
+    if (tab === 'warehouse' && typeof renderWarehouse === 'function') {
+        renderWarehouse();
+    }
+    if (tab === 'reminders' && typeof renderReminders === 'function') {
+        renderReminders();
+    }
+    if (tab === 'activity' && typeof renderActivityLog === 'function') {
+        renderActivityLog();
+    }
     if (tab === 'vault' && typeof renderVaultNotes === 'function') {
         renderVaultNotes();
     }

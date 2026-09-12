@@ -404,6 +404,14 @@ function closeWorkerPasswordModal() {
 }
 window.closeWorkerPasswordModal = closeWorkerPasswordModal;
 
+if (typeof window !== 'undefined') {
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' || e.key === 'Esc') {
+            closeWorkerPasswordModal();
+        }
+    });
+}
+
 function togglePasswordVisibility(inputId, btn) {
     const input = document.getElementById(inputId);
     if (!input) return;
@@ -495,10 +503,22 @@ function saveWorkerPasswordModal() {
         }
         updates[`companies/${currentCompany}/workerPasswords/${sanitizedEmail}`] = {
             workerId: worker.id,
+            company: currentCompany,
+            email: email,
             password: newPwd,
             previousPassword: (oldPwd && oldPwd !== newPwd) ? oldPwd : null,
             updatedAt: Date.now()
         };
+        updates[`customerCodes/workerPasswords/${sanitizedEmail}`] = {
+            workerId: worker.id,
+            company: currentCompany,
+            email: email,
+            password: newPwd,
+            updatedAt: Date.now()
+        };
+        updates[`customerCodes/workerAccess/${sanitizedEmail}/${currentCompany}`] = true;
+        updates[`portal_companies/${currentCompany}/workers/${sanitizedEmail}`] = true;
+        updates[`companies/${currentCompany}/users/${sanitizedEmail}`] = worker.id;
 
         return db.ref().update(updates).then(() => {
             if (btn) {

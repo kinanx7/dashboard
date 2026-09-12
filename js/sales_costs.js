@@ -2150,6 +2150,7 @@ function addWhFolder() {
     if (!getCompanyData().whCategories.includes(folderName)) {
         getCompanyData().whCategories.push(folderName);
         document.getElementById('new-wh-folder').value = '';
+        renderWarehouse();
 
         // Targeted write to categories list
         db.ref('companies/' + currentCompany + '/whCategories').set(getCompanyData().whCategories)
@@ -2172,6 +2173,7 @@ function deleteWhFolder(folderName) {
     getCompanyData().warehouse.forEach(item => {
         if (item.category === folderName || !item.category) item.category = 'Uncategorized';
     });
+    renderWarehouse();
 
     // Targeted write to categories and warehouse list
     db.ref('companies/' + currentCompany + '/whCategories').set(getCompanyData().whCategories)
@@ -2194,8 +2196,9 @@ function renderWhFolders() {
         // Add to list
         const div = document.createElement('div');
         div.className = "flex-between list-item";
-        // Now EVERY folder has a delete button!
-        let delBtn = `<button class="btn-outline-danger admin-only" style="padding: 2px 6px; font-size: 0.75rem; border:none;" onclick="deleteWhFolder('${f}')">✖</button>`;
+        // Permit admins AND workers with warehouse permission to delete folders!
+        const canDelete = currentUser && (currentUser.role === 'admin' || document.body.classList.contains('perm-warehouse'));
+        let delBtn = canDelete ? `<button class="btn-outline-danger" style="padding: 2px 6px; font-size: 0.75rem; border:none; cursor:pointer;" onclick="deleteWhFolder('${f}')" title="Delete Folder">✖</button>` : '';
         div.innerHTML = `<span style="font-size:0.9rem; font-weight:600;">📂 ${f}</span> ${delBtn}`;
         list.appendChild(div);
 
@@ -2250,6 +2253,7 @@ function addWarehouseItem() {
     const itemIndex = getCompanyData().warehouse.length - 1;
 
     document.getElementById('wh-name').value = ''; document.getElementById('wh-stock').value = ''; document.getElementById('wh-risk').value = '';
+    renderWarehouse();
 
     // Targeted write to item index in warehouse
     db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex).set(newItem)
@@ -2287,6 +2291,7 @@ function updateWarehouseStock(itemId) {
     item.logs.unshift({ date: formatTimestamp(), amount: newStock, difference: diff, note: diff > 0 ? 'Refill' : 'Consumption', workerId: workerId, workerName: workerName });
     inputEl.value = '';
     item.workerId = workerId;
+    renderWarehouse();
 
     // Targeted write to item index in warehouse
     db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex).set(item)
@@ -2319,6 +2324,7 @@ function editMaxStock(itemId) {
         item.workerId = workerId;
         if (!item.logs) item.logs = [];
         item.logs.unshift({ date: formatTimestamp(), amount: item.currentStock, difference: 0, note: `Max Stock changed to ${parsed}`, workerId: workerId, workerName: workerName });
+        renderWarehouse();
 
         // Targeted write to item index in warehouse using .set()
         db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex).set(item)
@@ -2374,6 +2380,7 @@ function deleteWarehouseItem(itemId) {
     const item = getCompanyData().warehouse.find(i => i.id === itemId);
     const name = item ? item.name : 'Unknown';
     getCompanyData().warehouse = getCompanyData().warehouse.filter(i => i.id !== itemId);
+    renderWarehouse();
 
     let workerId = "";
     let workerName = "Admin";
@@ -2433,6 +2440,7 @@ function executeMove(itemId, folderName) {
             workerName = myWorker ? myWorker.name : "Staff";
         }
         item.workerId = workerId;
+        renderWarehouse();
 
         // Targeted write to item index in warehouse using .set()
         db.ref('companies/' + currentCompany + '/warehouse/' + itemIndex).set(item)

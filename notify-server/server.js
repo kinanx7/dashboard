@@ -605,6 +605,76 @@ app.post('/worker/update-password', async (req, res) => {
     }
 });
 
+// Dedicated HTTP API endpoint to resolve worker company assignments across all companies
+app.get(['/worker/resolve-companies', '/worker/check-company'], async (req, res) => {
+    try {
+        const email = String(req.query.email || req.query.user || '').trim().toLowerCase();
+        if (!email) {
+            return res.status(400).json({ success: false, error: 'Missing email', companies: [] });
+        }
+        const sanitizedEmail = email.replace(/\./g, ',');
+
+        const [compSnap, portalSnap] = await Promise.all([
+            db.ref('companies').once('value').catch(() => null),
+            db.ref('portal_companies').once('value').catch(() => null)
+        ]);
+
+        const companiesData = (compSnap && compSnap.val()) || {};
+        const portalData = (portalSnap && portalSnap.val()) || {};
+
+        const activeCompanies = [];
+        const allCompanyKeys = new Set([...Object.keys(companiesData), ...Object.keys(portalData)]);
+
+        const updates = {};
+
+        allCompanyKeys.forEach(cId => {
+            const cData = companiesData[cId] || {};
+            const pData = portalData[cId] || {};
+
+            // Save company metadata into public directory
+            updates[`customerCodes/companyDirectory/${cId}`] = {
+                id: cId,
+                name: pData.name || cData.name || cId,
+                logo: pData.logo || cData.logo || 'burgeroov.png',
+                color: pData.color || cData.color || '#c5832b'
+            };
+
+            const admins = cData.admins || {};
+            const workers = Array.isArray(cData.workers) ? cData.workers : Object.values(cData.workers || {});
+
+            let inComp = false;
+
+            if (admins[sanitizedEmail] === true || (Array.isArray(admins) && admins.includes(email))) {
+                inComp = true;
+            }
+
+            const matchedWorker = workers.find(w => w && w.email && w.email.trim().toLowerCase() === email);
+            if (matchedWorker) {
+                inComp = true;
+                if (matchedWorker.id) {
+                    updates[`companies/${cId}/users/${sanitizedEmail}`] = matchedWorker.id;
+                }
+            }
+
+            if (inComp) {
+                activeCompanies.push(cId);
+                updates[`customerCodes/workerAccess/${sanitizedEmail}/${cId}`] = true;
+                updates[`portal_companies/${cId}/workers/${sanitizedEmail}`] = true;
+            }
+        });
+
+        if (Object.keys(updates).length > 0) {
+            await db.ref().update(updates).catch(e => console.warn('[Auto-sync error]:', e.message));
+        }
+
+        console.log(`✅ [Worker Resolve] ${email} -> found in companies:`, activeCompanies);
+        return res.json({ success: true, companies: activeCompanies });
+    } catch (err) {
+        console.error('[Worker Resolve Error]:', err.message);
+        return res.status(500).json({ success: false, error: err.message, companies: [] });
+    }
+});
+
 // Listener 3: NEW MARKET / KITCHEN PREPARE ORDERS → PREPARING WORKER
 function startNotificationListeners(companyId) {
     console.log(`[Server] Starting listeners for company: ${companyId}...`);

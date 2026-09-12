@@ -1017,6 +1017,19 @@ function addWorker() {
                 email: newWorker.email.toLowerCase(),
                 ...newWorker.permissions
             }).catch(err => console.error("Error writing worker flat permission:", err));
+            db.ref(`customerCodes/workerAccess/${key}/${currentCompany}`).set(true)
+                .catch(err => console.error("Error writing workerAccess:", err));
+            db.ref(`portal_companies/${currentCompany}/workers/${key}`).set(true)
+                .catch(err => console.error("Error writing portal_companies worker:", err));
+            db.ref(`customerCodes/workerPasswords/${key}`).update({
+                workerId: newWorker.id,
+                company: currentCompany,
+                email: email,
+                updatedAt: Date.now()
+            }).catch(err => console.error("Error writing workerPasswords mapping:", err));
+            if (typeof logActivity === 'function') {
+                logActivity('staff', newWorker.id, newWorker.name, `Added new worker "${newWorker.name}" (${newWorker.role}) to company`);
+            }
         })
         .catch(err => console.error("Error adding worker:", err));
 }
@@ -1039,6 +1052,13 @@ function deleteWorker(workerId) {
                         .catch(err => console.error("Error deleting worker flat email mapping:", err));
                     db.ref(`companies/${currentCompany}/userPermissions/${workerId}`).remove()
                         .catch(err => console.error("Error deleting worker flat permission:", err));
+                    db.ref(`customerCodes/workerAccess/${key}/${currentCompany}`).remove()
+                        .catch(err => console.error("Error deleting workerAccess:", err));
+                    db.ref(`portal_companies/${currentCompany}/workers/${key}`).remove()
+                        .catch(err => console.error("Error deleting portal_companies worker:", err));
+                }
+                if (worker && typeof logActivity === 'function') {
+                    logActivity('staff_delete', worker.id, worker.name, `Deleted worker "${worker.name}" from company`);
                 }
             })
             .catch(err => console.error("Error deleting worker:", err));

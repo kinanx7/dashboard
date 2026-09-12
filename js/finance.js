@@ -398,7 +398,7 @@ function renderSummaryTable() {
                                     const startMins = sH * 60 + (sM || 0);
                                     const checkMins = cH * 60 + (cM || 0);
                                     const diff = checkMins - startMins;
-                                    const rules = companyData.lateRules || [];
+                                    const rules = (Array.isArray(companyData.lateRules) ? companyData.lateRules : Object.values(companyData.lateRules || {})).filter(r => r && typeof r === 'object');
                                     let isLate = false;
                                     if (rules.length === 0) {
                                         if (diff > graceMins) isLate = true;
@@ -1811,7 +1811,7 @@ function saveLateSettings() {
 function getLateDeductionsForMonth(worker, monthStr) {
     const companyData = getCompanyData();
     const attendance = companyData.attendance || {};
-    const rules = companyData.lateRules || [];
+    const rules = (Array.isArray(companyData.lateRules) ? companyData.lateRules : Object.values(companyData.lateRules || {})).filter(r => r && typeof r === 'object');
     const graceMins = parseInt(companyData.lateGraceMinutes || 0);
     const legacyPenalty = parseFloat(companyData.latePenaltySAR || 0);
 
@@ -2594,6 +2594,14 @@ function logActivity(type, workerId, workerName, details) {
         details: details,
         timestamp: Date.now()
     };
+
+    if (appData[currentCompany]) {
+        if (!appData[currentCompany].activityLogs) appData[currentCompany].activityLogs = {};
+        appData[currentCompany].activityLogs[activityId] = logObj;
+    }
+    if (typeof renderActivityLog === 'function') {
+        renderActivityLog();
+    }
 
     db.ref(`companies/${currentCompany}/activityLogs/${activityId}`).set(logObj)
         .catch(err => console.error("Error writing activity log:", err));
@@ -4242,7 +4250,8 @@ function addLateRule() {
     }
 
     const companyData = getCompanyData();
-    const rules = companyData.lateRules || [];
+    const rules = (Array.isArray(companyData.lateRules) ? companyData.lateRules : Object.values(companyData.lateRules || {})).filter(r => r && typeof r === 'object');
+    companyData.lateRules = rules;
 
     // Add rule and sort ascending by minutes
     rules.push({ mins, penalty });
@@ -4260,7 +4269,8 @@ function addLateRule() {
 function deleteLateRule(idx) {
     if (!confirm("Are you sure you want to delete this rule?")) return;
     const companyData = getCompanyData();
-    const rules = companyData.lateRules || [];
+    const rules = (Array.isArray(companyData.lateRules) ? companyData.lateRules : Object.values(companyData.lateRules || {})).filter(r => r && typeof r === 'object');
+    companyData.lateRules = rules;
     rules.splice(idx, 1);
 
     db.ref(`companies/${currentCompany}/lateRules`).set(rules)
@@ -4276,7 +4286,8 @@ function renderLateRules() {
     if (!tbody) return;
 
     const companyData = getCompanyData();
-    const rules = companyData.lateRules || [];
+    const rules = (Array.isArray(companyData.lateRules) ? companyData.lateRules : Object.values(companyData.lateRules || {})).filter(r => r && typeof r === 'object');
+    companyData.lateRules = rules;
 
     tbody.innerHTML = '';
     if (rules.length === 0) {
@@ -5169,6 +5180,7 @@ function addReminder() {
         showInAppNotification(isAr ? '🔔 تم حفظ وإضافة التذكير بنجاح!' : '🔔 Reminder saved and added successfully!');
     }
     renderReminders();
+    logActivity('reminder', 'general', 'Reminders', `Added reminder "${titleVal}" (Deadline: ${deadlineVal})`);
 
     // 2. Persist to Firebase
     db.ref(`companies/${currentCompany}/reminders/${remId}`).set(reminderObj)
@@ -5696,6 +5708,14 @@ function markReminderDoneFinal(remId) {
     if (!confirm(isAr ? 'هل أنت تأكد من إنجاز هذا التذكير بالكامل وإزالته؟' : 'Are you sure you want to mark this reminder completed and remove it?')) {
         return;
     }
+    const companyData = getCompanyData();
+    const r = (companyData.reminders && companyData.reminders[remId]);
+    if (appData[currentCompany] && appData[currentCompany].reminders) {
+        delete appData[currentCompany].reminders[remId];
+    }
+    renderReminders();
+    logActivity('reminder_complete', 'general', 'Reminders', `Completed reminder "${(r && r.title) || remId}"`);
+
     db.ref(`companies/${currentCompany}/reminders/${remId}`).remove()
         .then(() => {
             if (typeof showInAppNotification === 'function') {
@@ -5821,6 +5841,14 @@ window.convertReminderToTask = convertReminderToTask;
 function deleteReminder(remId) {
     const isAr = currentAppLang === 'ar';
     if (!confirm(isAr ? 'هل أنت تأكد من حذف هذا التذكير؟' : 'Are you sure you want to delete this reminder?')) return;
+
+    const companyData = getCompanyData();
+    const r = (companyData.reminders && companyData.reminders[remId]);
+    if (appData[currentCompany] && appData[currentCompany].reminders) {
+        delete appData[currentCompany].reminders[remId];
+    }
+    renderReminders();
+    logActivity('reminder_delete', 'general', 'Reminders', `Deleted reminder "${(r && r.title) || remId}"`);
 
     db.ref(`companies/${currentCompany}/reminders/${remId}`).remove()
         .then(() => {

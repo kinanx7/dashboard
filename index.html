@@ -93,7 +93,7 @@
     <!-- QR Code Generator Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=333">
+    <link rel="stylesheet" href="style.css?v=340">
 </head>
 
 <body class="theme-burgeroov">
@@ -296,18 +296,19 @@
     </div>
 
     <!-- Worker Credentials & Password Management Modal -->
-    <div id="worker-credentials-modal" class="modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 13500; align-items: center; justify-content: center; backdrop-filter: blur(10px); padding: 16px; box-sizing: border-box;">
+    <div id="worker-credentials-modal" class="modal" onclick="if(event.target === this) closeWorkerPasswordModal()" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 13500; align-items: center; justify-content: center; backdrop-filter: blur(10px); padding: 16px; box-sizing: border-box;">
         <div class="modal-content" style="background: #161720; border: 1.5px solid rgba(56, 189, 248, 0.35); border-radius: 22px; max-width: 480px; width: 100%; padding: 26px; box-shadow: 0 24px 70px rgba(0,0,0,0.75); box-sizing: border-box; position: relative;">
-            <button type="button" onclick="closeWorkerPasswordModal()" style="position: absolute; top: 18px; right: 18px; background: none; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer; line-height: 1;" title="Close">✕</button>
-            
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-                <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
-                    🔑
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px;">
+                <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+                    <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0;">
+                        🔑
+                    </div>
+                    <div style="min-width: 0;">
+                        <h3 style="margin: 0; color: #ffffff; font-size: 1.2rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Manage Worker Credentials</h3>
+                        <p style="color: #94a3b8; font-size: 0.8rem; margin: 2px 0 0 0;">View, update or reset employee login access</p>
+                    </div>
                 </div>
-                <div>
-                    <h3 style="margin: 0; color: #ffffff; font-size: 1.25rem; font-weight: 800;">Manage Worker Credentials</h3>
-                    <p style="color: #94a3b8; font-size: 0.8rem; margin: 2px 0 0 0;">View, update or reset employee login access</p>
-                </div>
+                <button type="button" onclick="closeWorkerPasswordModal()" style="width: 36px; height: 36px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: #ffffff; font-size: 1.15rem; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all 0.2s; line-height: 1;" title="Close">✕</button>
             </div>
 
             <!-- Worker Info Strip -->
@@ -332,7 +333,7 @@
                     <input type="password" id="w-cred-current-pwd" readonly
                         style="width: 100%; padding: 10px 42px 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.12); background: #0b0c10; color: #22c55e; font-family: monospace; font-size: 0.95rem; font-weight: 700; box-sizing: border-box;">
                     <button type="button" onclick="togglePasswordVisibility('w-cred-current-pwd', this)"
-                        style="position: absolute; right: 10px; background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.1rem; padding: 4px;" title="Show/Hide">
+                        style="position: absolute; inset-inline-end: 10px; background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.1rem; padding: 4px;" title="Show/Hide">
                         👁️
                     </button>
                 </div>
@@ -351,7 +352,7 @@
                     <input type="password" id="w-cred-new-pwd" placeholder="Enter new password (min 6 characters)"
                         style="width: 100%; padding: 10px 42px 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.18); background: #0d0e12; color: #fff; font-family: monospace; font-size: 0.95rem; font-weight: 600; box-sizing: border-box;">
                     <button type="button" onclick="togglePasswordVisibility('w-cred-new-pwd', this)"
-                        style="position: absolute; right: 10px; background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.1rem; padding: 4px;" title="Show/Hide">
+                        style="position: absolute; inset-inline-end: 10px; background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.1rem; padding: 4px;" title="Show/Hide">
                         👁️
                     </button>
                 </div>
@@ -374,6 +375,11 @@
                         ✉️ Reset Email
                     </button>
                 </div>
+
+                <button type="button" onclick="closeWorkerPasswordModal()"
+                    style="width: 100%; padding: 9px; border-radius: 10px; background: transparent; border: 1px solid rgba(255, 255, 255, 0.15); color: #94a3b8; font-size: 0.82rem; font-weight: 700; cursor: pointer; margin-top: 4px;">
+                    ✕ Close
+                </button>
             </div>
         </div>
     </div>
@@ -2879,7 +2885,7 @@
             <!-- ========================================== -->
             <!-- VIEW 7.5: ACTIVITY LOG (Admin Only)        -->
             <!-- ========================================== -->
-            <div id="view-activity" class="view-section admin-only">
+            <div id="view-activity" class="view-section">
                 <div class="card" style="width: 100%; border-top: 4px solid var(--secondary);">
                     <div class="card-header-flex" style="align-items: center; justify-content: space-between; flex-wrap:wrap; gap:10px;">
                         <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
@@ -3540,7 +3546,7 @@
             <!-- ========================================== -->
             <!-- VIEW 14: REMINDERS (ADMIN ONLY)            -->
             <!-- ========================================== -->
-            <div id="view-reminders" class="view-section admin-only">
+            <div id="view-reminders" class="view-section">
                 <!-- Top Notification Banner for Due Reminders -->
                 <div id="reminders-due-banner"
                     style="display:none; background: linear-gradient(135deg, rgba(220,38,38,0.15), rgba(245,158,11,0.15)); border: 2px solid var(--danger); border-radius: 16px; padding: 20px; margin-bottom: 24px; box-shadow: 0 4px 14px rgba(220,38,38,0.15);">
@@ -4127,7 +4133,7 @@
         </div>
 
         <!-- Admin Informations & Document Vault Section -->
-        <div id="view-vault" class="view-section admin-only" style="grid-template-columns: 1fr; max-width: 1400px; width: 100%; margin: 0 auto; padding: 0 24px; box-sizing: border-box; overflow-x: hidden;">
+        <div id="view-vault" class="view-section" style="grid-template-columns: 1fr; max-width: 1400px; width: 100%; margin: 0 auto; padding: 0 24px; box-sizing: border-box; overflow-x: hidden;">
             <div class="card" style="width: 100%; border-top: 4px solid #6366f1;">
                 <!-- Header Title & Controls -->
                 <div class="flex-between" style="margin-bottom: 20px; flex-wrap: wrap; gap: 14px; align-items: center;">
@@ -8486,8 +8492,8 @@
     </div>
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=333"></script>
-    <script src="app.js?v=333"></script>
+    <script src="translations.js?v=340"></script>
+    <script src="app.js?v=340"></script>
 </body>
 
 </html>

@@ -917,6 +917,10 @@ function assignTask() {
             acceptedAt: null
         };
 
+        if (!getCompanyData().generalTasks) getCompanyData().generalTasks = [];
+        getCompanyData().generalTasks.push(newGeneralTask);
+        if (typeof renderTasks === 'function') renderTasks();
+
         db.ref(`companies/${currentCompany}/generalTasks/${newGeneralTask.id}`).set(newGeneralTask)
             .then(() => {
                 logActivity('task', 'general', 'General Pool', `Created general task ${assignedTaskNum}: "${text}"`);
@@ -925,6 +929,7 @@ function assignTask() {
                 if (document.getElementById('task-deadline')) document.getElementById('task-deadline').value = '';
                 if (document.getElementById('task-urgency')) document.getElementById('task-urgency').value = 'normal';
                 document.getElementById('task-worker-select').value = '';
+                if (typeof renderTasks === 'function') renderTasks();
             })
             .catch(err => console.error("Error creating general task:", err));
         return;
@@ -953,10 +958,14 @@ function assignTask() {
     if (document.getElementById('task-deadline')) document.getElementById('task-deadline').value = '';
     if (document.getElementById('task-urgency')) document.getElementById('task-urgency').value = 'normal';
 
+    // RENDER IMMEDIATELY so the newly assigned task appears in the list below instantly (0ms)
+    if (typeof renderTasks === 'function') renderTasks();
+
     // Targeted write to worker jobs path (notify-server will automatically dispatch the customized template)
     db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
         .then(() => {
             logActivity('task', worker.id, worker.name, `Assigned task ${assignedTaskNum} to ${worker.name}: "${text}"`);
+            if (typeof renderTasks === 'function') renderTasks();
         })
         .catch(err => console.error("Error assigning task:", err));
 }
@@ -973,9 +982,11 @@ function seeTask(workerId, taskId) {
         }
         t.status = 'seen';
         t.seenAt = Date.now();
+        if (typeof renderTasks === 'function') renderTasks();
 
         // Targeted write to worker jobs path
         db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
+            .then(() => { if (typeof renderTasks === 'function') renderTasks(); })
             .catch(err => console.error("Error seeing task:", err));
     }
 }
@@ -993,11 +1004,13 @@ function completeTask(workerId, taskId) {
         t.status = 'completed';
         t.done = true;
         t.completedAt = Date.now();
+        if (typeof renderTasks === 'function') renderTasks();
 
         // Targeted write to worker jobs path
         db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
             .then(() => {
                 logActivity('task', worker.id, worker.name, `${worker.name} completed task: "${t.title}"`);
+                if (typeof renderTasks === 'function') renderTasks();
             })
             .catch(err => console.error("Error completing task:", err));
     }
@@ -1016,11 +1029,13 @@ function toggleTaskDone(workerId, taskId) {
             t.status = 'completed';
             t.completedAt = Date.now();
         }
+        if (typeof renderTasks === 'function') renderTasks();
 
         // Targeted write to worker jobs path
         db.ref(`companies/${currentCompany}/workers/${workerIndex}/jobs`).set(worker.jobs)
             .then(() => {
                 logActivity('task', worker.id, worker.name, `${worker.name} toggled task: "${t.title}" (Status: ${t.status})`);
+                if (typeof renderTasks === 'function') renderTasks();
             })
             .catch(err => console.error("Error toggling task done:", err));
     }
