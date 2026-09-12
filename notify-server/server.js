@@ -568,6 +568,43 @@ app.post('/notify/prepare', async (req, res) => {
     }
 });
 
+// Dedicated HTTP API endpoint to update or create worker Firebase Authentication passwords
+app.post('/worker/update-password', async (req, res) => {
+    try {
+        const { email, newPassword } = req.body || {};
+        if (!email || !newPassword) {
+            return res.status(400).json({ success: false, error: 'Missing email or newPassword' });
+        }
+        if (newPassword.length < 6) {
+            return res.status(400).json({ success: false, error: 'Password must be at least 6 characters long' });
+        }
+
+        const cleanEmail = String(email).trim().toLowerCase();
+        try {
+            const userRecord = await admin.auth().getUserByEmail(cleanEmail);
+            if (userRecord && userRecord.uid) {
+                await admin.auth().updateUser(userRecord.uid, { password: newPassword });
+                console.log(`✅ [Worker Auth] Password updated for ${cleanEmail} (UID: ${userRecord.uid})`);
+                return res.json({ success: true, message: 'Password updated in Firebase Auth successfully', uid: userRecord.uid });
+            }
+        } catch (getErr) {
+            if (getErr.code === 'auth/user-not-found') {
+                const newUser = await admin.auth().createUser({
+                    email: cleanEmail,
+                    password: newPassword,
+                    emailVerified: true
+                });
+                console.log(`✅ [Worker Auth] New user created for ${cleanEmail} (UID: ${newUser.uid})`);
+                return res.json({ success: true, message: 'Worker account created in Firebase Auth successfully', uid: newUser.uid });
+            }
+            throw getErr;
+        }
+    } catch (err) {
+        console.error('[Worker Auth Update Error]:', err.message);
+        return res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // Listener 3: NEW MARKET / KITCHEN PREPARE ORDERS → PREPARING WORKER
 function startNotificationListeners(companyId) {
     console.log(`[Server] Starting listeners for company: ${companyId}...`);

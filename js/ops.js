@@ -181,7 +181,10 @@ function renderOpsWorkersTable() {
                     <td><span class="badge" style="background: var(--primary); margin:0;">${avg}</span></td>`;
         if (isAdmin) {
             html += `
-                    <td class="admin-only">
+                    <td class="admin-only" style="white-space: nowrap;">
+                        <button type="button" class="btn-outline" style="padding:6px 10px; font-size:0.8rem; margin-inline-end:6px; color:#38bdf8; border-color:rgba(56,189,248,0.4); display:inline-flex; align-items:center; gap:4px;" onclick="openWorkerPasswordModal('${worker.id}')" title="${isAr ? 'عرض وتعديل كلمة المرور وبيانات الدخول' : 'View & manage worker login password'}">
+                            🔑 ${isAr ? 'البيانات' : 'Credentials'}
+                        </button>
                         <button class="btn-outline-danger" style="padding:6px 12px;font-size:0.8rem;" onclick="deleteWorker('${worker.id}')">${t('btn-delete-worker')}</button>
                     </td>`;
         }
@@ -322,9 +325,290 @@ function renderOpsDetails() {
 
 // FINANCIAL TAB RENDERING
 
+// --- WORKER PASSWORD & CREDENTIALS MANAGEMENT ---
+function openWorkerPasswordModal(workerId) {
+    const worker = (getCompanyData().workers || []).find(w => w && String(w.id) === String(workerId));
+    if (!worker) {
+        alert("Worker record not found.");
+        return;
+    }
+
+    const modal = document.getElementById('worker-credentials-modal');
+    if (!modal) return;
+
+    document.getElementById('w-cred-id').value = worker.id;
+    document.getElementById('w-cred-name').textContent = worker.name || 'Worker';
+    document.getElementById('w-cred-role').textContent = worker.role || 'Staff';
+    document.getElementById('w-cred-email').textContent = worker.email || 'No email registered';
+
+    // Check stored password in worker object or local mapping
+    let storedPwd = worker.appPassword || worker.password || '';
+    const currPwdInput = document.getElementById('w-cred-current-pwd');
+    if (currPwdInput) {
+        if (storedPwd) {
+            currPwdInput.value = storedPwd;
+            currPwdInput.type = 'password';
+        } else {
+            currPwdInput.value = currentAppLang === 'ar' ? 'لم تُعيّن بعد (أدخل كلمة جديدة بالأسفل)' : 'Not set yet (enter new password below)';
+            currPwdInput.type = 'text';
+        }
+    }
+
+    const email = (worker.email || '').trim().toLowerCase();
+    const sanitizedEmail = email.replace(/\./g, ',');
+
+    if (!storedPwd && email) {
+        Promise.all([
+            db.ref(`companies/${currentCompany}/workerPasswords/${sanitizedEmail}`).once('value').catch(() => null),
+            db.ref(`customerCodes/workerPasswords/${sanitizedEmail}`).once('value').catch(() => null)
+        ]).then(([compSnap, custSnap]) => {
+            let foundPwd = '';
+            if (compSnap && compSnap.exists() && compSnap.val()) {
+                const val = compSnap.val();
+                foundPwd = val.password || (typeof val === 'string' ? val : '');
+            }
+            if (!foundPwd && custSnap && custSnap.exists() && custSnap.val()) {
+                const val = custSnap.val();
+                foundPwd = val.password || (typeof val === 'string' ? val : '');
+            }
+
+            if (foundPwd && document.getElementById('w-cred-id').value === worker.id) {
+                worker.appPassword = foundPwd;
+                if (currPwdInput) {
+                    currPwdInput.value = foundPwd;
+                    currPwdInput.type = 'password';
+                }
+            }
+        });
+    }
+
+    const newPwdInput = document.getElementById('w-cred-new-pwd');
+    if (newPwdInput) {
+        newPwdInput.value = '';
+        newPwdInput.type = 'password';
+    }
+
+    modal.style.display = 'flex';
+}
+window.openWorkerPasswordModal = openWorkerPasswordModal;
+
+function closeWorkerPasswordModal() {
+    const modal = document.getElementById('worker-credentials-modal');
+    if (modal) modal.style.display = 'none';
+}
+window.closeWorkerPasswordModal = closeWorkerPasswordModal;
+
+function togglePasswordVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    if (input.type === 'password') {
+        input.type = 'text';
+        if (btn) btn.textContent = '🔒';
+    } else {
+        input.type = 'password';
+        if (btn) btn.textContent = '👁️';
+    }
+}
+window.togglePasswordVisibility = togglePasswordVisibility;
+
+function generateRandomPassword() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    let rand = '';
+    for (let i = 0; i < 6; i++) {
+        rand += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    const pwd = 'Roov#' + rand;
+    const input = document.getElementById('w-cred-new-pwd');
+    if (input) {
+        input.value = pwd;
+        input.type = 'text';
+    }
+}
+window.generateRandomPassword = generateRandomPassword;
+
+function saveWorkerPasswordModal() {
+    const workerId = document.getElementById('w-cred-id').value;
+    const newPwd = (document.getElementById('w-cred-new-pwd').value || '').trim();
+    const isAr = currentAppLang === 'ar';
+
+    if (!newPwd) {
+        alert(isAr ? 'الرجاء إدخال كلمة المرور الجديدة.' : 'Please enter a new password.');
+        return;
+    }
+
+    if (newPwd.length < 6) {
+        alert(isAr ? 'يجب ألا تقل كلمة المرور عن 6 خانات.' : 'Password must be at least 6 characters long.');
+        return;
+    }
+
+    const workers = getCompanyData().workers || [];
+    const workerIndex = workers.findIndex(w => w && String(w.id) === String(workerId));
+    if (workerIndex === -1) {
+        alert(isAr ? 'تعذر العثور على سجل الموظف.' : 'Worker record not found.');
+        return;
+    }
+
+    const worker = workers[workerIndex];
+    const email = (worker.email || '').trim().toLowerCase();
+    if (!email) {
+        alert(isAr ? 'الموظف لا يملك بريد إلكتروني مسجل.' : 'Worker does not have a registered email address.');
+        return;
+    }
+
+    const btn = document.getElementById('btn-save-worker-pwd');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = isAr ? '⏳ جاري الحفظ والتحديث...' : '⏳ Updating Password...';
+    }
+
+    // 1. Update in Firebase RTDB worker record
+    worker.appPassword = newPwd;
+    const sanitizedEmail = email.replace(/\./g, ',');
+
+    const serverUrlInput = document.getElementById('wa-server-url');
+    const config = typeof getCompanyData === 'function' ? (getCompanyData().messagingConfig || {}) : {};
+    let baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || config.serverUrl || 'https://burgeroov-notify.onrender.com';
+    baseUrl = baseUrl.replace(/\/+$/, '');
+
+    // 2. Dispatch to backend endpoint to update Firebase Authentication
+    fetch(`${baseUrl}/worker/update-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, newPassword: newPwd })
+    })
+    .then(res => res.json().catch(() => ({ success: false, error: 'Non-JSON server response' })))
+    .catch(err => ({ success: false, error: err.message }))
+    .then(result => {
+        // 3. Save to RTDB regardless of server status
+        const oldPwd = worker.appPassword || worker.password || '';
+        const updates = {};
+        updates[`companies/${currentCompany}/workers/${workerIndex}/appPassword`] = newPwd;
+        if (oldPwd && oldPwd !== newPwd) {
+            worker.previousPassword = oldPwd;
+            updates[`companies/${currentCompany}/workers/${workerIndex}/previousPassword`] = oldPwd;
+        }
+        updates[`companies/${currentCompany}/workerPasswords/${sanitizedEmail}`] = {
+            workerId: worker.id,
+            password: newPwd,
+            previousPassword: (oldPwd && oldPwd !== newPwd) ? oldPwd : null,
+            updatedAt: Date.now()
+        };
+
+        return db.ref().update(updates).then(() => {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = isAr ? '💾 تحديث كلمة المرور' : '💾 Update Password';
+            }
+
+            const currInput = document.getElementById('w-cred-current-pwd');
+            if (currInput) currInput.value = newPwd;
+
+            let successMsg = isAr
+                ? `✅ تم تحديث كلمة المرور للموظف (${worker.name}) بنجاح!`
+                : `✅ Password updated successfully for (${worker.name})!`;
+
+            if (result && result.success) {
+                successMsg += isAr ? '\n(تم التحديث مباشرة في نظام تسجيل الدخول Firebase Auth)' : '\n(Directly updated in Firebase Auth)';
+            } else {
+                successMsg += isAr ? '\n(تم حفظ كلمة المرور في السجل. يمكنك مشاركتها عبر واتساب)' : '\n(Saved in database records. You can share it via WhatsApp)';
+            }
+
+            alert(successMsg);
+        });
+    })
+    .catch(err => {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = isAr ? '💾 تحديث كلمة المرور' : '💾 Update Password';
+        }
+        console.error('Error saving worker password:', err);
+        alert((isAr ? 'خطأ في حفظ كلمة المرور: ' : 'Error saving password: ') + err.message);
+    });
+}
+window.saveWorkerPasswordModal = saveWorkerPasswordModal;
+
+function sendWorkerCredentialsWhatsApp() {
+    const workerId = document.getElementById('w-cred-id').value;
+    const worker = (getCompanyData().workers || []).find(w => w && String(w.id) === String(workerId));
+    if (!worker) return;
+
+    const isAr = currentAppLang === 'ar';
+    const pwd = (document.getElementById('w-cred-new-pwd').value || '').trim() ||
+                worker.appPassword || worker.password || '';
+
+    const phone = worker.phone || '';
+    const email = worker.email || '';
+
+    const compObj = (typeof portalCompanies !== 'undefined' && portalCompanies[currentCompany]) || null;
+    const compName = compObj ? compObj.name : 'Operations Portal';
+
+    let msg = isAr
+        ? `🔐 *بيانات الدخول إلى منصة العمل - ${compName}*\n\n` +
+          `👤 الموظف: *${worker.name}*\n` +
+          `📧 البريد: *${email}*\n` +
+          `🔑 كلمة المرور: *${pwd || '(حسب طلبك)'}*\n\n` +
+          `📱 رابط تسجيل الدخول:\n${window.location.origin}${window.location.pathname}`
+        : `🔐 *Login Credentials - ${compName}*\n\n` +
+          `👤 Worker: *${worker.name}*\n` +
+          `📧 Email: *${email}*\n` +
+          `🔑 Password: *${pwd || '(as configured)'}*\n\n` +
+          `📱 Portal Link:\n${window.location.origin}${window.location.pathname}`;
+
+    if (phone && typeof sendWhatsAppDirect === 'function') {
+        sendWhatsAppDirect(phone, msg).then(res => {
+            if (res && res.success) {
+                alert(isAr ? `✅ تم إرسال بيانات الدخول عبر واتساب إلى ${phone}!` : `✅ Credentials sent via WhatsApp to ${phone}!`);
+            } else {
+                const cleanPhone = String(phone).replace(/[^0-9]/g, '');
+                window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`, '_blank');
+            }
+        });
+    } else {
+        const cleanPhone = phone ? String(phone).replace(/[^0-9]/g, '') : '';
+        const waUrl = cleanPhone 
+            ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`
+            : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+        window.open(waUrl, '_blank');
+    }
+}
+window.sendWorkerCredentialsWhatsApp = sendWorkerCredentialsWhatsApp;
+
+function sendWorkerPasswordResetEmail() {
+    const workerId = document.getElementById('w-cred-id').value;
+    const worker = (getCompanyData().workers || []).find(w => w && String(w.id) === String(workerId));
+    if (!worker || !worker.email) {
+        alert("Worker does not have a registered email.");
+        return;
+    }
+
+    const isAr = currentAppLang === 'ar';
+    if (!confirm(isAr ? `هل تريد إرسال رابط إعادة تعيين كلمة المرور إلى (${worker.email})؟` : `Send official password reset email to (${worker.email})?`)) {
+        return;
+    }
+
+    auth.sendPasswordResetEmail(worker.email)
+        .then(() => {
+            alert(isAr 
+                ? `✅ تم إرسال رابط إعادة تعيين كلمة المرور بنجاح إلى (${worker.email})!` 
+                : `✅ Password reset email sent successfully to (${worker.email})!`);
+        })
+        .catch(err => {
+            console.error('Password reset email error:', err);
+            alert((isAr ? 'تعذر إرسال البريد: ' : 'Failed to send email: ') + err.message);
+        });
+}
+window.sendWorkerPasswordResetEmail = sendWorkerPasswordResetEmail;
+
 // --- AUTOMATIC IN-SCOPE WINDOW EXPORTS ---
 if (typeof renderWorkerViolationPanel === 'function') window.renderWorkerViolationPanel = renderWorkerViolationPanel;
 if (typeof renderBranches === 'function') window.renderBranches = renderBranches;
 if (typeof populateWorkerDropdowns === 'function') window.populateWorkerDropdowns = populateWorkerDropdowns;
 if (typeof renderOpsWorkersTable === 'function') window.renderOpsWorkersTable = renderOpsWorkersTable;
 if (typeof renderOpsDetails === 'function') window.renderOpsDetails = renderOpsDetails;
+if (typeof openWorkerPasswordModal === 'function') window.openWorkerPasswordModal = openWorkerPasswordModal;
+if (typeof closeWorkerPasswordModal === 'function') window.closeWorkerPasswordModal = closeWorkerPasswordModal;
+if (typeof togglePasswordVisibility === 'function') window.togglePasswordVisibility = togglePasswordVisibility;
+if (typeof generateRandomPassword === 'function') window.generateRandomPassword = generateRandomPassword;
+if (typeof saveWorkerPasswordModal === 'function') window.saveWorkerPasswordModal = saveWorkerPasswordModal;
+if (typeof sendWorkerCredentialsWhatsApp === 'function') window.sendWorkerCredentialsWhatsApp = sendWorkerCredentialsWhatsApp;
+if (typeof sendWorkerPasswordResetEmail === 'function') window.sendWorkerPasswordResetEmail = sendWorkerPasswordResetEmail;

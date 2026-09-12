@@ -1089,23 +1089,25 @@ function renderVicardRestaurants() {
         let unitsListHtml = '';
         if (units.length > 0) {
             unitsListHtml = units.map((u, idx) => `
-                <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 10px; padding: 8px 10px; margin-top: 6px;">
-                    <div style="width: 44px; height: 44px; border-radius: 8px; overflow: hidden; background: #000; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.1);">
-                        ${u.image ? `<img src="${u.image}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.parentElement.innerHTML='🍲'">` : '🍲'}
-                    </div>
-                    <div style="flex: 1; min-width: 0;">
-                        <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                            ${escapeHtml(u.name)}
+                <div class="vicard-unit-item">
+                    <div class="vicard-unit-top">
+                        <div class="vicard-unit-media">
+                            ${u.image ? `<img src="${u.image}" alt="${escapeHtml(u.name)}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.parentElement.innerHTML='🍲'">` : '🍲'}
                         </div>
-                        <div style="font-size: 0.76rem; display: flex; align-items: center; gap: 6px; margin-top: 2px;">
-                            ${u.originalPrice ? `<span style="text-decoration: line-through; color: var(--text-muted);">SAR ${u.originalPrice}</span>` : ''}
-                            <span style="color: #2ed573; font-weight: 800;">SAR ${u.offerPrice || 0}</span>
-                            ${u.discount ? `<span style="background: rgba(212,175,55,0.15); color: #f5d77f; padding: 1px 6px; border-radius: 6px; font-size: 0.7rem; font-weight: 700;">${escapeHtml(u.discount)}</span>` : ''}
+                        <div class="vicard-unit-content">
+                            <div class="vicard-unit-name">${escapeHtml(u.name)}</div>
+                            <div class="vicard-unit-price-row">
+                                ${u.originalPrice ? `<span style="text-decoration: line-through; color: var(--text-muted); font-size: 0.72rem;">SAR ${u.originalPrice}</span>` : ''}
+                                <span style="color: #2ed573; font-weight: 800;">SAR ${u.offerPrice || 0}</span>
+                                ${u.discount ? `<span style="background: rgba(212,175,55,0.15); color: #f5d77f; padding: 1px 6px; border-radius: 6px; font-size: 0.68rem; font-weight: 700; border: 1px solid rgba(212,175,55,0.3);">${escapeHtml(u.discount)}</span>` : ''}
+                            </div>
                         </div>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 4px;">
-                        <button type="button" onclick="openEditUnitModal('${r.id}', ${idx})" style="background: rgba(212,175,55,0.12); border: 1px solid rgba(212,175,55,0.3); border-radius: 6px; color: #f5d77f; cursor: pointer; font-size: 0.76rem; padding: 3px 8px; font-weight: 700;" title="Edit Unit Details & Price">✏️ Edit</button>
-                        <button type="button" onclick="deleteVicardUnit('${r.id}', ${idx})" style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.9rem; padding: 4px;" title="Delete Unit">✖</button>
+                    <div class="vicard-unit-bottom">
+                        <div class="vicard-unit-controls">
+                            <button type="button" onclick="openEditUnitModal('${r.id}', ${idx})" class="vicard-unit-edit-btn" title="Edit Unit Details & Price">✏️ Edit</button>
+                            <button type="button" onclick="deleteVicardUnit('${r.id}', ${idx})" class="vicard-unit-del-btn" title="Delete Unit">✖</button>
+                        </div>
                     </div>
                 </div>
             `).join('');
@@ -1120,59 +1122,75 @@ function renderVicardRestaurants() {
             unitsListHtml = `<div style="font-size: 0.78rem; color: var(--text-muted); font-style: italic; padding: 6px 0;">No menu units added yet. Click "+ Add Menu Unit" below.</div>`;
         }
 
+        const lowestPlatRank = getLowestPlatformTierRank();
+        const activeTiers = (r.eligibleTiers || []).filter(t => t && t !== 'none' && t !== '__none__');
+        let tierBadgeHtml = '';
+        if (activeTiers.length > 0) {
+            const minRestRank = Math.min(...activeTiers.map(t => getTierRank(t)));
+            const isLowestRankChecked = minRestRank <= lowestPlatRank;
+            if (isLowestRankChecked) {
+                tierBadgeHtml = `<span class="vicard-hud-badge all-tiers">🌐 All Tiers (Rank ${minRestRank}+)</span>`;
+            } else {
+                const tierNames = activeTiers.map(tid => (getVicardTiers()[tid]?.name || tid)).join(', ');
+                tierBadgeHtml = `<span class="vicard-hud-badge restricted-tiers">🏅 ${escapeHtml(tierNames)} (Rank ${minRestRank}+) • Restricted</span>`;
+            }
+        } else {
+            tierBadgeHtml = `<span class="vicard-hud-badge locked-tiers">🚫 Restricted (Not Available Right Now)</span>`;
+        }
+
+        const pinHtml = `<span class="vicard-hud-badge pin">🔒 Cashier PIN: <strong class="vicard-hud-pin-code">${escapeHtml(r.cashierPin || '1234')}</strong></span>`;
+
         return `
-            <div class="card" style="border-radius: 16px; border: 1px solid var(--border-color); padding: 18px; display: flex; flex-direction: column; justify-content: space-between; ${isActive ? '' : 'opacity: 0.65; filter: grayscale(0.3);'}">
+            <div class="card vicard-partner-card" style="border-radius: 18px; border: 1px solid var(--border-color); padding: 18px; display: flex; flex-direction: column; justify-content: space-between; gap: 14px; ${isActive ? '' : 'opacity: 0.65; filter: grayscale(0.3);'}">
                 <div>
-                    <!-- Restaurant Header -->
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <div style="width: 50px; height: 50px; border-radius: 12px; background: rgba(212,175,55,0.1); border: 1.5px solid rgba(212,175,55,0.3); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; overflow: hidden; flex-shrink: 0;">
+                    <!-- Restaurant Header & Brand HUD -->
+                    <div class="vicard-rest-card-header">
+                        <div class="vicard-rest-card-brand">
+                            <div class="vicard-rest-logo-box">
                                 ${r.logo && (r.logo.startsWith('http') || r.logo.startsWith('data:') || r.logo.endsWith('.png') || r.logo.endsWith('.jpg') || r.logo.endsWith('.jpeg'))
-                                    ? `<img src="${r.logo}" style="width: 100%; height: 100%; object-fit: cover;">`
-                                    : (r.logo || '🍽️')}
+                                    ? `<img src="${r.logo}" alt="${escapeHtml(r.name)}" class="vicard-rest-logo-img">`
+                                    : `<div class="vicard-rest-logo-fallback">${r.logo || '🍽️'}</div>`}
                             </div>
-                            <div>
-                                <h4 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: var(--text-main);">${escapeHtml(r.name)}</h4>
-                                <div style="font-size: 0.78rem; color: #d4af37; font-weight: 600;">${escapeHtml(r.category || 'Dining')}</div>
-                                ${r.location ? `<div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 2px;">📍 ${escapeHtml(r.location)} • ⭐ ${r.rating || '4.9'} (${r.reviews || '350+'})</div>` : `<div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 2px;">⭐ ${r.rating || '4.9'} (${r.reviews || '350+'})</div>`}
-                                <div style="margin-top: 5px;">
-                                    ${(() => {
-                                        const lowestPlatRank = getLowestPlatformTierRank();
-                                        const activeTiers = (r.eligibleTiers || []).filter(t => t && t !== 'none' && t !== '__none__');
-                                        if (activeTiers.length > 0) {
-                                            const minRestRank = Math.min(...activeTiers.map(t => getTierRank(t)));
-                                            const isLowestRankChecked = minRestRank <= lowestPlatRank;
-                                            if (isLowestRankChecked) {
-                                                return `<span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: rgba(46,213,115,0.12); color: #2ed573; border: 1px solid rgba(46,213,115,0.3);">🌐 All Tiers (Rank ${minRestRank}+)</span>`;
-                                            } else {
-                                                return `<span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: rgba(212,175,55,0.15); color: #f5d77f; border: 1px solid rgba(212,175,55,0.3);">🏅 ${activeTiers.map(tid => (getVicardTiers()[tid]?.name || tid)).join(', ')} (Rank ${minRestRank}+) • Base Tier Restricted</span>`;
-                                            }
-                                        } else {
-                                            return `<span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: rgba(235,77,75,0.15); color: #fca5a5; border: 1px solid rgba(235,77,75,0.3);">🚫 Restricted (Not Available Right Now)</span>`;
-                                        }
-                                    })()}
-                                    <span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: rgba(212,175,55,0.15); color: #f5d77f; border: 1px solid rgba(212,175,55,0.3); margin-left: 4px;">🔒 Cashier PIN: <strong style="font-family: monospace; letter-spacing: 1px;">${escapeHtml(r.cashierPin || '1234')}</strong></span>
+                            <div class="vicard-rest-brand-info">
+                                <div class="vicard-rest-title-line">
+                                    <h4 class="vicard-rest-title">${escapeHtml(r.name)}</h4>
+                                    <span class="vicard-rest-cat-tag">${escapeHtml(r.category || 'Dining')}</span>
+                                </div>
+                                <div class="vicard-rest-sub-meta">
+                                    ${r.location ? `<span>📍 ${escapeHtml(r.location)}</span> • ` : ''}<span>⭐ ${r.rating || '4.9'} <span style="opacity:0.75;">(${r.reviews || '350+'})</span></span>
                                 </div>
                             </div>
                         </div>
 
-                        <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: 8px;">
+                        <div class="vicard-rest-status-wrap">
                             <button type="button" onclick="toggleVicardRestaurant('${r.id}')"
-                                style="padding: 4px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; border: none; cursor: pointer; ${isActive ? 'background: rgba(46, 213, 115, 0.15); color: #2ed573;' : 'background: rgba(235, 77, 75, 0.15); color: #eb4d4b;'}">
-                                ${isActive ? 'Active' : 'Paused'}
+                                class="vicard-rest-status-pill ${isActive ? 'active' : 'paused'}"
+                                title="Click to ${isActive ? 'Pause' : 'Activate'} Partner">
+                                <span class="vicard-status-dot"></span>
+                                <span>${isActive ? 'Active' : 'Paused'}</span>
                             </button>
                         </div>
                     </div>
 
+                    <!-- Dedicated Details HUD Bar (Tier Access & Cashier PIN with generous breathing space) -->
+                    <div class="vicard-rest-details-hud">
+                        <div class="vicard-hud-tier-col">
+                            ${tierBadgeHtml}
+                        </div>
+                        <div class="vicard-hud-pin-col">
+                            ${pinHtml}
+                        </div>
+                    </div>
+
                     <!-- Offered Menu Units Section -->
-                    <div style="margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 10px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <div style="margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                             <span style="font-size: 0.76rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Offered Menu Units (${units.length})</span>
-                            <button type="button" onclick="openAddUnitModal('${r.id}')" style="background: none; border: none; color: #d4af37; cursor: pointer; font-size: 0.78rem; font-weight: 700;">
+                            <button type="button" onclick="openAddUnitModal('${r.id}')" style="background: rgba(212,175,55,0.14); border: 1px solid rgba(212,175,55,0.35); color: #f5d77f; cursor: pointer; font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px;">
                                 ➕ Add Unit
                             </button>
                         </div>
-                        <div style="max-height: 220px; overflow-y: auto;">
+                        <div style="max-height: 260px; overflow-y: auto;">
                             ${unitsListHtml}
                         </div>
                     </div>
@@ -2709,7 +2727,7 @@ function generateRestaurantsDirectoryWebsiteHtml(rests, card) {
     });
 
     const isAr = typeof currentAppLang !== 'undefined' && currentAppLang === 'ar';
-    const txtProfile = (typeof t === 'function' && t('nfc-btn-profile')) || (isAr ? 'الملف الشخصي' : 'Profile');
+    const txtProfile = (typeof t === 'function' && t('nfc-btn-profile')) || (isAr ? 'الملف' : 'Profile');
     const txtInfo = (typeof t === 'function' && t('nfc-btn-info')) || (isAr ? 'معلومات' : 'Info');
     const txtLocation = isAr ? 'الرياض، المملكة العربية السعودية' : 'Riyadh, Saudi Arabia';
     const txtAllPartners = (typeof t === 'function' && t('nfc-pill-all-partners')) || (isAr ? 'جميع الشركاء' : 'All Partners');
@@ -2847,7 +2865,7 @@ function generateRestaurantsDirectoryWebsiteHtml(rests, card) {
                     <div class="keeta-member-avatar">${isActive ? '👑' : '⚠️'}</div>
                     <div class="keeta-member-info">
                         <div class="keeta-member-name">${escapeHtml(card ? card.name : 'VIP Member')}</div>
-                        <div class="keeta-member-id" dir="ltr"><span style="font-family:monospace;">${card ? card.id : 'VIC-GUEST'}</span> • <span style="color:${isActive ? '#10b981' : '#ef4444'}; font-weight:800;">${isActive ? 'ACTIVE' : 'SUSPENDED'}</span> • <span style="color:#f5d77f; font-weight:800;">${escapeHtml((card && card.tier) || 'Black VIP')}</span> • <span style="color:#38bdf8; font-weight:800;">🎯 ${monthlyLimit > 0 ? `${remainingOffers} left (${usedOffers}/${monthlyLimit})` : 'Unlimited'}</span></div>
+                        <div class="keeta-member-id" dir="ltr"><span style="font-family:monospace;">${card ? card.id : 'VIC-GUEST'}</span> • <span style="color:${isActive ? '#10b981' : '#ef4444'}; font-weight:800;">${isActive ? 'ACTIVE' : 'SUSPENDED'}</span> • <span style="color:#f5d77f; font-weight:800;">${escapeHtml((card && card.tier) || 'Black VIP')}</span> • <span style="color:#38bdf8; font-weight:800;">🎯 ${remainingOffers} left</span></div>
                     </div>
                 </div>
             </div>

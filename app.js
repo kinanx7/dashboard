@@ -357,7 +357,7 @@ function startGlobalNotificationListeners(email) {
     });
     notificationListeners = {};
 
-    const companiesToListen = ['burgeroov', 'mvc', 'mvcfresh'];
+    const companiesToListen = Object.keys(portalCompanies || { burgeroov: 1, mvc: 1, mvcfresh: 1 });
 
     companiesToListen.forEach(companyId => {
         const adminsRef = db.ref(`companies/${companyId}/admins`);
@@ -435,7 +435,8 @@ function startGlobalNotificationListeners(email) {
                     if (!snapshot.exists()) return;
                     const companyData = snapshot.val();
                     const isAr = currentAppLang === 'ar';
-                    const compName = companyId === 'burgeroov' ? 'Burgeroov' : (companyId === 'mvc' ? 'MVC FRESH' : 'MVC Fresh');
+                    const compObj = (portalCompanies && portalCompanies[companyId]) || null;
+                    const compName = compObj ? compObj.name : (companyId === 'burgeroov' ? 'Burgeroov' : (companyId === 'mvc' ? 'MVC FRESH' : 'MVC Fresh'));
 
                     let updatedWorker = null;
                     if (companyData.workers) {
@@ -625,6 +626,7 @@ firebase.initializeApp(firebaseConfig);
 var auth = firebase.auth();
 var db = firebase.database();
 initPublicCustomerSync();
+initPortalCompaniesListener();
 
 // =============================================
 // AUTOMATIC APK VERSION CHECKER & FORCED UPDATE
@@ -966,25 +968,296 @@ function getCompanyData() {
     return appData[currentCompany];
 }
 
+// =============================================
+// DYNAMIC PORTAL COMPANIES & MULTI-TENANCY
+// =============================================
+let portalCompanies = {
+    'burgeroov': { id: 'burgeroov', name: 'Burgeroov', logo: 'burgeroov.png', color: '#c5832b', createdAt: 1700000000000 },
+    'mvc': { id: 'mvc', name: 'MVC FRESH', logo: 'mvc.png', color: '#22c55e', createdAt: 1700000000001 },
+    'mvcfresh': { id: 'mvcfresh', name: 'MVC Fresh', logo: 'mvcfresh.png', color: '#10b981', createdAt: 1700000000002 }
+};
+window.portalCompanies = portalCompanies;
+
+function initPortalCompaniesListener() {
+    if (typeof db === 'undefined') return;
+    db.ref('portal_companies').on('value', snap => {
+        if (snap.exists()) {
+            const data = snap.val() || {};
+            portalCompanies = Object.assign({}, portalCompanies, data);
+        } else {
+            db.ref('portal_companies').set(portalCompanies).catch(err => {
+                console.warn("Could not seed portal_companies:", err);
+            });
+        }
+        window.portalCompanies = portalCompanies;
+        renderCompanySelectionHUD();
+        updateCurrentCompanyHeader();
+    });
+}
+window.initPortalCompaniesListener = initPortalCompaniesListener;
+
+function updateCurrentCompanyHeader() {
+    const c = (portalCompanies && portalCompanies[currentCompany]) || { id: currentCompany, name: currentCompany, logo: 'burgeroov.png', color: '#c5832b' };
+    const headerLogo = document.getElementById('header-logo');
+    if (headerLogo) {
+        headerLogo.src = c.logo || 'burgeroov.png';
+        headerLogo.style.display = 'block';
+    }
+    const headerTitle = document.getElementById('header-title');
+    if (headerTitle) {
+        headerTitle.textContent = (c.name || 'Company') + ' Operations Portal';
+    }
+    const settingsLogo = document.getElementById('company-settings-logo-img');
+    if (settingsLogo) settingsLogo.src = c.logo || 'burgeroov.png';
+    const settingsName = document.getElementById('company-settings-name-display');
+    if (settingsName) settingsName.textContent = c.name || currentCompany;
+    const settingsId = document.getElementById('company-settings-id-display');
+    if (settingsId) settingsId.textContent = currentCompany;
+
+    if (c.color) {
+        document.documentElement.style.setProperty('--primary', c.color);
+    }
+}
+window.updateCurrentCompanyHeader = updateCurrentCompanyHeader;
+
+function renderCompanySelectionHUD() {
+    const grid = document.getElementById('company-selection-grid');
+    if (!grid) return;
+
+    const companies = Object.values(portalCompanies || {});
+    const email = currentUser ? (currentUser.email || '').toLowerCase() : '';
+    const isKinan = email === 'kinan.rahal@hotmail.com';
+    const isAdmin = isKinan || (currentUser && currentUser.role === 'admin');
+
+    let html = companies.map(c => {
+        const canAccess = isKinan || !window.userActiveCompanies || window.userActiveCompanies.includes(c.id);
+        const cardStyle = canAccess ? '' : 'display: none;';
+        const color = c.color || '#c5832b';
+        const logoSrc = c.logo || 'burgeroov.png';
+
+        return `
+            <div class="company-card" style="${cardStyle}; border-color: ${color}44;" onclick="selectCompany('${c.id}')">
+                ${isAdmin ? `
+                    <button type="button" onclick="event.stopPropagation(); openEditCompanyModal('${c.id}')"
+                        class="company-card-edit-btn" title="Edit Company Details & Logo">
+                        ✏️
+                    </button>
+                ` : ''}
+                <div class="company-logo-wrap">
+                    <img src="${logoSrc}" alt="${escapeHtml(c.name)}" onerror="this.src='burgeroov.png'"
+                        style="max-width: 84px; max-height: 84px; object-fit: contain;">
+                </div>
+                <h3 style="color: #ffffff; font-size: 1.25rem; font-weight: 800; margin: 0; line-height: 1.2;">${escapeHtml(c.name)}</h3>
+                <span style="display: inline-block; margin-top: 14px; background: ${color}26; color: ${color}; font-size: 0.8rem; font-weight: 700; padding: 6px 16px; border-radius: 100px; border: 1px solid ${color}44;">
+                    Enter Portal
+                </span>
+            </div>
+        `;
+    }).join('');
+
+    if (isAdmin) {
+        html += `
+            <div class="company-card company-card-add" onclick="openAddCompanyModal()"
+                style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 220px; background: rgba(255,255,255,0.02); border: 2px dashed rgba(212,175,55,0.4); border-radius: 22px; cursor: pointer; transition: all 0.3s ease;">
+                <div style="width: 58px; height: 58px; border-radius: 50%; background: rgba(212,175,55,0.12); border: 1.5px solid rgba(212,175,55,0.4); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; color: #f5d77f; margin-bottom: 12px;">
+                    ➕
+                </div>
+                <h3 style="color: #f5d77f; font-size: 1.15rem; font-weight: 800; margin: 0;">Add New Company</h3>
+                <span style="color: #94a3b8; font-size: 0.78rem; margin-top: 6px;">Create isolated portal workspace</span>
+            </div>
+        `;
+    }
+
+    grid.innerHTML = html;
+}
+window.renderCompanySelectionHUD = renderCompanySelectionHUD;
+
+function openAddCompanyModal() {
+    const modal = document.getElementById('company-modal');
+    if (!modal) return;
+    document.getElementById('company-modal-title').textContent = 'Add New Company';
+    document.getElementById('company-modal-submit-btn').textContent = 'Create Company';
+    document.getElementById('company-modal-is-edit').value = '0';
+    document.getElementById('company-modal-id').value = '';
+    document.getElementById('company-modal-name').value = '';
+    document.getElementById('company-modal-slug').value = '';
+    document.getElementById('company-modal-slug').disabled = false;
+    document.getElementById('company-slug-hint').textContent = '(Used for data isolation)';
+    document.getElementById('company-modal-logo-url').value = '';
+    document.getElementById('company-modal-logo-preview').src = 'burgeroov.png';
+    document.getElementById('company-modal-color').value = '#c5832b';
+    modal.style.display = 'flex';
+}
+window.openAddCompanyModal = openAddCompanyModal;
+
+function openEditCompanyModal(cId) {
+    const modal = document.getElementById('company-modal');
+    if (!modal) return;
+    const c = (portalCompanies && portalCompanies[cId]) || { id: cId, name: cId, logo: 'burgeroov.png', color: '#c5832b' };
+
+    document.getElementById('company-modal-title').textContent = 'Edit Company: ' + (c.name || cId);
+    document.getElementById('company-modal-submit-btn').textContent = 'Save Changes';
+    document.getElementById('company-modal-is-edit').value = '1';
+    document.getElementById('company-modal-id').value = cId;
+    document.getElementById('company-modal-name').value = c.name || '';
+    document.getElementById('company-modal-slug').value = cId;
+    document.getElementById('company-modal-slug').disabled = true;
+    document.getElementById('company-slug-hint').textContent = '(Locked to preserve database key)';
+    document.getElementById('company-modal-logo-url').value = c.logo || '';
+    document.getElementById('company-modal-logo-preview').src = c.logo || 'burgeroov.png';
+    document.getElementById('company-modal-color').value = c.color || '#c5832b';
+    modal.style.display = 'flex';
+}
+window.openEditCompanyModal = openEditCompanyModal;
+
+function openCurrentCompanyEditModal() {
+    openEditCompanyModal(currentCompany || 'burgeroov');
+}
+window.openCurrentCompanyEditModal = openCurrentCompanyEditModal;
+
+function closeCompanyModal() {
+    const modal = document.getElementById('company-modal');
+    if (modal) modal.style.display = 'none';
+}
+window.closeCompanyModal = closeCompanyModal;
+
+function handleCompanyModalNameInput(val) {
+    const isEdit = document.getElementById('company-modal-is-edit').value === '1';
+    if (!isEdit) {
+        const slug = (val || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        document.getElementById('company-modal-slug').value = slug;
+    }
+}
+window.handleCompanyModalNameInput = handleCompanyModalNameInput;
+
+function setCompanyModalColor(hex) {
+    const input = document.getElementById('company-modal-color');
+    if (input) input.value = hex;
+}
+window.setCompanyModalColor = setCompanyModalColor;
+
+function handleCompanyLogoUpload(input) {
+    if (!input || !input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const maxDim = 400;
+            let width = img.width;
+            let height = img.height;
+            if (width > height) {
+                if (width > maxDim) {
+                    height = Math.round((height * maxDim) / width);
+                    width = maxDim;
+                }
+            } else {
+                if (height > maxDim) {
+                    width = Math.round((width * maxDim) / height);
+                    height = maxDim;
+                }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/png', 0.85);
+            document.getElementById('company-modal-logo-url').value = dataUrl;
+            document.getElementById('company-modal-logo-preview').src = dataUrl;
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+window.handleCompanyLogoUpload = handleCompanyLogoUpload;
+
+function saveCompanyModal() {
+    const isEdit = document.getElementById('company-modal-is-edit').value === '1';
+    const name = (document.getElementById('company-modal-name').value || '').trim();
+    let slug = (document.getElementById('company-modal-slug').value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    const logo = document.getElementById('company-modal-logo-url').value || document.getElementById('company-modal-logo-preview').src || 'burgeroov.png';
+    const color = document.getElementById('company-modal-color').value || '#c5832b';
+
+    if (!name) {
+        alert("Please enter a company name.");
+        return;
+    }
+
+    if (isEdit) {
+        slug = document.getElementById('company-modal-id').value;
+    }
+
+    if (!slug) {
+        alert("Please enter a valid company identifier (alphanumeric).");
+        return;
+    }
+
+    const companyData = {
+        id: slug,
+        name: name,
+        logo: logo,
+        color: color,
+        updatedAt: Date.now()
+    };
+
+    if (!isEdit) {
+        companyData.createdAt = Date.now();
+        companyData.createdBy = currentUser ? currentUser.email : 'admin';
+    }
+
+    db.ref(`portal_companies/${slug}`).update(companyData).then(() => {
+        if (!isEdit) {
+            const userEmail = currentUser ? currentUser.email : 'kinan.rahal@hotmail.com';
+            const sanitizedEmail = userEmail.replace(/\./g, ',');
+            const initialCompanyData = {
+                admins: { [sanitizedEmail]: true, 'kinan,rahal@hotmail,com': true },
+                branches: ['Main Branch'],
+                workers: [],
+                warehouse: [],
+                jobCatalog: [],
+                violationRules: [],
+                salesLogs: [],
+                costLogs: [],
+                depositLogs: [],
+                spendLogs: [],
+                spendOrders: [],
+                createdAt: Date.now()
+            };
+
+            db.ref(`companies/${slug}`).once('value').then(snap => {
+                if (!snap.exists()) {
+                    db.ref(`companies/${slug}`).set(initialCompanyData);
+                }
+            });
+
+            if (window.userActiveCompanies && !window.userActiveCompanies.includes(slug)) {
+                window.userActiveCompanies.push(slug);
+            }
+        }
+
+        portalCompanies[slug] = Object.assign({}, portalCompanies[slug] || {}, companyData);
+        closeCompanyModal();
+        renderCompanySelectionHUD();
+        updateCurrentCompanyHeader();
+
+        if (currentCompany === slug) {
+            updateCurrentCompanyHeader();
+        }
+    }).catch(err => {
+        console.error("Error saving company:", err);
+        alert("Failed to save company: " + err.message);
+    });
+}
+window.saveCompanyModal = saveCompanyModal;
+
 function showCompanySelectionHUD(event) {
     if (event) event.stopPropagation();
     const launchLoader = document.getElementById('launch-loader-overlay');
     if (launchLoader) launchLoader.style.display = 'none';
     if (typeof hideUnassignedOverlay === 'function') hideUnassignedOverlay();
 
-    const cardBurgeroov = document.querySelector('.burgeroov-card');
-    const cardMvc = document.querySelector('.mvc-card');
-    const cardMvcFresh = document.querySelector('.mvcfresh-card');
-
-    if (currentUser && currentUser.email === 'kinan.rahal@hotmail.com') {
-        if (cardBurgeroov) cardBurgeroov.style.display = 'block';
-        if (cardMvc) cardMvc.style.display = 'block';
-        if (cardMvcFresh) cardMvcFresh.style.display = 'block';
-    } else if (window.userActiveCompanies && Array.isArray(window.userActiveCompanies)) {
-        if (cardBurgeroov) cardBurgeroov.style.display = window.userActiveCompanies.includes('burgeroov') ? 'block' : 'none';
-        if (cardMvc) cardMvc.style.display = window.userActiveCompanies.includes('mvc') ? 'block' : 'none';
-        if (cardMvcFresh) cardMvcFresh.style.display = window.userActiveCompanies.includes('mvcfresh') ? 'block' : 'none';
-    }
+    renderCompanySelectionHUD();
 
     document.getElementById('company-selection-overlay').style.display = 'flex';
     document.getElementById('app-wrapper').style.display = 'none';
@@ -1095,18 +1368,31 @@ function selectCompany(companyId) {
         markLockedTabs();
     }
 
-    let logoSrc = 'burgeroov.png';
+    const c = (portalCompanies && portalCompanies[companyId]) || { id: companyId, name: companyId, logo: 'burgeroov.png', color: '#c5832b' };
+    let logoSrc = c.logo || 'burgeroov.png';
     if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession) {
         logoSrc = 'mvc.png';
-    } else if (companyId === 'mvc') logoSrc = 'mvc.png';
-    else if (companyId === 'mvcfresh') logoSrc = 'mvcfresh.png';
+    }
 
     const headerLogo = document.getElementById('header-logo');
-    if (headerLogo) headerLogo.src = logoSrc;
+    if (headerLogo) {
+        headerLogo.src = logoSrc;
+        headerLogo.style.display = 'block';
+    }
+    const headerTitle = document.getElementById('header-title');
+    if (headerTitle) {
+        headerTitle.textContent = (c.name || 'Company') + ' Operations Portal';
+    }
     const authLogo = document.getElementById('auth-logo');
     if (authLogo) authLogo.src = logoSrc;
     const loaderLogo = document.getElementById('launch-loader-logo');
     if (loaderLogo) loaderLogo.src = logoSrc;
+
+    if (c.color) {
+        document.documentElement.style.setProperty('--primary', c.color);
+    }
+
+    updateCurrentCompanyHeader();
 
     applyTranslations();
 
@@ -1219,19 +1505,15 @@ auth.onAuthStateChanged((user) => {
             document.getElementById('auth-btn').style.display = 'block';
             overlay.style.display = 'none';
 
-            // Show all cards in selection overlay for super admin
-            const cardBurgeroov = document.querySelector('.burgeroov-card');
-            const cardMvc = document.querySelector('.mvc-card');
-            const cardMvcFresh = document.querySelector('.mvcfresh-card');
-            if (cardBurgeroov) cardBurgeroov.style.display = 'block';
-            if (cardMvc) cardMvc.style.display = 'block';
-            if (cardMvcFresh) cardMvcFresh.style.display = 'block';
+            window.userActiveCompanies = Object.keys(portalCompanies || {});
+            window.isMultiCompany = window.userActiveCompanies.length > 1;
+            renderCompanySelectionHUD();
 
             const urlParams = new URLSearchParams(window.location.search);
             const queryCompany = urlParams.get('companyId');
             const queryTab = urlParams.get('tab');
 
-            if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc' || queryCompany === 'mvcfresh')) {
+            if (queryCompany && (portalCompanies[queryCompany] || queryCompany === 'burgeroov' || queryCompany === 'mvc' || queryCompany === 'mvcfresh')) {
                 selectCompany(queryCompany);
                 if (queryTab) {
                     setTimeout(() => {
@@ -1243,36 +1525,33 @@ auth.onAuthStateChanged((user) => {
                 }
             } else {
                 const savedCompany = localStorage.getItem('selected_company');
-                if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
+                if (savedCompany && (portalCompanies[savedCompany] || savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
                     selectCompany(savedCompany);
                 } else {
                     showCompanySelectionHUD();
                 }
             }
         } else {
-            // Check databases for worker membership
+            // Dynamically check databases for worker membership across all portal companies
             const sanitizedEmail = email.replace(/\./g, ',');
+            const compKeys = Object.keys(portalCompanies || { burgeroov: 1, mvc: 1, mvcfresh: 1 });
+            const adminPromises = compKeys.map(cId => db.ref(`companies/${cId}/admins`).once('value').catch(() => null));
+            const workerPromises = compKeys.map(cId => db.ref(`companies/${cId}/workers`).once('value').catch(() => null));
+
             Promise.all([
-                db.ref('companies/burgeroov/admins').once('value').catch(() => null),
-                db.ref('companies/burgeroov/workers').once('value').catch(() => null),
-                db.ref('companies/mvc/admins').once('value').catch(() => null),
-                db.ref('companies/mvc/workers').once('value').catch(() => null),
-                db.ref('companies/mvcfresh/admins').once('value').catch(() => null),
-                db.ref('companies/mvcfresh/workers').once('value').catch(() => null),
+                ...adminPromises,
+                ...workerPromises,
                 db.ref(`customerCodes/workerPasswords/${sanitizedEmail}`).once('value').catch(() => null),
                 db.ref(`customerCodes/workerAccess/${sanitizedEmail}`).once('value').catch(() => null)
-            ]).then(([bgAdmins, bgWorkers, mvcAdmins, mvcWorkers, freshAdmins, freshWorkers, pwdSnap, accessSnap]) => {
+            ]).then((results) => {
                 document.getElementById('auth-loader').style.display = 'none';
                 document.getElementById('auth-btn').style.display = 'block';
 
-                const burgeroovAdmins = parseAdminsSnap(bgAdmins);
-                const burgeroovWorkers = parseWorkersSnap(bgWorkers);
-
-                const mvcAdminsList = parseAdminsSnap(mvcAdmins);
-                const mvcWorkersList = parseWorkersSnap(mvcWorkers);
-
-                const mvcfreshAdminsList = parseAdminsSnap(freshAdmins);
-                const mvcfreshWorkersList = parseWorkersSnap(freshWorkers);
+                const totalComps = compKeys.length;
+                const adminSnaps = results.slice(0, totalComps);
+                const workerSnaps = results.slice(totalComps, totalComps * 2);
+                const pwdSnap = results[totalComps * 2];
+                const accessSnap = results[totalComps * 2 + 1];
 
                 let targetWorkerId = null;
                 if (pwdSnap && pwdSnap.exists() && pwdSnap.val()) {
@@ -1286,47 +1565,35 @@ auth.onAuthStateChanged((user) => {
                     targetWorkerId = localStorage.getItem('mvc_worker_id_' + sanitizedEmail);
                 }
 
-                let inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
-                    (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(burgeroovWorkers, email, targetWorkerId) : burgeroovWorkers.some(w => w && w.email && w.email.toLowerCase() === email));
-
-                let inMvc = mvcAdminsList[sanitizedEmail] === true ||
-                    (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(mvcWorkersList, email, targetWorkerId) : mvcWorkersList.some(w => w && w.email && w.email.toLowerCase() === email));
-
-                let inMvcFresh = mvcfreshAdminsList[sanitizedEmail] === true ||
-                    (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(mvcfreshWorkersList, email, targetWorkerId) : mvcfreshWorkersList.some(w => w && w.email && w.email.toLowerCase() === email));
-
-                if (accessSnap && accessSnap.exists() && accessSnap.val()) {
-                    const acc = accessSnap.val();
-                    if (acc.burgeroov === true) inBurgeroov = true;
-                    if (acc.mvc === true) inMvc = true;
-                    if (acc.mvcfresh === true) inMvcFresh = true;
-                }
-
-                if (pwdSnap && pwdSnap.exists() && pwdSnap.val() && pwdSnap.val().company) {
-                    const assignedComp = pwdSnap.val().company;
-                    if (assignedComp === 'burgeroov') inBurgeroov = true;
-                    if (assignedComp === 'mvc') inMvc = true;
-                    if (assignedComp === 'mvcfresh') inMvcFresh = true;
-                }
-
-                // Update selector cards display based on assigned status
-                const cardBurgeroov = document.querySelector('.burgeroov-card');
-                const cardMvc = document.querySelector('.mvc-card');
-                const cardMvcFresh = document.querySelector('.mvcfresh-card');
-
-                if (cardBurgeroov) cardBurgeroov.style.display = inBurgeroov ? 'block' : 'none';
-                if (cardMvc) cardMvc.style.display = inMvc ? 'block' : 'none';
-                if (cardMvcFresh) cardMvcFresh.style.display = inMvcFresh ? 'block' : 'none';
-
-                overlay.style.display = 'none';
-
                 const activeCompanies = [];
-                if (inBurgeroov) activeCompanies.push('burgeroov');
-                if (inMvc) activeCompanies.push('mvc');
-                if (inMvcFresh) activeCompanies.push('mvcfresh');
+
+                compKeys.forEach((cId, i) => {
+                    const adminsList = parseAdminsSnap(adminSnaps[i]);
+                    const workersList = parseWorkersSnap(workerSnaps[i]);
+
+                    let inComp = adminsList[sanitizedEmail] === true ||
+                        (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(workersList, email, targetWorkerId) : workersList.some(w => w && w.email && w.email.toLowerCase() === email));
+
+                    if (accessSnap && accessSnap.exists() && accessSnap.val() && accessSnap.val()[cId] === true) inComp = true;
+                    if (pwdSnap && pwdSnap.exists() && pwdSnap.val() && pwdSnap.val().company === cId) inComp = true;
+
+                    if (inComp) {
+                        activeCompanies.push(cId);
+                        const matchedWorker = typeof findMatchingWorker === 'function' 
+                            ? findMatchingWorker(workersList, email, targetWorkerId)
+                            : workersList.find(w => w && w.email && w.email.toLowerCase() === email);
+                        if (matchedWorker && matchedWorker.appPassword) {
+                            user.updatePassword(matchedWorker.appPassword)
+                                .then(() => console.log(`[Auth] Firebase Auth password synchronized with assigned password for ${email}`))
+                                .catch(e => console.warn('[Auth] Password sync notice:', e.message));
+                        }
+                    }
+                });
 
                 window.userActiveCompanies = activeCompanies;
                 window.isMultiCompany = activeCompanies.length > 1;
+                renderCompanySelectionHUD();
+                overlay.style.display = 'none';
 
                 const locationSearch = (typeof window !== 'undefined' && window.location && window.location.search) ? window.location.search : '';
                 const urlParams = new URLSearchParams(locationSearch);
@@ -1334,12 +1601,8 @@ auth.onAuthStateChanged((user) => {
                 const queryTab = urlParams.get('tab');
 
                 let chosenCompany = null;
-                if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc' || queryCompany === 'mvcfresh')) {
-                    if ((queryCompany === 'mvc' && inMvc) ||
-                        (queryCompany === 'burgeroov' && inBurgeroov) ||
-                        (queryCompany === 'mvcfresh' && inMvcFresh)) {
-                        chosenCompany = queryCompany;
-                    }
+                if (queryCompany && activeCompanies.includes(queryCompany)) {
+                    chosenCompany = queryCompany;
                 }
 
                 if (chosenCompany) {
@@ -1373,7 +1636,7 @@ auth.onAuthStateChanged((user) => {
 
                 overlay.style.display = 'none';
                 const savedCompany = localStorage.getItem('selected_company');
-                if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
+                if (savedCompany && (portalCompanies[savedCompany] || savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
                     selectCompany(savedCompany);
                 } else {
                     showCompanySelectionHUD();
@@ -1463,24 +1726,21 @@ function checkUnassignedUserAccess(isManualTrigger = false) {
     const email = currentUser.email.toLowerCase();
     const sanitizedEmail = email.replace(/\./g, ',');
 
+    const compKeys = Object.keys(portalCompanies || { burgeroov: 1, mvc: 1, mvcfresh: 1 });
+    const adminPromises = compKeys.map(cId => db.ref(`companies/${cId}/admins`).once('value').catch(() => null));
+    const workerPromises = compKeys.map(cId => db.ref(`companies/${cId}/workers`).once('value').catch(() => null));
+
     Promise.all([
-        db.ref('companies/burgeroov/admins').once('value').catch(() => null),
-        db.ref('companies/burgeroov/workers').once('value').catch(() => null),
-        db.ref('companies/mvc/admins').once('value').catch(() => null),
-        db.ref('companies/mvc/workers').once('value').catch(() => null),
-        db.ref('companies/mvcfresh/admins').once('value').catch(() => null),
-        db.ref('companies/mvcfresh/workers').once('value').catch(() => null),
+        ...adminPromises,
+        ...workerPromises,
         db.ref(`customerCodes/workerPasswords/${sanitizedEmail}`).once('value').catch(() => null),
         db.ref(`customerCodes/workerAccess/${sanitizedEmail}`).once('value').catch(() => null)
-    ]).then(([bgAdmins, bgWorkers, mvcAdmins, mvcWorkers, freshAdmins, freshWorkers, pwdSnap, accessSnap]) => {
-        const burgeroovAdmins = parseAdminsSnap(bgAdmins);
-        const burgeroovWorkers = parseWorkersSnap(bgWorkers);
-
-        const mvcAdminsList = parseAdminsSnap(mvcAdmins);
-        const mvcWorkersList = parseWorkersSnap(mvcWorkers);
-
-        const mvcfreshAdminsList = parseAdminsSnap(freshAdmins);
-        const mvcfreshWorkersList = parseWorkersSnap(freshWorkers);
+    ]).then((results) => {
+        const totalComps = compKeys.length;
+        const adminSnaps = results.slice(0, totalComps);
+        const workerSnaps = results.slice(totalComps, totalComps * 2);
+        const pwdSnap = results[totalComps * 2];
+        const accessSnap = results[totalComps * 2 + 1];
 
         let targetWorkerId = null;
         if (pwdSnap && pwdSnap.exists() && pwdSnap.val()) {
@@ -1494,48 +1754,27 @@ function checkUnassignedUserAccess(isManualTrigger = false) {
             targetWorkerId = localStorage.getItem('mvc_worker_id_' + sanitizedEmail);
         }
 
-        let inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
-            (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(burgeroovWorkers, email, targetWorkerId) : burgeroovWorkers.some(w => w && w.email && w.email.toLowerCase() === email));
-
-        let inMvc = mvcAdminsList[sanitizedEmail] === true ||
-            (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(mvcWorkersList, email, targetWorkerId) : mvcWorkersList.some(w => w && w.email && w.email.toLowerCase() === email));
-
-        let inMvcFresh = mvcfreshAdminsList[sanitizedEmail] === true ||
-            (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(mvcfreshWorkersList, email, targetWorkerId) : mvcfreshWorkersList.some(w => w && w.email && w.email.toLowerCase() === email));
-
-        if (accessSnap && accessSnap.exists() && accessSnap.val()) {
-            const acc = accessSnap.val();
-            if (acc.burgeroov === true) inBurgeroov = true;
-            if (acc.mvc === true) inMvc = true;
-            if (acc.mvcfresh === true) inMvcFresh = true;
-        }
-
-        if (pwdSnap && pwdSnap.exists() && pwdSnap.val() && pwdSnap.val().company) {
-            const assignedComp = pwdSnap.val().company;
-            if (assignedComp === 'burgeroov') inBurgeroov = true;
-            if (assignedComp === 'mvc') inMvc = true;
-            if (assignedComp === 'mvcfresh') inMvcFresh = true;
-        }
-
         const activeCompanies = [];
-        if (inBurgeroov) activeCompanies.push('burgeroov');
-        if (inMvc) activeCompanies.push('mvc');
-        if (inMvcFresh) activeCompanies.push('mvcfresh');
+
+        compKeys.forEach((cId, i) => {
+            const adminsList = parseAdminsSnap(adminSnaps[i]);
+            const workersList = parseWorkersSnap(workerSnaps[i]);
+
+            let inComp = adminsList[sanitizedEmail] === true ||
+                (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(workersList, email, targetWorkerId) : workersList.some(w => w && w.email && w.email.toLowerCase() === email));
+
+            if (accessSnap && accessSnap.exists() && accessSnap.val() && accessSnap.val()[cId] === true) inComp = true;
+            if (pwdSnap && pwdSnap.exists() && pwdSnap.val() && pwdSnap.val().company === cId) inComp = true;
+
+            if (inComp) activeCompanies.push(cId);
+        });
 
         window.userActiveCompanies = activeCompanies;
 
         if (activeCompanies.length > 0) {
             hideUnassignedOverlay();
-
-            const cardBurgeroov = document.querySelector('.burgeroov-card');
-            const cardMvc = document.querySelector('.mvc-card');
-            const cardMvcFresh = document.querySelector('.mvcfresh-card');
-
-            if (cardBurgeroov) cardBurgeroov.style.display = inBurgeroov ? 'block' : 'none';
-            if (cardMvc) cardMvc.style.display = inMvc ? 'block' : 'none';
-            if (cardMvcFresh) cardMvcFresh.style.display = inMvcFresh ? 'block' : 'none';
-
             window.isMultiCompany = activeCompanies.length > 1;
+            renderCompanySelectionHUD();
 
             if (activeCompanies.length > 1) {
                 showCompanySelectionHUD();
@@ -1604,6 +1843,42 @@ function handleAuthSubmit() {
     if (activeAuthMode === 'login') {
         auth.signInWithEmailAndPassword(email, password)
             .catch(error => {
+                if (error.code === 'auth/wrong-password') {
+                    // Check if worker typed the new assigned password and we have a previousPassword stored in RTDB
+                    const sanitizedEmail = email.replace(/\./g, ',');
+                    const compKeys = Object.keys(portalCompanies || { burgeroov: 1, mvc: 1, mvcfresh: 1 });
+                    const pwdPromises = compKeys.map(cId => db.ref(`companies/${cId}/workerPasswords/${sanitizedEmail}`).once('value').catch(() => null));
+
+                    Promise.all(pwdPromises).then(snaps => {
+                        let prevPwd = null;
+                        snaps.forEach(s => {
+                            if (s && s.exists()) {
+                                const val = s.val();
+                                if (val && val.password === password && val.previousPassword) {
+                                    prevPwd = val.previousPassword;
+                                }
+                            }
+                        });
+
+                        if (prevPwd) {
+                            return auth.signInWithEmailAndPassword(email, prevPwd)
+                                .then(cred => {
+                                    if (cred && cred.user) {
+                                        return cred.user.updatePassword(password);
+                                    }
+                                });
+                        }
+                        throw error;
+                    }).catch(fallbackErr => {
+                        btn.style.display = 'block';
+                        loader.style.display = 'none';
+                        errorMsg.style.color = "var(--danger)";
+                        errorMsg.textContent = fallbackErr.message || error.message;
+                        errorMsg.style.display = 'block';
+                    });
+                    return;
+                }
+
                 btn.style.display = 'block';
                 loader.style.display = 'none';
                 errorMsg.style.color = "var(--danger)";
@@ -2066,7 +2341,7 @@ function initGlobalMarketListeners() {
     if (window._hasGlobalMarketListeners) return;
     window._hasGlobalMarketListeners = true;
 
-    const companyList = ['mvc', 'mvcfresh', 'burgeroov'];
+    const companyList = Object.keys(portalCompanies || { mvc: 1, mvcfresh: 1, burgeroov: 1 });
     companyList.forEach(cKey => {
         db.ref(`companies/${cKey}/marketOrders`).on('value', snapshot => {
             if (!appData[cKey]) appData[cKey] = {};
@@ -2340,9 +2615,10 @@ function saveWorkerFCMToken(token) {
     const email = currentUser.email.toLowerCase();
 
     // Save token to all companies if worker is registered in them
-    saveTokenForCompany('burgeroov', email, token);
-    saveTokenForCompany('mvc', email, token);
-    saveTokenForCompany('mvcfresh', email, token);
+    const compKeys = Object.keys(portalCompanies || { burgeroov: 1, mvc: 1, mvcfresh: 1 });
+    compKeys.forEach(cId => {
+        saveTokenForCompany(cId, email, token);
+    });
 }
 
 function saveTokenForCompany(companyId, email, token) {
@@ -2436,17 +2712,16 @@ function applyTranslations() {
     };
 
     // Dynamic translations based on selected company
+    const activeCompObj = (portalCompanies && portalCompanies[currentCompany]) || null;
+    const compName = activeCompObj ? activeCompObj.name : (currentCompany === 'mvc' || currentCompany === 'mvcfresh' ? 'MVC Fresh' : 'Burgeroov');
+
     if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession) {
         langDict['app-title'] = currentAppLang === 'ar' ? 'سوق عملاء MVC' : (currentAppLang === 'bn' ? 'এমভিসি গ্রাহক বাজার' : 'MVC Customer Market');
         document.title = 'MVC Customer Market';
-    } else if (currentCompany === 'mvc' || currentCompany === 'mvcfresh') {
-        langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات إم في سي فريش' : (currentAppLang === 'bn' ? 'এমভিসি ফ্রেশ অপারেশন পোর্টাল' : 'MVC Fresh Operations Portal');
-        langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة تحكم إم في سي فريش' : (currentAppLang === 'bn' ? 'এমভিসি ফ্রেশ ড্যাশবোর্ডে লগইন' : 'Login to MVC Fresh Dashboard');
-        document.title = 'MVC Fresh Management Portal';
     } else {
-        langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات برجروف' : (currentAppLang === 'bn' ? 'বারগারুভ অপারেশন পোর্টাল' : 'Burgeroov Operations Portal');
-        langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة التحكم' : (currentAppLang === 'bn' ? 'ড্যাশবোর্ডে লগইন করুন' : 'Login to Dashboard');
-        document.title = 'Burgeroov Management Portal';
+        langDict['app-title'] = currentAppLang === 'ar' ? `بوابة عمليات ${compName}` : (currentAppLang === 'bn' ? `${compName} অপারেশন পোর্টাল` : `${compName} Operations Portal`);
+        langDict['auth-title-login'] = currentAppLang === 'ar' ? `تسجيل الدخول للوحة تحكم ${compName}` : (currentAppLang === 'bn' ? `${compName} ড্যাশবোর্ডে লগইন` : `Login to ${compName} Dashboard`);
+        document.title = `${compName} Management Portal`;
     }
 
     document.querySelectorAll("[data-i18n]").forEach(el => {
@@ -15228,7 +15503,10 @@ function renderOpsWorkersTable() {
                     <td><span class="badge" style="background: var(--primary); margin:0;">${avg}</span></td>`;
         if (isAdmin) {
             html += `
-                    <td class="admin-only">
+                    <td class="admin-only" style="white-space: nowrap;">
+                        <button type="button" class="btn-outline" style="padding:6px 10px; font-size:0.8rem; margin-inline-end:6px; color:#38bdf8; border-color:rgba(56,189,248,0.4); display:inline-flex; align-items:center; gap:4px;" onclick="openWorkerPasswordModal('${worker.id}')" title="${isAr ? 'عرض وتعديل كلمة المرور وبيانات الدخول' : 'View & manage worker login password'}">
+                            🔑 ${isAr ? 'البيانات' : 'Credentials'}
+                        </button>
                         <button class="btn-outline-danger" style="padding:6px 12px;font-size:0.8rem;" onclick="deleteWorker('${worker.id}')">${t('btn-delete-worker')}</button>
                     </td>`;
         }
@@ -15369,12 +15647,293 @@ function renderOpsDetails() {
 
 // FINANCIAL TAB RENDERING
 
+// --- WORKER PASSWORD & CREDENTIALS MANAGEMENT ---
+function openWorkerPasswordModal(workerId) {
+    const worker = (getCompanyData().workers || []).find(w => w && String(w.id) === String(workerId));
+    if (!worker) {
+        alert("Worker record not found.");
+        return;
+    }
+
+    const modal = document.getElementById('worker-credentials-modal');
+    if (!modal) return;
+
+    document.getElementById('w-cred-id').value = worker.id;
+    document.getElementById('w-cred-name').textContent = worker.name || 'Worker';
+    document.getElementById('w-cred-role').textContent = worker.role || 'Staff';
+    document.getElementById('w-cred-email').textContent = worker.email || 'No email registered';
+
+    // Check stored password in worker object or local mapping
+    let storedPwd = worker.appPassword || worker.password || '';
+    const currPwdInput = document.getElementById('w-cred-current-pwd');
+    if (currPwdInput) {
+        if (storedPwd) {
+            currPwdInput.value = storedPwd;
+            currPwdInput.type = 'password';
+        } else {
+            currPwdInput.value = currentAppLang === 'ar' ? 'لم تُعيّن بعد (أدخل كلمة جديدة بالأسفل)' : 'Not set yet (enter new password below)';
+            currPwdInput.type = 'text';
+        }
+    }
+
+    const email = (worker.email || '').trim().toLowerCase();
+    const sanitizedEmail = email.replace(/\./g, ',');
+
+    if (!storedPwd && email) {
+        Promise.all([
+            db.ref(`companies/${currentCompany}/workerPasswords/${sanitizedEmail}`).once('value').catch(() => null),
+            db.ref(`customerCodes/workerPasswords/${sanitizedEmail}`).once('value').catch(() => null)
+        ]).then(([compSnap, custSnap]) => {
+            let foundPwd = '';
+            if (compSnap && compSnap.exists() && compSnap.val()) {
+                const val = compSnap.val();
+                foundPwd = val.password || (typeof val === 'string' ? val : '');
+            }
+            if (!foundPwd && custSnap && custSnap.exists() && custSnap.val()) {
+                const val = custSnap.val();
+                foundPwd = val.password || (typeof val === 'string' ? val : '');
+            }
+
+            if (foundPwd && document.getElementById('w-cred-id').value === worker.id) {
+                worker.appPassword = foundPwd;
+                if (currPwdInput) {
+                    currPwdInput.value = foundPwd;
+                    currPwdInput.type = 'password';
+                }
+            }
+        });
+    }
+
+    const newPwdInput = document.getElementById('w-cred-new-pwd');
+    if (newPwdInput) {
+        newPwdInput.value = '';
+        newPwdInput.type = 'password';
+    }
+
+    modal.style.display = 'flex';
+}
+window.openWorkerPasswordModal = openWorkerPasswordModal;
+
+function closeWorkerPasswordModal() {
+    const modal = document.getElementById('worker-credentials-modal');
+    if (modal) modal.style.display = 'none';
+}
+window.closeWorkerPasswordModal = closeWorkerPasswordModal;
+
+function togglePasswordVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    if (input.type === 'password') {
+        input.type = 'text';
+        if (btn) btn.textContent = '🔒';
+    } else {
+        input.type = 'password';
+        if (btn) btn.textContent = '👁️';
+    }
+}
+window.togglePasswordVisibility = togglePasswordVisibility;
+
+function generateRandomPassword() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    let rand = '';
+    for (let i = 0; i < 6; i++) {
+        rand += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    const pwd = 'Roov#' + rand;
+    const input = document.getElementById('w-cred-new-pwd');
+    if (input) {
+        input.value = pwd;
+        input.type = 'text';
+    }
+}
+window.generateRandomPassword = generateRandomPassword;
+
+function saveWorkerPasswordModal() {
+    const workerId = document.getElementById('w-cred-id').value;
+    const newPwd = (document.getElementById('w-cred-new-pwd').value || '').trim();
+    const isAr = currentAppLang === 'ar';
+
+    if (!newPwd) {
+        alert(isAr ? 'الرجاء إدخال كلمة المرور الجديدة.' : 'Please enter a new password.');
+        return;
+    }
+
+    if (newPwd.length < 6) {
+        alert(isAr ? 'يجب ألا تقل كلمة المرور عن 6 خانات.' : 'Password must be at least 6 characters long.');
+        return;
+    }
+
+    const workers = getCompanyData().workers || [];
+    const workerIndex = workers.findIndex(w => w && String(w.id) === String(workerId));
+    if (workerIndex === -1) {
+        alert(isAr ? 'تعذر العثور على سجل الموظف.' : 'Worker record not found.');
+        return;
+    }
+
+    const worker = workers[workerIndex];
+    const email = (worker.email || '').trim().toLowerCase();
+    if (!email) {
+        alert(isAr ? 'الموظف لا يملك بريد إلكتروني مسجل.' : 'Worker does not have a registered email address.');
+        return;
+    }
+
+    const btn = document.getElementById('btn-save-worker-pwd');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = isAr ? '⏳ جاري الحفظ والتحديث...' : '⏳ Updating Password...';
+    }
+
+    // 1. Update in Firebase RTDB worker record
+    worker.appPassword = newPwd;
+    const sanitizedEmail = email.replace(/\./g, ',');
+
+    const serverUrlInput = document.getElementById('wa-server-url');
+    const config = typeof getCompanyData === 'function' ? (getCompanyData().messagingConfig || {}) : {};
+    let baseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || config.serverUrl || 'https://burgeroov-notify.onrender.com';
+    baseUrl = baseUrl.replace(/\/+$/, '');
+
+    // 2. Dispatch to backend endpoint to update Firebase Authentication
+    fetch(`${baseUrl}/worker/update-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, newPassword: newPwd })
+    })
+    .then(res => res.json().catch(() => ({ success: false, error: 'Non-JSON server response' })))
+    .catch(err => ({ success: false, error: err.message }))
+    .then(result => {
+        // 3. Save to RTDB regardless of server status
+        const oldPwd = worker.appPassword || worker.password || '';
+        const updates = {};
+        updates[`companies/${currentCompany}/workers/${workerIndex}/appPassword`] = newPwd;
+        if (oldPwd && oldPwd !== newPwd) {
+            worker.previousPassword = oldPwd;
+            updates[`companies/${currentCompany}/workers/${workerIndex}/previousPassword`] = oldPwd;
+        }
+        updates[`companies/${currentCompany}/workerPasswords/${sanitizedEmail}`] = {
+            workerId: worker.id,
+            password: newPwd,
+            previousPassword: (oldPwd && oldPwd !== newPwd) ? oldPwd : null,
+            updatedAt: Date.now()
+        };
+
+        return db.ref().update(updates).then(() => {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = isAr ? '💾 تحديث كلمة المرور' : '💾 Update Password';
+            }
+
+            const currInput = document.getElementById('w-cred-current-pwd');
+            if (currInput) currInput.value = newPwd;
+
+            let successMsg = isAr
+                ? `✅ تم تحديث كلمة المرور للموظف (${worker.name}) بنجاح!`
+                : `✅ Password updated successfully for (${worker.name})!`;
+
+            if (result && result.success) {
+                successMsg += isAr ? '\n(تم التحديث مباشرة في نظام تسجيل الدخول Firebase Auth)' : '\n(Directly updated in Firebase Auth)';
+            } else {
+                successMsg += isAr ? '\n(تم حفظ كلمة المرور في السجل. يمكنك مشاركتها عبر واتساب)' : '\n(Saved in database records. You can share it via WhatsApp)';
+            }
+
+            alert(successMsg);
+        });
+    })
+    .catch(err => {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = isAr ? '💾 تحديث كلمة المرور' : '💾 Update Password';
+        }
+        console.error('Error saving worker password:', err);
+        alert((isAr ? 'خطأ في حفظ كلمة المرور: ' : 'Error saving password: ') + err.message);
+    });
+}
+window.saveWorkerPasswordModal = saveWorkerPasswordModal;
+
+function sendWorkerCredentialsWhatsApp() {
+    const workerId = document.getElementById('w-cred-id').value;
+    const worker = (getCompanyData().workers || []).find(w => w && String(w.id) === String(workerId));
+    if (!worker) return;
+
+    const isAr = currentAppLang === 'ar';
+    const pwd = (document.getElementById('w-cred-new-pwd').value || '').trim() ||
+                worker.appPassword || worker.password || '';
+
+    const phone = worker.phone || '';
+    const email = worker.email || '';
+
+    const compObj = (typeof portalCompanies !== 'undefined' && portalCompanies[currentCompany]) || null;
+    const compName = compObj ? compObj.name : 'Operations Portal';
+
+    let msg = isAr
+        ? `🔐 *بيانات الدخول إلى منصة العمل - ${compName}*\n\n` +
+          `👤 الموظف: *${worker.name}*\n` +
+          `📧 البريد: *${email}*\n` +
+          `🔑 كلمة المرور: *${pwd || '(حسب طلبك)'}*\n\n` +
+          `📱 رابط تسجيل الدخول:\n${window.location.origin}${window.location.pathname}`
+        : `🔐 *Login Credentials - ${compName}*\n\n` +
+          `👤 Worker: *${worker.name}*\n` +
+          `📧 Email: *${email}*\n` +
+          `🔑 Password: *${pwd || '(as configured)'}*\n\n` +
+          `📱 Portal Link:\n${window.location.origin}${window.location.pathname}`;
+
+    if (phone && typeof sendWhatsAppDirect === 'function') {
+        sendWhatsAppDirect(phone, msg).then(res => {
+            if (res && res.success) {
+                alert(isAr ? `✅ تم إرسال بيانات الدخول عبر واتساب إلى ${phone}!` : `✅ Credentials sent via WhatsApp to ${phone}!`);
+            } else {
+                const cleanPhone = String(phone).replace(/[^0-9]/g, '');
+                window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`, '_blank');
+            }
+        });
+    } else {
+        const cleanPhone = phone ? String(phone).replace(/[^0-9]/g, '') : '';
+        const waUrl = cleanPhone 
+            ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`
+            : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+        window.open(waUrl, '_blank');
+    }
+}
+window.sendWorkerCredentialsWhatsApp = sendWorkerCredentialsWhatsApp;
+
+function sendWorkerPasswordResetEmail() {
+    const workerId = document.getElementById('w-cred-id').value;
+    const worker = (getCompanyData().workers || []).find(w => w && String(w.id) === String(workerId));
+    if (!worker || !worker.email) {
+        alert("Worker does not have a registered email.");
+        return;
+    }
+
+    const isAr = currentAppLang === 'ar';
+    if (!confirm(isAr ? `هل تريد إرسال رابط إعادة تعيين كلمة المرور إلى (${worker.email})؟` : `Send official password reset email to (${worker.email})?`)) {
+        return;
+    }
+
+    auth.sendPasswordResetEmail(worker.email)
+        .then(() => {
+            alert(isAr 
+                ? `✅ تم إرسال رابط إعادة تعيين كلمة المرور بنجاح إلى (${worker.email})!` 
+                : `✅ Password reset email sent successfully to (${worker.email})!`);
+        })
+        .catch(err => {
+            console.error('Password reset email error:', err);
+            alert((isAr ? 'تعذر إرسال البريد: ' : 'Failed to send email: ') + err.message);
+        });
+}
+window.sendWorkerPasswordResetEmail = sendWorkerPasswordResetEmail;
+
 // --- AUTOMATIC IN-SCOPE WINDOW EXPORTS ---
 if (typeof renderWorkerViolationPanel === 'function') window.renderWorkerViolationPanel = renderWorkerViolationPanel;
 if (typeof renderBranches === 'function') window.renderBranches = renderBranches;
 if (typeof populateWorkerDropdowns === 'function') window.populateWorkerDropdowns = populateWorkerDropdowns;
 if (typeof renderOpsWorkersTable === 'function') window.renderOpsWorkersTable = renderOpsWorkersTable;
 if (typeof renderOpsDetails === 'function') window.renderOpsDetails = renderOpsDetails;
+if (typeof openWorkerPasswordModal === 'function') window.openWorkerPasswordModal = openWorkerPasswordModal;
+if (typeof closeWorkerPasswordModal === 'function') window.closeWorkerPasswordModal = closeWorkerPasswordModal;
+if (typeof togglePasswordVisibility === 'function') window.togglePasswordVisibility = togglePasswordVisibility;
+if (typeof generateRandomPassword === 'function') window.generateRandomPassword = generateRandomPassword;
+if (typeof saveWorkerPasswordModal === 'function') window.saveWorkerPasswordModal = saveWorkerPasswordModal;
+if (typeof sendWorkerCredentialsWhatsApp === 'function') window.sendWorkerCredentialsWhatsApp = sendWorkerCredentialsWhatsApp;
+if (typeof sendWorkerPasswordResetEmail === 'function') window.sendWorkerPasswordResetEmail = sendWorkerPasswordResetEmail;
 
 
 /**
@@ -24746,7 +25305,7 @@ function renderPrepareSection() {
     }
 
     // Collect market orders across ALL loaded companies
-    const companyList = ['mvc', 'mvcfresh', 'burgeroov'];
+    const companyList = Object.keys(window.portalCompanies || { mvc: 1, mvcfresh: 1, burgeroov: 1 });
     let allOrders = [];
 
     companyList.forEach(cKey => {
@@ -36979,23 +37538,25 @@ function renderVicardRestaurants() {
         let unitsListHtml = '';
         if (units.length > 0) {
             unitsListHtml = units.map((u, idx) => `
-                <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 10px; padding: 8px 10px; margin-top: 6px;">
-                    <div style="width: 44px; height: 44px; border-radius: 8px; overflow: hidden; background: #000; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.1);">
-                        ${u.image ? `<img src="${u.image}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.parentElement.innerHTML='🍲'">` : '🍲'}
-                    </div>
-                    <div style="flex: 1; min-width: 0;">
-                        <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                            ${escapeHtml(u.name)}
+                <div class="vicard-unit-item">
+                    <div class="vicard-unit-top">
+                        <div class="vicard-unit-media">
+                            ${u.image ? `<img src="${u.image}" alt="${escapeHtml(u.name)}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.parentElement.innerHTML='🍲'">` : '🍲'}
                         </div>
-                        <div style="font-size: 0.76rem; display: flex; align-items: center; gap: 6px; margin-top: 2px;">
-                            ${u.originalPrice ? `<span style="text-decoration: line-through; color: var(--text-muted);">SAR ${u.originalPrice}</span>` : ''}
-                            <span style="color: #2ed573; font-weight: 800;">SAR ${u.offerPrice || 0}</span>
-                            ${u.discount ? `<span style="background: rgba(212,175,55,0.15); color: #f5d77f; padding: 1px 6px; border-radius: 6px; font-size: 0.7rem; font-weight: 700;">${escapeHtml(u.discount)}</span>` : ''}
+                        <div class="vicard-unit-content">
+                            <div class="vicard-unit-name">${escapeHtml(u.name)}</div>
+                            <div class="vicard-unit-price-row">
+                                ${u.originalPrice ? `<span style="text-decoration: line-through; color: var(--text-muted); font-size: 0.72rem;">SAR ${u.originalPrice}</span>` : ''}
+                                <span style="color: #2ed573; font-weight: 800;">SAR ${u.offerPrice || 0}</span>
+                                ${u.discount ? `<span style="background: rgba(212,175,55,0.15); color: #f5d77f; padding: 1px 6px; border-radius: 6px; font-size: 0.68rem; font-weight: 700; border: 1px solid rgba(212,175,55,0.3);">${escapeHtml(u.discount)}</span>` : ''}
+                            </div>
                         </div>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 4px;">
-                        <button type="button" onclick="openEditUnitModal('${r.id}', ${idx})" style="background: rgba(212,175,55,0.12); border: 1px solid rgba(212,175,55,0.3); border-radius: 6px; color: #f5d77f; cursor: pointer; font-size: 0.76rem; padding: 3px 8px; font-weight: 700;" title="Edit Unit Details & Price">✏️ Edit</button>
-                        <button type="button" onclick="deleteVicardUnit('${r.id}', ${idx})" style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.9rem; padding: 4px;" title="Delete Unit">✖</button>
+                    <div class="vicard-unit-bottom">
+                        <div class="vicard-unit-controls">
+                            <button type="button" onclick="openEditUnitModal('${r.id}', ${idx})" class="vicard-unit-edit-btn" title="Edit Unit Details & Price">✏️ Edit</button>
+                            <button type="button" onclick="deleteVicardUnit('${r.id}', ${idx})" class="vicard-unit-del-btn" title="Delete Unit">✖</button>
+                        </div>
                     </div>
                 </div>
             `).join('');
@@ -37010,59 +37571,75 @@ function renderVicardRestaurants() {
             unitsListHtml = `<div style="font-size: 0.78rem; color: var(--text-muted); font-style: italic; padding: 6px 0;">No menu units added yet. Click "+ Add Menu Unit" below.</div>`;
         }
 
+        const lowestPlatRank = getLowestPlatformTierRank();
+        const activeTiers = (r.eligibleTiers || []).filter(t => t && t !== 'none' && t !== '__none__');
+        let tierBadgeHtml = '';
+        if (activeTiers.length > 0) {
+            const minRestRank = Math.min(...activeTiers.map(t => getTierRank(t)));
+            const isLowestRankChecked = minRestRank <= lowestPlatRank;
+            if (isLowestRankChecked) {
+                tierBadgeHtml = `<span class="vicard-hud-badge all-tiers">🌐 All Tiers (Rank ${minRestRank}+)</span>`;
+            } else {
+                const tierNames = activeTiers.map(tid => (getVicardTiers()[tid]?.name || tid)).join(', ');
+                tierBadgeHtml = `<span class="vicard-hud-badge restricted-tiers">🏅 ${escapeHtml(tierNames)} (Rank ${minRestRank}+) • Restricted</span>`;
+            }
+        } else {
+            tierBadgeHtml = `<span class="vicard-hud-badge locked-tiers">🚫 Restricted (Not Available Right Now)</span>`;
+        }
+
+        const pinHtml = `<span class="vicard-hud-badge pin">🔒 Cashier PIN: <strong class="vicard-hud-pin-code">${escapeHtml(r.cashierPin || '1234')}</strong></span>`;
+
         return `
-            <div class="card" style="border-radius: 16px; border: 1px solid var(--border-color); padding: 18px; display: flex; flex-direction: column; justify-content: space-between; ${isActive ? '' : 'opacity: 0.65; filter: grayscale(0.3);'}">
+            <div class="card vicard-partner-card" style="border-radius: 18px; border: 1px solid var(--border-color); padding: 18px; display: flex; flex-direction: column; justify-content: space-between; gap: 14px; ${isActive ? '' : 'opacity: 0.65; filter: grayscale(0.3);'}">
                 <div>
-                    <!-- Restaurant Header -->
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <div style="width: 50px; height: 50px; border-radius: 12px; background: rgba(212,175,55,0.1); border: 1.5px solid rgba(212,175,55,0.3); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; overflow: hidden; flex-shrink: 0;">
+                    <!-- Restaurant Header & Brand HUD -->
+                    <div class="vicard-rest-card-header">
+                        <div class="vicard-rest-card-brand">
+                            <div class="vicard-rest-logo-box">
                                 ${r.logo && (r.logo.startsWith('http') || r.logo.startsWith('data:') || r.logo.endsWith('.png') || r.logo.endsWith('.jpg') || r.logo.endsWith('.jpeg'))
-                                    ? `<img src="${r.logo}" style="width: 100%; height: 100%; object-fit: cover;">`
-                                    : (r.logo || '🍽️')}
+                                    ? `<img src="${r.logo}" alt="${escapeHtml(r.name)}" class="vicard-rest-logo-img">`
+                                    : `<div class="vicard-rest-logo-fallback">${r.logo || '🍽️'}</div>`}
                             </div>
-                            <div>
-                                <h4 style="margin: 0; font-size: 1.05rem; font-weight: 800; color: var(--text-main);">${escapeHtml(r.name)}</h4>
-                                <div style="font-size: 0.78rem; color: #d4af37; font-weight: 600;">${escapeHtml(r.category || 'Dining')}</div>
-                                ${r.location ? `<div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 2px;">📍 ${escapeHtml(r.location)} • ⭐ ${r.rating || '4.9'} (${r.reviews || '350+'})</div>` : `<div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 2px;">⭐ ${r.rating || '4.9'} (${r.reviews || '350+'})</div>`}
-                                <div style="margin-top: 5px;">
-                                    ${(() => {
-                                        const lowestPlatRank = getLowestPlatformTierRank();
-                                        const activeTiers = (r.eligibleTiers || []).filter(t => t && t !== 'none' && t !== '__none__');
-                                        if (activeTiers.length > 0) {
-                                            const minRestRank = Math.min(...activeTiers.map(t => getTierRank(t)));
-                                            const isLowestRankChecked = minRestRank <= lowestPlatRank;
-                                            if (isLowestRankChecked) {
-                                                return `<span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: rgba(46,213,115,0.12); color: #2ed573; border: 1px solid rgba(46,213,115,0.3);">🌐 All Tiers (Rank ${minRestRank}+)</span>`;
-                                            } else {
-                                                return `<span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: rgba(212,175,55,0.15); color: #f5d77f; border: 1px solid rgba(212,175,55,0.3);">🏅 ${activeTiers.map(tid => (getVicardTiers()[tid]?.name || tid)).join(', ')} (Rank ${minRestRank}+) • Base Tier Restricted</span>`;
-                                            }
-                                        } else {
-                                            return `<span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: rgba(235,77,75,0.15); color: #fca5a5; border: 1px solid rgba(235,77,75,0.3);">🚫 Restricted (Not Available Right Now)</span>`;
-                                        }
-                                    })()}
-                                    <span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: rgba(212,175,55,0.15); color: #f5d77f; border: 1px solid rgba(212,175,55,0.3); margin-left: 4px;">🔒 Cashier PIN: <strong style="font-family: monospace; letter-spacing: 1px;">${escapeHtml(r.cashierPin || '1234')}</strong></span>
+                            <div class="vicard-rest-brand-info">
+                                <div class="vicard-rest-title-line">
+                                    <h4 class="vicard-rest-title">${escapeHtml(r.name)}</h4>
+                                    <span class="vicard-rest-cat-tag">${escapeHtml(r.category || 'Dining')}</span>
+                                </div>
+                                <div class="vicard-rest-sub-meta">
+                                    ${r.location ? `<span>📍 ${escapeHtml(r.location)}</span> • ` : ''}<span>⭐ ${r.rating || '4.9'} <span style="opacity:0.75;">(${r.reviews || '350+'})</span></span>
                                 </div>
                             </div>
                         </div>
 
-                        <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: 8px;">
+                        <div class="vicard-rest-status-wrap">
                             <button type="button" onclick="toggleVicardRestaurant('${r.id}')"
-                                style="padding: 4px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; border: none; cursor: pointer; ${isActive ? 'background: rgba(46, 213, 115, 0.15); color: #2ed573;' : 'background: rgba(235, 77, 75, 0.15); color: #eb4d4b;'}">
-                                ${isActive ? 'Active' : 'Paused'}
+                                class="vicard-rest-status-pill ${isActive ? 'active' : 'paused'}"
+                                title="Click to ${isActive ? 'Pause' : 'Activate'} Partner">
+                                <span class="vicard-status-dot"></span>
+                                <span>${isActive ? 'Active' : 'Paused'}</span>
                             </button>
                         </div>
                     </div>
 
+                    <!-- Dedicated Details HUD Bar (Tier Access & Cashier PIN with generous breathing space) -->
+                    <div class="vicard-rest-details-hud">
+                        <div class="vicard-hud-tier-col">
+                            ${tierBadgeHtml}
+                        </div>
+                        <div class="vicard-hud-pin-col">
+                            ${pinHtml}
+                        </div>
+                    </div>
+
                     <!-- Offered Menu Units Section -->
-                    <div style="margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 10px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <div style="margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                             <span style="font-size: 0.76rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Offered Menu Units (${units.length})</span>
-                            <button type="button" onclick="openAddUnitModal('${r.id}')" style="background: none; border: none; color: #d4af37; cursor: pointer; font-size: 0.78rem; font-weight: 700;">
+                            <button type="button" onclick="openAddUnitModal('${r.id}')" style="background: rgba(212,175,55,0.14); border: 1px solid rgba(212,175,55,0.35); color: #f5d77f; cursor: pointer; font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px;">
                                 ➕ Add Unit
                             </button>
                         </div>
-                        <div style="max-height: 220px; overflow-y: auto;">
+                        <div style="max-height: 260px; overflow-y: auto;">
                             ${unitsListHtml}
                         </div>
                     </div>
@@ -38599,7 +39176,7 @@ function generateRestaurantsDirectoryWebsiteHtml(rests, card) {
     });
 
     const isAr = typeof currentAppLang !== 'undefined' && currentAppLang === 'ar';
-    const txtProfile = (typeof t === 'function' && t('nfc-btn-profile')) || (isAr ? 'الملف الشخصي' : 'Profile');
+    const txtProfile = (typeof t === 'function' && t('nfc-btn-profile')) || (isAr ? 'الملف' : 'Profile');
     const txtInfo = (typeof t === 'function' && t('nfc-btn-info')) || (isAr ? 'معلومات' : 'Info');
     const txtLocation = isAr ? 'الرياض، المملكة العربية السعودية' : 'Riyadh, Saudi Arabia';
     const txtAllPartners = (typeof t === 'function' && t('nfc-pill-all-partners')) || (isAr ? 'جميع الشركاء' : 'All Partners');
@@ -38737,7 +39314,7 @@ function generateRestaurantsDirectoryWebsiteHtml(rests, card) {
                     <div class="keeta-member-avatar">${isActive ? '👑' : '⚠️'}</div>
                     <div class="keeta-member-info">
                         <div class="keeta-member-name">${escapeHtml(card ? card.name : 'VIP Member')}</div>
-                        <div class="keeta-member-id" dir="ltr"><span style="font-family:monospace;">${card ? card.id : 'VIC-GUEST'}</span> • <span style="color:${isActive ? '#10b981' : '#ef4444'}; font-weight:800;">${isActive ? 'ACTIVE' : 'SUSPENDED'}</span> • <span style="color:#f5d77f; font-weight:800;">${escapeHtml((card && card.tier) || 'Black VIP')}</span> • <span style="color:#38bdf8; font-weight:800;">🎯 ${monthlyLimit > 0 ? `${remainingOffers} left (${usedOffers}/${monthlyLimit})` : 'Unlimited'}</span></div>
+                        <div class="keeta-member-id" dir="ltr"><span style="font-family:monospace;">${card ? card.id : 'VIC-GUEST'}</span> • <span style="color:${isActive ? '#10b981' : '#ef4444'}; font-weight:800;">${isActive ? 'ACTIVE' : 'SUSPENDED'}</span> • <span style="color:#f5d77f; font-weight:800;">${escapeHtml((card && card.tier) || 'Black VIP')}</span> • <span style="color:#38bdf8; font-weight:800;">🎯 ${remainingOffers} left</span></div>
                     </div>
                 </div>
             </div>

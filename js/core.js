@@ -357,7 +357,7 @@ function startGlobalNotificationListeners(email) {
     });
     notificationListeners = {};
 
-    const companiesToListen = ['burgeroov', 'mvc', 'mvcfresh'];
+    const companiesToListen = Object.keys(portalCompanies || { burgeroov: 1, mvc: 1, mvcfresh: 1 });
 
     companiesToListen.forEach(companyId => {
         const adminsRef = db.ref(`companies/${companyId}/admins`);
@@ -435,7 +435,8 @@ function startGlobalNotificationListeners(email) {
                     if (!snapshot.exists()) return;
                     const companyData = snapshot.val();
                     const isAr = currentAppLang === 'ar';
-                    const compName = companyId === 'burgeroov' ? 'Burgeroov' : (companyId === 'mvc' ? 'MVC FRESH' : 'MVC Fresh');
+                    const compObj = (portalCompanies && portalCompanies[companyId]) || null;
+                    const compName = compObj ? compObj.name : (companyId === 'burgeroov' ? 'Burgeroov' : (companyId === 'mvc' ? 'MVC FRESH' : 'MVC Fresh'));
 
                     let updatedWorker = null;
                     if (companyData.workers) {
@@ -625,6 +626,7 @@ firebase.initializeApp(firebaseConfig);
 var auth = firebase.auth();
 var db = firebase.database();
 initPublicCustomerSync();
+initPortalCompaniesListener();
 
 // =============================================
 // AUTOMATIC APK VERSION CHECKER & FORCED UPDATE
@@ -966,25 +968,296 @@ function getCompanyData() {
     return appData[currentCompany];
 }
 
+// =============================================
+// DYNAMIC PORTAL COMPANIES & MULTI-TENANCY
+// =============================================
+let portalCompanies = {
+    'burgeroov': { id: 'burgeroov', name: 'Burgeroov', logo: 'burgeroov.png', color: '#c5832b', createdAt: 1700000000000 },
+    'mvc': { id: 'mvc', name: 'MVC FRESH', logo: 'mvc.png', color: '#22c55e', createdAt: 1700000000001 },
+    'mvcfresh': { id: 'mvcfresh', name: 'MVC Fresh', logo: 'mvcfresh.png', color: '#10b981', createdAt: 1700000000002 }
+};
+window.portalCompanies = portalCompanies;
+
+function initPortalCompaniesListener() {
+    if (typeof db === 'undefined') return;
+    db.ref('portal_companies').on('value', snap => {
+        if (snap.exists()) {
+            const data = snap.val() || {};
+            portalCompanies = Object.assign({}, portalCompanies, data);
+        } else {
+            db.ref('portal_companies').set(portalCompanies).catch(err => {
+                console.warn("Could not seed portal_companies:", err);
+            });
+        }
+        window.portalCompanies = portalCompanies;
+        renderCompanySelectionHUD();
+        updateCurrentCompanyHeader();
+    });
+}
+window.initPortalCompaniesListener = initPortalCompaniesListener;
+
+function updateCurrentCompanyHeader() {
+    const c = (portalCompanies && portalCompanies[currentCompany]) || { id: currentCompany, name: currentCompany, logo: 'burgeroov.png', color: '#c5832b' };
+    const headerLogo = document.getElementById('header-logo');
+    if (headerLogo) {
+        headerLogo.src = c.logo || 'burgeroov.png';
+        headerLogo.style.display = 'block';
+    }
+    const headerTitle = document.getElementById('header-title');
+    if (headerTitle) {
+        headerTitle.textContent = (c.name || 'Company') + ' Operations Portal';
+    }
+    const settingsLogo = document.getElementById('company-settings-logo-img');
+    if (settingsLogo) settingsLogo.src = c.logo || 'burgeroov.png';
+    const settingsName = document.getElementById('company-settings-name-display');
+    if (settingsName) settingsName.textContent = c.name || currentCompany;
+    const settingsId = document.getElementById('company-settings-id-display');
+    if (settingsId) settingsId.textContent = currentCompany;
+
+    if (c.color) {
+        document.documentElement.style.setProperty('--primary', c.color);
+    }
+}
+window.updateCurrentCompanyHeader = updateCurrentCompanyHeader;
+
+function renderCompanySelectionHUD() {
+    const grid = document.getElementById('company-selection-grid');
+    if (!grid) return;
+
+    const companies = Object.values(portalCompanies || {});
+    const email = currentUser ? (currentUser.email || '').toLowerCase() : '';
+    const isKinan = email === 'kinan.rahal@hotmail.com';
+    const isAdmin = isKinan || (currentUser && currentUser.role === 'admin');
+
+    let html = companies.map(c => {
+        const canAccess = isKinan || !window.userActiveCompanies || window.userActiveCompanies.includes(c.id);
+        const cardStyle = canAccess ? '' : 'display: none;';
+        const color = c.color || '#c5832b';
+        const logoSrc = c.logo || 'burgeroov.png';
+
+        return `
+            <div class="company-card" style="${cardStyle}; border-color: ${color}44;" onclick="selectCompany('${c.id}')">
+                ${isAdmin ? `
+                    <button type="button" onclick="event.stopPropagation(); openEditCompanyModal('${c.id}')"
+                        class="company-card-edit-btn" title="Edit Company Details & Logo">
+                        ✏️
+                    </button>
+                ` : ''}
+                <div class="company-logo-wrap">
+                    <img src="${logoSrc}" alt="${escapeHtml(c.name)}" onerror="this.src='burgeroov.png'"
+                        style="max-width: 84px; max-height: 84px; object-fit: contain;">
+                </div>
+                <h3 style="color: #ffffff; font-size: 1.25rem; font-weight: 800; margin: 0; line-height: 1.2;">${escapeHtml(c.name)}</h3>
+                <span style="display: inline-block; margin-top: 14px; background: ${color}26; color: ${color}; font-size: 0.8rem; font-weight: 700; padding: 6px 16px; border-radius: 100px; border: 1px solid ${color}44;">
+                    Enter Portal
+                </span>
+            </div>
+        `;
+    }).join('');
+
+    if (isAdmin) {
+        html += `
+            <div class="company-card company-card-add" onclick="openAddCompanyModal()"
+                style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 220px; background: rgba(255,255,255,0.02); border: 2px dashed rgba(212,175,55,0.4); border-radius: 22px; cursor: pointer; transition: all 0.3s ease;">
+                <div style="width: 58px; height: 58px; border-radius: 50%; background: rgba(212,175,55,0.12); border: 1.5px solid rgba(212,175,55,0.4); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; color: #f5d77f; margin-bottom: 12px;">
+                    ➕
+                </div>
+                <h3 style="color: #f5d77f; font-size: 1.15rem; font-weight: 800; margin: 0;">Add New Company</h3>
+                <span style="color: #94a3b8; font-size: 0.78rem; margin-top: 6px;">Create isolated portal workspace</span>
+            </div>
+        `;
+    }
+
+    grid.innerHTML = html;
+}
+window.renderCompanySelectionHUD = renderCompanySelectionHUD;
+
+function openAddCompanyModal() {
+    const modal = document.getElementById('company-modal');
+    if (!modal) return;
+    document.getElementById('company-modal-title').textContent = 'Add New Company';
+    document.getElementById('company-modal-submit-btn').textContent = 'Create Company';
+    document.getElementById('company-modal-is-edit').value = '0';
+    document.getElementById('company-modal-id').value = '';
+    document.getElementById('company-modal-name').value = '';
+    document.getElementById('company-modal-slug').value = '';
+    document.getElementById('company-modal-slug').disabled = false;
+    document.getElementById('company-slug-hint').textContent = '(Used for data isolation)';
+    document.getElementById('company-modal-logo-url').value = '';
+    document.getElementById('company-modal-logo-preview').src = 'burgeroov.png';
+    document.getElementById('company-modal-color').value = '#c5832b';
+    modal.style.display = 'flex';
+}
+window.openAddCompanyModal = openAddCompanyModal;
+
+function openEditCompanyModal(cId) {
+    const modal = document.getElementById('company-modal');
+    if (!modal) return;
+    const c = (portalCompanies && portalCompanies[cId]) || { id: cId, name: cId, logo: 'burgeroov.png', color: '#c5832b' };
+
+    document.getElementById('company-modal-title').textContent = 'Edit Company: ' + (c.name || cId);
+    document.getElementById('company-modal-submit-btn').textContent = 'Save Changes';
+    document.getElementById('company-modal-is-edit').value = '1';
+    document.getElementById('company-modal-id').value = cId;
+    document.getElementById('company-modal-name').value = c.name || '';
+    document.getElementById('company-modal-slug').value = cId;
+    document.getElementById('company-modal-slug').disabled = true;
+    document.getElementById('company-slug-hint').textContent = '(Locked to preserve database key)';
+    document.getElementById('company-modal-logo-url').value = c.logo || '';
+    document.getElementById('company-modal-logo-preview').src = c.logo || 'burgeroov.png';
+    document.getElementById('company-modal-color').value = c.color || '#c5832b';
+    modal.style.display = 'flex';
+}
+window.openEditCompanyModal = openEditCompanyModal;
+
+function openCurrentCompanyEditModal() {
+    openEditCompanyModal(currentCompany || 'burgeroov');
+}
+window.openCurrentCompanyEditModal = openCurrentCompanyEditModal;
+
+function closeCompanyModal() {
+    const modal = document.getElementById('company-modal');
+    if (modal) modal.style.display = 'none';
+}
+window.closeCompanyModal = closeCompanyModal;
+
+function handleCompanyModalNameInput(val) {
+    const isEdit = document.getElementById('company-modal-is-edit').value === '1';
+    if (!isEdit) {
+        const slug = (val || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        document.getElementById('company-modal-slug').value = slug;
+    }
+}
+window.handleCompanyModalNameInput = handleCompanyModalNameInput;
+
+function setCompanyModalColor(hex) {
+    const input = document.getElementById('company-modal-color');
+    if (input) input.value = hex;
+}
+window.setCompanyModalColor = setCompanyModalColor;
+
+function handleCompanyLogoUpload(input) {
+    if (!input || !input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const maxDim = 400;
+            let width = img.width;
+            let height = img.height;
+            if (width > height) {
+                if (width > maxDim) {
+                    height = Math.round((height * maxDim) / width);
+                    width = maxDim;
+                }
+            } else {
+                if (height > maxDim) {
+                    width = Math.round((width * maxDim) / height);
+                    height = maxDim;
+                }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/png', 0.85);
+            document.getElementById('company-modal-logo-url').value = dataUrl;
+            document.getElementById('company-modal-logo-preview').src = dataUrl;
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+window.handleCompanyLogoUpload = handleCompanyLogoUpload;
+
+function saveCompanyModal() {
+    const isEdit = document.getElementById('company-modal-is-edit').value === '1';
+    const name = (document.getElementById('company-modal-name').value || '').trim();
+    let slug = (document.getElementById('company-modal-slug').value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    const logo = document.getElementById('company-modal-logo-url').value || document.getElementById('company-modal-logo-preview').src || 'burgeroov.png';
+    const color = document.getElementById('company-modal-color').value || '#c5832b';
+
+    if (!name) {
+        alert("Please enter a company name.");
+        return;
+    }
+
+    if (isEdit) {
+        slug = document.getElementById('company-modal-id').value;
+    }
+
+    if (!slug) {
+        alert("Please enter a valid company identifier (alphanumeric).");
+        return;
+    }
+
+    const companyData = {
+        id: slug,
+        name: name,
+        logo: logo,
+        color: color,
+        updatedAt: Date.now()
+    };
+
+    if (!isEdit) {
+        companyData.createdAt = Date.now();
+        companyData.createdBy = currentUser ? currentUser.email : 'admin';
+    }
+
+    db.ref(`portal_companies/${slug}`).update(companyData).then(() => {
+        if (!isEdit) {
+            const userEmail = currentUser ? currentUser.email : 'kinan.rahal@hotmail.com';
+            const sanitizedEmail = userEmail.replace(/\./g, ',');
+            const initialCompanyData = {
+                admins: { [sanitizedEmail]: true, 'kinan,rahal@hotmail,com': true },
+                branches: ['Main Branch'],
+                workers: [],
+                warehouse: [],
+                jobCatalog: [],
+                violationRules: [],
+                salesLogs: [],
+                costLogs: [],
+                depositLogs: [],
+                spendLogs: [],
+                spendOrders: [],
+                createdAt: Date.now()
+            };
+
+            db.ref(`companies/${slug}`).once('value').then(snap => {
+                if (!snap.exists()) {
+                    db.ref(`companies/${slug}`).set(initialCompanyData);
+                }
+            });
+
+            if (window.userActiveCompanies && !window.userActiveCompanies.includes(slug)) {
+                window.userActiveCompanies.push(slug);
+            }
+        }
+
+        portalCompanies[slug] = Object.assign({}, portalCompanies[slug] || {}, companyData);
+        closeCompanyModal();
+        renderCompanySelectionHUD();
+        updateCurrentCompanyHeader();
+
+        if (currentCompany === slug) {
+            updateCurrentCompanyHeader();
+        }
+    }).catch(err => {
+        console.error("Error saving company:", err);
+        alert("Failed to save company: " + err.message);
+    });
+}
+window.saveCompanyModal = saveCompanyModal;
+
 function showCompanySelectionHUD(event) {
     if (event) event.stopPropagation();
     const launchLoader = document.getElementById('launch-loader-overlay');
     if (launchLoader) launchLoader.style.display = 'none';
     if (typeof hideUnassignedOverlay === 'function') hideUnassignedOverlay();
 
-    const cardBurgeroov = document.querySelector('.burgeroov-card');
-    const cardMvc = document.querySelector('.mvc-card');
-    const cardMvcFresh = document.querySelector('.mvcfresh-card');
-
-    if (currentUser && currentUser.email === 'kinan.rahal@hotmail.com') {
-        if (cardBurgeroov) cardBurgeroov.style.display = 'block';
-        if (cardMvc) cardMvc.style.display = 'block';
-        if (cardMvcFresh) cardMvcFresh.style.display = 'block';
-    } else if (window.userActiveCompanies && Array.isArray(window.userActiveCompanies)) {
-        if (cardBurgeroov) cardBurgeroov.style.display = window.userActiveCompanies.includes('burgeroov') ? 'block' : 'none';
-        if (cardMvc) cardMvc.style.display = window.userActiveCompanies.includes('mvc') ? 'block' : 'none';
-        if (cardMvcFresh) cardMvcFresh.style.display = window.userActiveCompanies.includes('mvcfresh') ? 'block' : 'none';
-    }
+    renderCompanySelectionHUD();
 
     document.getElementById('company-selection-overlay').style.display = 'flex';
     document.getElementById('app-wrapper').style.display = 'none';
@@ -1095,18 +1368,31 @@ function selectCompany(companyId) {
         markLockedTabs();
     }
 
-    let logoSrc = 'burgeroov.png';
+    const c = (portalCompanies && portalCompanies[companyId]) || { id: companyId, name: companyId, logo: 'burgeroov.png', color: '#c5832b' };
+    let logoSrc = c.logo || 'burgeroov.png';
     if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession) {
         logoSrc = 'mvc.png';
-    } else if (companyId === 'mvc') logoSrc = 'mvc.png';
-    else if (companyId === 'mvcfresh') logoSrc = 'mvcfresh.png';
+    }
 
     const headerLogo = document.getElementById('header-logo');
-    if (headerLogo) headerLogo.src = logoSrc;
+    if (headerLogo) {
+        headerLogo.src = logoSrc;
+        headerLogo.style.display = 'block';
+    }
+    const headerTitle = document.getElementById('header-title');
+    if (headerTitle) {
+        headerTitle.textContent = (c.name || 'Company') + ' Operations Portal';
+    }
     const authLogo = document.getElementById('auth-logo');
     if (authLogo) authLogo.src = logoSrc;
     const loaderLogo = document.getElementById('launch-loader-logo');
     if (loaderLogo) loaderLogo.src = logoSrc;
+
+    if (c.color) {
+        document.documentElement.style.setProperty('--primary', c.color);
+    }
+
+    updateCurrentCompanyHeader();
 
     applyTranslations();
 
@@ -1219,19 +1505,15 @@ auth.onAuthStateChanged((user) => {
             document.getElementById('auth-btn').style.display = 'block';
             overlay.style.display = 'none';
 
-            // Show all cards in selection overlay for super admin
-            const cardBurgeroov = document.querySelector('.burgeroov-card');
-            const cardMvc = document.querySelector('.mvc-card');
-            const cardMvcFresh = document.querySelector('.mvcfresh-card');
-            if (cardBurgeroov) cardBurgeroov.style.display = 'block';
-            if (cardMvc) cardMvc.style.display = 'block';
-            if (cardMvcFresh) cardMvcFresh.style.display = 'block';
+            window.userActiveCompanies = Object.keys(portalCompanies || {});
+            window.isMultiCompany = window.userActiveCompanies.length > 1;
+            renderCompanySelectionHUD();
 
             const urlParams = new URLSearchParams(window.location.search);
             const queryCompany = urlParams.get('companyId');
             const queryTab = urlParams.get('tab');
 
-            if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc' || queryCompany === 'mvcfresh')) {
+            if (queryCompany && (portalCompanies[queryCompany] || queryCompany === 'burgeroov' || queryCompany === 'mvc' || queryCompany === 'mvcfresh')) {
                 selectCompany(queryCompany);
                 if (queryTab) {
                     setTimeout(() => {
@@ -1243,36 +1525,33 @@ auth.onAuthStateChanged((user) => {
                 }
             } else {
                 const savedCompany = localStorage.getItem('selected_company');
-                if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
+                if (savedCompany && (portalCompanies[savedCompany] || savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
                     selectCompany(savedCompany);
                 } else {
                     showCompanySelectionHUD();
                 }
             }
         } else {
-            // Check databases for worker membership
+            // Dynamically check databases for worker membership across all portal companies
             const sanitizedEmail = email.replace(/\./g, ',');
+            const compKeys = Object.keys(portalCompanies || { burgeroov: 1, mvc: 1, mvcfresh: 1 });
+            const adminPromises = compKeys.map(cId => db.ref(`companies/${cId}/admins`).once('value').catch(() => null));
+            const workerPromises = compKeys.map(cId => db.ref(`companies/${cId}/workers`).once('value').catch(() => null));
+
             Promise.all([
-                db.ref('companies/burgeroov/admins').once('value').catch(() => null),
-                db.ref('companies/burgeroov/workers').once('value').catch(() => null),
-                db.ref('companies/mvc/admins').once('value').catch(() => null),
-                db.ref('companies/mvc/workers').once('value').catch(() => null),
-                db.ref('companies/mvcfresh/admins').once('value').catch(() => null),
-                db.ref('companies/mvcfresh/workers').once('value').catch(() => null),
+                ...adminPromises,
+                ...workerPromises,
                 db.ref(`customerCodes/workerPasswords/${sanitizedEmail}`).once('value').catch(() => null),
                 db.ref(`customerCodes/workerAccess/${sanitizedEmail}`).once('value').catch(() => null)
-            ]).then(([bgAdmins, bgWorkers, mvcAdmins, mvcWorkers, freshAdmins, freshWorkers, pwdSnap, accessSnap]) => {
+            ]).then((results) => {
                 document.getElementById('auth-loader').style.display = 'none';
                 document.getElementById('auth-btn').style.display = 'block';
 
-                const burgeroovAdmins = parseAdminsSnap(bgAdmins);
-                const burgeroovWorkers = parseWorkersSnap(bgWorkers);
-
-                const mvcAdminsList = parseAdminsSnap(mvcAdmins);
-                const mvcWorkersList = parseWorkersSnap(mvcWorkers);
-
-                const mvcfreshAdminsList = parseAdminsSnap(freshAdmins);
-                const mvcfreshWorkersList = parseWorkersSnap(freshWorkers);
+                const totalComps = compKeys.length;
+                const adminSnaps = results.slice(0, totalComps);
+                const workerSnaps = results.slice(totalComps, totalComps * 2);
+                const pwdSnap = results[totalComps * 2];
+                const accessSnap = results[totalComps * 2 + 1];
 
                 let targetWorkerId = null;
                 if (pwdSnap && pwdSnap.exists() && pwdSnap.val()) {
@@ -1286,47 +1565,35 @@ auth.onAuthStateChanged((user) => {
                     targetWorkerId = localStorage.getItem('mvc_worker_id_' + sanitizedEmail);
                 }
 
-                let inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
-                    (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(burgeroovWorkers, email, targetWorkerId) : burgeroovWorkers.some(w => w && w.email && w.email.toLowerCase() === email));
-
-                let inMvc = mvcAdminsList[sanitizedEmail] === true ||
-                    (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(mvcWorkersList, email, targetWorkerId) : mvcWorkersList.some(w => w && w.email && w.email.toLowerCase() === email));
-
-                let inMvcFresh = mvcfreshAdminsList[sanitizedEmail] === true ||
-                    (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(mvcfreshWorkersList, email, targetWorkerId) : mvcfreshWorkersList.some(w => w && w.email && w.email.toLowerCase() === email));
-
-                if (accessSnap && accessSnap.exists() && accessSnap.val()) {
-                    const acc = accessSnap.val();
-                    if (acc.burgeroov === true) inBurgeroov = true;
-                    if (acc.mvc === true) inMvc = true;
-                    if (acc.mvcfresh === true) inMvcFresh = true;
-                }
-
-                if (pwdSnap && pwdSnap.exists() && pwdSnap.val() && pwdSnap.val().company) {
-                    const assignedComp = pwdSnap.val().company;
-                    if (assignedComp === 'burgeroov') inBurgeroov = true;
-                    if (assignedComp === 'mvc') inMvc = true;
-                    if (assignedComp === 'mvcfresh') inMvcFresh = true;
-                }
-
-                // Update selector cards display based on assigned status
-                const cardBurgeroov = document.querySelector('.burgeroov-card');
-                const cardMvc = document.querySelector('.mvc-card');
-                const cardMvcFresh = document.querySelector('.mvcfresh-card');
-
-                if (cardBurgeroov) cardBurgeroov.style.display = inBurgeroov ? 'block' : 'none';
-                if (cardMvc) cardMvc.style.display = inMvc ? 'block' : 'none';
-                if (cardMvcFresh) cardMvcFresh.style.display = inMvcFresh ? 'block' : 'none';
-
-                overlay.style.display = 'none';
-
                 const activeCompanies = [];
-                if (inBurgeroov) activeCompanies.push('burgeroov');
-                if (inMvc) activeCompanies.push('mvc');
-                if (inMvcFresh) activeCompanies.push('mvcfresh');
+
+                compKeys.forEach((cId, i) => {
+                    const adminsList = parseAdminsSnap(adminSnaps[i]);
+                    const workersList = parseWorkersSnap(workerSnaps[i]);
+
+                    let inComp = adminsList[sanitizedEmail] === true ||
+                        (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(workersList, email, targetWorkerId) : workersList.some(w => w && w.email && w.email.toLowerCase() === email));
+
+                    if (accessSnap && accessSnap.exists() && accessSnap.val() && accessSnap.val()[cId] === true) inComp = true;
+                    if (pwdSnap && pwdSnap.exists() && pwdSnap.val() && pwdSnap.val().company === cId) inComp = true;
+
+                    if (inComp) {
+                        activeCompanies.push(cId);
+                        const matchedWorker = typeof findMatchingWorker === 'function' 
+                            ? findMatchingWorker(workersList, email, targetWorkerId)
+                            : workersList.find(w => w && w.email && w.email.toLowerCase() === email);
+                        if (matchedWorker && matchedWorker.appPassword) {
+                            user.updatePassword(matchedWorker.appPassword)
+                                .then(() => console.log(`[Auth] Firebase Auth password synchronized with assigned password for ${email}`))
+                                .catch(e => console.warn('[Auth] Password sync notice:', e.message));
+                        }
+                    }
+                });
 
                 window.userActiveCompanies = activeCompanies;
                 window.isMultiCompany = activeCompanies.length > 1;
+                renderCompanySelectionHUD();
+                overlay.style.display = 'none';
 
                 const locationSearch = (typeof window !== 'undefined' && window.location && window.location.search) ? window.location.search : '';
                 const urlParams = new URLSearchParams(locationSearch);
@@ -1334,12 +1601,8 @@ auth.onAuthStateChanged((user) => {
                 const queryTab = urlParams.get('tab');
 
                 let chosenCompany = null;
-                if (queryCompany && (queryCompany === 'burgeroov' || queryCompany === 'mvc' || queryCompany === 'mvcfresh')) {
-                    if ((queryCompany === 'mvc' && inMvc) ||
-                        (queryCompany === 'burgeroov' && inBurgeroov) ||
-                        (queryCompany === 'mvcfresh' && inMvcFresh)) {
-                        chosenCompany = queryCompany;
-                    }
+                if (queryCompany && activeCompanies.includes(queryCompany)) {
+                    chosenCompany = queryCompany;
                 }
 
                 if (chosenCompany) {
@@ -1373,7 +1636,7 @@ auth.onAuthStateChanged((user) => {
 
                 overlay.style.display = 'none';
                 const savedCompany = localStorage.getItem('selected_company');
-                if (savedCompany && (savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
+                if (savedCompany && (portalCompanies[savedCompany] || savedCompany === 'burgeroov' || savedCompany === 'mvc' || savedCompany === 'mvcfresh')) {
                     selectCompany(savedCompany);
                 } else {
                     showCompanySelectionHUD();
@@ -1463,24 +1726,21 @@ function checkUnassignedUserAccess(isManualTrigger = false) {
     const email = currentUser.email.toLowerCase();
     const sanitizedEmail = email.replace(/\./g, ',');
 
+    const compKeys = Object.keys(portalCompanies || { burgeroov: 1, mvc: 1, mvcfresh: 1 });
+    const adminPromises = compKeys.map(cId => db.ref(`companies/${cId}/admins`).once('value').catch(() => null));
+    const workerPromises = compKeys.map(cId => db.ref(`companies/${cId}/workers`).once('value').catch(() => null));
+
     Promise.all([
-        db.ref('companies/burgeroov/admins').once('value').catch(() => null),
-        db.ref('companies/burgeroov/workers').once('value').catch(() => null),
-        db.ref('companies/mvc/admins').once('value').catch(() => null),
-        db.ref('companies/mvc/workers').once('value').catch(() => null),
-        db.ref('companies/mvcfresh/admins').once('value').catch(() => null),
-        db.ref('companies/mvcfresh/workers').once('value').catch(() => null),
+        ...adminPromises,
+        ...workerPromises,
         db.ref(`customerCodes/workerPasswords/${sanitizedEmail}`).once('value').catch(() => null),
         db.ref(`customerCodes/workerAccess/${sanitizedEmail}`).once('value').catch(() => null)
-    ]).then(([bgAdmins, bgWorkers, mvcAdmins, mvcWorkers, freshAdmins, freshWorkers, pwdSnap, accessSnap]) => {
-        const burgeroovAdmins = parseAdminsSnap(bgAdmins);
-        const burgeroovWorkers = parseWorkersSnap(bgWorkers);
-
-        const mvcAdminsList = parseAdminsSnap(mvcAdmins);
-        const mvcWorkersList = parseWorkersSnap(mvcWorkers);
-
-        const mvcfreshAdminsList = parseAdminsSnap(freshAdmins);
-        const mvcfreshWorkersList = parseWorkersSnap(freshWorkers);
+    ]).then((results) => {
+        const totalComps = compKeys.length;
+        const adminSnaps = results.slice(0, totalComps);
+        const workerSnaps = results.slice(totalComps, totalComps * 2);
+        const pwdSnap = results[totalComps * 2];
+        const accessSnap = results[totalComps * 2 + 1];
 
         let targetWorkerId = null;
         if (pwdSnap && pwdSnap.exists() && pwdSnap.val()) {
@@ -1494,48 +1754,27 @@ function checkUnassignedUserAccess(isManualTrigger = false) {
             targetWorkerId = localStorage.getItem('mvc_worker_id_' + sanitizedEmail);
         }
 
-        let inBurgeroov = burgeroovAdmins[sanitizedEmail] === true ||
-            (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(burgeroovWorkers, email, targetWorkerId) : burgeroovWorkers.some(w => w && w.email && w.email.toLowerCase() === email));
-
-        let inMvc = mvcAdminsList[sanitizedEmail] === true ||
-            (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(mvcWorkersList, email, targetWorkerId) : mvcWorkersList.some(w => w && w.email && w.email.toLowerCase() === email));
-
-        let inMvcFresh = mvcfreshAdminsList[sanitizedEmail] === true ||
-            (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(mvcfreshWorkersList, email, targetWorkerId) : mvcfreshWorkersList.some(w => w && w.email && w.email.toLowerCase() === email));
-
-        if (accessSnap && accessSnap.exists() && accessSnap.val()) {
-            const acc = accessSnap.val();
-            if (acc.burgeroov === true) inBurgeroov = true;
-            if (acc.mvc === true) inMvc = true;
-            if (acc.mvcfresh === true) inMvcFresh = true;
-        }
-
-        if (pwdSnap && pwdSnap.exists() && pwdSnap.val() && pwdSnap.val().company) {
-            const assignedComp = pwdSnap.val().company;
-            if (assignedComp === 'burgeroov') inBurgeroov = true;
-            if (assignedComp === 'mvc') inMvc = true;
-            if (assignedComp === 'mvcfresh') inMvcFresh = true;
-        }
-
         const activeCompanies = [];
-        if (inBurgeroov) activeCompanies.push('burgeroov');
-        if (inMvc) activeCompanies.push('mvc');
-        if (inMvcFresh) activeCompanies.push('mvcfresh');
+
+        compKeys.forEach((cId, i) => {
+            const adminsList = parseAdminsSnap(adminSnaps[i]);
+            const workersList = parseWorkersSnap(workerSnaps[i]);
+
+            let inComp = adminsList[sanitizedEmail] === true ||
+                (typeof findMatchingWorker === 'function' ? !!findMatchingWorker(workersList, email, targetWorkerId) : workersList.some(w => w && w.email && w.email.toLowerCase() === email));
+
+            if (accessSnap && accessSnap.exists() && accessSnap.val() && accessSnap.val()[cId] === true) inComp = true;
+            if (pwdSnap && pwdSnap.exists() && pwdSnap.val() && pwdSnap.val().company === cId) inComp = true;
+
+            if (inComp) activeCompanies.push(cId);
+        });
 
         window.userActiveCompanies = activeCompanies;
 
         if (activeCompanies.length > 0) {
             hideUnassignedOverlay();
-
-            const cardBurgeroov = document.querySelector('.burgeroov-card');
-            const cardMvc = document.querySelector('.mvc-card');
-            const cardMvcFresh = document.querySelector('.mvcfresh-card');
-
-            if (cardBurgeroov) cardBurgeroov.style.display = inBurgeroov ? 'block' : 'none';
-            if (cardMvc) cardMvc.style.display = inMvc ? 'block' : 'none';
-            if (cardMvcFresh) cardMvcFresh.style.display = inMvcFresh ? 'block' : 'none';
-
             window.isMultiCompany = activeCompanies.length > 1;
+            renderCompanySelectionHUD();
 
             if (activeCompanies.length > 1) {
                 showCompanySelectionHUD();
@@ -1604,6 +1843,42 @@ function handleAuthSubmit() {
     if (activeAuthMode === 'login') {
         auth.signInWithEmailAndPassword(email, password)
             .catch(error => {
+                if (error.code === 'auth/wrong-password') {
+                    // Check if worker typed the new assigned password and we have a previousPassword stored in RTDB
+                    const sanitizedEmail = email.replace(/\./g, ',');
+                    const compKeys = Object.keys(portalCompanies || { burgeroov: 1, mvc: 1, mvcfresh: 1 });
+                    const pwdPromises = compKeys.map(cId => db.ref(`companies/${cId}/workerPasswords/${sanitizedEmail}`).once('value').catch(() => null));
+
+                    Promise.all(pwdPromises).then(snaps => {
+                        let prevPwd = null;
+                        snaps.forEach(s => {
+                            if (s && s.exists()) {
+                                const val = s.val();
+                                if (val && val.password === password && val.previousPassword) {
+                                    prevPwd = val.previousPassword;
+                                }
+                            }
+                        });
+
+                        if (prevPwd) {
+                            return auth.signInWithEmailAndPassword(email, prevPwd)
+                                .then(cred => {
+                                    if (cred && cred.user) {
+                                        return cred.user.updatePassword(password);
+                                    }
+                                });
+                        }
+                        throw error;
+                    }).catch(fallbackErr => {
+                        btn.style.display = 'block';
+                        loader.style.display = 'none';
+                        errorMsg.style.color = "var(--danger)";
+                        errorMsg.textContent = fallbackErr.message || error.message;
+                        errorMsg.style.display = 'block';
+                    });
+                    return;
+                }
+
                 btn.style.display = 'block';
                 loader.style.display = 'none';
                 errorMsg.style.color = "var(--danger)";
@@ -2066,7 +2341,7 @@ function initGlobalMarketListeners() {
     if (window._hasGlobalMarketListeners) return;
     window._hasGlobalMarketListeners = true;
 
-    const companyList = ['mvc', 'mvcfresh', 'burgeroov'];
+    const companyList = Object.keys(portalCompanies || { mvc: 1, mvcfresh: 1, burgeroov: 1 });
     companyList.forEach(cKey => {
         db.ref(`companies/${cKey}/marketOrders`).on('value', snapshot => {
             if (!appData[cKey]) appData[cKey] = {};
@@ -2340,9 +2615,10 @@ function saveWorkerFCMToken(token) {
     const email = currentUser.email.toLowerCase();
 
     // Save token to all companies if worker is registered in them
-    saveTokenForCompany('burgeroov', email, token);
-    saveTokenForCompany('mvc', email, token);
-    saveTokenForCompany('mvcfresh', email, token);
+    const compKeys = Object.keys(portalCompanies || { burgeroov: 1, mvc: 1, mvcfresh: 1 });
+    compKeys.forEach(cId => {
+        saveTokenForCompany(cId, email, token);
+    });
 }
 
 function saveTokenForCompany(companyId, email, token) {
@@ -2436,17 +2712,16 @@ function applyTranslations() {
     };
 
     // Dynamic translations based on selected company
+    const activeCompObj = (portalCompanies && portalCompanies[currentCompany]) || null;
+    const compName = activeCompObj ? activeCompObj.name : (currentCompany === 'mvc' || currentCompany === 'mvcfresh' ? 'MVC Fresh' : 'Burgeroov');
+
     if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession) {
         langDict['app-title'] = currentAppLang === 'ar' ? 'سوق عملاء MVC' : (currentAppLang === 'bn' ? 'এমভিসি গ্রাহক বাজার' : 'MVC Customer Market');
         document.title = 'MVC Customer Market';
-    } else if (currentCompany === 'mvc' || currentCompany === 'mvcfresh') {
-        langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات إم في سي فريش' : (currentAppLang === 'bn' ? 'এমভিসি ফ্রেশ অপারেশন পোর্টাল' : 'MVC Fresh Operations Portal');
-        langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة تحكم إم في سي فريش' : (currentAppLang === 'bn' ? 'এমভিসি ফ্রেশ ড্যাশবোর্ডে লগইন' : 'Login to MVC Fresh Dashboard');
-        document.title = 'MVC Fresh Management Portal';
     } else {
-        langDict['app-title'] = currentAppLang === 'ar' ? 'بوابة عمليات برجروف' : (currentAppLang === 'bn' ? 'বারগারুভ অপারেশন পোর্টাল' : 'Burgeroov Operations Portal');
-        langDict['auth-title-login'] = currentAppLang === 'ar' ? 'تسجيل الدخول للوحة التحكم' : (currentAppLang === 'bn' ? 'ড্যাশবোর্ডে লগইন করুন' : 'Login to Dashboard');
-        document.title = 'Burgeroov Management Portal';
+        langDict['app-title'] = currentAppLang === 'ar' ? `بوابة عمليات ${compName}` : (currentAppLang === 'bn' ? `${compName} অপারেশন পোর্টাল` : `${compName} Operations Portal`);
+        langDict['auth-title-login'] = currentAppLang === 'ar' ? `تسجيل الدخول للوحة تحكم ${compName}` : (currentAppLang === 'bn' ? `${compName} ড্যাশবোর্ডে লগইন` : `Login to ${compName} Dashboard`);
+        document.title = `${compName} Management Portal`;
     }
 
     document.querySelectorAll("[data-i18n]").forEach(el => {

@@ -1234,7 +1234,7 @@ var uiTranslations = {
         "nfc-profile-stat-visits": "الزيارات",
         "nfc-profile-btn-history": "سجل الزيارات",
         "nfc-profile-btn-close": "إغلاق",
-        "nfc-btn-profile": "الملف الشخصي",
+        "nfc-btn-profile": "الملف",
         "nfc-btn-info": "معلومات",
         "nfc-pill-all-partners": "جميع المطاعم",
         "nfc-pill-burgers": "برجر ومشويات",

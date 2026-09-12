@@ -76,7 +76,7 @@ function renderPrepareSection() {
     }
 
     // Collect market orders across ALL loaded companies
-    const companyList = ['mvc', 'mvcfresh', 'burgeroov'];
+    const companyList = Object.keys(window.portalCompanies || { mvc: 1, mvcfresh: 1, burgeroov: 1 });
     let allOrders = [];
 
     companyList.forEach(cKey => {
