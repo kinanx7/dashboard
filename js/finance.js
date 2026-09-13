@@ -771,38 +771,56 @@ function renderRankingSettingsInputs() {
 window.renderRankingSettingsInputs = renderRankingSettingsInputs;
 
 function renderLeaderboard() {
-    const companyData = getCompanyData();
-    const workers = companyData.workers || [];
-    if (workers.length === 0) return;
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    let workers = (companyData && companyData.workers) || [];
+    if (!Array.isArray(workers) && typeof workers === 'object') {
+        workers = Object.values(workers);
+    }
+    workers = workers.filter(w => w && typeof w === 'object' && w.id && w.name);
+
+    const isAr = typeof currentAppLang !== 'undefined' && currentAppLang === 'ar';
 
     if (typeof renderRankingSettingsInputs === 'function') {
         renderRankingSettingsInputs();
     }
 
-    const isAr = currentAppLang === 'ar';
+    if (workers.length === 0) {
+        ['podium-1-name', 'podium-1-score', 'podium-2-name', 'podium-2-score', 'podium-3-name', 'podium-3-score',
+         'driver-podium-1-name', 'driver-podium-1-score', 'driver-podium-2-name', 'driver-podium-2-score', 'driver-podium-3-name', 'driver-podium-3-score'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = '—';
+        });
+        const genListDiv = document.getElementById('leaderboard-list');
+        if (genListDiv) genListDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); padding:16px;">${isAr ? 'لا يوجد موظفون في هذه الشركة حتى الآن.' : 'No workers found in this company yet.'}</p>`;
+        const drvListDiv = document.getElementById('driver-leaderboard-list');
+        if (drvListDiv) drvListDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); padding:16px;">${isAr ? 'لا يوجد سائقون في هذه الشركة حتى الآن.' : 'No drivers found in this company yet.'}</p>`;
+        return;
+    }
+
     const settings = companyData.rankingSettings || { attendPts: 5, onTimePts: 2, normalTaskPts: 10, urgentTaskPts: 20, deliveryPts: 15 };
 
     // 1. Calculate general leaderboard (All workers with custom points)
     const generalRanked = workers.map(worker => {
-        const avg = parseFloat(getAveragePerfection(getLogsForMonth(worker, currentGlobalMonth)) || 0);
+        const perfVal = typeof getAveragePerfection === 'function' ? getAveragePerfection(getLogsForMonth(worker, currentGlobalMonth)) : 'N/A';
+        const avg = perfVal === 'N/A' ? 0 : (parseFloat(perfVal) || 0);
 
         let taskPoints = 0;
         let taskHigh = 0;
         let taskNormal = 0;
-        if (worker.jobs) {
-            worker.jobs.forEach(job => {
-                if (job.status === 'completed' || job.done) {
-                    const urgency = (job.urgency || 'normal').toLowerCase();
-                    if (urgency === 'high' || urgency === 'urgent') {
-                        taskPoints += (settings.urgentTaskPts !== undefined ? settings.urgentTaskPts : 20);
-                        taskHigh++;
-                    } else {
-                        taskPoints += (settings.normalTaskPts !== undefined ? settings.normalTaskPts : 10);
-                        taskNormal++;
-                    }
+        let jobs = worker.jobs || [];
+        if (!Array.isArray(jobs) && typeof jobs === 'object') jobs = Object.values(jobs);
+        jobs.forEach(job => {
+            if (job && (job.status === 'completed' || job.done)) {
+                const urgency = (job.urgency || 'normal').toLowerCase();
+                if (urgency === 'high' || urgency === 'urgent') {
+                    taskPoints += (settings.urgentTaskPts !== undefined ? settings.urgentTaskPts : 20);
+                    taskHigh++;
+                } else {
+                    taskPoints += (settings.normalTaskPts !== undefined ? settings.normalTaskPts : 10);
+                    taskNormal++;
                 }
-            });
-        }
+            }
+        });
 
         // Attendance points for current month
         let attendancePoints = 0;
@@ -820,7 +838,7 @@ function renderLeaderboard() {
         });
 
         // Driver delivery points
-        const stats = getMonthlyStats(worker, currentGlobalMonth);
+        const stats = typeof getMonthlyStats === 'function' ? getMonthlyStats(worker, currentGlobalMonth) : {};
         const deliveries = (stats.deliveriesList ? stats.deliveriesList.length : 0) + (stats.legacyDeliveries || 0);
         const deliveryPoints = deliveries * (settings.deliveryPts !== undefined ? settings.deliveryPts : 15);
 
@@ -904,11 +922,11 @@ function renderLeaderboard() {
     // 2. Calculate driver leaderboard (Strictly deliveries)
     const driversRanked = workers.filter(worker => {
         const isDriver = worker.role && (worker.role.toLowerCase().includes('driver') || worker.role.includes('سائق'));
-        const stats = getMonthlyStats(worker, currentGlobalMonth);
+        const stats = typeof getMonthlyStats === 'function' ? getMonthlyStats(worker, currentGlobalMonth) : {};
         const deliveries = (stats.deliveriesList ? stats.deliveriesList.length : 0) + (stats.legacyDeliveries || 0);
         return isDriver || deliveries > 0;
     }).map(worker => {
-        const stats = getMonthlyStats(worker, currentGlobalMonth);
+        const stats = typeof getMonthlyStats === 'function' ? getMonthlyStats(worker, currentGlobalMonth) : {};
         const deliveries = (stats.deliveriesList ? stats.deliveriesList.length : 0) + (stats.legacyDeliveries || 0);
         return {
             id: worker.id,
@@ -918,14 +936,14 @@ function renderLeaderboard() {
     }).sort((a, b) => b.deliveries - a.deliveries);
 
     // Populate Driver Podium
-    const pd1Name = document.getElementById('podium-drv-1-name');
-    const pd1Score = document.getElementById('podium-drv-1-score');
-    const pd2Name = document.getElementById('podium-drv-2-name');
-    const pd2Score = document.getElementById('podium-drv-2-score');
-    const pd3Name = document.getElementById('podium-drv-3-name');
-    const pd3Score = document.getElementById('podium-drv-3-score');
+    const pd1Name = document.getElementById('driver-podium-1-name');
+    const pd1Score = document.getElementById('driver-podium-1-score');
+    const pd2Name = document.getElementById('driver-podium-2-name');
+    const pd2Score = document.getElementById('driver-podium-2-score');
+    const pd3Name = document.getElementById('driver-podium-3-name');
+    const pd3Score = document.getElementById('driver-podium-3-score');
 
-    const labelDels = isAr ? 'توصيلة' : 'dels';
+    const labelDels = isAr ? 'طلب' : 'deliv';
 
     if (driversRanked[0]) {
         if (pd1Name) pd1Name.textContent = driversRanked[0].name;
@@ -953,22 +971,26 @@ function renderLeaderboard() {
     const drvListDiv = document.getElementById('driver-leaderboard-list');
     if (drvListDiv) {
         drvListDiv.innerHTML = '';
-        driversRanked.forEach((worker, idx) => {
-            const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
-            drvListDiv.innerHTML += `
-                <div class="flex-between" style="padding:10px 14px; background:var(--input-bg); border-radius:10px; border:1px solid var(--border-color); align-items:center;">
-                    <div style="display:flex; align-items:center; gap:10px; overflow:hidden;">
-                        <span style="font-weight:800; font-size:1.1rem; width:24px; text-align:center; color:var(--text-muted);">${medal}</span>
-                        <div style="overflow:hidden;">
-                            <strong style="color:var(--text-main); display:block; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${worker.name}</strong>
+        if (driversRanked.length === 0) {
+            drvListDiv.innerHTML = `<p style="text-align:center; color:var(--text-muted); padding:16px;">${isAr ? 'لا يوجد سائقون في هذه الشركة حتى الآن.' : 'No drivers found in this company yet.'}</p>`;
+        } else {
+            driversRanked.forEach((worker, idx) => {
+                const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+                drvListDiv.innerHTML += `
+                    <div class="flex-between" style="padding:10px 14px; background:var(--input-bg); border-radius:10px; border:1px solid var(--border-color); align-items:center;">
+                        <div style="display:flex; align-items:center; gap:10px; overflow:hidden;">
+                            <span style="font-weight:800; font-size:1.1rem; width:24px; text-align:center; color:var(--text-muted);">${medal}</span>
+                            <div style="overflow:hidden;">
+                                <strong style="color:var(--text-main); display:block; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${worker.name}</strong>
+                            </div>
+                        </div>
+                        <div style="text-align:right; font-weight:800; color:var(--primary); font-size:1.05rem; white-space:nowrap; margin-left:10px;">
+                            ${worker.deliveries} ${labelDels}
                         </div>
                     </div>
-                    <div style="text-align:right; font-weight:800; color:var(--primary); font-size:1.05rem; white-space:nowrap; margin-left:10px;">
-                        ${worker.deliveries} ${labelDels}
-                    </div>
-                </div>
-            `;
-        });
+                `;
+            });
+        }
     }
 }
 

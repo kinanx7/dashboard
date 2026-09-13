@@ -2288,6 +2288,13 @@ function ensureArraysExist(data) {
         else if (!Array.isArray(w.jobs)) w.jobs = Object.values(w.jobs);
         w.jobs = w.jobs.filter(j => j && j.id);
 
+        if (!w.logs) w.logs = [];
+        else if (!Array.isArray(w.logs)) w.logs = Object.values(w.logs);
+
+        if (!w.rank) w.rank = 'Unranked';
+
+        if (!w.monthlyStats || typeof w.monthlyStats !== 'object') w.monthlyStats = {};
+
         if (!w.constantTasks) w.constantTasks = [];
         else if (!Array.isArray(w.constantTasks)) w.constantTasks = Object.values(w.constantTasks);
         w.constantTasks = w.constantTasks.filter(ct => ct && (ct.id || ct.title));
@@ -2667,8 +2674,11 @@ function listenToCloudData() {
                     if (typeof currentTab !== 'undefined' && currentTab === 'finance') {
                         if (typeof renderFinanceTable === 'function') renderFinanceTable();
                         if (typeof renderFinDetails === 'function') renderFinDetails();
+                    } else if (typeof currentTab !== 'undefined' && currentTab === 'ranks') {
+                        if (typeof renderRanksTable === 'function') renderRanksTable();
+                        if (typeof renderLeaderboard === 'function') renderLeaderboard();
                     }
-                } catch(e) { console.error('finance render error:', e); }
+                } catch(e) { console.error('workers tab render error:', e); }
             } },
             { key: 'warehouse', render: () => { renderWarehouse(); checkStockAlerts(); } },
             { key: 'whCategories', render: () => { renderWarehouse(); } },
@@ -2736,7 +2746,10 @@ function listenToCloudData() {
             { key: 'vaultFolders', render: () => { if (typeof renderVaultNotes === 'function') renderVaultNotes(); } },
             { key: 'lateRules', render: () => { if (typeof renderAttendance === 'function') renderAttendance(); } },
             { key: 'driverVolumeRewards', render: () => { if (typeof renderFinanceTable === 'function') renderFinanceTable(); } },
-            { key: 'rankSettings', render: () => { if (typeof renderRanks === 'function') renderRanks(); } },
+            { key: 'rankSettings', render: () => { 
+                if (typeof renderRanksTable === 'function') renderRanksTable(); 
+                if (typeof renderLeaderboard === 'function') renderLeaderboard(); 
+            } },
             { key: 'violationRules', render: () => { if (typeof renderViolationRules === 'function') renderViolationRules(); } }
         ];
 
@@ -3102,16 +3115,26 @@ document.addEventListener('touchend', handleDropdownOutsideInteraction, { passiv
 
 function getVisibleWorkers() {
     const data = typeof getCompanyData === 'function' ? getCompanyData() : null;
-    const workers = (data && data.workers) || [];
-    if (!currentUser) return [];
+    let workers = (data && data.workers) || [];
+    if (!Array.isArray(workers) && typeof workers === 'object') {
+        workers = Object.values(workers);
+    }
+    workers = workers.filter(w => w && typeof w === 'object' && w.id && w.name);
+    if (!currentUser) return workers;
 
-    const email = currentUser.email.toLowerCase();
-    const admins = (data && data.admins) || { "kinan,rahal@hotmail,com": true };
-    const isAdmin = email === 'kinan.rahal@hotmail.com' || admins[email.replace(/\./g, ',')] === true;
+    const email = (currentUser.email || '').toLowerCase();
+    const admins = (data && data.admins) || {};
+    const isAdmin = email === 'kinan.rahal@hotmail.com' ||
+                    (currentUser.isKinan === true) ||
+                    (currentUser.role === 'admin' || currentUser.role === 'super_admin') ||
+                    (admins[email.replace(/\./g, ',')] === true) ||
+                    document.body.classList.contains('role-admin');
 
     const worker = workers.find(w => w && w.email && w.email.toLowerCase() === email);
     const hasFinancePerm = worker && worker.permissions && worker.permissions.finance;
-    const hasTasksPerm = (worker && worker.permissions && (worker.permissions.tasks === true || worker.permissions.tasks === 'true')) || document.body.classList.contains('perm-tasks');
+    const hasTasksPerm = (worker && worker.permissions && (worker.permissions.tasks === true || worker.permissions.tasks === 'true')) ||
+                         document.body.classList.contains('perm-tasks') ||
+                         (currentUser.perms && (currentUser.perms.tasks === true || currentUser.perms.tasks === 'true'));
 
     if (isAdmin || hasFinancePerm || hasTasksPerm) {
         return workers;
@@ -3333,6 +3356,10 @@ function switchTab(tab) {
     if (tab === 'tasks' && typeof renderInquiries === 'function') {
         renderInquiries();
     }
+    if (tab === 'ranks') {
+        if (typeof renderRanksTable === 'function') renderRanksTable();
+        if (typeof renderLeaderboard === 'function') renderLeaderboard();
+    }
 
     // Update the compact bar's active tab label and icon
     const tabMeta = {
@@ -3458,7 +3485,11 @@ function getMonthlyStats(worker, monthStr) {
     return worker.monthlyStats[monthStr];
 }
 
-function getLogsForMonth(worker, monthStr) { return worker.logs.filter(l => l.date.startsWith(monthStr)); }
+function getLogsForMonth(worker, monthStr) {
+    if (!worker || !worker.logs) return [];
+    const logs = Array.isArray(worker.logs) ? worker.logs : Object.values(worker.logs);
+    return logs.filter(l => l && l.date && typeof l.date === 'string' && l.date.startsWith(monthStr));
+}
 
 function calculateViolationsTotal(violationsList) {
     if (!violationsList) return 0;
@@ -3589,7 +3620,11 @@ function getMonthlyStats(worker, monthStr) {
     return worker.monthlyStats[monthStr];
 }
 
-function getLogsForMonth(worker, monthStr) { return worker.logs.filter(l => l.date.startsWith(monthStr)); }
+function getLogsForMonth(worker, monthStr) {
+    if (!worker || !worker.logs) return [];
+    const logs = Array.isArray(worker.logs) ? worker.logs : Object.values(worker.logs);
+    return logs.filter(l => l && l.date && typeof l.date === 'string' && l.date.startsWith(monthStr));
+}
 
 function calculateViolationsTotal(violationsList) {
     if (!violationsList) return 0;
@@ -3720,7 +3755,10 @@ function renderAll() {
         if (typeof renderWorkerOperationsContractBanner === 'function') renderWorkerOperationsContractBanner();
         if (typeof renderWorkerOperationsResponsibilitiesBanner === 'function') renderWorkerOperationsResponsibilitiesBanner();
     }
-    else if (currentTab === 'ranks') { if (typeof renderRanksTable === 'function') renderRanksTable(); }
+    else if (currentTab === 'ranks') { 
+        if (typeof renderRanksTable === 'function') renderRanksTable(); 
+        if (typeof renderLeaderboard === 'function') renderLeaderboard(); 
+    }
     else if (currentTab === 'attendance') { if (typeof renderAttendance === 'function') renderAttendance(); }
     else if (currentTab === 'tasks') {
         if (typeof renderTasks === 'function') renderTasks();

@@ -1088,9 +1088,13 @@ function setInitialBalance() {
 }
 
 function getAveragePerfection(logs) {
-    const graded = logs.filter(l => l.noteType !== 'vacation' && l.score !== 'vacation');
+    if (!logs || !Array.isArray(logs)) {
+        if (logs && typeof logs === 'object') logs = Object.values(logs);
+        else return 'N/A';
+    }
+    const graded = logs.filter(l => l && l.noteType !== 'vacation' && l.score !== 'vacation');
     if (graded.length === 0) return 'N/A';
-    return Math.round(graded.reduce((sum, log) => sum + parseFloat(log.score), 0) / graded.length) + '%';
+    return Math.round(graded.reduce((sum, log) => sum + (parseFloat(log.score) || 0), 0) / graded.length) + '%';
 }
 
 function updateFinancialRecord(type, action) {

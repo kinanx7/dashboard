@@ -12,6 +12,7 @@ const files = [
     'js/finance.js',
     'js/market.js',
     'js/prepare.js',
+    'js/digest.js',
     'js/contracts.js',
     'js/tracking.js',
     'js/learning.js',

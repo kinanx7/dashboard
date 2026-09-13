@@ -237,20 +237,32 @@ function runAutoLogger() {
 }
 
 function getVisibleWorkers() {
-    const workers = getCompanyData().workers;
-    if (!currentUser) return [];
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : null;
+    let workers = (data && data.workers) || [];
+    if (!Array.isArray(workers) && typeof workers === 'object') {
+        workers = Object.values(workers);
+    }
+    workers = workers.filter(w => w && typeof w === 'object' && w.id && w.name);
+    if (!currentUser) return workers;
 
-    const email = currentUser.email.toLowerCase();
-    const admins = getCompanyData().admins || { "kinan,rahal@hotmail,com": true };
-    const isAdmin = email === 'kinan.rahal@hotmail.com' || admins[email.replace(/\./g, ',')] === true;
+    const email = (currentUser.email || '').toLowerCase();
+    const admins = (data && data.admins) || {};
+    const isAdmin = email === 'kinan.rahal@hotmail.com' ||
+                    (currentUser.isKinan === true) ||
+                    (currentUser.role === 'admin' || currentUser.role === 'super_admin') ||
+                    (admins[email.replace(/\./g, ',')] === true) ||
+                    document.body.classList.contains('role-admin');
 
-    const worker = workers.find(w => w.email && w.email.toLowerCase() === email);
+    const worker = workers.find(w => w && w.email && w.email.toLowerCase() === email);
     const hasFinancePerm = worker && worker.permissions && worker.permissions.finance;
+    const hasTasksPerm = (worker && worker.permissions && (worker.permissions.tasks === true || worker.permissions.tasks === 'true')) ||
+                         document.body.classList.contains('perm-tasks') ||
+                         (currentUser.perms && (currentUser.perms.tasks === true || currentUser.perms.tasks === 'true'));
 
-    if (isAdmin || hasFinancePerm) {
+    if (isAdmin || hasFinancePerm || hasTasksPerm) {
         return workers;
     } else {
-        return workers.filter(w => w.email && w.email.toLowerCase() === email);
+        return workers.filter(w => w && w.email && w.email.toLowerCase() === email);
     }
 }
 

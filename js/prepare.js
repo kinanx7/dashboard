@@ -3930,43 +3930,58 @@ window.toggleAdRecipientStatus = toggleAdRecipientStatus;
 function toggleMessagingViewMode(mode) {
     const gatewayContainer = document.getElementById('msg-mode-gateway-container');
     const adContainer = document.getElementById('msg-mode-ad-container');
+    const digestContainer = document.getElementById('msg-mode-digest-container');
     const btnGateway = document.getElementById('btn-msg-mode-gateway');
     const btnAd = document.getElementById('btn-msg-mode-ad');
+    const btnDigest = document.getElementById('btn-msg-mode-digest');
 
-    if (mode === 'ad') {
+    const setBtnActive = (btn) => {
+        if (!btn) return;
+        btn.className = 'btn-primary';
+        btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+        btn.style.color = 'white';
+        btn.style.border = 'none';
+    };
+
+    const setBtnInactive = (btn) => {
+        if (!btn) return;
+        btn.className = 'btn-neutral';
+        btn.style.background = 'var(--input-bg)';
+        btn.style.color = 'var(--text-main)';
+        btn.style.border = '1px solid var(--border-color)';
+    };
+
+    if (mode === 'digest') {
+        if (gatewayContainer) gatewayContainer.style.display = 'none';
+        if (adContainer) adContainer.style.display = 'none';
+        if (digestContainer) digestContainer.style.display = 'block';
+
+        setBtnInactive(btnGateway);
+        setBtnInactive(btnAd);
+        setBtnActive(btnDigest);
+
+        if (typeof initDailyDigestModule === 'function') {
+            initDailyDigestModule();
+        }
+    } else if (mode === 'ad') {
         if (gatewayContainer) gatewayContainer.style.display = 'none';
         if (adContainer) adContainer.style.display = 'block';
+        if (digestContainer) digestContainer.style.display = 'none';
 
-        if (btnGateway) {
-            btnGateway.className = 'btn-neutral';
-            btnGateway.style.background = 'var(--input-bg)';
-            btnGateway.style.color = 'var(--text-main)';
-            btnGateway.style.border = '1px solid var(--border-color)';
-        }
-        if (btnAd) {
-            btnAd.className = 'btn-primary';
-            btnAd.style.background = 'linear-gradient(135deg, #10b981, #059669)';
-            btnAd.style.color = 'white';
-            btnAd.style.border = 'none';
-        }
+        setBtnInactive(btnGateway);
+        setBtnActive(btnAd);
+        setBtnInactive(btnDigest);
+
         loadAdRecipients();
         renderAdRecipientsList();
     } else {
         if (gatewayContainer) gatewayContainer.style.display = 'block';
         if (adContainer) adContainer.style.display = 'none';
+        if (digestContainer) digestContainer.style.display = 'none';
 
-        if (btnGateway) {
-            btnGateway.className = 'btn-primary';
-            btnGateway.style.background = 'linear-gradient(135deg, #10b981, #059669)';
-            btnGateway.style.color = 'white';
-            btnGateway.style.border = 'none';
-        }
-        if (btnAd) {
-            btnAd.className = 'btn-neutral';
-            btnAd.style.background = 'var(--input-bg)';
-            btnAd.style.color = 'var(--text-main)';
-            btnAd.style.border = '1px solid var(--border-color)';
-        }
+        setBtnActive(btnGateway);
+        setBtnInactive(btnAd);
+        setBtnInactive(btnDigest);
     }
 }
 window.toggleMessagingViewMode = toggleMessagingViewMode;

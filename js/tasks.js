@@ -21,7 +21,11 @@ function getMonthlyStats(worker, monthStr) {
     return worker.monthlyStats[monthStr];
 }
 
-function getLogsForMonth(worker, monthStr) { return worker.logs.filter(l => l.date.startsWith(monthStr)); }
+function getLogsForMonth(worker, monthStr) {
+    if (!worker || !worker.logs) return [];
+    const logs = Array.isArray(worker.logs) ? worker.logs : Object.values(worker.logs);
+    return logs.filter(l => l && l.date && typeof l.date === 'string' && l.date.startsWith(monthStr));
+}
 
 function calculateViolationsTotal(violationsList) {
     if (!violationsList) return 0;
@@ -663,9 +667,14 @@ window.deleteDetailedViolation = deleteDetailedViolation;
 function manuallyUpdateRank(workerId, newRank) {
     if (!newRank) return;
     if (!confirm(`Change rank to ${newRank}?`)) return;
-    const workerIndex = getCompanyData().workers.findIndex(w => w.id === workerId);
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    let workers = companyData.workers || [];
+    if (!Array.isArray(workers) && typeof workers === 'object') {
+        workers = Object.values(workers);
+    }
+    const workerIndex = workers.findIndex(w => w && w.id === workerId);
     if (workerIndex === -1) return;
-    const worker = getCompanyData().workers[workerIndex];
+    const worker = workers[workerIndex];
     worker.rank = newRank;
     worker.lastEvalDate = Date.now();
 
@@ -673,6 +682,9 @@ function manuallyUpdateRank(workerId, newRank) {
     db.ref(`companies/${currentCompany}/workers/${workerIndex}`).update({
         rank: newRank,
         lastEvalDate: worker.lastEvalDate
+    }).then(() => {
+        if (typeof renderRanksTable === 'function') renderRanksTable();
+        if (typeof renderLeaderboard === 'function') renderLeaderboard();
     }).catch(err => console.error("Error manually updating rank:", err));
 }
 
@@ -681,62 +693,83 @@ function renderRanksTable() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    const now = Date.now();
-    const ninetyDays = 90 * 24 * 60 * 60 * 1000;
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    let workers = getVisibleWorkers();
+    if (!Array.isArray(workers)) {
+        workers = workers && typeof workers === 'object' ? Object.values(workers) : [];
+    }
+    workers = (workers || []).filter(w => w && typeof w === 'object' && w.id && w.name);
 
-    const workers = getVisibleWorkers();
+    // Fallback: if workers is empty, check raw companyData.workers
+    if (workers.length === 0 && companyData && companyData.workers) {
+        let raw = companyData.workers;
+        if (!Array.isArray(raw) && typeof raw === 'object') raw = Object.values(raw);
+        if (Array.isArray(raw) && raw.length > 0) {
+            workers = raw.filter(w => w && typeof w === 'object' && w.id && w.name);
+        }
+    }
 
-    if (workers.length === 0 && (!currentUser || currentUser.role !== 'admin')) {
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;">Your account is not linked to any worker profile yet.</td></tr>`;
+    const isAr = typeof currentAppLang !== 'undefined' && currentAppLang === 'ar';
+
+    if (workers.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:24px;">${isAr ? 'لا يوجد موظفون في هذه الشركة حتى الآن.' : 'No workers found in this company yet.'}</td></tr>`;
         return;
     }
 
+    const now = Date.now();
+    const ninetyDays = 90 * 24 * 60 * 60 * 1000;
+
     workers.forEach(worker => {
-        let relevantLogs = worker.logs.filter(l => (now - new Date(l.date).getTime()) <= ninetyDays);
-        let gradedLogs = relevantLogs.filter(l => l.noteType !== 'vacation' && l.score !== 'vacation');
+        let logs = worker.logs || [];
+        if (!Array.isArray(logs) && typeof logs === 'object') logs = Object.values(logs);
+
+        let relevantLogs = logs.filter(l => l && l.date && (now - new Date(l.date).getTime()) <= ninetyDays);
+        let gradedLogs = relevantLogs.filter(l => l && l.noteType !== 'vacation' && l.score !== 'vacation');
 
         let avgDisplay = 'N/A';
         if (gradedLogs.length > 0) {
-            let sum = gradedLogs.reduce((acc, l) => acc + parseFloat(l.score), 0);
+            let sum = gradedLogs.reduce((acc, l) => acc + (parseFloat(l.score) || 0), 0);
             avgDisplay = Math.round(sum / gradedLogs.length) + '%';
         }
 
         const detailsId = `rank-details-${worker.id}`;
+        const currentRank = worker.rank || 'Unranked';
+        const branchDisplay = worker.branch || (isAr ? 'الفرع الرئيسي' : 'Main Branch');
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-                    <td>
-                        <strong style="color:var(--text-main);">${worker.name}</strong><br>
-                        <span class="text-muted-heavy">${worker.branch}</span>
-                    </td>
-                    <td><span class="rank-badge rank-${worker.rank}">${worker.rank}</span></td>
-                    <td>
-                        <div style="display:flex; align-items:center; gap:8px; cursor:pointer;" onclick="toggleDetails('${detailsId}')">
-                            <span class="badge" style="background: var(--primary); margin:0;">${avgDisplay}</span>
-                            <span style="font-size:0.7rem; color:var(--primary);">▼ Log</span>
+            <td>
+                <strong style="color:var(--text-main);">${worker.name}</strong><br>
+                <span class="text-muted-heavy">${branchDisplay}</span>
+            </td>
+            <td><span class="rank-badge rank-${currentRank}">${currentRank}</span></td>
+            <td>
+                <div style="display:flex; align-items:center; gap:8px; cursor:pointer;" onclick="toggleDetails('${detailsId}')">
+                    <span class="badge" style="background: var(--primary); margin:0;">${avgDisplay}</span>
+                    <span style="font-size:0.7rem; color:var(--primary);">▼ Log</span>
+                </div>
+                <div class="breakdown-details" id="${detailsId}" style="max-height: 200px; overflow-y:auto; margin-top: 10px;">
+                    <strong style="display:block; border-bottom:1px solid var(--border-color); margin-bottom:8px; padding-bottom:4px; color:var(--text-main);">Last 90 Days Log</strong>
+                    ${relevantLogs.length === 0 ? '<em style="color:var(--text-muted)">No logs found.</em>' : relevantLogs.map(l => `
+                        <div class="breakdown-row" style="padding:4px 0; border-bottom:1px solid rgba(0,0,0,0.05);">
+                            <span style="color:var(--text-muted); font-size:0.75rem;">${l.date || ''}</span> 
+                            <span style="${l.noteType === 'vacation' ? 'color:var(--warning)' : (l.score == 100 ? 'color:var(--success)' : 'color:var(--danger)')}">
+                                ${l.noteType === 'vacation' ? '🌴 Vacation' : (l.score == 100 ? '✅ 100%' : '❌ ' + (l.score || '0') + '%')}
+                            </span>
                         </div>
-                        <div class="breakdown-details" id="${detailsId}" style="max-height: 200px; overflow-y:auto; margin-top: 10px;">
-                            <strong style="display:block; border-bottom:1px solid var(--border-color); margin-bottom:8px; padding-bottom:4px; color:var(--text-main);">Last 90 Days Log</strong>
-                            ${relevantLogs.length === 0 ? '<em style="color:var(--text-muted)">No logs found.</em>' : relevantLogs.map(l => `
-                                <div class="breakdown-row" style="padding:4px 0; border-bottom:1px solid rgba(0,0,0,0.05);">
-                                    <span style="color:var(--text-muted); font-size:0.75rem;">${l.date}</span> 
-                                    <span style="${l.noteType === 'vacation' ? 'color:var(--warning)' : (l.score == 100 ? 'color:var(--success)' : 'color:var(--danger)')}">
-                                        ${l.noteType === 'vacation' ? '🌴 Vacation' : (l.score == 100 ? '✅ 100%' : '❌ 2.5%')}
-                                    </span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </td>
-                    <td class="admin-only">
-                        <select onchange="manuallyUpdateRank('${worker.id}', this.value)" style="padding: 8px; width: auto; font-size: 0.85rem;">
-                            <option value="">Change...</option>
-                            <option value="A">Promote to A</option>
-                            <option value="B">Set to B</option>
-                            <option value="C">Set to C</option>
-                            <option value="Unranked">Demote to Unranked</option>
-                        </select>
-                    </td>
-                `;
+                    `).join('')}
+                </div>
+            </td>
+            <td class="admin-only">
+                <select onchange="manuallyUpdateRank('${worker.id}', this.value)" style="padding: 8px; width: auto; font-size: 0.85rem;">
+                    <option value="">Change...</option>
+                    <option value="A" ${currentRank === 'A' ? 'selected' : ''}>Promote to A</option>
+                    <option value="B" ${currentRank === 'B' ? 'selected' : ''}>Set to B</option>
+                    <option value="C" ${currentRank === 'C' ? 'selected' : ''}>Set to C</option>
+                    <option value="Unranked" ${currentRank === 'Unranked' ? 'selected' : ''}>Demote to Unranked</option>
+                </select>
+            </td>
+        `;
         tbody.appendChild(tr);
     });
 }
@@ -1168,17 +1201,30 @@ function getJobTimestamp(j) {
 }
 
 function getVisibleWorkers() {
-    const companyData = getCompanyData();
-    const allWorkers = companyData.workers || [];
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    let allWorkers = (companyData && companyData.workers) || [];
+    if (!Array.isArray(allWorkers) && typeof allWorkers === 'object') {
+        allWorkers = Object.values(allWorkers);
+    }
+    allWorkers = allWorkers.filter(w => w && typeof w === 'object' && w.id && w.name);
+
     if (!currentUser) return allWorkers;
-    if (currentUser.role === 'admin') return allWorkers;
 
-    const activeWorker = getActiveWorker();
+    const email = (currentUser.email || '').toLowerCase();
+    const admins = (companyData && companyData.admins) || {};
+    const isCompanyAdmin = email === 'kinan.rahal@hotmail.com' ||
+                          (currentUser.isKinan === true) ||
+                          (currentUser.role === 'admin' || currentUser.role === 'super_admin') ||
+                          (admins[email.replace(/\./g, ',')] === true) ||
+                          document.body.classList.contains('role-admin');
 
-    // Check if worker has task access (perm-tasks class on body or perms object or currentUser perms)
+    if (isCompanyAdmin) return allWorkers;
+
+    const activeWorker = typeof getActiveWorker === 'function' ? getActiveWorker() : null;
     const hasTaskAccess = document.body.classList.contains('perm-tasks') ||
+        (activeWorker && activeWorker.permissions && (activeWorker.permissions.tasks === true || activeWorker.permissions.tasks === 'true')) ||
         (activeWorker && activeWorker.perms && (activeWorker.perms.tasks === true || activeWorker.perms.tasks === 'true')) ||
-        (currentUser && currentUser.perms && (currentUser.perms.tasks === true || currentUser.perms.tasks === 'true'));
+        (currentUser.perms && (currentUser.perms.tasks === true || currentUser.perms.tasks === 'true'));
 
     if (hasTaskAccess || !activeWorker) {
         return allWorkers;
