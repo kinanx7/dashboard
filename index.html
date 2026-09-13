@@ -5059,15 +5059,46 @@
                                 </h3>
 
                                 <!-- Master Enable/Disable Toggle -->
-                                <div style="background:var(--card-bg); padding:12px 16px; border-radius:12px; border:1px solid var(--border-color); display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+                                <div style="background:var(--card-bg); padding:14px 18px; border-radius:14px; border:1px solid var(--border-color); display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
                                     <div>
-                                        <strong style="font-size:0.88rem; color:var(--text-main); display:block;" data-i18n="label-digest-enable">Enable Automated Daily WhatsApp Digest</strong>
-                                        <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">Dispatches the full log automatically at the scheduled time</span>
+                                        <div style="display:flex; align-items:center; gap:8px;">
+                                            <strong style="font-size:0.92rem; color:var(--text-main); display:block;" data-i18n="label-digest-enable">Automated Daily WhatsApp Dispatch</strong>
+                                            <span id="digest-toggle-status-badge" style="font-size:0.75rem; font-weight:800; padding:3px 10px; border-radius:20px; background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);">
+                                                🟢 ACTIVE (مفعّل)
+                                            </span>
+                                        </div>
+                                        <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600; display:block; margin-top:2px;">
+                                            Master switch: automatically dispatches the operations log every day at the scheduled time
+                                        </span>
                                     </div>
-                                    <label class="switch" style="position:relative; display:inline-block; width:48px; height:26px;">
-                                        <input type="checkbox" id="digest-enable-toggle" checked onchange="updateDigestPreview()">
-                                        <span class="slider round" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#ccc; transition:.4s; border-radius:34px;"></span>
+                                    <label class="digest-ios-switch" title="Toggle automated scheduled dispatch ON/OFF">
+                                        <input type="checkbox" id="digest-enable-toggle" checked onchange="toggleDigestMasterSwitch(this.checked)">
+                                        <span class="digest-toggle-track">
+                                            <span class="digest-toggle-knob"></span>
+                                        </span>
                                     </label>
+                                </div>
+
+                                <!-- Dispatch Language Selector -->
+                                <div style="background:var(--card-bg); padding:14px 18px; border-radius:14px; border:1px solid var(--border-color); margin-bottom:16px;">
+                                    <label style="font-size:0.82rem; font-weight:800; color:var(--text-main); margin-bottom:8px; display:flex; align-items:center; justify-content:space-between;">
+                                        <span>🌐 Report Language / لغة إرسال التقرير:</span>
+                                        <span id="digest-selected-lang-tag" style="font-size:0.75rem; color:#10b981; font-weight:800;">🇸🇦 العربية فقط</span>
+                                    </label>
+                                    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px;">
+                                        <button type="button" id="btn-digest-lang-ar" onclick="setDigestLanguage('ar')" class="digest-lang-btn active">
+                                            🇸🇦 العربية
+                                        </button>
+                                        <button type="button" id="btn-digest-lang-en" onclick="setDigestLanguage('en')" class="digest-lang-btn">
+                                            🇬🇧 English
+                                        </button>
+                                        <button type="button" id="btn-digest-lang-both" onclick="setDigestLanguage('both')" class="digest-lang-btn">
+                                            🌐 كلاهما (Both)
+                                        </button>
+                                    </div>
+                                    <span style="font-size:0.72rem; color:var(--text-muted); display:block; margin-top:6px;">
+                                        اختر اللغة التي سيتم اعتمادها عند الإرسال التلقائي أو الفوري للمدراء عبر الواتساب.
+                                    </span>
                                 </div>
 
                                 <!-- Scheduled Send Time -->
@@ -5167,14 +5198,20 @@
                                 </h3>
                                 <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">Real-time preview of the actual compiled message for today</span>
                             </div>
-                            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                                <button type="button" onclick="updateDigestPreview()" class="btn-neutral" style="padding:8px 16px; border-radius:8px; font-weight:800; font-size:0.8rem; background:var(--card-bg); color:var(--text-main); border:1px solid var(--border-color); cursor:pointer;" data-i18n="btn-refresh-digest-preview">
-                                    🔄 Refresh Preview
+                            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                                <button type="button" onclick="updateDigestPreview()" class="btn-neutral" style="padding:8px 14px; border-radius:8px; font-weight:800; font-size:0.8rem; background:var(--card-bg); color:var(--text-main); border:1px solid var(--border-color); cursor:pointer;" data-i18n="btn-refresh-digest-preview">
+                                    🔄 Refresh
                                 </button>
-                                <button type="button" onclick="copyDigestReportText()" class="btn-neutral" style="padding:8px 16px; border-radius:8px; font-weight:800; font-size:0.8rem; background:var(--card-bg); color:var(--text-main); border:1px solid var(--border-color); cursor:pointer;" data-i18n="btn-copy-digest-text">
-                                    📋 Copy Report Text
+                                <button type="button" onclick="copyDigestReportArabic()" class="btn-neutral" style="padding:8px 14px; border-radius:8px; font-weight:800; font-size:0.8rem; background:var(--card-bg); color:#10b981; border:1px solid rgba(16,185,129,0.4); cursor:pointer;" title="نسخ التقرير بصيغة اللغة العربية فقط">
+                                    📋 نسخ بالعربية
                                 </button>
-                                <button type="button" onclick="sendDailyDigestNow()" class="btn-primary" style="padding:8px 18px; border-radius:8px; font-weight:800; font-size:0.8rem; background:linear-gradient(135deg, #10b981, #059669); color:white; border:none; cursor:pointer;" data-i18n="btn-send-digest-now">
+                                <button type="button" onclick="copyDigestReportEnglish()" class="btn-neutral" style="padding:8px 14px; border-radius:8px; font-weight:800; font-size:0.8rem; background:var(--card-bg); color:#3b82f6; border:1px solid rgba(59,130,246,0.4); cursor:pointer;" title="Copy English report only">
+                                    📋 Copy English
+                                </button>
+                                <button type="button" onclick="copyDigestReportBoth()" class="btn-neutral" style="padding:8px 14px; border-radius:8px; font-weight:800; font-size:0.8rem; background:var(--card-bg); color:var(--text-main); border:1px solid var(--border-color); cursor:pointer;" title="نسخ التقرير الكامل باللغتين">
+                                    📋 نسخ باللغتين (Both)
+                                </button>
+                                <button type="button" onclick="sendDailyDigestNow()" class="btn-primary" style="padding:8px 18px; border-radius:8px; font-weight:800; font-size:0.82rem; background:linear-gradient(135deg, #10b981, #059669); color:white; border:none; cursor:pointer; box-shadow:0 2px 8px rgba(16,185,129,0.3);" data-i18n="btn-send-digest-now">
                                     🚀 Send Today's Log Now
                                 </button>
                             </div>
@@ -8666,8 +8703,8 @@
     </div>
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=345"></script>
-    <script src="app.js?v=345"></script>
+    <script src="translations.js?v=347"></script>
+    <script src="app.js?v=347"></script>
 </body>
 
 </html>

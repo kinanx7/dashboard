@@ -14,6 +14,7 @@
 
 var dailyDigestConfig = {
     enabled: true,
+    language: "ar", // 'ar' (Arabic), 'en' (English), 'both' (Bilingual)
     scheduledTime: "23:00",
     managers: [],
     options: {
@@ -48,6 +49,7 @@ function loadDailyDigestConfig() {
         if (saved) {
             const parsed = JSON.parse(saved);
             dailyDigestConfig = Object.assign({}, dailyDigestConfig, parsed);
+            if (!dailyDigestConfig.language) dailyDigestConfig.language = 'ar';
             if (!dailyDigestConfig.options) {
                 dailyDigestConfig.options = { sales: true, tasks: true, absent: true, violations: true, rewards: true, payments: true, custody: true };
             }
@@ -68,6 +70,7 @@ function setupDailyDigestFirebaseListener() {
                 const data = snap.val();
                 if (data && typeof data === 'object') {
                     dailyDigestConfig = Object.assign({}, dailyDigestConfig, data);
+                    if (!dailyDigestConfig.language) dailyDigestConfig.language = 'ar';
                     if (!dailyDigestConfig.options) {
                         dailyDigestConfig.options = { sales: true, tasks: true, absent: true, violations: true, rewards: true, payments: true, custody: true };
                     }
@@ -82,6 +85,82 @@ function setupDailyDigestFirebaseListener() {
         });
     } catch (e) {
         console.warn("Failed to attach Firebase listener for daily digest:", e);
+    }
+}
+
+// Master Enable / Disable Toggle Switch Handler
+function toggleDigestMasterSwitch(checked) {
+    dailyDigestConfig.enabled = !!checked;
+    const enableEl = document.getElementById('digest-enable-toggle');
+    if (enableEl) enableEl.checked = dailyDigestConfig.enabled;
+    updateDigestStatusBadges();
+    saveDailyDigestSettings(true);
+}
+window.toggleDigestMasterSwitch = toggleDigestMasterSwitch;
+
+// Language Selector Handler ('ar', 'en', 'both')
+function setDigestLanguage(lang) {
+    if (!['ar', 'en', 'both'].includes(lang)) lang = 'ar';
+    dailyDigestConfig.language = lang;
+    updateDigestLanguageButtonsUI();
+    saveDailyDigestSettings(true);
+    updateDigestPreview();
+}
+window.setDigestLanguage = setDigestLanguage;
+
+// Update Language Buttons UI state
+function updateDigestLanguageButtonsUI() {
+    const currentLang = dailyDigestConfig.language || 'ar';
+    const btnAr = document.getElementById('btn-digest-lang-ar');
+    const btnEn = document.getElementById('btn-digest-lang-en');
+    const btnBoth = document.getElementById('btn-digest-lang-both');
+    const tag = document.getElementById('digest-selected-lang-tag');
+
+    if (btnAr) btnAr.classList.toggle('active', currentLang === 'ar');
+    if (btnEn) btnEn.classList.toggle('active', currentLang === 'en');
+    if (btnBoth) btnBoth.classList.toggle('active', currentLang === 'both');
+
+    if (tag) {
+        if (currentLang === 'ar') tag.textContent = '🇸🇦 العربية فقط';
+        else if (currentLang === 'en') tag.textContent = '🇬🇧 English Only';
+        else tag.textContent = '🌐 كلا اللغتين (Arabic & English)';
+    }
+}
+
+// Update Status Badges in top header & toggle area
+function updateDigestStatusBadges() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const badge = document.getElementById('digest-status-badge');
+    const toggleBadge = document.getElementById('digest-toggle-status-badge');
+
+    if (dailyDigestConfig.enabled) {
+        if (badge) {
+            badge.style.background = 'rgba(16,185,129,0.15)';
+            badge.style.color = '#10b981';
+            badge.style.borderColor = 'rgba(16,185,129,0.3)';
+            badge.textContent = isAr 
+                ? `⏰ مفعّل يومياً (${dailyDigestConfig.scheduledTime || '23:00'} بتوقيت الرياض)` 
+                : `⏰ Scheduled Daily (${dailyDigestConfig.scheduledTime || '23:00'} KSA)`;
+        }
+        if (toggleBadge) {
+            toggleBadge.style.background = 'rgba(16,185,129,0.15)';
+            toggleBadge.style.color = '#10b981';
+            toggleBadge.style.borderColor = 'rgba(16,185,129,0.3)';
+            toggleBadge.textContent = '🟢 ACTIVE (مفعّل)';
+        }
+    } else {
+        if (badge) {
+            badge.style.background = 'rgba(239,68,68,0.15)';
+            badge.style.color = '#ef4444';
+            badge.style.borderColor = 'rgba(239,68,68,0.3)';
+            badge.textContent = isAr ? '⛔ متوقف مؤقتاً' : '⛔ Paused';
+        }
+        if (toggleBadge) {
+            toggleBadge.style.background = 'rgba(239,68,68,0.15)';
+            toggleBadge.style.color = '#ef4444';
+            toggleBadge.style.borderColor = 'rgba(239,68,68,0.3)';
+            toggleBadge.textContent = '⛔ PAUSED (متوقف)';
+        }
     }
 }
 
@@ -139,35 +218,21 @@ window.saveDailyDigestSettings = saveDailyDigestSettings;
 
 // Render UI Components
 function renderDailyDigestSection() {
-    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
-
-    // 1. Status Badge
-    const badge = document.getElementById('digest-status-badge');
-    if (badge) {
-        if (dailyDigestConfig.enabled) {
-            badge.style.background = 'rgba(16,185,129,0.15)';
-            badge.style.color = '#10b981';
-            badge.style.borderColor = 'rgba(16,185,129,0.3)';
-            badge.textContent = isAr 
-                ? `⏰ مفعّل يومياً (${dailyDigestConfig.scheduledTime || '23:00'} بتوقيت الرياض)` 
-                : `⏰ Scheduled Daily (${dailyDigestConfig.scheduledTime || '23:00'} KSA)`;
-        } else {
-            badge.style.background = 'rgba(239,68,68,0.15)';
-            badge.style.color = '#ef4444';
-            badge.style.borderColor = 'rgba(239,68,68,0.3)';
-            badge.textContent = isAr ? '⛔ متوقف مؤقتاً' : '⛔ Paused';
-        }
-    }
+    // 1. Status Badges
+    updateDigestStatusBadges();
 
     // 2. Master Enable Toggle
     const enableEl = document.getElementById('digest-enable-toggle');
     if (enableEl) enableEl.checked = dailyDigestConfig.enabled !== false;
 
-    // 3. Scheduled Time
+    // 3. Language Selector Buttons
+    updateDigestLanguageButtonsUI();
+
+    // 4. Scheduled Time
     const timeEl = document.getElementById('digest-scheduled-time');
     if (timeEl && dailyDigestConfig.scheduledTime) timeEl.value = dailyDigestConfig.scheduledTime;
 
-    // 4. Content Options Checkboxes
+    // 5. Content Options Checkboxes
     const opts = dailyDigestConfig.options || {};
     const optSales = document.getElementById('digest-inc-sales');
     const optTasks = document.getElementById('digest-inc-tasks');
@@ -185,13 +250,13 @@ function renderDailyDigestSection() {
     if (optPayments) optPayments.checked = opts.payments !== false;
     if (optCustody) optCustody.checked = opts.custody !== false;
 
-    // 5. Managers List
+    // 6. Managers List
     renderDigestManagersList();
 
-    // 6. Companies Grid
+    // 7. Companies Grid
     renderDigestCompaniesGrid();
 
-    // 7. Update Live Preview
+    // 8. Update Live Preview
     updateDigestPreview();
 }
 window.renderDailyDigestSection = renderDailyDigestSection;
@@ -327,10 +392,83 @@ function toggleDigestCompany(slug) {
 }
 window.toggleDigestCompany = toggleDigestCompany;
 
+// --- BULLETPROOF DATE MATCHER FOR DAILY DIGEST ---
+// Accurately matches epoch timestamps, ISO date strings, YYYY-MM-DD, and "Mmm DD, HH:MM" from formatTimestamp()
+function isItemForDate(item, targetDateStr, localDateStr = '') {
+    if (!item) return false;
+    if (!targetDateStr) return false;
+
+    const checkDates = [targetDateStr];
+    if (localDateStr && localDateStr !== targetDateStr) {
+        checkDates.push(localDateStr);
+    }
+
+    for (const dStr of checkDates) {
+        const [tY, tM, tD] = dStr.split('-').map(Number);
+        const startOfDay = new Date(tY, tM - 1, tD, 0, 0, 0, 0).getTime();
+        const endOfDay = new Date(tY, tM - 1, tD, 23, 59, 59, 999).getTime();
+
+        // 1. Check numeric timestamps (timestamp, createdAt, completedAt, approvedAt, confirmedAt)
+        let ts = Number(item.timestamp || item.createdAt || item.completedAt || item.approvedAt || item.confirmedAt);
+        if (!ts && item.id && /^\d{13,}$/.test(String(item.id))) {
+            ts = Number(item.id);
+        }
+        if (ts > 0 && ts < 10000000000) ts *= 1000;
+        if (ts > 0) {
+            // Direct range check
+            if (ts >= startOfDay && ts <= endOfDay) return true;
+            // Date ISO check
+            const d = new Date(ts);
+            if (!isNaN(d.getTime())) {
+                const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                if (iso === dStr) return true;
+            }
+        }
+
+        // 2. Date string properties (dateStr, assignedDate, targetDate)
+        const dProp = item.dateStr || item.assignedDate || item.targetDate;
+        if (dProp && typeof dProp === 'string' && dProp.trim().startsWith(dStr)) return true;
+
+        // 3. String date field (could be ISO, YYYY-MM-DD, or "Sep 13, 21:05")
+        if (item.date && typeof item.date === 'string') {
+            const clean = item.date.trim();
+            if (clean.startsWith(dStr)) return true;
+
+            // Check for 4-digit year format YYYY-MM-DD or YYYY/MM/DD
+            const matchIso = clean.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+            if (matchIso) {
+                const iso = matchIso[1] + '-' + String(matchIso[2]).padStart(2, '0') + '-' + String(matchIso[3]).padStart(2, '0');
+                if (iso === dStr) return true;
+            }
+
+            // Check for format "Mmm DD, HH:MM" generated by formatTimestamp() (e.g. "Sep 13, 21:05")
+            const matchMonth = clean.match(/([a-zA-Z]{3})\s+(\d{1,2})/);
+            if (matchMonth) {
+                const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+                const mIdx = months.indexOf(matchMonth[1].toLowerCase());
+                const dNum = parseInt(matchMonth[2], 10);
+                if (mIdx === (tM - 1) && dNum === tD) return true;
+            }
+        }
+
+        // 4. Fallback to parseLogDate if available in global scope
+        if (typeof parseLogDate === 'function') {
+            try {
+                const d = parseLogDate(item);
+                if (d && d.getFullYear() === tY && (d.getMonth() + 1) === tM && d.getDate() === tD) return true;
+            } catch (e) {}
+        }
+    }
+
+    return false;
+}
+window.isItemForDate = isItemForDate;
+
 // --- DAILY DIGEST DATA COMPILER ---
-// Asynchronously collects data for all included companies and builds the message
-async function compileDailyDigest(targetDateStr = null) {
-    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+// Asynchronously collects data for all included companies and builds the message in selected language
+async function compileDailyDigest(targetDateStr = null, targetLang = null) {
+    // Determine target language: 'ar', 'en', or 'both'
+    const lang = targetLang || dailyDigestConfig.language || 'ar';
     
     // Determine KSA date (GMT+3)
     const now = new Date();
@@ -342,7 +480,8 @@ async function compileDailyDigest(targetDateStr = null) {
     const monthStr = String(ksaTime.getMonth() + 1).padStart(2, '0');
     const dayStr = String(ksaTime.getDate()).padStart(2, '0');
     const today = targetDateStr || `${year}-${monthStr}-${dayStr}`;
-    const targetMonth = today.slice(0, 7);
+
+    const localTodayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     const companies = window.portalCompanies || {
         burgeroov: { id: 'burgeroov', name: 'BURGEROOV' },
@@ -356,19 +495,21 @@ async function compileDailyDigest(targetDateStr = null) {
     const includedSlugs = Object.keys(companies).filter(s => !excluded.includes(s));
     
     // Overall Grand Totals
-    let grandTotalSales = 0;
-    let grandTotalTasks = 0;
-    let grandTotalAbsent = 0;
-    let grandTotalViolationsAmt = 0;
-    let grandTotalViolationsCount = 0;
-    let grandTotalRewardsAmt = 0;
-    let grandTotalRewardsCount = 0;
-    let grandTotalPaymentsAmt = 0;
-    let grandTotalPaymentsCount = 0;
-    let grandTotalCustodyAmt = 0;
-    let grandTotalCustodyCount = 0;
+    let grandTotals = {
+        sales: 0,
+        tasks: 0,
+        absent: 0,
+        violationsCount: 0,
+        violationsAmt: 0,
+        rewardsCount: 0,
+        rewardsAmt: 0,
+        paymentsCount: 0,
+        paymentsAmt: 0,
+        custodyCount: 0,
+        custodyAmt: 0
+    };
 
-    let companyBlocks = [];
+    let companyDataList = [];
 
     for (const slug of includedSlugs) {
         const compMeta = companies[slug] || { id: slug, name: slug.toUpperCase() };
@@ -377,10 +518,18 @@ async function compileDailyDigest(targetDateStr = null) {
         let compData = {};
         if (slug === window.currentCompany && typeof getCompanyData === 'function') {
             compData = getCompanyData();
-        } else if (typeof db !== 'undefined' && db) {
+        } else if (window.appData && window.appData[slug] && Object.keys(window.appData[slug]).length > 0) {
+            compData = window.appData[slug];
+        }
+
+        // Fetch fresh company snapshot from Firebase if missing
+        if ((!compData || !compData.workers) && typeof db !== 'undefined' && db) {
             try {
                 const snap = await db.ref(`companies/${slug}`).once('value');
-                if (snap.exists()) compData = snap.val() || {};
+                if (snap.exists()) {
+                    const val = snap.val() || {};
+                    compData = Object.assign({}, val, compData);
+                }
             } catch (e) {
                 console.warn(`Could not fetch data for ${slug}:`, e);
             }
@@ -388,40 +537,74 @@ async function compileDailyDigest(targetDateStr = null) {
 
         const workers = compData.workers ? (Array.isArray(compData.workers) ? compData.workers : Object.values(compData.workers)) : [];
         const attendance = compData.attendance || {};
-        const todayAtt = attendance[today] || {};
 
-        // 1. Sales Calculation
+        // 1. Sales Calculation (Accurately read POS sales + Marketplace orders)
         let compSalesTotal = 0;
         let posSalesToday = 0;
         let marketSalesToday = 0;
 
         if (opts.sales) {
+            const disabledMethods = compData.disabledSalesMethods || [];
+
+            // A. Check POS salesLogs in company data
             const salesLogs = compData.salesLogs ? (Array.isArray(compData.salesLogs) ? compData.salesLogs : Object.values(compData.salesLogs)) : [];
             salesLogs.forEach(l => {
                 if (!l) return;
-                const dKey = (typeof normalizeDateStr === 'function') ? normalizeDateStr(l.date || l.timestamp || l.createdAt) : (l.dateStr || l.date);
-                if (dKey === today) {
+                if (disabledMethods.includes(l.method)) return;
+                if (isItemForDate(l, today, localTodayStr)) {
                     posSalesToday += parseFloat(l.amount || 0);
                 }
             });
 
+            // B. Check Marketplace / Online Orders
             const marketOrders = compData.marketOrders ? (Array.isArray(compData.marketOrders) ? compData.marketOrders : Object.values(compData.marketOrders)) : [];
             marketOrders.forEach(o => {
                 if (!o) return;
-                const dKey = (typeof normalizeDateStr === 'function') ? normalizeDateStr(o.date || o.createdAt) : (o.dateStr || o.date);
-                if (dKey === today) {
+                if (isItemForDate(o, today, localTodayStr)) {
                     marketSalesToday += parseFloat(o.totalCost || o.price || 0);
                 }
             });
 
+            // C. If active company on screen has rendered sales totals, reconcile with Sales Section DOM / summary
+            if (slug === window.currentCompany) {
+                // If posSalesToday is 0, attempt getTodaySalesSummary()
+                if (posSalesToday === 0 && typeof getTodaySalesSummary === 'function') {
+                    try {
+                        const sumObj = getTodaySalesSummary();
+                        if (sumObj && sumObj.total > 0) {
+                            posSalesToday = sumObj.posTotal || sumObj.total;
+                            if (marketSalesToday === 0 && sumObj.marketTotal) marketSalesToday = sumObj.marketTotal;
+                        }
+                    } catch (e) {}
+                }
+
+                // If still 0, check DOM elements of the Sales Section directly
+                if (posSalesToday === 0) {
+                    const grandEl = document.getElementById('sales-grand-total');
+                    const salaryEl = document.getElementById('sales-total-salary');
+                    let domNum = 0;
+                    if (salaryEl && salaryEl.textContent) {
+                        const n = parseFloat(salaryEl.textContent.replace(/[^0-9.]/g, ''));
+                        if (!isNaN(n) && n > 0) domNum = n;
+                    }
+                    if (domNum === 0 && grandEl && grandEl.textContent) {
+                        const n = parseFloat(grandEl.textContent.replace(/[^0-9.]/g, ''));
+                        if (!isNaN(n) && n > 0) domNum = n;
+                    }
+                    if (domNum > 0) {
+                        posSalesToday = domNum;
+                    }
+                }
+            }
+
             compSalesTotal = posSalesToday + marketSalesToday;
-            grandTotalSales += compSalesTotal;
+            grandTotals.sales += compSalesTotal;
         }
 
         // 2. Tasks Done Today
         let compTasksDone = 0;
-        let completedTaskTitles = [];
         if (opts.tasks) {
+            // A. Worker assigned jobs
             workers.forEach(w => {
                 if (!w || !w.jobs) return;
                 const jobs = Array.isArray(w.jobs) ? w.jobs : Object.values(w.jobs);
@@ -429,47 +612,44 @@ async function compileDailyDigest(targetDateStr = null) {
                     if (!j) return;
                     const isDone = (j.done === true || j.status === 'completed');
                     if (isDone) {
-                        let isToday = false;
-                        if (j.completedAt) {
-                            const doneDate = (typeof normalizeDateStr === 'function') ? normalizeDateStr(j.completedAt) : '';
-                            if (doneDate === today) isToday = true;
-                        }
-                        if (!isToday && j.assignedDate && j.assignedDate === today) isToday = true;
-                        if (!isToday && !j.completedAt && !j.assignedDate) isToday = true; // General done today
-
-                        if (isToday) {
+                        if (isItemForDate(j, today, localTodayStr) || (!j.completedAt && !j.assignedDate)) {
                             compTasksDone++;
-                            if (completedTaskTitles.length < 4) {
-                                completedTaskTitles.push(`${w.name}: "${j.title || 'Task'}"`);
-                            }
                         }
                     }
                 });
             });
 
-            // Also check generalTasks
+            // B. General Tasks
             const genTasks = compData.generalTasks ? (Array.isArray(compData.generalTasks) ? compData.generalTasks : Object.values(compData.generalTasks)) : [];
             genTasks.forEach(gt => {
                 if (gt && (gt.done || gt.status === 'completed')) {
-                    const d = (typeof normalizeDateStr === 'function') ? normalizeDateStr(gt.completedAt || gt.date) : '';
-                    if (d === today) compTasksDone++;
+                    if (isItemForDate(gt, today, localTodayStr) || (!gt.completedAt && !gt.date)) compTasksDone++;
                 }
             });
 
-            grandTotalTasks += compTasksDone;
+            // C. Tracked Tasks system
+            const trTasks = compData.trackedTasks ? (Array.isArray(compData.trackedTasks) ? compData.trackedTasks : Object.values(compData.trackedTasks)) : [];
+            trTasks.forEach(tt => {
+                if (tt && (tt.status === 'completed' || tt.done)) {
+                    if (isItemForDate(tt, today, localTodayStr)) compTasksDone++;
+                }
+            });
+
+            grandTotals.tasks += compTasksDone;
         }
 
         // 3. Absent Workers
         let absentWorkers = [];
         if (opts.absent) {
+            const todayAtt = attendance[today] || attendance[localTodayStr] || {};
             workers.forEach(w => {
                 if (!w) return;
                 const rec = todayAtt[w.id];
-                if (rec && rec.status === 'absent') {
+                if (rec && (rec.status === 'absent' || rec.status === 'غياب' || rec.isAbsent === true || rec.type === 'absent')) {
                     absentWorkers.push(`${w.name}${w.role ? ` (${w.role})` : ''}`);
                 }
             });
-            grandTotalAbsent += absentWorkers.length;
+            grandTotals.absent += absentWorkers.length;
         }
 
         // 4. Violations Today
@@ -478,20 +658,27 @@ async function compileDailyDigest(targetDateStr = null) {
         if (opts.violations) {
             workers.forEach(w => {
                 if (!w || !w.monthlyStats) return;
-                const mStats = w.monthlyStats[targetMonth] || {};
-                const vList = mStats.violationsList || [];
-                vList.forEach(v => {
-                    if (!v || v.status === 'waived') return;
-                    const vDate = (typeof normalizeDateStr === 'function') ? normalizeDateStr(v.date || v.timestamp) : '';
-                    if (vDate === today) {
-                        const amt = parseFloat(v.amount || 0);
-                        compViolationsAmt += amt;
-                        violationsToday.push(`${w.name}: ${amt.toFixed(2)} SR (${v.reason || 'Violation'})`);
-                    }
+                const allMonths = Object.keys(w.monthlyStats);
+                allMonths.forEach(mKey => {
+                    const mStats = w.monthlyStats[mKey] || {};
+                    const vList = mStats.violationsList || [];
+                    const vArray = Array.isArray(vList) ? vList : Object.values(vList);
+                    vArray.forEach(v => {
+                        if (!v || v.status === 'waived') return;
+                        if (isItemForDate(v, today, localTodayStr)) {
+                            const amt = parseFloat(v.amount || 0);
+                            compViolationsAmt += amt;
+                            violationsToday.push({
+                                workerName: w.name,
+                                amt,
+                                reason: v.reason || (v.ruleTitle ? v.ruleTitle : (lang === 'ar' ? 'مخالفة' : 'Violation'))
+                            });
+                        }
+                    });
                 });
             });
-            grandTotalViolationsAmt += compViolationsAmt;
-            grandTotalViolationsCount += violationsToday.length;
+            grandTotals.violationsAmt += compViolationsAmt;
+            grandTotals.violationsCount += violationsToday.length;
         }
 
         // 5. Rewards Today
@@ -500,186 +687,103 @@ async function compileDailyDigest(targetDateStr = null) {
         if (opts.rewards) {
             workers.forEach(w => {
                 if (!w || !w.monthlyStats) return;
-                const mStats = w.monthlyStats[targetMonth] || {};
-                const rList = mStats.rewardsList || [];
-                rList.forEach(r => {
-                    if (!r) return;
-                    const rDate = (typeof normalizeDateStr === 'function') ? normalizeDateStr(r.date || r.timestamp) : '';
-                    if (rDate === today) {
-                        const amt = parseFloat(r.amount || 0);
-                        compRewardsAmt += amt;
-                        rewardsToday.push(`${w.name}: ${amt.toFixed(2)} SR (${r.reason || 'Reward'})`);
-                    }
+                const allMonths = Object.keys(w.monthlyStats);
+                allMonths.forEach(mKey => {
+                    const mStats = w.monthlyStats[mKey] || {};
+                    const rList = mStats.rewardsList || [];
+                    const rArray = Array.isArray(rList) ? rList : Object.values(rList);
+                    rArray.forEach(r => {
+                        if (!r) return;
+                        if (isItemForDate(r, today, localTodayStr)) {
+                            const amt = parseFloat(r.amount || 0);
+                            compRewardsAmt += amt;
+                            rewardsToday.push({
+                                workerName: w.name,
+                                amt,
+                                reason: r.reason || (lang === 'ar' ? 'مكافأة' : 'Reward')
+                            });
+                        }
+                    });
                 });
             });
-            grandTotalRewardsAmt += compRewardsAmt;
-            grandTotalRewardsCount += rewardsToday.length;
+            grandTotals.rewardsAmt += compRewardsAmt;
+            grandTotals.rewardsCount += rewardsToday.length;
         }
 
         // 6. Accepted Payment Requests Today
         let acceptedPayments = [];
         let compPaymentsAmt = 0;
         if (opts.payments) {
-            const pReqs = compData.paymentRequests ? Object.values(compData.paymentRequests) : [];
+            const pReqs = compData.paymentRequests ? (Array.isArray(compData.paymentRequests) ? compData.paymentRequests : Object.values(compData.paymentRequests)) : [];
             pReqs.forEach(p => {
                 if (!p) return;
                 const isAccepted = ['accepted', 'approved', 'transferred', 'paid', 'approved_paid'].includes(String(p.status || '').toLowerCase());
-                const pDate = (typeof normalizeDateStr === 'function') ? normalizeDateStr(p.date || p.timestamp || p.approvedAt) : '';
-                if (isAccepted && (pDate === today || (!pDate && p.status === 'accepted'))) {
-                    const amt = parseFloat(p.amount || 0);
-                    compPaymentsAmt += amt;
-                    acceptedPayments.push(`${p.workerName || 'Worker'}: ${amt.toFixed(2)} SR`);
+                if (isAccepted) {
+                    if (isItemForDate(p, today, localTodayStr) || (!p.date && !p.timestamp && !p.approvedAt)) {
+                        const amt = parseFloat(p.amount || 0);
+                        compPaymentsAmt += amt;
+                        acceptedPayments.push({
+                            workerName: p.workerName || (lang === 'ar' ? 'موظف' : 'Worker'),
+                            amt
+                        });
+                    }
                 }
             });
-            grandTotalPaymentsAmt += compPaymentsAmt;
-            grandTotalPaymentsCount += acceptedPayments.length;
+            grandTotals.paymentsAmt += compPaymentsAmt;
+            grandTotals.paymentsCount += acceptedPayments.length;
         }
 
         // 7. Accepted Custody Requests Today
         let acceptedCustody = [];
         let compCustodyAmt = 0;
         if (opts.custody) {
-            const cReqs = compData.custodyRequests ? Object.values(compData.custodyRequests) : [];
+            const cReqs = compData.custodyRequests ? (Array.isArray(compData.custodyRequests) ? compData.custodyRequests : Object.values(compData.custodyRequests)) : [];
             cReqs.forEach(c => {
                 if (!c) return;
                 const isAccepted = ['accepted', 'approved'].includes(String(c.status || '').toLowerCase());
-                const cDate = (typeof normalizeDateStr === 'function') ? normalizeDateStr(c.date || c.timestamp || c.approvedAt) : '';
-                if (isAccepted && (cDate === today || (!cDate && c.status === 'accepted'))) {
-                    const amt = parseFloat(c.amount || 0);
-                    compCustodyAmt += amt;
-                    acceptedCustody.push(`${c.workerName || 'Worker'}: ${amt.toFixed(2)} SR`);
+                if (isAccepted) {
+                    if (isItemForDate(c, today, localTodayStr) || (!c.date && !c.timestamp && !c.approvedAt)) {
+                        const amt = parseFloat(c.amount || 0);
+                        compCustodyAmt += amt;
+                        acceptedCustody.push({
+                            workerName: c.workerName || (lang === 'ar' ? 'موظف' : 'Worker'),
+                            amt
+                        });
+                    }
                 }
             });
-            grandTotalCustodyAmt += compCustodyAmt;
-            grandTotalCustodyCount += acceptedCustody.length;
+            grandTotals.custodyAmt += compCustodyAmt;
+            grandTotals.custodyCount += acceptedCustody.length;
         }
 
-        // Build Block for this company
-        let block = `🏢 *${compName}*\n`;
-
-        if (opts.sales) {
-            if (marketSalesToday > 0) {
-                block += isAr
-                    ? `💰 *المبيعات:* ${compSalesTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })} ر.س (نقاط البيع: ${posSalesToday.toFixed(2)} | المتجر: ${marketSalesToday.toFixed(2)})\n`
-                    : `💰 *Sales:* ${compSalesTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })} SR (POS: ${posSalesToday.toFixed(2)} | Store: ${marketSalesToday.toFixed(2)})\n`;
-            } else {
-                block += isAr
-                    ? `💰 *المبيعات:* ${compSalesTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })} ر.س\n`
-                    : `💰 *Sales:* ${compSalesTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })} SR\n`;
-            }
-        }
-
-        if (opts.tasks) {
-            block += isAr
-                ? `📋 *المهام المنجزة اليوم:* ${compTasksDone} مهمة\n`
-                : `📋 *Tasks Completed Today:* ${compTasksDone} tasks\n`;
-        }
-
-        if (opts.absent) {
-            if (absentWorkers.length > 0) {
-                block += isAr
-                    ? `🚫 *الموظفون الغائبون (${absentWorkers.length}):*\n  • ${absentWorkers.join('\n  • ')}\n`
-                    : `🚫 *Absent Workers (${absentWorkers.length}):*\n  • ${absentWorkers.join('\n  • ')}\n`;
-            } else {
-                block += isAr
-                    ? `🚫 *الموظفون الغائبون:* لا يوجد غياب اليوم ✅\n`
-                    : `🚫 *Absent Workers:* None (All present) ✅\n`;
-            }
-        }
-
-        if (opts.violations) {
-            if (violationsToday.length > 0) {
-                block += isAr
-                    ? `⚠️ *المخالفات المسجلة اليوم (${violationsToday.length} - ${compViolationsAmt.toFixed(2)} ر.س):*\n  • ${violationsToday.join('\n  • ')}\n`
-                    : `⚠️ *Violations Today (${violationsToday.length} - ${compViolationsAmt.toFixed(2)} SR):*\n  • ${violationsToday.join('\n  • ')}\n`;
-            } else {
-                block += isAr
-                    ? `⚠️ *المخالفات المسجلة اليوم:* لا يوجد مخالفات\n`
-                    : `⚠️ *Violations Today:* None\n`;
-            }
-        }
-
-        if (opts.rewards) {
-            if (rewardsToday.length > 0) {
-                block += isAr
-                    ? `🎁 *المكافآت المسجلة اليوم (${rewardsToday.length} - ${compRewardsAmt.toFixed(2)} ر.س):*\n  • ${rewardsToday.join('\n  • ')}\n`
-                    : `🎁 *Rewards Today (${rewardsToday.length} - ${compRewardsAmt.toFixed(2)} SR):*\n  • ${rewardsToday.join('\n  • ')}\n`;
-            } else {
-                block += isAr
-                    ? `🎁 *المكافآت المسجلة اليوم:* لا يوجد مكافآت\n`
-                    : `🎁 *Rewards Today:* None\n`;
-            }
-        }
-
-        if (opts.payments) {
-            if (acceptedPayments.length > 0) {
-                block += isAr
-                    ? `💵 *طلبات الصرف المقبولة (${acceptedPayments.length} - ${compPaymentsAmt.toFixed(2)} ر.س):*\n  • ${acceptedPayments.join('\n  • ')}\n`
-                    : `💵 *Accepted Payment Requests (${acceptedPayments.length} - ${compPaymentsAmt.toFixed(2)} SR):*\n  • ${acceptedPayments.join('\n  • ')}\n`;
-            } else {
-                block += isAr
-                    ? `💵 *طلبات الصرف المقبولة:* لا يوجد\n`
-                    : `💵 *Accepted Payment Requests:* None\n`;
-            }
-        }
-
-        if (opts.custody) {
-            if (acceptedCustody.length > 0) {
-                block += isAr
-                    ? `📦 *طلبات العهدة المقبولة (${acceptedCustody.length} - ${compCustodyAmt.toFixed(2)} ر.س):*\n  • ${acceptedCustody.join('\n  • ')}\n`
-                    : `📦 *Accepted Custody Requests (${acceptedCustody.length} - ${compCustodyAmt.toFixed(2)} SR):*\n  • ${acceptedCustody.join('\n  • ')}\n`;
-            } else {
-                block += isAr
-                    ? `📦 *طلبات العهدة المقبولة:* لا يوجد\n`
-                    : `📦 *Accepted Custody Requests:* None\n`;
-            }
-        }
-
-        companyBlocks.push(block.trim());
+        companyDataList.push({
+            slug,
+            compName,
+            salesTotal: compSalesTotal,
+            posSales: posSalesToday,
+            marketSales: marketSalesToday,
+            tasksDone: compTasksDone,
+            absentWorkers,
+            violationsList: violationsToday,
+            violationsAmt: compViolationsAmt,
+            rewardsList: rewardsToday,
+            rewardsAmt: compRewardsAmt,
+            paymentsList: acceptedPayments,
+            paymentsAmt: compPaymentsAmt,
+            custodyList: acceptedCustody,
+            custodyAmt: compCustodyAmt
+        });
     }
 
-    // Header & Meta Info
     const timeFormatted = `${String(ksaTime.getHours()).padStart(2, '0')}:${String(ksaTime.getMinutes()).padStart(2, '0')}`;
     let finalMessage = "";
 
-    if (isAr) {
-        finalMessage += `📊 *تقرير وسجل العمليات اليومي للمدراء*\n`;
-        finalMessage += `📅 *التاريخ:* ${today}\n`;
-        finalMessage += `⏰ *وقت الإرسال:* ${timeFormatted} بتوقيت الرياض (KSA)\n`;
-        finalMessage += `━━━━━━━━━━━━━━━━━━━\n\n`;
-
-        finalMessage += companyBlocks.join('\n\n━━━━━━━━━━━━━━━━━━━\n\n') + '\n\n';
-
-        finalMessage += `━━━━━━━━━━━━━━━━━━━\n`;
-        finalMessage += `📈 *الملخص العام لجميع الشركات:*\n`;
-        if (opts.sales) finalMessage += `💰 *إجمالي المبيعات:* ${grandTotalSales.toLocaleString('en-US', { minimumFractionDigits: 2 })} ر.س\n`;
-        if (opts.tasks) finalMessage += `📋 *إجمالي المهام المنجزة:* ${grandTotalTasks} مهمة\n`;
-        if (opts.absent) finalMessage += `🚫 *إجمالي الغياب:* ${grandTotalAbsent} موظف\n`;
-        if (opts.violations) finalMessage += `⚠️ *إجمالي المخالفات:* ${grandTotalViolationsCount} (${grandTotalViolationsAmt.toFixed(2)} ر.س)\n`;
-        if (opts.rewards) finalMessage += `🎁 *إجمالي المكافآت:* ${grandTotalRewardsCount} (${grandTotalRewardsAmt.toFixed(2)} ر.س)\n`;
-        if (opts.payments) finalMessage += `💵 *إجمالي الصرف المقبول:* ${grandTotalPaymentsCount} (${grandTotalPaymentsAmt.toFixed(2)} ر.س)\n`;
-        if (opts.custody) finalMessage += `📦 *إجمالي العهد المقبولة:* ${grandTotalCustodyCount} (${grandTotalCustodyAmt.toFixed(2)} ر.س)\n`;
-        finalMessage += `━━━━━━━━━━━━━━━━━━━\n`;
-        finalMessage += `_تم توليد التقرير تلقائياً عبر لوحة التحكم_`;
+    if (lang === 'en') {
+        finalMessage = formatDigestEnglish(today, timeFormatted, companyDataList, grandTotals, opts);
+    } else if (lang === 'both') {
+        finalMessage = formatDigestBoth(today, timeFormatted, companyDataList, grandTotals, opts);
     } else {
-        finalMessage += `📊 *Daily Executive Operations Log for Managers*\n`;
-        finalMessage += `📅 *Date:* ${today}\n`;
-        finalMessage += `⏰ *Dispatched:* ${timeFormatted} KSA (Riyadh Time)\n`;
-        finalMessage += `━━━━━━━━━━━━━━━━━━━\n\n`;
-
-        finalMessage += companyBlocks.join('\n\n━━━━━━━━━━━━━━━━━━━\n\n') + '\n\n';
-
-        finalMessage += `━━━━━━━━━━━━━━━━━━━\n`;
-        finalMessage += `📈 *Grand Totals Across All Companies:*\n`;
-        if (opts.sales) finalMessage += `💰 *Total Sales:* ${grandTotalSales.toLocaleString('en-US', { minimumFractionDigits: 2 })} SR\n`;
-        if (opts.tasks) finalMessage += `📋 *Total Tasks Done:* ${grandTotalTasks} tasks\n`;
-        if (opts.absent) finalMessage += `🚫 *Total Absent Workers:* ${grandTotalAbsent}\n`;
-        if (opts.violations) finalMessage += `⚠️ *Total Violations:* ${grandTotalViolationsCount} (${grandTotalViolationsAmt.toFixed(2)} SR)\n`;
-        if (opts.rewards) finalMessage += `🎁 *Total Rewards:* ${grandTotalRewardsCount} (${grandTotalRewardsAmt.toFixed(2)} SR)\n`;
-        if (opts.payments) finalMessage += `💵 *Total Accepted Payments:* ${grandTotalPaymentsCount} (${grandTotalPaymentsAmt.toFixed(2)} SR)\n`;
-        if (opts.custody) finalMessage += `📦 *Total Accepted Custody:* ${grandTotalCustodyCount} (${grandTotalCustodyAmt.toFixed(2)} SR)\n`;
-        finalMessage += `━━━━━━━━━━━━━━━━━━━\n`;
-        finalMessage += `_Automated Executive Operations Summary_`;
+        finalMessage = formatDigestArabic(today, timeFormatted, companyDataList, grandTotals, opts);
     }
 
     _compiledDigestCache = finalMessage;
@@ -687,13 +791,194 @@ async function compileDailyDigest(targetDateStr = null) {
 }
 window.compileDailyDigest = compileDailyDigest;
 
+// --- ARABIC FORMATTER ---
+function formatDigestArabic(today, timeFormatted, companyDataList, grandTotals, opts) {
+    let companyBlocks = [];
+    for (const comp of companyDataList) {
+        let block = `🏢 *${comp.compName}*\n`;
+
+        if (opts.sales) {
+            if (comp.marketSales > 0) {
+                block += `💰 *المبيعات:* ${comp.salesTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })} ر.س (نقاط البيع: ${comp.posSales.toFixed(2)} | المتجر: ${comp.marketSales.toFixed(2)})\n`;
+            } else {
+                block += `💰 *المبيعات:* ${comp.salesTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })} ر.س\n`;
+            }
+        }
+
+        if (opts.tasks) {
+            block += `📋 *المهام المنجزة اليوم:* ${comp.tasksDone} مهمة\n`;
+        }
+
+        if (opts.absent) {
+            if (comp.absentWorkers.length > 0) {
+                block += `🚫 *الموظفون الغائبون (${comp.absentWorkers.length}):*\n  • ${comp.absentWorkers.join('\n  • ')}\n`;
+            } else {
+                block += `🚫 *الموظفون الغائبون:* لا يوجد غياب اليوم ✅\n`;
+            }
+        }
+
+        if (opts.violations) {
+            if (comp.violationsList.length > 0) {
+                const formatted = comp.violationsList.map(v => typeof v === 'string' ? v : `${v.workerName}: ${v.amt.toFixed(2)} ر.س (${v.reason})`);
+                block += `⚠️ *المخالفات المسجلة اليوم (${comp.violationsList.length} - ${comp.violationsAmt.toFixed(2)} ر.س):*\n  • ${formatted.join('\n  • ')}\n`;
+            } else {
+                block += `⚠️ *المخالفات المسجلة اليوم:* لا يوجد مخالفات\n`;
+            }
+        }
+
+        if (opts.rewards) {
+            if (comp.rewardsList.length > 0) {
+                const formatted = comp.rewardsList.map(r => typeof r === 'string' ? r : `${r.workerName}: ${r.amt.toFixed(2)} ر.س (${r.reason})`);
+                block += `🎁 *المكافآت المسجلة اليوم (${comp.rewardsList.length} - ${comp.rewardsAmt.toFixed(2)} ر.س):*\n  • ${formatted.join('\n  • ')}\n`;
+            } else {
+                block += `🎁 *المكافآت المسجلة اليوم:* لا يوجد مكافآت\n`;
+            }
+        }
+
+        if (opts.payments) {
+            if (comp.paymentsList.length > 0) {
+                const formatted = comp.paymentsList.map(p => typeof p === 'string' ? p : `${p.workerName}: ${p.amt.toFixed(2)} ر.س`);
+                block += `💵 *طلبات الصرف المقبولة (${comp.paymentsList.length} - ${comp.paymentsAmt.toFixed(2)} ر.س):*\n  • ${formatted.join('\n  • ')}\n`;
+            } else {
+                block += `💵 *طلبات الصرف المقبولة:* لا يوجد\n`;
+            }
+        }
+
+        if (opts.custody) {
+            if (comp.custodyList.length > 0) {
+                const formatted = comp.custodyList.map(c => typeof c === 'string' ? c : `${c.workerName}: ${c.amt.toFixed(2)} ر.س`);
+                block += `📦 *طلبات العهدة المقبولة (${comp.custodyList.length} - ${comp.custodyAmt.toFixed(2)} ر.س):*\n  • ${formatted.join('\n  • ')}\n`;
+            } else {
+                block += `📦 *طلبات العهدة المقبولة:* لا يوجد\n`;
+            }
+        }
+
+        companyBlocks.push(block.trim());
+    }
+
+    let msg = `📊 *تقرير وسجل العمليات اليومي للمدراء*\n`;
+    msg += `📅 *التاريخ:* ${today}\n`;
+    msg += `⏰ *وقت الإرسال:* ${timeFormatted} بتوقيت الرياض (KSA)\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    msg += companyBlocks.join('\n\n━━━━━━━━━━━━━━━━━━━\n\n') + '\n\n';
+
+    msg += `━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `📈 *الملخص العام لجميع الشركات:*\n`;
+    if (opts.sales) msg += `💰 *إجمالي المبيعات:* ${grandTotals.sales.toLocaleString('en-US', { minimumFractionDigits: 2 })} ر.س\n`;
+    if (opts.tasks) msg += `📋 *إجمالي المهام المنجزة:* ${grandTotals.tasks} مهمة\n`;
+    if (opts.absent) msg += `🚫 *إجمالي الغياب:* ${grandTotals.absent} موظف\n`;
+    if (opts.violations) msg += `⚠️ *إجمالي المخالفات:* ${grandTotals.violationsCount} (${grandTotals.violationsAmt.toFixed(2)} ر.س)\n`;
+    if (opts.rewards) msg += `🎁 *إجمالي المكافآت:* ${grandTotals.rewardsCount} (${grandTotals.rewardsAmt.toFixed(2)} ر.س)\n`;
+    if (opts.payments) msg += `💵 *إجمالي طلبات الصرف المقبولة:* ${grandTotals.paymentsCount} (${grandTotals.paymentsAmt.toFixed(2)} ر.س)\n`;
+    if (opts.custody) msg += `📦 *إجمالي طلبات العهدة المقبولة:* ${grandTotals.custodyCount} (${grandTotals.custodyAmt.toFixed(2)} ر.س)\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `_تم توليد التقرير تلقائياً عبر لوحة التحكم_`;
+
+    return msg;
+}
+
+// --- ENGLISH FORMATTER ---
+function formatDigestEnglish(today, timeFormatted, companyDataList, grandTotals, opts) {
+    let companyBlocks = [];
+    for (const comp of companyDataList) {
+        let block = `🏢 *${comp.compName}*\n`;
+
+        if (opts.sales) {
+            if (comp.marketSales > 0) {
+                block += `💰 *Sales:* ${comp.salesTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })} SR (POS: ${comp.posSales.toFixed(2)} | Store: ${comp.marketSales.toFixed(2)})\n`;
+            } else {
+                block += `💰 *Sales:* ${comp.salesTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })} SR\n`;
+            }
+        }
+
+        if (opts.tasks) {
+            block += `📋 *Tasks Completed Today:* ${comp.tasksDone} tasks\n`;
+        }
+
+        if (opts.absent) {
+            if (comp.absentWorkers.length > 0) {
+                block += `🚫 *Absent Workers (${comp.absentWorkers.length}):*\n  • ${comp.absentWorkers.join('\n  • ')}\n`;
+            } else {
+                block += `🚫 *Absent Workers:* None (All present) ✅\n`;
+            }
+        }
+
+        if (opts.violations) {
+            if (comp.violationsList.length > 0) {
+                const formatted = comp.violationsList.map(v => typeof v === 'string' ? v : `${v.workerName}: ${v.amt.toFixed(2)} SR (${v.reason})`);
+                block += `⚠️ *Violations Today (${comp.violationsList.length} - ${comp.violationsAmt.toFixed(2)} SR):*\n  • ${formatted.join('\n  • ')}\n`;
+            } else {
+                block += `⚠️ *Violations Today:* None\n`;
+            }
+        }
+
+        if (opts.rewards) {
+            if (comp.rewardsList.length > 0) {
+                const formatted = comp.rewardsList.map(r => typeof r === 'string' ? r : `${r.workerName}: ${r.amt.toFixed(2)} SR (${r.reason})`);
+                block += `🎁 *Rewards Today (${comp.rewardsList.length} - ${comp.rewardsAmt.toFixed(2)} SR):*\n  • ${formatted.join('\n  • ')}\n`;
+            } else {
+                block += `🎁 *Rewards Today:* None\n`;
+            }
+        }
+
+        if (opts.payments) {
+            if (comp.paymentsList.length > 0) {
+                const formatted = comp.paymentsList.map(p => typeof p === 'string' ? p : `${p.workerName}: ${p.amt.toFixed(2)} SR`);
+                block += `💵 *Accepted Payment Requests (${comp.paymentsList.length} - ${comp.paymentsAmt.toFixed(2)} SR):*\n  • ${formatted.join('\n  • ')}\n`;
+            } else {
+                block += `💵 *Accepted Payment Requests:* None\n`;
+            }
+        }
+
+        if (opts.custody) {
+            if (comp.custodyList.length > 0) {
+                const formatted = comp.custodyList.map(c => typeof c === 'string' ? c : `${c.workerName}: ${c.amt.toFixed(2)} SR`);
+                block += `📦 *Accepted Custody Requests (${comp.custodyList.length} - ${comp.custodyAmt.toFixed(2)} SR):*\n  • ${formatted.join('\n  • ')}\n`;
+            } else {
+                block += `📦 *Accepted Custody Requests:* None\n`;
+            }
+        }
+
+        companyBlocks.push(block.trim());
+    }
+
+    let msg = `📊 *Daily Executive Operations Log for Managers*\n`;
+    msg += `📅 *Date:* ${today}\n`;
+    msg += `⏰ *Dispatched:* ${timeFormatted} KSA (Riyadh Time)\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    msg += companyBlocks.join('\n\n━━━━━━━━━━━━━━━━━━━\n\n') + '\n\n';
+
+    msg += `━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `📈 *Grand Totals Across All Companies:*\n`;
+    if (opts.sales) msg += `💰 *Total Sales:* ${grandTotals.sales.toLocaleString('en-US', { minimumFractionDigits: 2 })} SR\n`;
+    if (opts.tasks) msg += `📋 *Total Tasks Done:* ${grandTotals.tasks} tasks\n`;
+    if (opts.absent) msg += `🚫 *Total Absent Workers:* ${grandTotals.absent}\n`;
+    if (opts.violations) msg += `⚠️ *Total Violations:* ${grandTotals.violationsCount} (${grandTotals.violationsAmt.toFixed(2)} SR)\n`;
+    if (opts.rewards) msg += `🎁 *Total Rewards:* ${grandTotals.rewardsCount} (${grandTotals.rewardsAmt.toFixed(2)} SR)\n`;
+    if (opts.payments) msg += `💵 *Total Accepted Payments:* ${grandTotals.paymentsCount} (${grandTotals.paymentsAmt.toFixed(2)} SR)\n`;
+    if (opts.custody) msg += `📦 *Total Accepted Custody:* ${grandTotals.custodyCount} (${grandTotals.custodyAmt.toFixed(2)} SR)\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `_Automated Executive Operations Summary_`;
+
+    return msg;
+}
+
+// --- BILINGUAL (BOTH) FORMATTER ---
+function formatDigestBoth(today, timeFormatted, companyDataList, grandTotals, opts) {
+    const ar = formatDigestArabic(today, timeFormatted, companyDataList, grandTotals, opts);
+    const en = formatDigestEnglish(today, timeFormatted, companyDataList, grandTotals, opts);
+    return `${ar}\n\n═══════════════════════════════════\n🇬🇧 *ENGLISH REPORT / التقرير بالإنجليزية*\n═══════════════════════════════════\n\n${en}`;
+}
+
 // Update Real-Time Preview
 async function updateDigestPreview() {
     const previewBox = document.getElementById('digest-live-preview-box');
     const charCountEl = document.getElementById('digest-preview-char-count');
     if (!previewBox) return;
 
-    previewBox.textContent = "⏳ Generating live preview from all active company databases...";
+    previewBox.textContent = "⏳ Generating live preview in selected language from all active company databases...";
     try {
         const text = await compileDailyDigest();
         previewBox.textContent = text;
@@ -707,7 +992,7 @@ async function updateDigestPreview() {
 }
 window.updateDigestPreview = updateDigestPreview;
 
-// Copy Report Text to Clipboard
+// Copy Report Text to Clipboard (Current active selection)
 function copyDigestReportText() {
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     if (!_compiledDigestCache) {
@@ -722,6 +1007,45 @@ function copyDigestReportText() {
 }
 window.copyDigestReportText = copyDigestReportText;
 
+// Copy Report Text specifically in Arabic
+async function copyDigestReportArabic() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    try {
+        const text = await compileDailyDigest(null, 'ar');
+        await navigator.clipboard.writeText(text);
+        alert(isAr ? "📋 تم نسخ التقرير اليومي باللغة العربية بنجاح!" : "📋 Arabic daily digest copied to clipboard!");
+    } catch (e) {
+        console.error("Copy Arabic error:", e);
+    }
+}
+window.copyDigestReportArabic = copyDigestReportArabic;
+
+// Copy Report Text specifically in English
+async function copyDigestReportEnglish() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    try {
+        const text = await compileDailyDigest(null, 'en');
+        await navigator.clipboard.writeText(text);
+        alert(isAr ? "📋 تم نسخ التقرير اليومي باللغة الإنجليزية بنجاح!" : "📋 English daily digest copied to clipboard!");
+    } catch (e) {
+        console.error("Copy English error:", e);
+    }
+}
+window.copyDigestReportEnglish = copyDigestReportEnglish;
+
+// Copy Report Text specifically in Both (Bilingual)
+async function copyDigestReportBoth() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    try {
+        const text = await compileDailyDigest(null, 'both');
+        await navigator.clipboard.writeText(text);
+        alert(isAr ? "📋 تم نسخ التقرير المدمج باللغتين (العربية والإنجليزية) بنجاح!" : "📋 Combined bilingual daily digest copied to clipboard!");
+    } catch (e) {
+        console.error("Copy Both error:", e);
+    }
+}
+window.copyDigestReportBoth = copyDigestReportBoth;
+
 // Send Daily Digest Now
 async function sendDailyDigestNow() {
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
@@ -734,9 +1058,12 @@ async function sendDailyDigestNow() {
         return;
     }
 
+    const currentLang = dailyDigestConfig.language || 'ar';
+    const langLabel = currentLang === 'ar' ? 'العربية' : (currentLang === 'en' ? 'English' : 'العربية والإنجليزية (Bilingual)');
+
     const confirmMsg = isAr
-        ? `هل أنت متأكد من إرسال سجل العمليات اليومي الآن عبر الواتساب إلى [${managers.length}] من المدراء؟`
-        : `Are you sure you want to send today's operations log now via WhatsApp to [${managers.length}] managers?`;
+        ? `هل أنت متأكد من إرسال سجل العمليات اليومي الآن بصيغة (${langLabel}) عبر الواتساب إلى [${managers.length}] من المدراء؟`
+        : `Are you sure you want to send today's operations log in (${langLabel}) via WhatsApp to [${managers.length}] managers?`;
 
     if (!confirm(confirmMsg)) return;
 
@@ -744,7 +1071,7 @@ async function sendDailyDigestNow() {
     let rawBaseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || 'https://burgeroov-notify.onrender.com';
     let baseUrl = rawBaseUrl.replace(/\/+$/, '');
 
-    const messageText = await compileDailyDigest();
+    const messageText = await compileDailyDigest(null, dailyDigestConfig.language || 'ar');
 
     let successCount = 0;
     let failedCount = 0;
@@ -764,7 +1091,6 @@ async function sendDailyDigestNow() {
                 successCount++;
             } else {
                 failedCount++;
-                // Fallback: open WhatsApp link in new tab if requested or failed
                 console.warn(`Gateway returned status ${res.status} for ${phone}`);
             }
         } catch (e) {
@@ -836,7 +1162,7 @@ async function checkAndTriggerScheduledDigest() {
         let rawBaseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || 'https://burgeroov-notify.onrender.com';
         let baseUrl = rawBaseUrl.replace(/\/+$/, '');
 
-        const messageText = await compileDailyDigest(todayStr);
+        const messageText = await compileDailyDigest(todayStr, dailyDigestConfig.language || 'ar');
 
         for (const phone of managers) {
             try {
