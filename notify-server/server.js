@@ -2051,9 +2051,577 @@ app.post(['/salla*', '/salla/webhook', '/salla/webhcook', '/salla/webhcoo', '/sa
     }
 });
 
+// ─── SERVER-SIDE AUTONOMOUS DAILY DIGEST ENGINE & SCHEDULER ─────────────
+function getKsaDateTime() {
+    const now = new Date();
+    const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const ksaTime = new Date(utcMs + (3 * 3600000));
+    const year = ksaTime.getFullYear();
+    const month = String(ksaTime.getMonth() + 1).padStart(2, '0');
+    const day = String(ksaTime.getDate()).padStart(2, '0');
+    const hour = String(ksaTime.getHours()).padStart(2, '0');
+    const min = String(ksaTime.getMinutes()).padStart(2, '0');
+    return {
+        ksaTime,
+        dateStr: `${year}-${month}-${day}`,
+        timeStr: `${hour}:${min}`,
+        hour: ksaTime.getHours(),
+        minute: ksaTime.getMinutes()
+    };
+}
+
+function isDigestItemForDate(item, targetDateStr) {
+    if (!item || !targetDateStr) return false;
+    const parts = targetDateStr.split('-');
+    if (parts.length !== 3) return false;
+    const tY = parseInt(parts[0], 10);
+    const tM = parseInt(parts[1], 10);
+    const tD = parseInt(parts[2], 10);
+
+    // 1. Numeric timestamp
+    let ts = item.timestamp || item.createdAt || item.completedAt || item.approvedAt || item.confirmedAt || item.resolvedAt;
+    if (!ts && item.id && /^\d{13,}$/.test(String(item.id))) {
+        ts = parseInt(item.id, 10);
+    }
+    if (ts) {
+        if (typeof ts === 'number' && ts < 1e11) ts = ts * 1000;
+        const d = new Date(ts);
+        if (!isNaN(d.getTime())) {
+            const utcMs = d.getTime() + (d.getTimezoneOffset() * 60000);
+            const ksaD = new Date(utcMs + (3 * 3600000));
+            if (ksaD.getFullYear() === tY && (ksaD.getMonth() + 1) === tM && ksaD.getDate() === tD) return true;
+            if (d.getFullYear() === tY && (d.getMonth() + 1) === tM && d.getDate() === tD) return true;
+        }
+    }
+
+    // 2. Date string properties
+    const dProp = item.dateStr || item.assignedDate || item.targetDate;
+    if (dProp && typeof dProp === 'string' && dProp.trim().startsWith(targetDateStr)) return true;
+
+    // 3. String date field
+    if (item.date && typeof item.date === 'string') {
+        const clean = item.date.trim();
+        if (clean.startsWith(targetDateStr)) return true;
+
+        const matchIso = clean.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+        if (matchIso) {
+            const iso = matchIso[1] + '-' + String(matchIso[2]).padStart(2, '0') + '-' + String(matchIso[3]).padStart(2, '0');
+            if (iso === targetDateStr) return true;
+        }
+
+        const matchMonth = clean.match(/([a-zA-Z]{3})\s+(\d{1,2})/);
+        if (matchMonth) {
+            const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+            const mIdx = months.indexOf(matchMonth[1].toLowerCase());
+            const dNum = parseInt(matchMonth[2], 10);
+            if (mIdx === (tM - 1) && dNum === tD) return true;
+        }
+    }
+
+    return false;
+}
+
+function formatServerDigestArabic(today, timeFormatted, companyDataList, grandTotals, opts) {
+    let msg = `📊 *تقرير وسجل العمليات اليومي للمدراء*\n`;
+    msg += `📅 *التاريخ:* ${today}\n`;
+    msg += `⏰ *وقت الإرسال:* ${timeFormatted} بتوقيت الرياض (KSA)\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    const companyBlocks = companyDataList.map(comp => {
+        let block = `🏢 *${comp.name}*\n`;
+        if (opts.sales) {
+            if (comp.salesBreakdown && comp.salesBreakdown.market > 0) {
+                block += `💰 *المبيعات:* ${comp.sales.toFixed(2)} ر.س (نقاط البيع: ${comp.salesBreakdown.pos.toFixed(2)} | المتجر: ${comp.salesBreakdown.market.toFixed(2)})\n`;
+            } else {
+                block += `💰 *المبيعات:* ${comp.sales.toFixed(2)} ر.س\n`;
+            }
+        }
+        if (opts.tasks) {
+            block += `📋 *المهام المنجزة اليوم:* ${comp.tasks} مهمة\n`;
+        }
+        if (opts.absent) {
+            if (comp.absentList && comp.absentList.length > 0) {
+                block += `🚫 *الموظفون الغائبون (${comp.absentList.length}):*\n`;
+                comp.absentList.forEach(w => {
+                    block += `  • ${w.name}${w.role ? ` (${w.role})` : ''}\n`;
+                });
+            } else {
+                block += `🚫 *الموظفون الغائبون:* لا يوجد (الجميع حاضر) ✅\n`;
+            }
+        }
+        if (opts.violations) {
+            if (comp.violationsList && comp.violationsList.length > 0) {
+                block += `⚠️ *المخالفات المسجلة اليوم (${comp.violationsList.length} - ${comp.violationsTotal.toFixed(2)} ر.س):*\n`;
+                comp.violationsList.forEach(v => {
+                    block += `  • ${v.workerName}: ${Number(v.amount).toFixed(2)} ر.س${v.reason ? ` (${v.reason})` : ''}\n`;
+                });
+            } else {
+                block += `⚠️ *المخالفات المسجلة اليوم:* لا يوجد ✅\n`;
+            }
+        }
+        if (opts.rewards) {
+            if (comp.rewardsList && comp.rewardsList.length > 0) {
+                block += `🎁 *المكافآت المسجلة اليوم (${comp.rewardsList.length} - ${comp.rewardsTotal.toFixed(2)} ر.س):*\n`;
+                comp.rewardsList.forEach(r => {
+                    block += `  • ${r.workerName}: ${Number(r.amount).toFixed(2)} ر.س${r.reason ? ` (${r.reason})` : ''}\n`;
+                });
+            } else {
+                block += `🎁 *المكافآت المسجلة اليوم:* لا يوجد\n`;
+            }
+        }
+        if (opts.payments) {
+            if (comp.paymentRequestsList && comp.paymentRequestsList.length > 0) {
+                block += `💵 *طلبات الصرف المقبولة (${comp.paymentRequestsList.length} - ${comp.paymentRequestsTotal.toFixed(2)} ر.س):*\n`;
+                comp.paymentRequestsList.forEach(p => {
+                    block += `  • ${p.workerName}: ${Number(p.amount).toFixed(2)} ر.س\n`;
+                });
+            } else {
+                block += `💵 *طلبات الصرف المقبولة:* لا يوجد\n`;
+            }
+        }
+        if (opts.custody) {
+            if (comp.custodyRequestsList && comp.custodyRequestsList.length > 0) {
+                block += `📦 *طلبات العهدة المقبولة (${comp.custodyRequestsList.length} - ${comp.custodyRequestsTotal.toFixed(2)} ر.س):*\n`;
+                comp.custodyRequestsList.forEach(c => {
+                    block += `  • ${c.workerName}: ${Number(c.amount).toFixed(2)} ر.س\n`;
+                });
+            } else {
+                block += `📦 *طلبات العهدة المقبولة:* لا يوجد\n`;
+            }
+        }
+        return block.trim();
+    });
+
+    msg += companyBlocks.join('\n\n━━━━━━━━━━━━━━━━━━━\n\n') + '\n\n';
+    msg += `━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `📈 *الملخص العام لجميع الشركات:*\n`;
+    if (opts.sales) msg += `💰 *إجمالي المبيعات:* ${grandTotals.sales.toLocaleString('en-US', { minimumFractionDigits: 2 })} ر.س\n`;
+    if (opts.tasks) msg += `📋 *إجمالي المهام المنجزة:* ${grandTotals.tasks} مهمة\n`;
+    if (opts.absent) msg += `🚫 *إجمالي الغياب:* ${grandTotals.absent} موظف\n`;
+    if (opts.violations) msg += `⚠️ *إجمالي المخالفات:* ${grandTotals.violationsCount} (${grandTotals.violationsAmt.toFixed(2)} ر.س)\n`;
+    if (opts.rewards) msg += `🎁 *إجمالي المكافآت:* ${grandTotals.rewardsCount} (${grandTotals.rewardsAmt.toFixed(2)} ر.س)\n`;
+    if (opts.payments) msg += `💵 *إجمالي طلبات الصرف المقبولة:* ${grandTotals.paymentsCount} (${grandTotals.paymentsAmt.toFixed(2)} ر.س)\n`;
+    if (opts.custody) msg += `📦 *إجمالي طلبات العهدة المقبولة:* ${grandTotals.custodyCount} (${grandTotals.custodyAmt.toFixed(2)} ر.س)\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `_تم توليد التقرير تلقائياً عبر الخادم السحابي_`;
+
+    return msg;
+}
+
+function formatServerDigestEnglish(today, timeFormatted, companyDataList, grandTotals, opts) {
+    let msg = `📊 *Daily Executive Operations Log for Managers*\n`;
+    msg += `📅 *Date:* ${today}\n`;
+    msg += `⏰ *Dispatched:* ${timeFormatted} KSA (Riyadh Time)\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    const companyBlocks = companyDataList.map(comp => {
+        let block = `🏢 *${comp.name}*\n`;
+        if (opts.sales) {
+            if (comp.salesBreakdown && comp.salesBreakdown.market > 0) {
+                block += `💰 *Sales:* ${comp.sales.toFixed(2)} SR (POS: ${comp.salesBreakdown.pos.toFixed(2)} | Store: ${comp.salesBreakdown.market.toFixed(2)})\n`;
+            } else {
+                block += `💰 *Sales:* ${comp.sales.toFixed(2)} SR\n`;
+            }
+        }
+        if (opts.tasks) {
+            block += `📋 *Tasks Completed Today:* ${comp.tasks} tasks\n`;
+        }
+        if (opts.absent) {
+            if (comp.absentList && comp.absentList.length > 0) {
+                block += `🚫 *Absent Workers (${comp.absentList.length}):*\n`;
+                comp.absentList.forEach(w => {
+                    block += `  • ${w.name}${w.role ? ` (${w.role})` : ''}\n`;
+                });
+            } else {
+                block += `🚫 *Absent Workers:* None (All present) ✅\n`;
+            }
+        }
+        if (opts.violations) {
+            if (comp.violationsList && comp.violationsList.length > 0) {
+                block += `⚠️ *Violations Today (${comp.violationsList.length} - ${comp.violationsTotal.toFixed(2)} SR):*\n`;
+                comp.violationsList.forEach(v => {
+                    block += `  • ${v.workerName}: ${Number(v.amount).toFixed(2)} SR${v.reason ? ` (${v.reason})` : ''}\n`;
+                });
+            } else {
+                block += `⚠️ *Violations Today:* None ✅\n`;
+            }
+        }
+        if (opts.rewards) {
+            if (comp.rewardsList && comp.rewardsList.length > 0) {
+                block += `🎁 *Rewards Today (${comp.rewardsList.length} - ${comp.rewardsTotal.toFixed(2)} SR):*\n`;
+                comp.rewardsList.forEach(r => {
+                    block += `  • ${r.workerName}: ${Number(r.amount).toFixed(2)} SR${r.reason ? ` (${r.reason})` : ''}\n`;
+                });
+            } else {
+                block += `🎁 *Rewards Today:* None\n`;
+            }
+        }
+        if (opts.payments) {
+            if (comp.paymentRequestsList && comp.paymentRequestsList.length > 0) {
+                block += `💵 *Accepted Payment Requests (${comp.paymentRequestsList.length} - ${comp.paymentRequestsTotal.toFixed(2)} SR):*\n`;
+                comp.paymentRequestsList.forEach(p => {
+                    block += `  • ${p.workerName}: ${Number(p.amount).toFixed(2)} SR\n`;
+                });
+            } else {
+                block += `💵 *Accepted Payment Requests:* None\n`;
+            }
+        }
+        if (opts.custody) {
+            if (comp.custodyRequestsList && comp.custodyRequestsList.length > 0) {
+                block += `📦 *Accepted Custody Requests (${comp.custodyRequestsList.length} - ${comp.custodyRequestsTotal.toFixed(2)} SR):*\n`;
+                comp.custodyRequestsList.forEach(c => {
+                    block += `  • ${c.workerName}: ${Number(c.amount).toFixed(2)} SR\n`;
+                });
+            } else {
+                block += `📦 *Accepted Custody Requests:* None\n`;
+            }
+        }
+        return block.trim();
+    });
+
+    msg += companyBlocks.join('\n\n━━━━━━━━━━━━━━━━━━━\n\n') + '\n\n';
+    msg += `━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `📈 *Grand Totals Across All Companies:*\n`;
+    if (opts.sales) msg += `💰 *Total Sales:* ${grandTotals.sales.toLocaleString('en-US', { minimumFractionDigits: 2 })} SR\n`;
+    if (opts.tasks) msg += `📋 *Total Tasks Done:* ${grandTotals.tasks} tasks\n`;
+    if (opts.absent) msg += `🚫 *Total Absent Workers:* ${grandTotals.absent}\n`;
+    if (opts.violations) msg += `⚠️ *Total Violations:* ${grandTotals.violationsCount} (${grandTotals.violationsAmt.toFixed(2)} SR)\n`;
+    if (opts.rewards) msg += `🎁 *Total Rewards:* ${grandTotals.rewardsCount} (${grandTotals.rewardsAmt.toFixed(2)} SR)\n`;
+    if (opts.payments) msg += `💵 *Total Accepted Payments:* ${grandTotals.paymentsCount} (${grandTotals.paymentsAmt.toFixed(2)} SR)\n`;
+    if (opts.custody) msg += `📦 *Total Accepted Custody:* ${grandTotals.custodyCount} (${grandTotals.custodyAmt.toFixed(2)} SR)\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `_Automated Cloud Executive Operations Summary_`;
+
+    return msg;
+}
+
+function compileServerDailyDigestText(targetDateStr, config, portalCompanies, companiesData) {
+    const lang = config.language || 'ar';
+    const opts = config.options || { sales: true, tasks: true, absent: true, violations: true, rewards: true, payments: true, custody: true };
+    const excluded = config.excludedCompanies || [];
+
+    const compSlugs = Object.keys(portalCompanies || {}).length > 0 
+        ? Object.keys(portalCompanies) 
+        : Object.keys(companiesData || {});
+    const includedSlugs = compSlugs.filter(s => !excluded.includes(s));
+
+    let grandTotals = {
+        sales: 0, tasks: 0, absent: 0,
+        violationsCount: 0, violationsAmt: 0,
+        rewardsCount: 0, rewardsAmt: 0,
+        paymentsCount: 0, paymentsAmt: 0,
+        custodyCount: 0, custodyAmt: 0
+    };
+
+    let companyDataList = [];
+
+    for (const slug of includedSlugs) {
+        const compMeta = (portalCompanies && portalCompanies[slug]) || { id: slug, name: slug.toUpperCase() };
+        const compName = compMeta.name || slug.toUpperCase();
+        const compData = (companiesData && companiesData[slug]) || {};
+
+        let compSummary = {
+            id: slug,
+            name: compName,
+            sales: 0,
+            salesBreakdown: { pos: 0, market: 0 },
+            tasks: 0,
+            absentList: [],
+            violationsList: [],
+            violationsTotal: 0,
+            rewardsList: [],
+            rewardsTotal: 0,
+            paymentRequestsList: [],
+            paymentRequestsTotal: 0,
+            custodyRequestsList: [],
+            custodyRequestsTotal: 0
+        };
+
+        // 1. Sales
+        if (opts.sales) {
+            const disabledMethods = Array.isArray(compData.disabledSalesMethods) ? compData.disabledSalesMethods : [];
+            const salesLogs = Array.isArray(compData.salesLogs) ? compData.salesLogs : (compData.salesLogs ? Object.values(compData.salesLogs) : []);
+            let posTotal = 0;
+            salesLogs.forEach(sale => {
+                if (!sale) return;
+                if (sale.method && disabledMethods.includes(sale.method)) return;
+                if (isDigestItemForDate(sale, targetDateStr)) {
+                    posTotal += (Number(sale.amount) || 0);
+                }
+            });
+
+            let marketTotal = 0;
+            const marketOrders = Array.isArray(compData.marketOrders) ? compData.marketOrders : (compData.marketOrders ? Object.values(compData.marketOrders) : []);
+            marketOrders.forEach(order => {
+                if (!order) return;
+                if (isDigestItemForDate(order, targetDateStr)) {
+                    marketTotal += (Number(order.price || order.totalCost || order.total || 0));
+                }
+            });
+
+            compSummary.salesBreakdown.pos = posTotal;
+            compSummary.salesBreakdown.market = marketTotal;
+            compSummary.sales = posTotal + marketTotal;
+            grandTotals.sales += compSummary.sales;
+        }
+
+        // 2. Tasks
+        if (opts.tasks) {
+            let tasksDone = 0;
+            const workers = Array.isArray(compData.workers) ? compData.workers : (compData.workers ? Object.values(compData.workers) : []);
+            workers.forEach(w => {
+                if (!w || !w.jobs) return;
+                const jobs = Array.isArray(w.jobs) ? w.jobs : Object.values(w.jobs);
+                jobs.forEach(job => {
+                    if (job && (job.done || job.completed) && isDigestItemForDate(job, targetDateStr)) {
+                        tasksDone++;
+                    }
+                });
+            });
+            compSummary.tasks = tasksDone;
+            grandTotals.tasks += tasksDone;
+        }
+
+        // 3. Absent Workers
+        if (opts.absent) {
+            const att = compData.attendance || {};
+            const dayAtt = att[targetDateStr] || {};
+            const workers = Array.isArray(compData.workers) ? compData.workers : (compData.workers ? Object.values(compData.workers) : []);
+            const workerMap = {};
+            workers.forEach(w => { if (w && w.id) workerMap[w.id] = w; });
+
+            Object.keys(dayAtt).forEach(wId => {
+                const rec = dayAtt[wId];
+                if (!rec) return;
+                const status = String(rec.status || rec.attendanceStatus || '').toLowerCase();
+                if (status === 'absent' || status === 'غياب' || rec.isAbsent === true) {
+                    const wObj = workerMap[wId] || {};
+                    compSummary.absentList.push({
+                        id: wId,
+                        name: rec.workerName || wObj.name || wId,
+                        role: wObj.role || rec.role || ''
+                    });
+                }
+            });
+            grandTotals.absent += compSummary.absentList.length;
+        }
+
+        // 4. Violations & 5. Rewards
+        if (opts.violations || opts.rewards) {
+            const workers = Array.isArray(compData.workers) ? compData.workers : (compData.workers ? Object.values(compData.workers) : []);
+            const monthKey = targetDateStr.substring(0, 7);
+            workers.forEach(w => {
+                if (!w || !w.monthlyStats) return;
+                const mStats = w.monthlyStats[monthKey] || {};
+
+                if (opts.violations && mStats.violationsList) {
+                    const vList = Array.isArray(mStats.violationsList) ? mStats.violationsList : Object.values(mStats.violationsList);
+                    vList.forEach(v => {
+                        if (!v || v.status === 'waived') return;
+                        if (isDigestItemForDate(v, targetDateStr)) {
+                            const amt = Number(v.amount) || 0;
+                            compSummary.violationsList.push({
+                                workerName: w.name || 'Worker',
+                                amount: amt,
+                                reason: v.reason || ''
+                            });
+                            compSummary.violationsTotal += amt;
+                            grandTotals.violationsCount++;
+                            grandTotals.violationsAmt += amt;
+                        }
+                    });
+                }
+
+                if (opts.rewards && mStats.rewardsList) {
+                    const rList = Array.isArray(mStats.rewardsList) ? mStats.rewardsList : Object.values(mStats.rewardsList);
+                    rList.forEach(r => {
+                        if (!r) return;
+                        if (isDigestItemForDate(r, targetDateStr)) {
+                            const amt = Number(r.amount) || 0;
+                            compSummary.rewardsList.push({
+                                workerName: w.name || 'Worker',
+                                amount: amt,
+                                reason: r.reason || ''
+                            });
+                            compSummary.rewardsTotal += amt;
+                            grandTotals.rewardsCount++;
+                            grandTotals.rewardsAmt += amt;
+                        }
+                    });
+                }
+            });
+        }
+
+        // 6. Payment Requests
+        if (opts.payments && compData.paymentRequests) {
+            const pReqs = Array.isArray(compData.paymentRequests) ? compData.paymentRequests : Object.values(compData.paymentRequests);
+            pReqs.forEach(p => {
+                if (!p) return;
+                const st = String(p.status || '').toLowerCase();
+                if (['accepted', 'approved', 'transferred', 'paid', 'approved_paid'].includes(st)) {
+                    if (isDigestItemForDate(p, targetDateStr)) {
+                        const amt = Number(p.amount) || 0;
+                        compSummary.paymentRequestsList.push({
+                            workerName: p.workerName || p.userName || 'Worker',
+                            amount: amt
+                        });
+                        compSummary.paymentRequestsTotal += amt;
+                        grandTotals.paymentsCount++;
+                        grandTotals.paymentsAmt += amt;
+                    }
+                }
+            });
+        }
+
+        // 7. Custody Requests
+        if (opts.custody && compData.custodyRequests) {
+            const cReqs = Array.isArray(compData.custodyRequests) ? compData.custodyRequests : Object.values(compData.custodyRequests);
+            cReqs.forEach(c => {
+                if (!c) return;
+                const st = String(c.status || '').toLowerCase();
+                if (['accepted', 'approved'].includes(st)) {
+                    if (isDigestItemForDate(c, targetDateStr)) {
+                        const amt = Number(c.amount) || 0;
+                        compSummary.custodyRequestsList.push({
+                            workerName: c.workerName || c.userName || 'Worker',
+                            amount: amt
+                        });
+                        compSummary.custodyRequestsTotal += amt;
+                        grandTotals.custodyCount++;
+                        grandTotals.custodyAmt += amt;
+                    }
+                }
+            });
+        }
+
+        companyDataList.push(compSummary);
+    }
+
+    const { timeStr } = getKsaDateTime();
+    if (lang === 'en') {
+        return formatServerDigestEnglish(targetDateStr, timeStr, companyDataList, grandTotals, opts);
+    } else if (lang === 'both') {
+        const ar = formatServerDigestArabic(targetDateStr, timeStr, companyDataList, grandTotals, opts);
+        const en = formatServerDigestEnglish(targetDateStr, timeStr, companyDataList, grandTotals, opts);
+        return `${ar}\n\n═══════════════════════════════════\n🇬🇧 *ENGLISH REPORT / التقرير بالإنجليزية*\n═══════════════════════════════════\n\n${en}`;
+    } else {
+        return formatServerDigestArabic(targetDateStr, timeStr, companyDataList, grandTotals, opts);
+    }
+}
+
+async function checkAndDispatchServerSideDailyDigest(force = false) {
+    try {
+        const digestSnap = await db.ref('system_settings/daily_digest').once('value');
+        if (!digestSnap.exists()) return { status: 'no_config' };
+        const config = digestSnap.val() || {};
+
+        if (!force && !config.enabled) return { status: 'disabled' };
+
+        const managers = config.managers || [];
+        if (!Array.isArray(managers) || managers.length === 0) return { status: 'no_managers' };
+
+        const { dateStr, timeStr, hour, minute } = getKsaDateTime();
+        const targetTime = config.scheduledTime || "23:00";
+        const [targetH, targetM] = targetTime.split(':').map(n => parseInt(n, 10) || 0);
+
+        const currentMins = hour * 60 + minute;
+        const targetMins = targetH * 60 + targetM;
+        const diffMins = currentMins - targetMins;
+
+        // Grace window check (0 to 60 minutes after target time)
+        const shouldTrigger = force || (diffMins >= 0 && diffMins <= 60 && config.lastSentDate !== dateStr);
+
+        if (!shouldTrigger) {
+            return { status: 'idle', ksaTime: `${dateStr} ${timeStr}`, scheduledTime: targetTime, lastSentDate: config.lastSentDate };
+        }
+
+        console.log(`⏰ [Server Daily Digest] Dispatching automated daily log for ${dateStr} at ${timeStr} KSA (Scheduled: ${targetTime}, Force: ${force})...`);
+
+        // Determine target report date
+        // If scheduled around midnight (00:00 - 04:59 AM), summarize yesterday's business day
+        let reportDateStr = dateStr;
+        if (targetH < 5) {
+            const now = new Date();
+            const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+            const prevKsa = new Date(utcMs + (3 * 3600000) - (24 * 3600000));
+            const py = prevKsa.getFullYear();
+            const pm = String(prevKsa.getMonth() + 1).padStart(2, '0');
+            const pd = String(prevKsa.getDate()).padStart(2, '0');
+            reportDateStr = `${py}-${pm}-${pd}`;
+        }
+
+        // Mark sent date to avoid double dispatch
+        await db.ref('system_settings/daily_digest/lastSentDate').set(dateStr);
+
+        // Fetch data
+        const [portalSnap, companiesSnap] = await Promise.all([
+            db.ref('portalCompanies').once('value'),
+            db.ref('companies').once('value')
+        ]);
+
+        const portalCompanies = portalSnap.val() || {};
+        const companiesData = companiesSnap.val() || {};
+
+        const digestText = compileServerDailyDigestText(reportDateStr, config, portalCompanies, companiesData);
+
+        let sentCount = 0;
+        for (const phone of managers) {
+            queueWhatsAppMessage(phone, digestText);
+            sentCount++;
+        }
+
+        console.log(`✅ [Server Daily Digest] Successfully queued daily log to [${sentCount}] managers for date ${reportDateStr}`);
+        return { status: 'sent', date: reportDateStr, managers: sentCount, messagePreview: digestText.substring(0, 100) };
+    } catch (err) {
+        console.error('❌ [Server Daily Digest Error]:', err);
+        return { status: 'error', error: err.message };
+    }
+}
+
+// REST Endpoints for Daily Digest
+app.all('/wa/trigger-digest', async (req, res) => {
+    try {
+        console.log('🔄 [/wa/trigger-digest] Trigger request received...');
+        const result = await checkAndDispatchServerSideDailyDigest(true);
+        return res.json({ success: true, ...result });
+    } catch (e) {
+        return res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.get('/wa/digest-status', async (_req, res) => {
+    try {
+        const digestSnap = await db.ref('system_settings/daily_digest').once('value');
+        const config = digestSnap.val() || {};
+        const ksa = getKsaDateTime();
+        return res.json({
+            status: 'ok',
+            ksaTime: `${ksa.dateStr} ${ksa.timeStr}`,
+            config: {
+                enabled: config.enabled || false,
+                scheduledTime: config.scheduledTime || '23:00',
+                language: config.language || 'ar',
+                managersCount: (config.managers || []).length,
+                lastSentDate: config.lastSentDate || ''
+            }
+        });
+    } catch (e) {
+        return res.status(500).json({ error: e.message });
+    }
+});
+
+// Autonomous background scheduler every 60 seconds
+setInterval(() => {
+    checkAndDispatchServerSideDailyDigest(false);
+}, 60000);
+setTimeout(() => {
+    checkAndDispatchServerSideDailyDigest(false);
+}, 15000);
+
 // ─── Start HTTP Server & Initialize WhatsApp Engine ────────────────────────
 app.listen(PORT, () => {
     console.log(`🚀 Burgeroov Notify & WhatsApp Gateway Server is active and listening on port ${PORT}`);
     initWhatsAppEngine();
 });
+
 

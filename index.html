@@ -5106,9 +5106,23 @@
                                     <label style="font-size:0.8rem; font-weight:800; color:var(--text-main); margin-bottom:6px; display:block;" data-i18n="label-digest-scheduled-time">
                                         Daily Scheduled Send Time (KSA GMT+3):
                                     </label>
-                                    <div style="display:flex; align-items:center; gap:10px;">
-                                        <input type="time" id="digest-scheduled-time" value="23:00" style="padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:1rem; font-weight:800; width:160px;">
+                                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                                        <input type="time" id="digest-scheduled-time" value="23:00" oninput="onDigestTimeInput(this.value)" onchange="onDigestTimeChange(this.value)" style="padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-main); font-size:1rem; font-weight:800; width:160px;">
+                                        <span id="digest-time-interpretation-badge" style="font-size:0.75rem; font-weight:800; padding:4px 10px; border-radius:8px; background:rgba(59,130,246,0.15); color:#3b82f6; border:1px solid rgba(59,130,246,0.3);">
+                                            ⏰ 11:00 PM ليلاً (مساءً)
+                                        </span>
                                         <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">🇸🇦 Riyadh Time (توقيت مكة المكرمة)</span>
+                                    </div>
+                                    <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
+                                        <button type="button" onclick="setDigestPresetTime('00:00')" class="btn-neutral" style="padding:4px 10px; font-size:0.75rem; border-radius:8px; font-weight:700; background:var(--card-bg); color:var(--text-main); border:1px solid var(--border-color); cursor:pointer;" title="إرسال التقرير عند منتصف الليل نهاية اليوم">
+                                            🌙 12:00 AM منتصف الليل (نهاية اليوم)
+                                        </button>
+                                        <button type="button" onclick="setDigestPresetTime('23:00')" class="btn-neutral" style="padding:4px 10px; font-size:0.75rem; border-radius:8px; font-weight:700; background:var(--card-bg); color:#10b981; border:1px solid rgba(16,185,129,0.4); cursor:pointer;" title="إرسال التقرير الساعة 11 مساءً">
+                                            ⏰ 11:00 PM ليلاً (الموصى به)
+                                        </button>
+                                        <button type="button" onclick="setDigestPresetTime('12:00')" class="btn-neutral" style="padding:4px 10px; font-size:0.75rem; border-radius:8px; font-weight:700; background:var(--card-bg); color:var(--text-main); border:1px solid var(--border-color); cursor:pointer;" title="إرسال التقرير الساعة 12 ظهراً">
+                                            ☀️ 12:00 PM ظهراً (منتصف النهار)
+                                        </button>
                                     </div>
                                 </div>
 
@@ -5142,31 +5156,31 @@
 
                                 <div style="display:flex; flex-direction:column; gap:10px;">
                                     <label style="display:flex; align-items:center; gap:10px; background:var(--card-bg); padding:9px 14px; border-radius:10px; border:1px solid var(--border-color); cursor:pointer; font-size:0.84rem; font-weight:700; color:var(--text-main);">
-                                        <input type="checkbox" id="digest-inc-sales" checked onchange="updateDigestPreview()" style="width:18px; height:18px; cursor:pointer;">
+                                        <input type="checkbox" id="digest-inc-sales" checked onchange="saveDailyDigestSettings(true); updateDigestPreview();" style="width:18px; height:18px; cursor:pointer;">
                                         <span data-i18n="label-inc-sales">💰 Sales for this day</span>
                                     </label>
                                     <label style="display:flex; align-items:center; gap:10px; background:var(--card-bg); padding:9px 14px; border-radius:10px; border:1px solid var(--border-color); cursor:pointer; font-size:0.84rem; font-weight:700; color:var(--text-main);">
-                                        <input type="checkbox" id="digest-inc-tasks" checked onchange="updateDigestPreview()" style="width:18px; height:18px; cursor:pointer;">
+                                        <input type="checkbox" id="digest-inc-tasks" checked onchange="saveDailyDigestSettings(true); updateDigestPreview();" style="width:18px; height:18px; cursor:pointer;">
                                         <span data-i18n="label-inc-tasks">📋 Total tasks done today</span>
                                     </label>
                                     <label style="display:flex; align-items:center; gap:10px; background:var(--card-bg); padding:9px 14px; border-radius:10px; border:1px solid var(--border-color); cursor:pointer; font-size:0.84rem; font-weight:700; color:var(--text-main);">
-                                        <input type="checkbox" id="digest-inc-absent" checked onchange="updateDigestPreview()" style="width:18px; height:18px; cursor:pointer;">
+                                        <input type="checkbox" id="digest-inc-absent" checked onchange="saveDailyDigestSettings(true); updateDigestPreview();" style="width:18px; height:18px; cursor:pointer;">
                                         <span data-i18n="label-inc-absent">🚫 Absent workers (count & names)</span>
                                     </label>
                                     <label style="display:flex; align-items:center; gap:10px; background:var(--card-bg); padding:9px 14px; border-radius:10px; border:1px solid var(--border-color); cursor:pointer; font-size:0.84rem; font-weight:700; color:var(--text-main);">
-                                        <input type="checkbox" id="digest-inc-violations" checked onchange="updateDigestPreview()" style="width:18px; height:18px; cursor:pointer;">
+                                        <input type="checkbox" id="digest-inc-violations" checked onchange="saveDailyDigestSettings(true); updateDigestPreview();" style="width:18px; height:18px; cursor:pointer;">
                                         <span data-i18n="label-inc-violations">⚠️ Workers with violations today</span>
                                     </label>
                                     <label style="display:flex; align-items:center; gap:10px; background:var(--card-bg); padding:9px 14px; border-radius:10px; border:1px solid var(--border-color); cursor:pointer; font-size:0.84rem; font-weight:700; color:var(--text-main);">
-                                        <input type="checkbox" id="digest-inc-rewards" checked onchange="updateDigestPreview()" style="width:18px; height:18px; cursor:pointer;">
+                                        <input type="checkbox" id="digest-inc-rewards" checked onchange="saveDailyDigestSettings(true); updateDigestPreview();" style="width:18px; height:18px; cursor:pointer;">
                                         <span data-i18n="label-inc-rewards">🎁 Workers rewarded today</span>
                                     </label>
                                     <label style="display:flex; align-items:center; gap:10px; background:var(--card-bg); padding:9px 14px; border-radius:10px; border:1px solid var(--border-color); cursor:pointer; font-size:0.84rem; font-weight:700; color:var(--text-main);">
-                                        <input type="checkbox" id="digest-inc-payments" checked onchange="updateDigestPreview()" style="width:18px; height:18px; cursor:pointer;">
+                                        <input type="checkbox" id="digest-inc-payments" checked onchange="saveDailyDigestSettings(true); updateDigestPreview();" style="width:18px; height:18px; cursor:pointer;">
                                         <span data-i18n="label-inc-payments">💵 Workers with accepted payment requests</span>
                                     </label>
                                     <label style="display:flex; align-items:center; gap:10px; background:var(--card-bg); padding:9px 14px; border-radius:10px; border:1px solid var(--border-color); cursor:pointer; font-size:0.84rem; font-weight:700; color:var(--text-main);">
-                                        <input type="checkbox" id="digest-inc-custody" checked onchange="updateDigestPreview()" style="width:18px; height:18px; cursor:pointer;">
+                                        <input type="checkbox" id="digest-inc-custody" checked onchange="saveDailyDigestSettings(true); updateDigestPreview();" style="width:18px; height:18px; cursor:pointer;">
                                         <span data-i18n="label-inc-custody">📦 Workers with accepted custody requests</span>
                                     </label>
                                 </div>
@@ -8703,8 +8717,8 @@
     </div>
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=347"></script>
-    <script src="app.js?v=347"></script>
+    <script src="translations.js?v=348"></script>
+    <script src="app.js?v=348"></script>
 </body>
 
 </html>

@@ -216,6 +216,78 @@ function saveDailyDigestSettings(quiet = false) {
 }
 window.saveDailyDigestSettings = saveDailyDigestSettings;
 
+// Time interpretation and preset utilities
+function formatDigestTimeLabel(timeStr) {
+    if (!timeStr || typeof timeStr !== 'string') timeStr = "23:00";
+    const parts = timeStr.split(':');
+    const h = parseInt(parts[0], 10) || 0;
+    const m = parseInt(parts[1], 10) || 0;
+    const mStr = String(m).padStart(2, '0');
+
+    if (h === 0) {
+        return {
+            text: `🌙 12:${mStr} AM منتصف الليل (نهاية اليوم - Midnight)`,
+            color: '#8b5cf6',
+            bg: 'rgba(139,92,246,0.15)',
+            border: 'rgba(139,92,246,0.35)'
+        };
+    } else if (h === 12) {
+        return {
+            text: `☀️ 12:${mStr} PM ظهراً (منتصف النهار - Noon)`,
+            color: '#f59e0b',
+            bg: 'rgba(245,158,11,0.15)',
+            border: 'rgba(245,158,11,0.35)'
+        };
+    } else if (h < 12) {
+        return {
+            text: `🌅 ${h}:${mStr} AM صباحاً (Morning)`,
+            color: '#06b6d4',
+            bg: 'rgba(6,182,212,0.15)',
+            border: 'rgba(6,182,212,0.35)'
+        };
+    } else {
+        const h12 = h - 12;
+        return {
+            text: `⏰ ${h12}:${mStr} PM ليلاً (مساءً - Evening)`,
+            color: '#3b82f6',
+            bg: 'rgba(59,130,246,0.15)',
+            border: 'rgba(59,130,246,0.35)'
+        };
+    }
+}
+
+function updateDigestTimeInterpretationBadge(timeVal) {
+    const badge = document.getElementById('digest-time-interpretation-badge');
+    if (!badge) return;
+    const info = formatDigestTimeLabel(timeVal || dailyDigestConfig.scheduledTime || "23:00");
+    badge.textContent = info.text;
+    badge.style.color = info.color;
+    badge.style.background = info.bg;
+    badge.style.borderColor = info.border;
+}
+window.updateDigestTimeInterpretationBadge = updateDigestTimeInterpretationBadge;
+
+function onDigestTimeInput(val) {
+    if (!val) return;
+    updateDigestTimeInterpretationBadge(val);
+}
+window.onDigestTimeInput = onDigestTimeInput;
+
+function onDigestTimeChange(val) {
+    if (!val) return;
+    dailyDigestConfig.scheduledTime = val;
+    updateDigestTimeInterpretationBadge(val);
+    saveDailyDigestSettings(true);
+}
+window.onDigestTimeChange = onDigestTimeChange;
+
+function setDigestPresetTime(val) {
+    const input = document.getElementById('digest-scheduled-time');
+    if (input) input.value = val;
+    onDigestTimeChange(val);
+}
+window.setDigestPresetTime = setDigestPresetTime;
+
 // Render UI Components
 function renderDailyDigestSection() {
     // 1. Status Badges
@@ -228,9 +300,10 @@ function renderDailyDigestSection() {
     // 3. Language Selector Buttons
     updateDigestLanguageButtonsUI();
 
-    // 4. Scheduled Time
+    // 4. Scheduled Time & Interpretation Badge
     const timeEl = document.getElementById('digest-scheduled-time');
     if (timeEl && dailyDigestConfig.scheduledTime) timeEl.value = dailyDigestConfig.scheduledTime;
+    updateDigestTimeInterpretationBadge(dailyDigestConfig.scheduledTime || (timeEl ? timeEl.value : "23:00"));
 
     // 5. Content Options Checkboxes
     const opts = dailyDigestConfig.options || {};
@@ -1071,8 +1144,34 @@ async function sendDailyDigestNow() {
     let rawBaseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || 'https://burgeroov-notify.onrender.com';
     let baseUrl = rawBaseUrl.replace(/\/+$/, '');
 
-    const messageText = await compileDailyDigest(null, dailyDigestConfig.language || 'ar');
+    // 1. Try triggering via cloud server Baileys engine first
+    let serverHandled = false;
+    try {
+        const srvRes = await fetch(`${baseUrl}/wa/trigger-digest`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ force: true, triggerSource: 'dashboard_manual_button' })
+        });
+        if (srvRes.ok) {
+            const srvData = await srvRes.json();
+            if (srvData.success) {
+                serverHandled = true;
+                const now = new Date();
+                const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                dailyDigestConfig.lastSentDate = todayStr;
+                saveDailyDigestSettings(true);
+                alert(isAr 
+                    ? `✅ تم إرسال التقرير اليومي بنجاح عبر خادم الإشعارات السحابي إلى [${managers.length}] من المدراء!` 
+                    : `✅ Daily operations log dispatched successfully via cloud server to [${managers.length}] managers!`);
+                return;
+            }
+        }
+    } catch (srvErr) {
+        console.warn("Cloud server trigger-digest unavailable, falling back to direct client send:", srvErr.message);
+    }
 
+    // 2. Direct client fallback loop if cloud endpoint was unreachable
+    const messageText = await compileDailyDigest(null, dailyDigestConfig.language || 'ar');
     let successCount = 0;
     let failedCount = 0;
 
@@ -1112,7 +1211,7 @@ async function sendDailyDigestNow() {
     } else {
         const directWaUrl = `https://wa.me/?text=${encodeURIComponent(messageText)}`;
         if (confirm(isAr 
-            ? `⚠️ تم إرسال (${successCount}) وفشل (${failedCount}) عبر بوابة الخادم (ربما يكون الخادم في وضع الاستعداد).\n\nهل تريد فتح الواتساب مباشرة لإرساله يدوياً؟` 
+            ? `⚠️ تم إرسال (${successCount}) وفشل (${failedCount}) عبر بوابة الخادم.\n\nهل تريد فتح الواتساب مباشرة لإرساله يدوياً؟` 
             : `⚠️ Sent (${successCount}) and failed (${failedCount}) via server gateway.\n\nWould you like to open WhatsApp directly to forward manually?`)) {
             window.open(directWaUrl, '_blank');
         }
@@ -1134,7 +1233,7 @@ async function checkAndTriggerScheduledDigest() {
     const managers = dailyDigestConfig.managers || [];
     if (managers.length === 0) return;
 
-    // Get KSA Time
+    // Get KSA Time (UTC+3)
     const now = new Date();
     const ksaOffset = 3 * 60; // UTC+3 in minutes
     const localOffset = now.getTimezoneOffset(); // in minutes
@@ -1145,15 +1244,18 @@ async function checkAndTriggerScheduledDigest() {
     const dayStr = String(ksaTime.getDate()).padStart(2, '0');
     const todayStr = `${year}-${monthStr}-${dayStr}`;
 
-    const currentHourStr = String(ksaTime.getHours()).padStart(2, '0');
-    const currentMinStr = String(ksaTime.getMinutes()).padStart(2, '0');
-    const currentTimeStr = `${currentHourStr}:${currentMinStr}`;
+    const currentHour = ksaTime.getHours();
+    const currentMin = ksaTime.getMinutes();
+    const currentMinutes = currentHour * 60 + currentMin;
 
     const targetTime = dailyDigestConfig.scheduledTime || "23:00";
+    const [targetH, targetM] = targetTime.split(':').map(n => parseInt(n, 10) || 0);
+    const targetMinutes = targetH * 60 + targetM;
+    const diffMinutes = currentMinutes - targetMinutes;
 
-    // Trigger if time matches and has not yet been sent today
-    if (currentTimeStr === targetTime && dailyDigestConfig.lastSentDate !== todayStr) {
-        console.log(`⏰ [Daily Digest Scheduler] Triggering automatic daily log dispatch for ${todayStr} at ${currentTimeStr} KSA...`);
+    // Trigger within 60-minute window if not already sent today
+    if (diffMinutes >= 0 && diffMinutes <= 60 && dailyDigestConfig.lastSentDate !== todayStr) {
+        console.log(`⏰ [Daily Digest Scheduler] Triggering scheduled dispatch for ${todayStr} at KSA ${String(currentHour).padStart(2, '0')}:${String(currentMin).padStart(2, '0')} (Scheduled: ${targetTime})...`);
         
         dailyDigestConfig.lastSentDate = todayStr;
         saveDailyDigestSettings(true);
@@ -1162,20 +1264,51 @@ async function checkAndTriggerScheduledDigest() {
         let rawBaseUrl = (serverUrlInput ? serverUrlInput.value.trim() : '') || 'https://burgeroov-notify.onrender.com';
         let baseUrl = rawBaseUrl.replace(/\/+$/, '');
 
-        const messageText = await compileDailyDigest(todayStr, dailyDigestConfig.language || 'ar');
+        // Try triggering via backend server first (runs autonomous Baileys queue)
+        let serverHandled = false;
+        try {
+            const srvRes = await fetch(`${baseUrl}/wa/trigger-digest`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ force: true, triggerSource: 'client_scheduler' })
+            });
+            if (srvRes.ok) {
+                const srvData = await srvRes.json();
+                if (srvData.success) {
+                    console.log(`✅ [Daily Digest Scheduler] Successfully dispatched via cloud server:`, srvData);
+                    serverHandled = true;
+                }
+            }
+        } catch (srvErr) {
+            console.warn(`[Daily Digest Scheduler] Cloud server trigger skipped or unreachable:`, srvErr.message);
+        }
 
-        for (const phone of managers) {
-            try {
-                await fetch(`${baseUrl}/wa/send`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        phone: phone,
-                        text: messageText
-                    })
-                });
-            } catch (err) {
-                console.warn(`Scheduled send error for ${phone}:`, err);
+        // Fallback to client-side dispatch if server was unreachable
+        if (!serverHandled) {
+            let reportDateStr = todayStr;
+            if (targetH < 5) {
+                const prevKsa = new Date(ksaTime.getTime() - (24 * 3600000));
+                const py = prevKsa.getFullYear();
+                const pm = String(prevKsa.getMonth() + 1).padStart(2, '0');
+                const pd = String(prevKsa.getDate()).padStart(2, '0');
+                reportDateStr = `${py}-${pm}-${pd}`;
+            }
+
+            const messageText = await compileDailyDigest(reportDateStr, dailyDigestConfig.language || 'ar');
+
+            for (const phone of managers) {
+                try {
+                    await fetch(`${baseUrl}/wa/send`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            phone: phone,
+                            text: messageText
+                        })
+                    });
+                } catch (err) {
+                    console.warn(`Scheduled fallback send error for ${phone}:`, err);
+                }
             }
         }
     }
