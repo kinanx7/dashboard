@@ -93,7 +93,7 @@
     <!-- QR Code Generator Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=343">
+    <link rel="stylesheet" href="style.css?v=353">
 </head>
 
 <body class="theme-burgeroov">
@@ -664,6 +664,9 @@
                     <button id="tab-nfc" class="dept-tab" onclick="switchTab('nfc')"
                         data-i18n="tab-nfc">💳
                         NFC VICard</button>
+                    <button id="tab-jobs-applied" class="dept-tab" onclick="switchTab('jobs-applied')"
+                        data-i18n="tab-jobs-applied">💼
+                        Jobs Applied</button>
                 </div>
                 <button type="button" class="btn-outline" id="tab-reorder-btn" onclick="toggleTabReorderMode()"
                     style="padding: 8px 16px; border-radius: 100px; font-weight: 700; font-size: 0.85rem;"
@@ -5841,6 +5844,136 @@
             </div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- VIEW: JOBS APPLIED & RECRUITMENT PORTAL    -->
+        <!-- ========================================== -->
+        <div id="view-jobs-applied" class="view-section" style="max-width: 1680px; width: calc(100% - 80px); margin: 0 auto 40px auto; padding: 0; box-sizing: border-box;">
+            
+            <!-- Header Card with Top HUD Metrics -->
+            <div class="card" style="margin-bottom: 24px; border-top: 4px solid var(--primary);">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom: 20px;">
+                    <div style="display:flex; align-items:center; gap:14px;">
+                        <div style="width:48px; height:48px; border-radius:14px; background:rgba(212,175,55,0.12); border:1px solid var(--primary); display:flex; align-items:center; justify-content:center; font-size:1.6rem; color:var(--primary); flex-shrink:0;">
+                            💼
+                        </div>
+                        <div>
+                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                <h2 style="font-size: 1.35rem; font-weight: 800; margin: 0; color: var(--text-main);" data-i18n="title-jobs-applied">
+                                    💼 Jobs Applied & Recruitment Portal
+                                </h2>
+                                <span style="font-size:0.72rem; font-weight:800; padding:3px 10px; border-radius:100px; background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);">
+                                    STREET QR ACTIVE
+                                </span>
+                            </div>
+                            <p style="margin:4px 0 0 0; color:var(--text-muted); font-size:0.86rem;" data-i18n="desc-jobs-applied">
+                                Manage vacancies, generate street recruitment QR codes, inspect candidate screening answers, and contact applicants directly via WhatsApp.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Sub-view navigation tabs (Applicants vs Job Openings) -->
+                    <div style="display:flex; gap:8px; background:var(--input-bg); padding:4px; border-radius:12px; border:1px solid var(--border-color);">
+                        <button type="button" id="jobs-subtab-applicants" onclick="setJobsAppliedSubTab('applicants')"
+                            class="btn active-subtab"
+                            style="padding:8px 18px; border-radius:8px; font-weight:800; font-size:0.86rem; cursor:pointer;">
+                            👥 <span data-i18n="subtab-job-applicants">Applicants</span>
+                        </button>
+                        <button type="button" id="jobs-subtab-openings" onclick="setJobsAppliedSubTab('openings')"
+                            class="btn"
+                            style="padding:8px 18px; border-radius:8px; font-weight:800; font-size:0.86rem; cursor:pointer; background:transparent; color:var(--text-muted);">
+                            📋 <span data-i18n="subtab-job-openings">Job Openings & QR</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- HUD Key Metrics -->
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:12px;">
+                    <div style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:12px; padding:12px 16px; text-align:center;">
+                        <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700; margin-bottom:4px;" data-i18n="stat-total-apps">Total Applications</div>
+                        <div id="jobs-stat-total" style="font-size:1.4rem; font-weight:900; color:var(--text-main);">0</div>
+                    </div>
+                    <div style="background:var(--input-bg); border:1px solid rgba(168,85,247,0.3); border-radius:12px; padding:12px 16px; text-align:center;">
+                        <div style="font-size:0.75rem; color:#a855f7; font-weight:700; margin-bottom:4px;" data-i18n="stat-new-apps">New Submissions</div>
+                        <div id="jobs-stat-new" style="font-size:1.4rem; font-weight:900; color:#a855f7;">0</div>
+                    </div>
+                    <div style="background:var(--input-bg); border:1px solid rgba(56,189,248,0.3); border-radius:12px; padding:12px 16px; text-align:center;">
+                        <div style="font-size:0.75rem; color:#38bdf8; font-weight:700; margin-bottom:4px;" data-i18n="stat-contacted-apps">Contacted</div>
+                        <div id="jobs-stat-contacted" style="font-size:1.4rem; font-weight:900; color:#38bdf8;">0</div>
+                    </div>
+                    <div style="background:var(--input-bg); border:1px solid rgba(245,158,11,0.3); border-radius:12px; padding:12px 16px; text-align:center;">
+                        <div style="font-size:0.75rem; color:#f59e0b; font-weight:700; margin-bottom:4px;" data-i18n="stat-interviewed-apps">Interviewed</div>
+                        <div id="jobs-stat-interviewed" style="font-size:1.4rem; font-weight:900; color:#f59e0b;">0</div>
+                    </div>
+                    <div style="background:var(--input-bg); border:1px solid rgba(16,185,129,0.3); border-radius:12px; padding:12px 16px; text-align:center;">
+                        <div style="font-size:0.75rem; color:#10b981; font-weight:700; margin-bottom:4px;" data-i18n="stat-hired-apps">Hired 🎉</div>
+                        <div id="jobs-stat-hired" style="font-size:1.4rem; font-weight:900; color:#10b981;">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SUB-VIEW A: APPLICANTS LIST -->
+            <div id="jobs-applied-applicants-view">
+                <!-- Filter Bar -->
+                <div class="card" style="margin-bottom: 20px; padding: 16px 20px;">
+                    <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px;">
+                        <!-- Search Box -->
+                        <div style="flex:1; min-width:240px; position:relative;">
+                            <input type="text" id="jobs-applied-search-input" oninput="onJobsAppliedSearch(this.value)"
+                                placeholder="🔍 Search applicant name, phone, nationality..."
+                                data-i18n="[placeholder]placeholder-search-applicants"
+                                style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.9rem; box-sizing:border-box;">
+                        </div>
+
+                        <!-- Position Selector -->
+                        <div style="min-width:180px;">
+                            <select id="jobs-filter-position" onchange="onApplicantJobFilterChange(this.value)"
+                                style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.85rem; font-weight:700; cursor:pointer;">
+                                <option value="all">All Job Positions</option>
+                            </select>
+                        </div>
+
+                        <!-- Status Filter Chips -->
+                        <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                            <button type="button" class="app-status-chip active-chip" data-status="all" onclick="onApplicantStatusFilterChange('all')" style="padding:6px 14px; border-radius:100px; font-size:0.8rem; font-weight:700; cursor:pointer;">All</button>
+                            <button type="button" class="app-status-chip" data-status="new" onclick="onApplicantStatusFilterChange('new')" style="padding:6px 14px; border-radius:100px; font-size:0.8rem; font-weight:700; cursor:pointer;">✨ New</button>
+                            <button type="button" class="app-status-chip" data-status="contacted" onclick="onApplicantStatusFilterChange('contacted')" style="padding:6px 14px; border-radius:100px; font-size:0.8rem; font-weight:700; cursor:pointer;">📞 Contacted</button>
+                            <button type="button" class="app-status-chip" data-status="interviewed" onclick="onApplicantStatusFilterChange('interviewed')" style="padding:6px 14px; border-radius:100px; font-size:0.8rem; font-weight:700; cursor:pointer;">🤝 Interviewed</button>
+                            <button type="button" class="app-status-chip" data-status="hired" onclick="onApplicantStatusFilterChange('hired')" style="padding:6px 14px; border-radius:100px; font-size:0.8rem; font-weight:700; cursor:pointer;">🎉 Hired</button>
+                            <button type="button" class="app-status-chip" data-status="rejected" onclick="onApplicantStatusFilterChange('rejected')" style="padding:6px 14px; border-radius:100px; font-size:0.8rem; font-weight:700; cursor:pointer;">❌ Rejected</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Grid of Applicants -->
+                <div id="jobs-applicants-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:16px;">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+
+            <!-- SUB-VIEW B: MANAGE JOB OPENINGS & QR CODES -->
+            <div id="jobs-applied-openings-view" style="display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <h3 style="margin:0; font-size:1.2rem; color:var(--text-main); font-weight:800;" data-i18n="title-vacancies-list">
+                            Active Job Vacancies & Street QR Codes
+                        </h3>
+                        <p style="margin:3px 0 0 0; color:var(--text-muted); font-size:0.84rem;">
+                            Each job posting has its own unique QR code and customized screening questionnaire.
+                        </p>
+                    </div>
+                    <button type="button" onclick="openCreateJobModal()" class="btn-primary"
+                        style="padding:10px 20px; font-weight:800; border-radius:10px; background:linear-gradient(135deg, var(--primary), #b38914); color:#000; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                        ➕ <span data-i18n="btn-post-new-job">Post New Job Opening</span>
+                    </button>
+                </div>
+
+                <div id="jobs-openings-container">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+
+        </div> <!-- End View Jobs Applied -->
+
         <!-- Locked Department Overlay (shown when a worker taps a restricted tab) -->
         <div id="view-locked" class="view-section">
             <div style="text-align:center; max-width:480px; margin:0 auto; padding:20px;">
@@ -6100,6 +6233,90 @@
                 <div style="display:flex; justify-content:flex-end; gap:10px;">
                     <button type="button" onclick="closeTransferConstantTaskModal()" class="btn-outline" style="padding:10px 18px; border-radius:10px; font-weight:700;">Cancel</button>
                     <button type="submit" class="btn-primary" style="padding:10px 22px; border-radius:10px; font-weight:800; background:linear-gradient(135deg, #10b981, #047857); border:none; color:white;">🔁 Confirm Transfer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Worker Salary and All-Time Remaining Modal -->
+    <div id="modal-edit-worker-salary-balance" class="modal"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); backdrop-filter:blur(8px); z-index:11000; align-items:center; justify-content:center; padding:16px;">
+        <div class="modal-content"
+            style="background:var(--card-bg); color:var(--text-main); border-radius:20px; width:100%; max-width:560px; max-height:92vh; overflow-y:auto; padding:26px; border:1px solid var(--border-color); box-shadow:0 20px 50px rgba(0,0,0,0.5);">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:14px; margin-bottom:18px;">
+                <h3 style="margin:0; color:var(--primary); font-size:1.2rem; display:flex; align-items:center; gap:10px; font-weight:800;">
+                    💰 <span data-i18n="title-edit-salary-balance">Edit Worker Salary & All-Time Remaining</span>
+                </h3>
+                <button type="button" onclick="closeEditWorkerSalaryAndBalanceModal()"
+                    style="background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer; line-height:1;">✖</button>
+            </div>
+
+            <!-- Worker Identification Badge -->
+            <div style="display:flex; align-items:center; gap:14px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:14px; padding:14px 16px; margin-bottom:20px;">
+                <div style="width:48px; height:48px; border-radius:50%; background:rgba(212,175,55,0.15); border:1.5px solid var(--primary); display:flex; align-items:center; justify-content:center; font-size:1.4rem; color:var(--primary); flex-shrink:0;">
+                    👤
+                </div>
+                <div style="flex:1; min-width:0;">
+                    <div id="edit-fin-worker-name" style="font-weight:800; font-size:1.05rem; color:var(--text-main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Worker Name</div>
+                    <div style="font-size:0.82rem; color:var(--text-muted); margin-top:3px; display:flex; gap:10px; flex-wrap:wrap;">
+                        <span id="edit-fin-worker-branch" style="background:rgba(255,255,255,0.06); padding:2px 8px; border-radius:6px;">Branch</span>
+                        <span id="edit-fin-worker-role" style="background:rgba(212,175,55,0.1); color:var(--primary); padding:2px 8px; border-radius:6px; font-weight:700;">Role</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Financial Snapshot Pills -->
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px; margin-bottom:22px;">
+                <div style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:12px; padding:10px 12px; text-align:center;">
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;" data-i18n="th-base-salary">Base Salary</div>
+                    <div id="edit-fin-cur-salary-badge" style="font-size:0.95rem; font-weight:800; color:var(--text-main);">SAR 0</div>
+                </div>
+                <div style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:12px; padding:10px 12px; text-align:center;">
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;" data-i18n="th-total-remaining">Total Remaining</div>
+                    <div id="edit-fin-cur-alltime-badge" style="font-size:0.95rem; font-weight:800; color:var(--primary);">SAR 0</div>
+                </div>
+                <div style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:12px; padding:10px 12px; text-align:center;">
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;" data-i18n="initialBalance">Carried Debt</div>
+                    <div id="edit-fin-cur-carried-badge" style="font-size:0.95rem; font-weight:800; color:#38bdf8;">SAR 0</div>
+                </div>
+            </div>
+
+            <!-- Form Inputs -->
+            <form onsubmit="event.preventDefault(); saveWorkerSalaryAndBalance();" style="display:flex; flex-direction:column; gap:16px;">
+                <!-- Field 1: Worker Base Salary -->
+                <div>
+                    <label style="display:block; font-size:0.85rem; font-weight:700; color:var(--text-main); margin-bottom:6px;" data-i18n="label-edit-base-salary">
+                        💵 Base Salary (SAR) / الراتب الأساسي
+                    </label>
+                    <input type="number" step="any" min="0" id="edit-fin-worker-salary" required
+                        style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:1rem; font-weight:700; box-sizing:border-box;">
+                    <span style="display:block; font-size:0.75rem; color:var(--text-muted); margin-top:4px;" data-i18n="desc-edit-salary-hint">
+                        Sets the monthly base salary for this worker across all payroll calculations.
+                    </span>
+                </div>
+
+                <!-- Field 2: Total Remaining (All Time) -->
+                <div>
+                    <label style="display:block; font-size:0.85rem; font-weight:700; color:var(--primary); margin-bottom:6px;" data-i18n="label-edit-alltime-remaining">
+                        🎯 Total Remaining (All Time) (SAR) / إجمالي المتبقي لكافة الشهور
+                    </label>
+                    <input type="number" step="any" id="edit-fin-worker-alltime" required
+                        style="width:100%; padding:12px 14px; border-radius:10px; border:1.5px solid var(--primary); background:var(--input-bg); color:var(--text-main); font-size:1.05rem; font-weight:800; box-sizing:border-box;">
+                    <span style="display:block; font-size:0.75rem; color:var(--text-muted); margin-top:4px;" data-i18n="desc-edit-alltime-hint">
+                        The exact target all-time balance. The system automatically calibrates the initial carried balance so the ledger displays this exact amount.
+                    </span>
+                </div>
+
+                <!-- Action Buttons -->
+                <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:10px; border-top:1px solid var(--border-color); padding-top:16px;">
+                    <button type="button" onclick="closeEditWorkerSalaryAndBalanceModal()" class="btn-outline"
+                        style="padding:10px 20px; border-radius:10px; font-weight:700; cursor:pointer;" data-i18n="btn-cancel">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn-primary"
+                        style="padding:10px 24px; border-radius:10px; font-weight:800; background:linear-gradient(135deg, var(--primary), #b38914); border:none; color:#000; cursor:pointer; display:inline-flex; align-items:center; gap:6px;" data-i18n="btn-save-changes">
+                        💾 <span>Save Changes</span>
+                    </button>
                 </div>
             </form>
         </div>
@@ -6964,6 +7181,10 @@
             <button class="mob-dept-item mob-sheet-tab" id="mob-tab-nfc" data-tab="nfc"
                 onclick="switchTab('nfc'); closeMobDeptMenu()">
                 <span class="mob-dept-icon">💳</span><span data-i18n="tab-nfc">NFC VICard</span>
+            </button>
+            <button class="mob-dept-item mob-sheet-tab" id="mob-tab-jobs-applied" data-tab="jobs-applied"
+                onclick="switchTab('jobs-applied'); closeMobDeptMenu()">
+                <span class="mob-dept-icon">💼</span><span data-i18n="tab-jobs-applied">Jobs Applied</span>
             </button>
         </div>
     </div>
@@ -8716,9 +8937,313 @@
         </div>
     </div>
 
+    <!-- ============================================================================== -->
+    <!-- JOBS APPLIED RECRUITMENT MODALS & PUBLIC APPLICATION OVERLAY                   -->
+    <!-- ============================================================================== -->
+
+    <!-- 1. CREATE / EDIT JOB VACANCY & SCREENING QUESTIONS BUILDER MODAL -->
+    <div id="modal-create-job-opening" class="modal"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); backdrop-filter:blur(8px); z-index:11000; align-items:center; justify-content:center; padding:16px;">
+        <div class="modal-content"
+            style="background:var(--card-bg, #1a1a24); color:var(--text-main); border-radius:20px; width:100%; max-width:640px; max-height:90vh; display:flex; flex-direction:column; border:1px solid var(--border-color); box-shadow:0 24px 60px rgba(0,0,0,0.7); overflow:hidden;">
+            <!-- Modal Header -->
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 24px; border-bottom:1px solid var(--border-color); background:rgba(255,255,255,0.02);">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:1.4rem;">💼</span>
+                    <h3 id="create-job-modal-title" style="margin:0; font-size:1.2rem; font-weight:800; color:var(--text-main);">
+                        ➕ Post New Job & Setup Questions
+                    </h3>
+                </div>
+                <button type="button" onclick="closeCreateJobModal()"
+                    style="background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer; line-height:1;">✖</button>
+            </div>
+
+            <!-- Modal Scrollable Body -->
+            <div style="padding:22px 24px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:16px;">
+                <!-- Job Title -->
+                <div>
+                    <label style="display:block; font-size:0.85rem; font-weight:700; color:var(--text-main); margin-bottom:6px;">
+                        Job Title (مسمى الوظيفة) <span style="color:var(--danger, #ef4444);">*</span>
+                    </label>
+                    <input type="text" id="create-job-title" required placeholder="e.g. Burger Cook / طباخ برجر وشواية"
+                        style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.95rem; font-weight:700; box-sizing:border-box;">
+                </div>
+
+                <!-- Department & Branch -->
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div>
+                        <label style="display:block; font-size:0.84rem; font-weight:700; color:var(--text-main); margin-bottom:6px;">
+                            Department (القسم)
+                        </label>
+                        <input type="text" id="create-job-dept" placeholder="e.g. Kitchen / المطبخ"
+                            style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:0.84rem; font-weight:700; color:var(--text-main); margin-bottom:6px;">
+                            Branch (الفرع)
+                        </label>
+                        <input type="text" id="create-job-branch" placeholder="e.g. Main Branch"
+                            style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; box-sizing:border-box;">
+                    </div>
+                </div>
+
+                <!-- Salary Range & Description -->
+                <div style="display:grid; grid-template-columns:1fr; gap:12px;">
+                    <div>
+                        <label style="display:block; font-size:0.84rem; font-weight:700; color:var(--text-main); margin-bottom:6px;">
+                            Expected Salary (الراتب المتوقع)
+                        </label>
+                        <input type="text" id="create-job-salary" placeholder="e.g. SAR 3,500 - 4,500"
+                            style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:0.84rem; font-weight:700; color:var(--text-main); margin-bottom:6px;">
+                            Job Description & Requirements (الوصف والشروط)
+                        </label>
+                        <textarea id="create-job-desc" rows="2" placeholder="Brief job duties, experience needed..."
+                            style="width:100%; padding:10px 14px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; box-sizing:border-box; resize:vertical;"></textarea>
+                    </div>
+                </div>
+
+                <!-- Fast Preset Templates -->
+                <div style="background:rgba(212,175,55,0.05); border:1px dashed rgba(212,175,55,0.4); border-radius:14px; padding:12px 16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+                        <span style="font-size:0.82rem; font-weight:800; color:var(--primary);">⚡ Fast Question Presets (نماذج أسئلة جاهزة):</span>
+                        <span style="font-size:0.75rem; color:var(--text-muted);">Click to load standard questions:</span>
+                    </div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button type="button" onclick="loadPresetQuestions('chef')" class="btn-outline" style="padding:5px 12px; font-size:0.8rem; border-radius:8px;">👨‍🍳 Chef / Cook</button>
+                        <button type="button" onclick="loadPresetQuestions('driver')" class="btn-outline" style="padding:5px 12px; font-size:0.8rem; border-radius:8px;">🚚 Delivery Driver</button>
+                        <button type="button" onclick="loadPresetQuestions('cashier')" class="btn-outline" style="padding:5px 12px; font-size:0.8rem; border-radius:8px;">💵 Cashier</button>
+                        <button type="button" onclick="loadPresetQuestions('general')" class="btn-outline" style="padding:5px 12px; font-size:0.8rem; border-radius:8px;">📦 General Staff</button>
+                    </div>
+                </div>
+
+                <!-- Custom Screening Questions Section -->
+                <div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <div>
+                            <label style="font-size:0.92rem; font-weight:800; color:var(--text-main); margin:0;">
+                                ❓ Screening Questions (أسئلة التقديم للمرشح)
+                            </label>
+                            <div style="font-size:0.76rem; color:var(--text-muted);">The candidate will see and answer these questions upon scanning the street QR code.</div>
+                        </div>
+                        <button type="button" onclick="addQuestionToBuilder()" class="btn-primary"
+                            style="padding:6px 14px; font-size:0.8rem; font-weight:800; border-radius:8px; cursor:pointer;">
+                            ➕ Add Question
+                        </button>
+                    </div>
+
+                    <!-- Dynamic List of Questions -->
+                    <div id="create-job-questions-list">
+                        <!-- Populated dynamically by renderQuestionBuilderList() -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div style="padding:14px 24px; border-top:1px solid var(--border-color); display:flex; justify-content:flex-end; gap:12px; background:rgba(255,255,255,0.02);">
+                <button type="button" onclick="closeCreateJobModal()" class="btn-outline"
+                    style="padding:9px 18px; border-radius:10px; font-weight:700; cursor:pointer;">
+                    Cancel
+                </button>
+                <button type="button" onclick="saveJobOpening()" class="btn-primary"
+                    style="padding:9px 24px; border-radius:10px; font-weight:800; background:linear-gradient(135deg, var(--primary), #b38914); color:#000; border:none; cursor:pointer;">
+                    💾 Save Job & Questions
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. STREET QR CODE & PRINTABLE FLYER POSTER MODAL -->
+    <div id="modal-job-qr-poster" class="modal"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); backdrop-filter:blur(8px); z-index:11000; align-items:center; justify-content:center; padding:16px;">
+        <div class="modal-content"
+            style="background:var(--card-bg, #1a1a24); color:var(--text-main); border-radius:22px; width:100%; max-width:540px; border:1px solid var(--border-color); box-shadow:0 24px 60px rgba(0,0,0,0.7); overflow:hidden; text-align:center;">
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 22px; border-bottom:1px solid var(--border-color);">
+                <div style="text-align:left;">
+                    <h3 id="job-qr-modal-title" style="margin:0; font-size:1.15rem; font-weight:800; color:var(--text-main);">
+                        📱 Street QR Code & Poster
+                    </h3>
+                    <div id="job-qr-subtitle" style="font-size:0.78rem; color:var(--text-muted); margin-top:2px;">
+                        Scan with mobile camera to apply
+                    </div>
+                </div>
+                <button type="button" onclick="closeJobQrModal()"
+                    style="background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer; line-height:1;">✖</button>
+            </div>
+
+            <div style="padding:24px 20px;">
+                <!-- QR Image Display -->
+                <div style="background:#ffffff; padding:18px; border-radius:18px; display:inline-block; box-shadow:0 10px 30px rgba(0,0,0,0.4); margin-bottom:16px;">
+                    <img id="job-qr-image-display" src="" alt="Job Application Street QR Code" style="width:220px; height:220px; display:block; border-radius:8px;">
+                </div>
+
+                <div style="font-size:0.86rem; font-weight:700; color:var(--text-main); margin-bottom:6px;">
+                    📱 Public Street Scan URL (رابط التقديم المباشر):
+                </div>
+                <div style="display:flex; gap:8px; max-width:440px; margin:0 auto 20px auto;">
+                    <input type="text" id="job-qr-url-input" readonly
+                        style="flex:1; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--primary); font-size:0.82rem; font-family:monospace; box-sizing:border-box;">
+                    <button type="button" onclick="copyJobApplyLink(_activeQrJobId)" class="btn-outline"
+                        style="padding:9px 14px; border-radius:10px; font-weight:700; font-size:0.82rem; white-space:nowrap;">
+                        📋 Copy
+                    </button>
+                </div>
+
+                <!-- Print A4 Street Flyer Callout -->
+                <div style="background:linear-gradient(135deg, rgba(212,175,55,0.12), rgba(16,185,129,0.08)); border:1.5px dashed rgba(212,175,55,0.5); border-radius:16px; padding:18px; margin-bottom:10px;">
+                    <div style="font-size:1.3rem; margin-bottom:6px;">📄🖨️</div>
+                    <div style="font-weight:800; font-size:0.95rem; color:var(--text-main); margin-bottom:4px;">
+                        Ready-to-Print Street Recruitment Flyer (A4)
+                    </div>
+                    <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:14px; line-height:1.4;">
+                        Generates a formatted high-contrast A4 poster with your company logo, job title, and high-res QR code ready to print and paste on streets, branch doors, or shop windows.
+                    </div>
+                    <button type="button" onclick="printJobRecruitmentPoster()" class="btn-primary"
+                        style="padding:12px 28px; font-weight:900; font-size:0.95rem; border-radius:12px; background:linear-gradient(135deg, #10b981, #059669); border:none; color:#ffffff; cursor:pointer; box-shadow:0 4px 15px rgba(16,185,129,0.4); display:inline-flex; align-items:center; gap:8px;">
+                        🖨️ <span>Print A4 Street Poster (طباعة الملصق)</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. APPLICANT DETAILS & SCREENING ANSWERS REVIEW MODAL -->
+    <div id="modal-job-applicant-details" class="modal"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); backdrop-filter:blur(8px); z-index:11000; align-items:center; justify-content:center; padding:16px;">
+        <div class="modal-content"
+            style="background:var(--card-bg, #1a1a24); color:var(--text-main); border-radius:22px; width:100%; max-width:680px; max-height:92vh; display:flex; flex-direction:column; border:1px solid var(--border-color); box-shadow:0 24px 60px rgba(0,0,0,0.7); overflow:hidden;">
+            
+            <!-- Modal Header -->
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 24px; border-bottom:1px solid var(--border-color); background:rgba(255,255,255,0.02);">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div style="width:44px; height:44px; border-radius:12px; background:rgba(212,175,55,0.15); border:1px solid var(--primary); display:flex; align-items:center; justify-content:center; font-size:1.4rem; color:var(--primary);">
+                        👤
+                    </div>
+                    <div>
+                        <h3 id="applicant-modal-name" style="margin:0; font-size:1.2rem; font-weight:800; color:var(--text-main);">
+                            Applicant Name
+                        </h3>
+                        <div id="applicant-modal-job" style="font-size:0.82rem; color:var(--primary); font-weight:700; margin-top:2px;">
+                            💼 Job Position
+                        </div>
+                    </div>
+                </div>
+                <button type="button" onclick="closeApplicantDetailsModal()"
+                    style="background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer; line-height:1;">✖</button>
+            </div>
+
+            <!-- Modal Body -->
+            <div style="padding:22px 24px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:18px;">
+                <!-- Fast Contact Action Strip (WhatsApp & Phone) -->
+                <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between; background:var(--input-bg); border:1px solid var(--border-color); border-radius:14px; padding:12px 16px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:0.85rem; color:var(--text-muted); font-weight:600;">Direct Contact:</span>
+                        <span id="applicant-modal-phone" style="font-weight:800; color:var(--text-main); font-size:0.95rem; font-family:monospace;">+966...</span>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <a id="applicant-modal-wa-btn" href="#" target="_blank" class="btn"
+                            style="padding:8px 16px; border-radius:10px; font-weight:800; font-size:0.84rem; background:#25D366; color:#ffffff; text-decoration:none; display:inline-flex; align-items:center; gap:6px; box-shadow:0 2px 10px rgba(37,211,102,0.3);">
+                            💬 <span>WhatsApp Candidate</span>
+                        </a>
+                        <a id="applicant-modal-call-btn" href="#" class="btn-outline"
+                            style="padding:8px 14px; border-radius:10px; font-weight:700; font-size:0.84rem; text-decoration:none;">
+                            📞 Call
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Candidate Basic Info Grid -->
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px;">
+                    <div style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:10px; padding:10px 12px;">
+                        <div style="font-size:0.75rem; color:var(--text-muted);">Nationality</div>
+                        <div id="applicant-modal-nat" style="font-weight:800; font-size:0.92rem; color:var(--text-main); margin-top:3px;">—</div>
+                    </div>
+                    <div style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:10px; padding:10px 12px;">
+                        <div style="font-size:0.75rem; color:var(--text-muted);">Age</div>
+                        <div id="applicant-modal-age" style="font-weight:800; font-size:0.92rem; color:var(--text-main); margin-top:3px;">—</div>
+                    </div>
+                    <div style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:10px; padding:10px 12px;">
+                        <div style="font-size:0.75rem; color:var(--text-muted);">City / District</div>
+                        <div id="applicant-modal-city" style="font-weight:800; font-size:0.92rem; color:var(--text-main); margin-top:3px;">—</div>
+                    </div>
+                    <div style="background:var(--input-bg); border:1px solid var(--border-color); border-radius:10px; padding:10px 12px;">
+                        <div style="font-size:0.75rem; color:var(--text-muted);">Submitted</div>
+                        <div id="applicant-modal-date" style="font-weight:700; font-size:0.8rem; color:var(--text-muted); margin-top:4px;">—</div>
+                    </div>
+                </div>
+
+                <!-- Screening Questions & Candidate Answers -->
+                <div>
+                    <h4 style="font-size:0.95rem; font-weight:800; color:var(--text-main); margin:0 0 10px 0; display:flex; align-items:center; gap:6px;">
+                        📝 <span>Screening Questionnaire Answers (إجابات أسئلة التقديم):</span>
+                    </h4>
+                    <div id="applicant-modal-answers-list">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Status & Manager Notes -->
+                <div style="border-top:1px solid var(--border-color); padding-top:16px;">
+                    <div style="display:grid; grid-template-columns:180px 1fr; gap:12px; margin-bottom:12px;">
+                        <div>
+                            <label style="display:block; font-size:0.84rem; font-weight:700; color:var(--text-main); margin-bottom:6px;">
+                                Application Status
+                            </label>
+                            <select id="applicant-modal-status-select"
+                                style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; font-weight:700;">
+                                <option value="new">✨ New Submission</option>
+                                <option value="contacted">📞 Contacted</option>
+                                <option value="interviewed">🤝 Interviewed</option>
+                                <option value="hired">🎉 Hired</option>
+                                <option value="rejected">❌ Rejected</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:0.84rem; font-weight:700; color:var(--text-main); margin-bottom:6px;">
+                                Manager Internal Notes (ملاحظات المقابلة)
+                            </label>
+                            <input type="text" id="applicant-modal-notes" placeholder="e.g. Good attitude, available immediately..."
+                                style="width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.88rem; box-sizing:border-box;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div style="padding:14px 24px; border-top:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; gap:12px; background:rgba(255,255,255,0.02); flex-wrap:wrap;">
+                <!-- Direct Hire Button -->
+                <button type="button" onclick="hireApplicantDirectly()" class="btn-success"
+                    style="padding:9px 20px; border-radius:10px; font-weight:800; font-size:0.88rem; background:linear-gradient(135deg, #10b981, #059669); border:none; color:#ffffff; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                    🤝 <span>Hire Directly & Add to Workers Roster</span>
+                </button>
+
+                <div style="display:flex; gap:10px;">
+                    <button type="button" onclick="closeApplicantDetailsModal()" class="btn-outline"
+                        style="padding:9px 18px; border-radius:10px; font-weight:700; cursor:pointer;">
+                        Close
+                    </button>
+                    <button type="button" onclick="saveApplicantReviewChanges()" class="btn-primary"
+                        style="padding:9px 22px; border-radius:10px; font-weight:800; background:linear-gradient(135deg, var(--primary), #b38914); color:#000; border:none; cursor:pointer;">
+                        💾 Save Status
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. FULL-SCREEN STANDALONE PUBLIC RECRUITMENT OVERLAY (?apply_job=JOB_ID&company=COMP_ID) -->
+    <div id="job-apply-public-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#08080c; z-index:9999999; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:20px 16px;">
+        <div id="job-apply-public-container" style="max-width:600px; margin:0 auto; padding-bottom:60px;">
+            <!-- Rendered dynamically by initPublicJobApplyPortal() in js/jobs_applied.js -->
+        </div>
+    </div>
+
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=348"></script>
-    <script src="app.js?v=348"></script>
+    <script src="translations.js?v=354"></script>
+    <script src="app.js?v=354"></script>
 </body>
 
 </html>

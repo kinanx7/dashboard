@@ -49,6 +49,7 @@ function renderFinanceTable() {
         if (ov > 0) {
             overtimeHtml = `<div class="breakdown-row" style="color:#f59e0b;"><span>${isAr ? 'العمل الإضافي:' : 'Overtime:'}</span> <span>+ SAR ${ov.toLocaleString()}</span></div>`;
         }
+        const isFinAdmin = currentUser && (currentUser.role === 'admin' || document.body.classList.contains('perm-finance'));
         tr.innerHTML = `
                     <td><strong style="color:var(--text-main);">${worker.name}</strong><br><span class="text-muted-heavy">${worker.branch}</span></td>
                     <td>SAR ${base.toLocaleString()}</td>
@@ -69,7 +70,19 @@ function renderFinanceTable() {
                         </div>
                     </td>
                     <td class="text-info">SAR ${paidThisMonth.toLocaleString()}</td>
-                    <td style="font-weight:700; color:var(--primary); font-size:1.05rem;">SAR ${remainingAllTime.toLocaleString()}</td>
+                    <td style="font-weight:700; color:var(--primary); font-size:1.05rem;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+                            <span>SAR ${remainingAllTime.toLocaleString()}</span>
+                            ${isFinAdmin ? `
+                                <button type="button" onclick="event.stopPropagation(); openEditWorkerSalaryAndBalanceModal('${worker.id}')"
+                                    class="btn-edit-fin-worker"
+                                    style="padding: 4px 10px; font-size: 0.78rem; font-weight: 700; border-radius: 8px; border: 1px solid var(--primary); background: rgba(212,175,55,0.14); color: var(--primary); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.2s ease; box-shadow: 0 1px 4px rgba(0,0,0,0.2);"
+                                    title="${isAr ? 'تعديل راتب ورصيد الموظف' : 'Edit Worker Salary & All-Time Remaining'}">
+                                    ✏️ <span>${isAr ? 'تعديل' : 'Edit'}</span>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </td>
                 `;
         tbody.querySelector('tbody').appendChild(tr);
     });
@@ -5966,6 +5979,127 @@ try {
     marketCart = [];
 }
 
+
+// =====================================================================
+// WORKER SALARY & ALL-TIME REMAINING EDITING MODAL LOGIC
+// =====================================================================
+var _activeEditingWorkerId = null;
+
+function openEditWorkerSalaryAndBalanceModal(workerId) {
+    if (!workerId) return;
+    const workers = (getCompanyData() && getCompanyData().workers) || [];
+    const worker = workers.find(w => w.id === workerId);
+    if (!worker) {
+        alert(currentAppLang === 'ar' ? 'لم يتم العثور على الموظف' : 'Worker not found.');
+        return;
+    }
+
+    _activeEditingWorkerId = workerId;
+
+    const modal = document.getElementById('modal-edit-worker-salary-balance');
+    if (!modal) return;
+
+    const nameEl = document.getElementById('edit-fin-worker-name');
+    const branchEl = document.getElementById('edit-fin-worker-branch');
+    const roleEl = document.getElementById('edit-fin-worker-role');
+    const salaryInput = document.getElementById('edit-fin-worker-salary');
+    const allTimeInput = document.getElementById('edit-fin-worker-alltime');
+    const curSalaryDisplay = document.getElementById('edit-fin-cur-salary-badge');
+    const curAllTimeDisplay = document.getElementById('edit-fin-cur-alltime-badge');
+    const curCarriedDisplay = document.getElementById('edit-fin-cur-carried-badge');
+
+    const baseSalary = parseFloat(worker.income || 0);
+    const curAllTime = getCumulativeBalance(worker, currentGlobalMonth);
+    const curCarried = parseFloat(worker.initialBalance || 0);
+
+    if (nameEl) nameEl.textContent = worker.name || 'Worker';
+    if (branchEl) branchEl.textContent = worker.branch || 'Main Branch';
+    if (roleEl) roleEl.textContent = worker.role || 'Staff';
+
+    if (salaryInput) salaryInput.value = baseSalary;
+    if (allTimeInput) allTimeInput.value = curAllTime;
+
+    if (curSalaryDisplay) curSalaryDisplay.textContent = `SAR ${baseSalary.toLocaleString()}`;
+    if (curAllTimeDisplay) curAllTimeDisplay.textContent = `SAR ${curAllTime.toLocaleString()}`;
+    if (curCarriedDisplay) curCarriedDisplay.textContent = `SAR ${curCarried.toLocaleString()}`;
+
+    modal.style.display = 'flex';
+}
+window.openEditWorkerSalaryAndBalanceModal = openEditWorkerSalaryAndBalanceModal;
+
+function closeEditWorkerSalaryAndBalanceModal() {
+    _activeEditingWorkerId = null;
+    const modal = document.getElementById('modal-edit-worker-salary-balance');
+    if (modal) modal.style.display = 'none';
+}
+window.closeEditWorkerSalaryAndBalanceModal = closeEditWorkerSalaryAndBalanceModal;
+
+function saveWorkerSalaryAndBalance() {
+    if (!_activeEditingWorkerId) return;
+    const workers = (getCompanyData() && getCompanyData().workers) || [];
+    const workerIndex = workers.findIndex(w => w.id === _activeEditingWorkerId);
+    if (workerIndex === -1) {
+        alert(currentAppLang === 'ar' ? 'لم يتم العثور على الموظف' : 'Worker not found');
+        return;
+    }
+
+    const worker = workers[workerIndex];
+    const isAr = currentAppLang === 'ar';
+
+    const salaryInput = document.getElementById('edit-fin-worker-salary');
+    const allTimeInput = document.getElementById('edit-fin-worker-alltime');
+
+    const newSalary = parseFloat(salaryInput ? salaryInput.value : '');
+    const newTargetRemaining = parseFloat(allTimeInput ? allTimeInput.value : '');
+
+    if (isNaN(newSalary) || newSalary < 0) {
+        alert(isAr ? 'يرجى إدخال راتب أساسي صحيح' : 'Please enter a valid base salary amount.');
+        return;
+    }
+
+    if (isNaN(newTargetRemaining)) {
+        alert(isAr ? 'يرجى إدخال مبلغ صحيح للمتبقي الإجمالي' : 'Please enter a valid all-time remaining amount.');
+        return;
+    }
+
+    // Mathematical calibration:
+    // 1. Temporarily update worker.income so monthly calculations reflect the new base salary
+    const oldInitialBalance = parseFloat(worker.initialBalance || 0);
+    worker.income = newSalary;
+
+    // 2. Compute cumulative balance with the new salary and old initial balance
+    const currentBalanceWithNewSalary = getCumulativeBalance(worker, currentGlobalMonth);
+
+    // 3. The monthly net accumulation is (currentBalanceWithNewSalary - oldInitialBalance)
+    const monthlyAccumulation = currentBalanceWithNewSalary - oldInitialBalance;
+
+    // 4. We want total remaining to equal newTargetRemaining.
+    // Since total = newInitialBalance + monthlyAccumulation,
+    // newInitialBalance = newTargetRemaining - monthlyAccumulation
+    const newInitialBalance = Math.round((newTargetRemaining - monthlyAccumulation) * 100) / 100;
+    worker.initialBalance = newInitialBalance;
+
+    // 5. Update Firebase RTDB
+    db.ref(`companies/${currentCompany}/workers/${workerIndex}`).update({
+        income: newSalary,
+        initialBalance: newInitialBalance
+    }).then(() => {
+        logActivity('finance', worker.id, worker.name, `Updated salary to SAR ${newSalary} and all-time remaining to SAR ${newTargetRemaining} for employee ${worker.name}`);
+        closeEditWorkerSalaryAndBalanceModal();
+        renderFinanceTable();
+        if (typeof renderFinDetails === 'function') renderFinDetails();
+        if (typeof renderAll === 'function') renderAll();
+        if (typeof showInAppNotification === 'function') {
+            showInAppNotification(isAr ? '✅ تم تحديث الراتب ورصيد الموظف بنجاح!' : '✅ Worker salary and all-time balance updated successfully!');
+        } else {
+            alert(isAr ? 'تم تحديث الراتب والرصيد بنجاح!' : 'Worker salary and all-time balance updated successfully!');
+        }
+    }).catch(err => {
+        console.error("Error saving worker salary and balance:", err);
+        alert(isAr ? 'فشل الحفظ في قاعدة البيانات' : 'Failed to save to database.');
+    });
+}
+window.saveWorkerSalaryAndBalance = saveWorkerSalaryAndBalance;
 
 // --- AUTOMATIC IN-SCOPE WINDOW EXPORTS ---
 if (typeof renderFinanceTable === 'function') window.renderFinanceTable = renderFinanceTable;

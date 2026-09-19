@@ -2181,6 +2181,7 @@ function applyUserRoles() {
         if (wPerms.market) document.body.classList.add('perm-market');
         if (wPerms.summary) document.body.classList.add('perm-summary');
         if (wPerms.salla) document.body.classList.add('perm-salla');
+        if (wPerms.jobs_applied) document.body.classList.add('perm-jobs-applied');
 
         if (isDriver) document.body.classList.add('is-driver');
         if (typeof checkWorkerSystemViolationAlerts === 'function') {
@@ -2248,7 +2249,8 @@ function markLockedTabs() {
         contracts: isAdmin,
         tracking: isAdmin,
         salla: isAdmin || document.body.classList.contains('perm-salla'),
-        nfc: isAdmin
+        nfc: isAdmin,
+        'jobs-applied': isAdmin || document.body.classList.contains('perm-jobs-applied')
     };
 
     Object.entries(access).forEach(([tabId, hasAccess]) => {
@@ -2261,6 +2263,12 @@ function markLockedTabs() {
             el.classList.toggle('tab-locked', !hasAccess);
         });
     });
+
+    if (typeof currentTab !== 'undefined' && access[currentTab] === false) {
+        if (typeof switchTab === 'function') {
+            switchTab(currentTab);
+        }
+    }
 }
 
 // --- REAL-TIME DATABASE SYNC ---
@@ -3293,7 +3301,7 @@ function switchTab(tab) {
         }
     }
 
-    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant', 'vault', 'messaging', 'learning', 'contracts', 'tracking', 'salla', 'nfc'];
+    const allTabs = ['ops', 'ranks', 'attendance', 'tasks', 'warehouse', 'drivers', 'finance', 'summary', 'adverts', 'notes', 'activity', 'managing', 'costs', 'reminders', 'market', 'prepare', 'ai-assistant', 'vault', 'messaging', 'learning', 'contracts', 'tracking', 'salla', 'nfc', 'jobs-applied'];
 
     allTabs.forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
@@ -3344,6 +3352,9 @@ function switchTab(tab) {
     if (tab === 'nfc') {
         if (typeof renderNfcSection === 'function') renderNfcSection();
     }
+    if (tab === 'jobs-applied') {
+        if (!isLocked && typeof renderJobsAppliedSection === 'function') renderJobsAppliedSection();
+    }
     if (tab === 'adverts') {
         if (typeof renderAnnouncementsSection === 'function') renderAnnouncementsSection();
     }
@@ -3386,7 +3397,8 @@ function switchTab(tab) {
         contracts: { icon: '📜', label: 'Contracts' },
         tracking: { icon: '📍', label: 'Live Radar' },
         salla: { icon: '🛍️', label: 'Salla' },
-        nfc: { icon: '💳', label: 'NFC VICard' }
+        nfc: { icon: '💳', label: 'NFC VICard' },
+        'jobs-applied': { icon: '💼', label: 'Jobs Applied' }
     };
     const meta = tabMeta[tab] || { icon: '⚙️', label: tab };
     const iconEl = document.getElementById('mob-active-icon');
@@ -3398,7 +3410,8 @@ function switchTab(tab) {
         notes: 'tab-notes', activity: 'tab-activity', managing: 'tab-sales', costs: 'tab-costs',
         attendance: 'tab-attendance', reminders: 'tab-reminders', market: 'tab-market', prepare: 'tab-prepare',
         'ai-assistant': 'tab-ai-assistant', vault: 'tab-vault', messaging: 'tab-messaging',
-        learning: 'tab-learning', contracts: 'tab-contracts', tracking: 'tab-tracking', salla: 'tab-salla', nfc: 'tab-nfc'
+        learning: 'tab-learning', contracts: 'tab-contracts', tracking: 'tab-tracking', salla: 'tab-salla', nfc: 'tab-nfc',
+        'jobs-applied': 'tab-jobs-applied'
     };
     const tabKey = tabI18nKeys[tab];
     const localizedLabel = (tabKey && typeof t === 'function') ? t(tabKey) : meta.label;
@@ -3794,6 +3807,10 @@ function renderAll() {
     else if (currentTab === 'tracking') { if (typeof renderTrackingSection === 'function') renderTrackingSection(); }
     else if (currentTab === 'salla') { if (typeof renderSallaSection === 'function') renderSallaSection(); }
     else if (currentTab === 'nfc') { if (typeof renderNfcSection === 'function') renderNfcSection(); }
+    else if (currentTab === 'jobs-applied') {
+        const hasAccess = document.body.classList.contains('role-admin') || document.body.classList.contains('perm-jobs-applied');
+        if (hasAccess && typeof renderJobsAppliedSection === 'function') renderJobsAppliedSection();
+    }
 
     if (typeof renderPaymentRequests === 'function') renderPaymentRequests();
     if (typeof renderWorkerCustodyRequests === 'function') renderWorkerCustodyRequests();

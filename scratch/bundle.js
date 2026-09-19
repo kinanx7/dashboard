@@ -17,7 +17,8 @@ const files = [
     'js/tracking.js',
     'js/learning.js',
     'js/salla.js',
-    'js/nfc.js'
+    'js/nfc.js',
+    'js/jobs_applied.js'
 ];
 
 console.log('Bundling app.js from ' + files.length + ' source files...');
