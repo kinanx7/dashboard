@@ -1287,13 +1287,16 @@ var _publicActiveCompany = null;
 function checkUrlForPublicJobApplication() {
     if (typeof window === 'undefined' || !window.location) return;
     const urlParams = new URLSearchParams(window.location.search);
-    const jobId = urlParams.get('apply_job');
+    const jobId = urlParams.get('apply_job') || urlParams.get('applyJob') || urlParams.get('jobId') || urlParams.get('job');
     const compKey = urlParams.get('company') || 'burgeroov';
 
     if (jobId) {
-        setTimeout(() => {
-            initPublicJobApplyPortal(jobId, compKey);
-        }, 300);
+        const overlay = document.getElementById('job-apply-public-overlay');
+        if (overlay) {
+            overlay.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+        initPublicJobApplyPortal(jobId, compKey);
     }
 }
 
@@ -1302,42 +1305,72 @@ function initPublicJobApplyPortal(jobId, compKey) {
     _publicActiveCompany = compKey;
 
     const overlay = document.getElementById('job-apply-public-overlay');
-    if (!overlay) return;
+    if (overlay) {
+        overlay.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+    }
 
-    overlay.style.display = 'block';
-    document.body.style.overflow = 'hidden';
+    const container = document.getElementById('job-apply-public-container');
+    if (container) {
+        container.innerHTML = `
+            <div style="text-align:center; padding:70px 20px; color:#fff; direction:rtl;">
+                <div style="font-size:3rem; margin-bottom:16px;">⏳</div>
+                <h3 style="color:#f5d77f; font-size:1.3rem; margin-bottom:8px;">جاري تحميل تفاصيل الوظيفة...</h3>
+                <p style="color:#94a3b8; font-size:0.95rem;">يرجى الانتظار لحظات</p>
+            </div>
+        `;
+    }
+
+    if (typeof db === 'undefined' || !db) {
+        setTimeout(() => {
+            initPublicJobApplyPortal(jobId, compKey);
+        }, 300);
+        return;
+    }
+
+    let resolved = false;
+
+    function handleJobSuccess(job) {
+        if (resolved) return;
+        resolved = true;
+        _publicActiveJobData = job;
+        if (typeof jobOpeningsCache !== 'undefined' && job) jobOpeningsCache[jobId] = job;
+        renderPublicApplicationForm(job, compKey);
+    }
+
+    function handleJobFail(err) {
+        if (resolved) return;
+        resolved = true;
+        console.error('[Jobs Applied Public] Job load failed:', err);
+        renderPublicApplicationForm(null, compKey, err);
+    }
 
     // Fetch Job Details from Firebase (try public mirror first, fallback to company node)
     db.ref(`publicJobOpenings/${compKey}/${jobId}`).once('value').then(snap => {
         const job = snap.val();
         if (job) {
-            _publicActiveJobData = job;
-            if (typeof jobOpeningsCache !== 'undefined') jobOpeningsCache[jobId] = job;
-            renderPublicApplicationForm(job, compKey);
+            handleJobSuccess(job);
         } else {
             db.ref(`companies/${compKey}/jobOpenings/${jobId}`).once('value').then(s2 => {
                 const j2 = s2.val();
-                _publicActiveJobData = j2;
-                if (typeof jobOpeningsCache !== 'undefined' && j2) jobOpeningsCache[jobId] = j2;
-                renderPublicApplicationForm(j2, compKey);
-            }).catch(() => {
-                renderPublicApplicationForm(null, compKey);
+                handleJobSuccess(j2 || null);
+            }).catch(e2 => {
+                handleJobFail(e2);
             });
         }
-    }).catch(() => {
+    }).catch(e1 => {
+        console.warn('[Jobs Applied Public] public mirror read failed, trying company node...', e1);
         db.ref(`companies/${compKey}/jobOpenings/${jobId}`).once('value').then(s2 => {
             const j2 = s2.val();
-            _publicActiveJobData = j2;
-            if (typeof jobOpeningsCache !== 'undefined' && j2) jobOpeningsCache[jobId] = j2;
-            renderPublicApplicationForm(j2, compKey);
-        }).catch(() => {
-            renderPublicApplicationForm(null, compKey);
+            handleJobSuccess(j2 || null);
+        }).catch(e2 => {
+            handleJobFail(e2);
         });
     });
 }
 window.initPublicJobApplyPortal = initPublicJobApplyPortal;
 
-function renderPublicApplicationForm(job, compKey) {
+function renderPublicApplicationForm(job, compKey, err) {
     const container = document.getElementById('job-apply-public-container');
     if (!container) return;
 
@@ -1347,11 +1380,22 @@ function renderPublicApplicationForm(job, compKey) {
     }
 
     if (!job) {
+        const isPermError = err && (err.code === 'PERMISSION_DENIED' || String(err).toLowerCase().includes('permission_denied'));
+        const title = isPermError ? 'تعذر تحميل بيانات الوظيفة' : 'الوظيفة غير متاحة حالياً';
+        const msg = isPermError
+            ? 'يتطلب الوصول تحديث قواعد أمان قاعدة البيانات (Firebase Rules) للسماح للزوار بفتح الوظائف.'
+            : 'ربما تم إغلاق هذه الوظيفة أو انتهى التقديم عليها. شكراً لاهتمامك!';
+
         container.innerHTML = `
-            <div style="text-align:center; padding:50px 20px; color:#fff;">
-                <div style="font-size:3rem; margin-bottom:14px;">⚠️</div>
-                <h2>الوظيفة غير متاحة حالياً</h2>
-                <p style="color:#94a3b8;">ربما تم إغلاق هذه الوظيفة أو انتهى التقديم عليها. شكراً لاهتمامك!</p>
+            <div style="text-align:center; padding:50px 20px; color:#fff; direction:rtl;">
+                <div style="font-size:3.2rem; margin-bottom:14px;">${isPermError ? '🔒' : '⚠️'}</div>
+                <h2 style="color:#f5d77f; margin-bottom:12px; font-size:1.4rem;">${escapeHtml(title)}</h2>
+                <p style="color:#94a3b8; font-size:0.95rem; line-height:1.6; max-width:420px; margin:0 auto;">${escapeHtml(msg)}</p>
+                <div style="margin-top:24px;">
+                    <button onclick="location.reload()" style="background:#334155; color:#fff; border:none; padding:12px 24px; border-radius:12px; font-weight:700; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.3);">
+                        🔄 إعادة المحاولة
+                    </button>
+                </div>
             </div>
         `;
         return;
@@ -1576,7 +1620,7 @@ function submitPublicJobApplication() {
     updates[`companies/${compKey}/jobApplications/${appId}`] = applicationPayload;
     updates[`publicJobApplications/${compKey}/${appId}`] = applicationPayload;
 
-    db.ref().update(updates).then(() => {
+    function onSubmissionSuccess() {
         const container = document.getElementById('job-apply-public-container');
         if (container) {
             container.innerHTML = `
@@ -1593,18 +1637,41 @@ function submitPublicJobApplication() {
                 </div>
             `;
         }
-    }).catch(err => {
-        console.error('Error submitting application:', err);
-        alert('حدث خطأ أثناء الإرسال. يرجى المحاولة مرة أخرى.');
+    }
+
+    function onSubmissionError(err) {
+        console.error('[Jobs Applied] Submission error:', err);
+        alert('حدث خطأ أثناء إرسال الطلب. يرجى التأكد من الاتصال بالإنترنت والمحاولة مرة أخرى.');
         if (submitBtn) {
             submitBtn.disabled = false;
             submitBtn.innerHTML = '📤 إرسال طلب التوظيف الآن';
         }
+    }
+
+    // Attempt multi-path atomic update first
+    db.ref().update(updates).then(() => {
+        onSubmissionSuccess();
+    }).catch(err => {
+        console.warn('[Jobs Applied] Multi-path update failed, attempting direct write to company node...', err);
+        db.ref(`companies/${compKey}/jobApplications/${appId}`).set(applicationPayload).then(() => {
+            onSubmissionSuccess();
+        }).catch(err2 => {
+            console.warn('[Jobs Applied] Company node write failed, attempting direct write to public node...', err2);
+            db.ref(`publicJobApplications/${compKey}/${appId}`).set(applicationPayload).then(() => {
+                onSubmissionSuccess();
+            }).catch(err3 => {
+                onSubmissionError(err3);
+            });
+        });
     });
 }
 window.submitPublicJobApplication = submitPublicJobApplication;
 
-// Auto-check URL on load
+// Auto-check URL on load immediately or on DOMContentLoaded
 if (typeof window !== 'undefined') {
-    window.addEventListener('DOMContentLoaded', checkUrlForPublicJobApplication);
+    if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', checkUrlForPublicJobApplication);
+    } else {
+        checkUrlForPublicJobApplication();
+    }
 }
