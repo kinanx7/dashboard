@@ -9214,11 +9214,20 @@
 
             <!-- Modal Footer -->
             <div style="padding:14px 24px; border-top:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; gap:12px; background:rgba(255,255,255,0.02); flex-wrap:wrap;">
-                <!-- Direct Hire Button -->
-                <button type="button" onclick="hireApplicantDirectly()" class="btn-success"
-                    style="padding:9px 20px; border-radius:10px; font-weight:800; font-size:0.88rem; background:linear-gradient(135deg, #10b981, #059669); border:none; color:#ffffff; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
-                    🤝 <span>Hire Directly & Add to Workers Roster</span>
-                </button>
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <!-- Direct Hire Button -->
+                    <button type="button" onclick="hireApplicantDirectly()" class="btn-success"
+                        style="padding:9px 20px; border-radius:10px; font-weight:800; font-size:0.88rem; background:linear-gradient(135deg, #10b981, #059669); border:none; color:#ffffff; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                        🤝 <span>Hire Directly & Add to Workers Roster</span>
+                    </button>
+                    <!-- Delete Application Button -->
+                    <button type="button" onclick="deleteJobApplicant(_activeViewingAppId)" class="btn-danger"
+                        style="padding:9px 16px; border-radius:10px; font-weight:700; font-size:0.85rem; background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.35); color:#ef4444; cursor:pointer; display:inline-flex; align-items:center; gap:6px;"
+                        onmouseover="this.style.background='rgba(239,68,68,0.25)'"
+                        onmouseout="this.style.background='rgba(239,68,68,0.12)'">
+                        <span data-i18n="btn-delete-applicant">🗑️ Delete Application</span>
+                    </button>
+                </div>
 
                 <div style="display:flex; gap:10px;">
                     <button type="button" onclick="closeApplicantDetailsModal()" class="btn-outline"
@@ -9242,8 +9251,8 @@
     </div>
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=354"></script>
-    <script src="app.js?v=354"></script>
+    <script src="translations.js?v=355"></script>
+    <script src="app.js?v=355"></script>
 </body>
 
 </html>

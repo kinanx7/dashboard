@@ -43581,21 +43581,50 @@ function renderApplicantsGrid() {
         const submitDate = app.submittedAt ? new Date(app.submittedAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently';
         const phone = (app.phone || '').replace(/[^0-9]/g, '');
         const waLink = phone ? `https://wa.me/${phone.startsWith('0') ? '966' + phone.substring(1) : phone}` : '#';
-        const questionsCount = app.answers ? Object.keys(app.answers).length : 0;
+        const job = (jobOpeningsCache && app.jobId) ? jobOpeningsCache[app.jobId] : null;
+        let displayJobTitle = app.jobTitle;
+        if ((!displayJobTitle || displayJobTitle === 'General Position') && job && job.title) {
+            displayJobTitle = job.title;
+        }
+        if (!displayJobTitle && jobOpeningsCache) {
+            const firstJob = Object.values(jobOpeningsCache).find(Boolean);
+            if (firstJob && firstJob.title) displayJobTitle = firstJob.title;
+        }
+        if (!displayJobTitle) displayJobTitle = 'General Position';
+
+        let answeredCount = 0;
+        if (Array.isArray(app.answersDetailed) && app.answersDetailed.length > 0) {
+            answeredCount = app.answersDetailed.filter(a => a && a.answer && a.answer.trim() && a.answer.trim() !== '—').length;
+        } else if (app.answers && typeof app.answers === 'object') {
+            answeredCount = Object.values(app.answers).filter(v => v && String(v).trim() && String(v).trim() !== '—').length;
+        }
+        const totalJobQuestions = (job && Array.isArray(job.questions)) ? job.questions.length : 0;
+        const questionsPillText = answeredCount > 0 
+            ? `📝 ${answeredCount} ${isAr ? 'إجابات أسئلة' : 'answers'}`
+            : (totalJobQuestions > 0 ? `📝 ${totalJobQuestions} ${isAr ? 'أسئلة' : 'questions'}` : `📝 0 ${isAr ? 'إجابات' : 'answers'}`);
 
         return `
             <div class="job-app-card" onclick="openApplicantDetailsModal('${app.id}')" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; transition: all 0.2s ease; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,0.15); position: relative; overflow: hidden;">
                 <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: ${statusConfig.color};"></div>
                 
                 <div>
-                    <!-- Top row: Status & Date -->
+                    <!-- Top row: Status & Date & Delete Button -->
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                         <span style="font-size: 0.75rem; font-weight: 800; padding: 4px 10px; border-radius: 100px; background: ${statusConfig.bg}; color: ${statusConfig.color}; border: 1px solid ${statusConfig.color}40;">
                             ${statusConfig.label}
                         </span>
-                        <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">
-                            🕒 ${submitDate}
-                        </span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">
+                                🕒 ${submitDate}
+                            </span>
+                            <button type="button" onclick="deleteJobApplicant('${app.id}', event)"
+                                title="${isAr ? 'حذف طلب التقديم' : 'Delete Application'}"
+                                style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.28); color: #ef4444; width: 28px; height: 28px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.82rem; cursor: pointer; transition: all 0.2s ease; padding: 0;"
+                                onmouseover="this.style.background='rgba(239, 68, 68, 0.28)'; this.style.transform='scale(1.08)';"
+                                onmouseout="this.style.background='rgba(239, 68, 68, 0.12)'; this.style.transform='scale(1)';">
+                                🗑️
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Applicant Name & Title -->
@@ -43608,7 +43637,7 @@ function renderApplicantsGrid() {
                                 ${escapeHtml(app.applicantName || 'Applicant')}
                             </h4>
                             <div style="font-size: 0.8rem; color: var(--primary); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                💼 ${escapeHtml(app.jobTitle || 'General Position')}
+                                💼 ${escapeHtml(displayJobTitle)}
                             </div>
                         </div>
                     </div>
@@ -43622,7 +43651,7 @@ function renderApplicantsGrid() {
                         ${app.experienceYears ? `<span style="font-size: 0.74rem; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-muted); padding: 3px 8px; border-radius: 6px;">⭐ ${app.experienceYears} ${isAr ? 'سنوات خبرة' : 'yrs exp'}</span>` : ''}
                         ${app.currentCity ? `<span style="font-size: 0.74rem; background: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-muted); padding: 3px 8px; border-radius: 6px;">📍 ${escapeHtml(app.currentCity)}</span>` : ''}
                         <span style="font-size: 0.74rem; background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.3); color: #38bdf8; padding: 3px 8px; border-radius: 6px; font-weight: 700;">
-                            📝 ${questionsCount} ${isAr ? 'إجابات أسئلة' : 'answers'}
+                            ${questionsPillText}
                         </span>
                     </div>
                 </div>
@@ -43898,7 +43927,7 @@ function renderQuestionBuilderList() {
                     <span style="font-weight: 800; color: var(--primary); font-size: 0.9rem; margin-top: 6px;">#${idx + 1}</span>
                     
                     <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
-                        <input type="text" value="${escapeHtml(q.text)}"
+                        <input type="text" class="builder-q-text" data-qidx="${idx}" value="${escapeHtml(q.text)}"
                             oninput="_currentEditingJobQuestions[${idx}].text = this.value"
                             placeholder="${isAr ? 'نص السؤال (مثال: هل لديك رخصة قيادة؟)' : 'Question text (e.g. Do you have a driver license?)'}"
                             style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); font-weight: 700; font-size: 0.9rem; box-sizing: border-box;">
@@ -43924,7 +43953,7 @@ function renderQuestionBuilderList() {
 
                         ${isSelect ? `
                             <div>
-                                <input type="text" value="${escapeHtml(optsStr)}"
+                                <input type="text" class="builder-q-options" data-qidx="${idx}" value="${escapeHtml(optsStr)}"
                                     oninput="_currentEditingJobQuestions[${idx}].options = this.value.split(',').map(s => s.trim()).filter(Boolean)"
                                     placeholder="${isAr ? 'أدخل الخيارات مفصولة بفاصلة (مثال: نعم, لا, قيد الاستخراج)' : 'Comma-separated options (e.g. Yes, No, In-Progress)'}"
                                     style="width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px dashed var(--border-color); background: var(--card-bg); color: var(--text-main); font-size: 0.8rem; box-sizing: border-box;">
@@ -43961,6 +43990,26 @@ function saveJobOpening() {
     // PERMANENT STABLE ID: When editing, preserves existing ID. When new, generates unique permanent ID.
     const jobId = _editingJobId || ('job_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6));
 
+    // Ensure all question inputs are synced from DOM
+    const qListContainer = document.getElementById('create-job-questions-list');
+    if (qListContainer) {
+        const textInputs = qListContainer.querySelectorAll('input.builder-q-text');
+        textInputs.forEach(input => {
+            const idx = parseInt(input.getAttribute('data-qidx'), 10);
+            if (!isNaN(idx) && _currentEditingJobQuestions[idx]) {
+                _currentEditingJobQuestions[idx].text = input.value.trim();
+            }
+        });
+        const optInputs = qListContainer.querySelectorAll('input.builder-q-options');
+        optInputs.forEach(input => {
+            const idx = parseInt(input.getAttribute('data-qidx'), 10);
+            if (!isNaN(idx) && _currentEditingJobQuestions[idx]) {
+                _currentEditingJobQuestions[idx].options = input.value.split(',').map(s => s.trim()).filter(Boolean);
+            }
+        });
+    }
+
+    const validQuestions = _currentEditingJobQuestions.filter(q => q && q.text && q.text.trim().length > 0);
     const jobData = {
         id: jobId,
         title: title,
@@ -43971,8 +44020,11 @@ function saveJobOpening() {
         status: (_editingJobId && jobOpeningsCache[_editingJobId]) ? (jobOpeningsCache[_editingJobId].status || 'active') : 'active',
         createdAt: (_editingJobId && jobOpeningsCache[_editingJobId]) ? (jobOpeningsCache[_editingJobId].createdAt || Date.now()) : Date.now(),
         updatedAt: Date.now(),
-        questions: _currentEditingJobQuestions.filter(q => q && q.text && q.text.trim().length > 0)
+        questions: validQuestions
     };
+
+    // Update local cache immediately
+    jobOpeningsCache[jobId] = jobData;
 
     // Save simultaneously to company and public mirror so candidates can always scan even if anonymous
     const updates = {};
@@ -44321,8 +44373,20 @@ function openApplicantDetailsModal(appId) {
     const waBtn = document.getElementById('applicant-modal-wa-btn');
     const callBtn = document.getElementById('applicant-modal-call-btn');
 
+    // Dynamic position title lookup
+    let job = (jobOpeningsCache && app.jobId) ? jobOpeningsCache[app.jobId] : null;
+    if (!job && jobOpeningsCache) {
+        const allJobs = Object.values(jobOpeningsCache).filter(Boolean);
+        if (allJobs.length === 1) {
+            job = allJobs[0];
+        } else if (app.jobTitle) {
+            job = allJobs.find(j => j && j.title && j.title.toLowerCase() === app.jobTitle.toLowerCase()) || allJobs[0] || null;
+        }
+    }
+    const displayJobTitle = (job && job.title) ? job.title : (app.jobTitle || 'General Position');
+    if (jobTitleEl) jobTitleEl.textContent = `💼 ${displayJobTitle}`;
+
     if (nameEl) nameEl.textContent = app.applicantName || 'Applicant';
-    if (jobTitleEl) jobTitleEl.textContent = `💼 ${app.jobTitle || 'Position'}`;
     if (phoneEl) phoneEl.textContent = app.phone || 'N/A';
     if (natEl) natEl.textContent = app.nationality || 'Unspecified';
     if (ageEl) ageEl.textContent = app.age ? `${app.age} ${isAr ? 'سنة' : 'yrs'}` : 'N/A';
@@ -44339,27 +44403,89 @@ function openApplicantDetailsModal(appId) {
     // Populate dynamic questionnaire answers
     if (answersContainer) {
         const answers = app.answers || {};
-        const job = jobOpeningsCache[app.jobId] || {};
-        const questions = job.questions || [];
+        const answersDetailed = Array.isArray(app.answersDetailed) ? app.answersDetailed : [];
+        const jobQuestions = (job && Array.isArray(job.questions)) ? job.questions : [];
 
-        // Build question map for exact label lookup
-        const qMap = {};
-        questions.forEach(q => { qMap[q.id] = q.text; });
+        // Build unified list of questions & answers to display
+        const displayList = [];
+        const handledQIds = new Set();
 
-        const answerKeys = Object.keys(answers);
-        if (answerKeys.length === 0) {
-            answersContainer.innerHTML = `<p style="color:var(--text-muted); font-size:0.85rem;">${isAr ? 'لم يقدم المتقدم أي إجابات إضافية.' : 'No additional screening questions answered.'}</p>`;
+        // 1. If we have detailed answers with questions stored on the application
+        if (answersDetailed.length > 0) {
+            answersDetailed.forEach(item => {
+                if (item && item.id) {
+                    handledQIds.add(item.id);
+                    displayList.push({
+                        id: item.id,
+                        question: item.question || item.id,
+                        answer: item.answer || '—',
+                        hasAnswer: !!(item.answer && item.answer.trim() && item.answer.trim() !== '—')
+                    });
+                }
+            });
+        } else if (Object.keys(answers).length > 0) {
+            // Build a question text lookup map from job questions and presets
+            const qMap = {};
+            jobQuestions.forEach(q => { if (q && q.id) qMap[q.id] = q.text; });
+            Object.values(JOB_QUESTION_PRESETS).forEach(preset => {
+                preset.forEach(pq => { if (pq && pq.id && !qMap[pq.id]) qMap[pq.id] = pq.text; });
+            });
+
+            Object.entries(answers).forEach(([qid, ans]) => {
+                handledQIds.add(qid);
+                const qText = qMap[qid] || (typeof ans === 'object' && ans.question ? ans.question : `Question (${qid})`);
+                const ansText = (typeof ans === 'object' && ans.answer !== undefined) ? ans.answer : ans;
+                displayList.push({
+                    id: qid,
+                    question: qText,
+                    answer: ansText || '—',
+                    hasAnswer: !!(ansText && String(ansText).trim() && String(ansText).trim() !== '—')
+                });
+            });
+        }
+
+        // 2. Also include any questions from the job opening that haven't been listed yet
+        if (jobQuestions.length > 0) {
+            jobQuestions.forEach(jq => {
+                if (jq && jq.id && !handledQIds.has(jq.id)) {
+                    handledQIds.add(jq.id);
+                    const ans = answers[jq.id];
+                    displayList.push({
+                        id: jq.id,
+                        question: jq.text,
+                        answer: ans || (isAr ? 'لم تتم الإجابة بعد' : 'Not answered'),
+                        hasAnswer: !!(ans && String(ans).trim() && String(ans).trim() !== '—')
+                    });
+                }
+            });
+        }
+
+        if (displayList.length === 0) {
+            answersContainer.innerHTML = `
+                <div style="background: var(--input-bg); border: 1px dashed var(--border-color); border-radius: 12px; padding: 18px; text-align: center;">
+                    <span style="font-size: 1.4rem; display: block; margin-bottom: 6px;">📝</span>
+                    <p style="color: var(--text-muted); font-size: 0.88rem; margin: 0;">
+                        ${isAr ? 'لا توجد أسئلة تقييم إضافية مسجلة لهذه الوظيفة.' : 'No screening questions configured for this position.'}
+                    </p>
+                </div>
+            `;
         } else {
-            answersContainer.innerHTML = answerKeys.map((k, idx) => {
-                const qText = qMap[k] || `Question #${idx + 1}`;
-                const ansText = answers[k] || '—';
+            answersContainer.innerHTML = displayList.map((item, idx) => {
+                const isAnswered = item.hasAnswer;
+                const statusBadge = isAnswered
+                    ? `<span style="font-size:0.72rem; font-weight:800; padding:2px 8px; border-radius:100px; background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);">${isAr ? 'تمت الإجابة' : 'Answered'}</span>`
+                    : `<span style="font-size:0.72rem; font-weight:700; padding:2px 8px; border-radius:100px; background:rgba(239,68,68,0.1); color:#f87171; border:1px solid rgba(239,68,68,0.25);">${isAr ? 'غير مجاب' : 'Not answered'}</span>`;
+
                 return `
-                    <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 16px; margin-bottom: 10px;">
-                        <div style="font-size: 0.85rem; font-weight: 700; color: var(--primary); margin-bottom: 6px;">
-                            ❓ ${escapeHtml(qText)}
+                    <div style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; transition: all 0.2s ease;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px;">
+                            <div style="font-size: 0.88rem; font-weight: 800; color: var(--primary); line-height: 1.4;">
+                                #${idx + 1} ❓ ${escapeHtml(item.question)}
+                            </div>
+                            ${statusBadge}
                         </div>
-                        <div style="font-size: 0.95rem; font-weight: 800; color: var(--text-main); background: var(--card-bg); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color);">
-                            ${escapeHtml(String(ansText))}
+                        <div style="font-size: 0.95rem; font-weight: 700; color: ${isAnswered ? 'var(--text-main)' : 'var(--text-muted)'}; background: var(--card-bg); padding: 10px 14px; border-radius: 8px; border: 1px solid ${isAnswered ? 'rgba(212,175,55,0.3)' : 'var(--border-color)'};">
+                            ${escapeHtml(String(item.answer))}
                         </div>
                     </div>
                 `;
@@ -44399,6 +44525,59 @@ function saveApplicantReviewChanges() {
     });
 }
 window.saveApplicantReviewChanges = saveApplicantReviewChanges;
+
+/**
+ * Delete a job application request permanently from RTDB and public mirror
+ */
+function deleteJobApplicant(appId, event) {
+    if (event && typeof event.stopPropagation === 'function') {
+        event.stopPropagation();
+    }
+    if (!hasJobsAppliedAccess()) return;
+    if (!appId) return;
+
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const app = jobApplicationsCache ? jobApplicationsCache[appId] : null;
+    const applicantName = (app && app.applicantName) ? app.applicantName : '';
+
+    const confirmMsg = isAr 
+        ? `هل أنت متأكد من حذف طلب التوظيف المقدم من "${applicantName || 'المتقدم'}" نهائياً؟`
+        : `Are you sure you want to permanently delete the job application from "${applicantName || 'this applicant'}"?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    const compKey = currentCompany || 'burgeroov';
+    const updates = {};
+    updates[`companies/${compKey}/jobApplications/${appId}`] = null;
+    updates[`publicJobApplications/${compKey}/${appId}`] = null;
+
+    if (typeof db !== 'undefined' && db) {
+        db.ref().update(updates).then(() => {
+            if (jobApplicationsCache && jobApplicationsCache[appId]) {
+                delete jobApplicationsCache[appId];
+            }
+            if (_activeViewingAppId === appId) {
+                closeApplicantDetailsModal();
+            }
+            updateJobsAppliedUI();
+            if (typeof showInAppNotification === 'function') {
+                showInAppNotification(isAr ? '🗑️ تم حذف طلب التقديم بنجاح' : '🗑️ Job application deleted successfully');
+            }
+        }).catch(err => {
+            console.error('Error deleting job application:', err);
+            alert(isAr ? 'حدث خطأ أثناء حذف الطلب' : 'Error deleting application');
+        });
+    } else {
+        if (jobApplicationsCache && jobApplicationsCache[appId]) {
+            delete jobApplicationsCache[appId];
+        }
+        if (_activeViewingAppId === appId) {
+            closeApplicantDetailsModal();
+        }
+        updateJobsAppliedUI();
+    }
+}
+window.deleteJobApplicant = deleteJobApplicant;
 
 /**
  * Automatically hire applicant and create active company worker profile
@@ -44480,17 +44659,25 @@ function initPublicJobApplyPortal(jobId, compKey) {
     db.ref(`publicJobOpenings/${compKey}/${jobId}`).once('value').then(snap => {
         const job = snap.val();
         if (job) {
+            _publicActiveJobData = job;
+            if (typeof jobOpeningsCache !== 'undefined') jobOpeningsCache[jobId] = job;
             renderPublicApplicationForm(job, compKey);
         } else {
             db.ref(`companies/${compKey}/jobOpenings/${jobId}`).once('value').then(s2 => {
-                renderPublicApplicationForm(s2.val(), compKey);
+                const j2 = s2.val();
+                _publicActiveJobData = j2;
+                if (typeof jobOpeningsCache !== 'undefined' && j2) jobOpeningsCache[jobId] = j2;
+                renderPublicApplicationForm(j2, compKey);
             }).catch(() => {
                 renderPublicApplicationForm(null, compKey);
             });
         }
     }).catch(() => {
         db.ref(`companies/${compKey}/jobOpenings/${jobId}`).once('value').then(s2 => {
-            renderPublicApplicationForm(s2.val(), compKey);
+            const j2 = s2.val();
+            _publicActiveJobData = j2;
+            if (typeof jobOpeningsCache !== 'undefined' && j2) jobOpeningsCache[jobId] = j2;
+            renderPublicApplicationForm(j2, compKey);
         }).catch(() => {
             renderPublicApplicationForm(null, compKey);
         });
@@ -44501,6 +44688,11 @@ window.initPublicJobApplyPortal = initPublicJobApplyPortal;
 function renderPublicApplicationForm(job, compKey) {
     const container = document.getElementById('job-apply-public-container');
     if (!container) return;
+
+    _publicActiveJobData = job;
+    if (job && job.id && typeof jobOpeningsCache !== 'undefined') {
+        jobOpeningsCache[job.id] = job;
+    }
 
     if (!job) {
         container.innerHTML = `
@@ -44549,7 +44741,7 @@ function renderPublicApplicationForm(job, compKey) {
                     }
 
                     return `
-                        <div style="margin-bottom: 16px;">
+                        <div class="public-question-item" data-qid="${q.id}" data-qtext="${escapeHtml(q.text)}" style="margin-bottom: 16px;">
                             <label style="display:block; color:#f8fafc; font-size:0.88rem; font-weight:700; margin-bottom:6px;">
                                 ${idx + 1}. ${escapeHtml(q.text)} ${reqStar}
                             </label>
@@ -44669,12 +44861,42 @@ function submitPublicJobApplication() {
 
     // Collect Answers
     const answers = {};
-    const job = (jobOpeningsCache && jobOpeningsCache[jobId]) ? jobOpeningsCache[jobId] : {};
+    const answersDetailed = [];
+    const job = _publicActiveJobData || (jobOpeningsCache && jobOpeningsCache[jobId]) || {};
+
+    // Method 1: Scan all rendered question items from DOM
+    const qItems = document.querySelectorAll('.public-question-item');
+    if (qItems && qItems.length > 0) {
+        qItems.forEach(item => {
+            const qid = item.getAttribute('data-qid');
+            const qtext = item.getAttribute('data-qtext') || qid;
+            const input = item.querySelector(`[id="pub-q-${qid}"]`) || item.querySelector('input, select, textarea');
+            if (qid && input) {
+                const val = input.value ? input.value.trim() : '';
+                answers[qid] = val;
+                answersDetailed.push({
+                    id: qid,
+                    question: qtext,
+                    answer: val
+                });
+            }
+        });
+    }
+
+    // Method 2: Ensure any question in job.questions is captured
     const questions = job.questions || [];
     questions.forEach(q => {
-        const input = document.getElementById(`pub-q-${q.id}`);
-        if (input) {
-            answers[q.id] = input.value.trim();
+        if (!answers[q.id]) {
+            const input = document.getElementById(`pub-q-${q.id}`);
+            if (input) {
+                const val = input.value ? input.value.trim() : '';
+                answers[q.id] = val;
+                answersDetailed.push({
+                    id: q.id,
+                    question: q.text || q.id,
+                    answer: val
+                });
+            }
         }
     });
 
@@ -44683,6 +44905,7 @@ function submitPublicJobApplication() {
         id: appId,
         jobId: jobId,
         jobTitle: job.title || 'General Position',
+        department: job.department || 'General',
         companyId: compKey,
         applicantName: name,
         phone: phone,
@@ -44690,6 +44913,7 @@ function submitPublicJobApplication() {
         age: age,
         currentCity: city,
         answers: answers,
+        answersDetailed: answersDetailed,
         status: 'new',
         managerNotes: '',
         submittedAt: Date.now()
