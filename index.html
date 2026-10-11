@@ -4262,19 +4262,16 @@
                     <div style="margin-bottom: 18px;">
                         <label
                             style="font-weight: 800; font-size: 0.82rem; color: var(--text-main); margin-bottom: 6px; display: block;"
-                            data-i18n="label-vault-image">📷 Upload Image / License Photo (Optional)</label>
+                            data-i18n="label-vault-image">📎 Upload Images or PDF Documents (Optional)</label>
                         <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
-                            <input type="file" id="vault-note-image-file" accept="image/*" multiple
+                            <input type="file" id="vault-note-image-file" accept="image/*,application/pdf,.pdf" multiple
                                 onchange="handleVaultImagePreview(event)"
                                 style="padding: 10px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-main); flex:1; min-width:220px;">
                             <button type="button" id="vault-clear-img-btn" onclick="clearVaultImagePreview()"
                                 style="display:none; padding:10px 16px; border-radius:10px; background:rgba(220, 38, 38, 0.15); border:1px solid rgba(220, 38, 38, 0.3); color:var(--danger); font-weight:800; font-size:0.85rem; cursor:pointer;"
-                                data-i18n="btn-vault-clear-img">✕ Remove Photo</button>
+                                data-i18n="btn-vault-clear-img">✕ Remove Attachments</button>
                         </div>
-                        <div id="vault-img-preview-container" style="display:none; margin-top:12px;">
-                            <img id="vault-img-preview"
-                                style="max-height:180px; border-radius:12px; border:2px solid #6366f1; box-shadow:var(--shadow-sm);">
-                        </div>
+                        <div id="vault-img-preview-container" style="display:none; margin-top:12px;"></div>
                     </div>
 
                     <div style="display:flex; justify-content:flex-end; gap:12px;">
@@ -6024,6 +6021,37 @@
         onclick="this.style.display='none'">
         <img id="image-modal-content"
             style="max-width: 90%; max-height: 90%; border-radius: 8px; border: 2px solid var(--border-color); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    </div>
+
+    <!-- Vault PDF Viewer Modal -->
+    <div id="vault-pdf-modal"
+        style="display: none; position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.85); backdrop-filter: blur(6px); z-index: 10005; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box;"
+        onclick="if(event.target === this) closeVaultPdfModal();">
+        <div style="background: var(--card-bg, #1e293b); border: 1.5px solid var(--border-color, #334155); border-radius: 16px; width: 100%; max-width: 950px; height: 90vh; max-height: 850px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.6);">
+            <!-- Modal Header -->
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border-color, #334155); background: var(--input-bg, #0f172a); gap: 12px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 10px; overflow: hidden; flex: 1; min-width: 180px;">
+                    <span style="font-size: 1.6rem; line-height: 1;">📄</span>
+                    <h3 id="vault-pdf-modal-title" style="margin: 0; font-size: 1rem; font-weight: 800; color: var(--text-main, #fff); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        Document.pdf
+                    </h3>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
+                    <button type="button" id="vault-pdf-modal-download-btn" class="btn-primary"
+                        style="padding: 8px 16px; border-radius: 10px; font-size: 0.85rem; font-weight: 800; background: linear-gradient(135deg, #ef4444, #dc2626); border: none; color: white; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(239,68,68,0.3);">
+                        <span>📥</span> <span>تحميل / Download</span>
+                    </button>
+                    <button type="button" onclick="closeVaultPdfModal()"
+                        style="background: transparent; border: none; color: var(--text-muted, #94a3b8); font-size: 1.5rem; font-weight: 800; cursor: pointer; padding: 4px 8px; line-height: 1;">
+                        ✕
+                    </button>
+                </div>
+            </div>
+            <!-- Modal Body (iFrame with native PDF controls) -->
+            <div style="flex: 1; width: 100%; height: 100%; background: #0b0f17; position: relative;">
+                <iframe id="vault-pdf-modal-frame" src="" style="width: 100%; height: 100%; border: none; display: block;"></iframe>
+            </div>
+        </div>
     </div>
 
     <!-- APK Permission Helper Modal -->
@@ -9251,8 +9279,8 @@
     </div>
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=356"></script>
-    <script src="app.js?v=356"></script>
+    <script src="translations.js?v=357"></script>
+    <script src="app.js?v=357"></script>
 </body>
 
 </html>

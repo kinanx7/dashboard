@@ -2354,9 +2354,32 @@ window.toggleVaultAddForm = toggleVaultAddForm;
 
 var currentVaultImagesData = [];
 
+function getVaultAttachmentUrl(item) {
+    if (!item) return '';
+    if (typeof item === 'string') return item;
+    return item.url || '';
+}
+window.getVaultAttachmentUrl = getVaultAttachmentUrl;
+
+function getVaultAttachmentType(item) {
+    if (!item) return 'image';
+    if (typeof item === 'object' && item.type) return item.type;
+    const url = typeof item === 'string' ? item : (item.url || '');
+    if (url.startsWith('data:application/pdf') || url.toLowerCase().includes('.pdf')) return 'pdf';
+    return 'image';
+}
+window.getVaultAttachmentType = getVaultAttachmentType;
+
+function getVaultAttachmentName(item, defaultName) {
+    if (typeof item === 'object' && item.name) return item.name;
+    const type = getVaultAttachmentType(item);
+    return defaultName || (type === 'pdf' ? 'Document.pdf' : 'Photo.jpg');
+}
+window.getVaultAttachmentName = getVaultAttachmentName;
+
 function renderVaultFormImagePreviews() {
     if (typeof currentVaultImageData !== 'undefined') {
-        currentVaultImageData = currentVaultImagesData[0] || null;
+        currentVaultImageData = currentVaultImagesData[0] ? getVaultAttachmentUrl(currentVaultImagesData[0]) : null;
     }
     const previewContainer = document.getElementById('vault-img-preview-container');
     const clearBtn = document.getElementById('vault-clear-img-btn');
@@ -2375,7 +2398,7 @@ function renderVaultFormImagePreviews() {
 
     if (clearBtn) {
         clearBtn.style.display = 'inline-block';
-        clearBtn.textContent = isAr ? '✕ حذف جميع الصور' : '✕ Remove All Photos';
+        clearBtn.textContent = isAr ? '✕ حذف جميع المرفقات' : '✕ Remove All Attachments';
     }
 
     previewContainer.style.display = 'flex';
@@ -2383,29 +2406,65 @@ function renderVaultFormImagePreviews() {
     previewContainer.style.gap = '10px';
     previewContainer.style.marginTop = '12px';
 
-    previewContainer.innerHTML = currentVaultImagesData.map((imgUrl, idx) => `
-        <div style="position: relative; display: inline-block;">
-            <img src="${imgUrl}" style="max-height: 120px; border-radius: 10px; border: 2px solid #6366f1; box-shadow: var(--shadow-sm); object-fit: cover;">
-            <button type="button" onclick="removeVaultFormImage(${idx})" style="
-                position: absolute;
-                top: -6px;
-                right: -6px;
-                background: #dc2626;
-                color: white;
-                border: none;
-                border-radius: 50%;
-                width: 22px;
-                height: 22px;
-                font-size: 0.75rem;
-                font-weight: 900;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-            " title="${isAr ? 'حذف هذه الصورة' : 'Delete this photo'}">✖</button>
-        </div>
-    `).join('');
+    previewContainer.innerHTML = currentVaultImagesData.map((item, idx) => {
+        const type = getVaultAttachmentType(item);
+        const url = getVaultAttachmentUrl(item);
+        const name = getVaultAttachmentName(item);
+
+        if (type === 'pdf') {
+            return `
+                <div style="position: relative; display: inline-flex; align-items: center; gap: 10px; background: rgba(239, 68, 68, 0.1); border: 2px solid #ef4444; border-radius: 12px; padding: 10px 14px; min-width: 180px; max-width: 280px; box-shadow: var(--shadow-sm); box-sizing: border-box;">
+                    <div style="font-size: 2rem; color: #ef4444; line-height: 1;">📄</div>
+                    <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">
+                        <div style="font-weight: 800; font-size: 0.85rem; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+                        <div style="font-size: 0.72rem; color: #ef4444; font-weight: 800;">PDF Document</div>
+                    </div>
+                    <button type="button" onclick="removeVaultFormImage(${idx})" style="
+                        position: absolute;
+                        top: -6px;
+                        right: -6px;
+                        background: #dc2626;
+                        color: white;
+                        border: none;
+                        border-radius: 50%;
+                        width: 22px;
+                        height: 22px;
+                        font-size: 0.75rem;
+                        font-weight: 900;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+                    " title="${isAr ? 'حذف هذا الملف' : 'Delete this file'}">✖</button>
+                </div>
+            `;
+        } else {
+            return `
+                <div style="position: relative; display: inline-block;">
+                    <img src="${url}" style="max-height: 120px; border-radius: 10px; border: 2px solid #6366f1; box-shadow: var(--shadow-sm); object-fit: cover;">
+                    <button type="button" onclick="removeVaultFormImage(${idx})" style="
+                        position: absolute;
+                        top: -6px;
+                        right: -6px;
+                        background: #dc2626;
+                        color: white;
+                        border: none;
+                        border-radius: 50%;
+                        width: 22px;
+                        height: 22px;
+                        font-size: 0.75rem;
+                        font-weight: 900;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+                    " title="${isAr ? 'حذف هذه الصورة' : 'Delete this photo'}">✖</button>
+                </div>
+            `;
+        }
+    }).join('');
 }
 
 function removeVaultFormImage(index) {
@@ -2450,44 +2509,87 @@ function handleVaultImagePreview(event) {
     if (files.length === 0) return;
 
     let processedCount = 0;
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+
     files.forEach(file => {
-        const reader = new FileReader();
-        reader.onload = function (e) {
-            const img = new Image();
-            img.onload = function () {
-                const canvas = document.createElement('canvas');
-                const maxDim = 1200;
-                let width = img.width;
-                let height = img.height;
+        const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 
-                if (width > height) {
-                    if (width > maxDim) {
-                        height = Math.round((height * maxDim) / width);
-                        width = maxDim;
-                    }
-                } else {
-                    if (height > maxDim) {
-                        width = Math.round((width * maxDim) / height);
-                        height = maxDim;
-                    }
-                }
+        if (isPdf) {
+            // Check file size (max 10MB)
+            if (file.size > 10 * 1024 * 1024) {
+                const msg = isAr 
+                    ? `⚠️ حجم ملف "${file.name}" كبير جداً (${(file.size / (1024 * 1024)).toFixed(1)}MB). الحد الأقصى المسموح به هو 10MB.`
+                    : `⚠️ File "${file.name}" is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Max allowed size is 10MB.`;
+                if (typeof showInAppNotification === 'function') showInAppNotification(msg);
+                else alert(msg);
+                processedCount++;
+                if (processedCount === files.length) renderVaultFormImagePreviews();
+                return;
+            }
 
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-
-                const base64Data = canvas.toDataURL('image/jpeg', 0.82);
-                currentVaultImagesData.push(base64Data);
-
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentVaultImagesData.push({
+                    type: 'pdf',
+                    url: e.target.result,
+                    name: file.name,
+                    size: file.size
+                });
                 processedCount++;
                 if (processedCount === files.length) {
                     renderVaultFormImagePreviews();
                 }
             };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
+            reader.readAsDataURL(file);
+        } else {
+            // Process Image: resize & compress via Canvas
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const img = new Image();
+                img.onload = function () {
+                    const canvas = document.createElement('canvas');
+                    const maxDim = 1200;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > maxDim) {
+                            height = Math.round((height * maxDim) / width);
+                            width = maxDim;
+                        }
+                    } else {
+                        if (height > maxDim) {
+                            width = Math.round((width * maxDim) / height);
+                            height = maxDim;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    const base64Data = canvas.toDataURL('image/jpeg', 0.82);
+                    currentVaultImagesData.push({
+                        type: 'image',
+                        url: base64Data,
+                        name: file.name || 'photo.jpg',
+                        size: file.size
+                    });
+
+                    processedCount++;
+                    if (processedCount === files.length) {
+                        renderVaultFormImagePreviews();
+                    }
+                };
+                img.onerror = function() {
+                    processedCount++;
+                    if (processedCount === files.length) renderVaultFormImagePreviews();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
     });
 }
 window.handleVaultImagePreview = handleVaultImagePreview;
@@ -2526,13 +2628,23 @@ function editVaultNote(noteId) {
         submitBtn.setAttribute('data-i18n', 'btn-update-vault-note');
     }
 
+    let rawItems = [];
     if (noteObj.imageUrls && Array.isArray(noteObj.imageUrls) && noteObj.imageUrls.length > 0) {
-        currentVaultImagesData = [...noteObj.imageUrls];
+        rawItems = [...noteObj.imageUrls];
     } else if (noteObj.imageUrl) {
-        currentVaultImagesData = [noteObj.imageUrl];
-    } else {
-        currentVaultImagesData = [];
+        rawItems = [noteObj.imageUrl];
     }
+
+    currentVaultImagesData = rawItems.map(item => {
+        if (typeof item === 'object') return item;
+        const type = getVaultAttachmentType(item);
+        return {
+            type: type,
+            url: item,
+            name: type === 'pdf' ? 'Document.pdf' : 'Photo.jpg'
+        };
+    });
+
     const fileInput = document.getElementById('vault-note-image-file');
     if (fileInput) fileInput.value = '';
     renderVaultFormImagePreviews();
@@ -2556,7 +2668,7 @@ function postVaultNote() {
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
 
     if (!title && !text && currentVaultImagesData.length === 0) {
-        const msg = isAr ? "⚠️ يرجى كتابة عنوان أو تفاصيل أو رفع صورة." : "⚠️ Please enter a title, details, or upload an image.";
+        const msg = isAr ? "⚠️ يرجى كتابة عنوان أو تفاصيل أو رفع صورة/ملف PDF." : "⚠️ Please enter a title, details, or upload an image/PDF.";
         if (typeof showInAppNotification === 'function') showInAppNotification(msg);
         else alert(msg);
         return;
@@ -2567,12 +2679,15 @@ function postVaultNote() {
     const noteId = currentEditingVaultId || ('vault_' + Date.now());
     const existingNote = (data.vaultNotes && data.vaultNotes[noteId]) ? data.vaultNotes[noteId] : {};
 
+    const firstItem = currentVaultImagesData[0];
+    const firstUrl = firstItem ? getVaultAttachmentUrl(firstItem) : '';
+
     const noteObj = {
         id: noteId,
         title: title || (isAr ? 'ملاحظة معلومات' : 'Information Note'),
         category: category,
         text: text || '',
-        imageUrl: currentVaultImagesData[0] || '',
+        imageUrl: firstUrl || '',
         imageUrls: currentVaultImagesData || [],
         createdAt: existingNote.createdAt || Date.now(),
         createdBy: existingNote.createdBy || ((currentUser && currentUser.email) ? currentUser.email : 'Admin'),
@@ -2651,7 +2766,11 @@ function renderVaultNotes() {
             const txt = (n.text || '').toLowerCase();
             const cat = (n.category || '').toLowerCase();
             const dateStr = n.createdAt ? new Date(n.createdAt).toLocaleDateString() : '';
-            return t.includes(q) || txt.includes(q) || cat.includes(q) || dateStr.includes(q);
+            const fileMatch = (n.imageUrls || []).some(att => {
+                const name = typeof att === 'object' && att.name ? att.name.toLowerCase() : '';
+                return name.includes(q);
+            });
+            return t.includes(q) || txt.includes(q) || cat.includes(q) || dateStr.includes(q) || fileMatch;
         });
     }
 
@@ -2814,15 +2933,79 @@ function renderVaultNotes() {
                 overflow: hidden;
             " title="${isAr ? 'انقر مرتين لتعديل الملاحظة' : 'Double-click to edit note'}">
                 <div>
-                    <!-- Image Card (If Uploaded) -->
-                    <!-- Images Gallery (Single or Multi-Image Grid) -->
+                    <!-- Attachments: PDFs & Images Galleries -->
                     ${(() => {
-                        const imgs = (n.imageUrls && Array.isArray(n.imageUrls) && n.imageUrls.length > 0) ? n.imageUrls : (n.imageUrl ? [n.imageUrl] : []);
-                        if (imgs.length === 0) return '';
-                        if (typeof preloadVaultNoteFile === 'function') preloadVaultNoteFile(n.id, imgs[0]);
+                        const attachments = (n.imageUrls && Array.isArray(n.imageUrls) && n.imageUrls.length > 0) ? n.imageUrls : (n.imageUrl ? [n.imageUrl] : []);
+                        if (attachments.length === 0) return '';
 
-                        if (imgs.length === 1) {
-                            return `
+                        const images = [];
+                        const pdfs = [];
+
+                        attachments.forEach((att, idx) => {
+                            if (getVaultAttachmentType(att) === 'pdf') {
+                                pdfs.push({
+                                    index: idx,
+                                    url: getVaultAttachmentUrl(att),
+                                    name: getVaultAttachmentName(att, (n.title || 'Document') + '.pdf')
+                                });
+                            } else {
+                                images.push({
+                                    index: idx,
+                                    url: getVaultAttachmentUrl(att),
+                                    name: getVaultAttachmentName(att, 'photo.jpg')
+                                });
+                            }
+                        });
+
+                        let pdfsHtml = '';
+                        if (pdfs.length > 0) {
+                            pdfsHtml = `
+                                <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">
+                                    ${pdfs.map(p => `
+                                        <div style="
+                                            display: flex;
+                                            align-items: center;
+                                            justify-content: space-between;
+                                            padding: 9px 12px;
+                                            background: rgba(239, 68, 68, 0.08);
+                                            border: 1.5px solid rgba(239, 68, 68, 0.3);
+                                            border-radius: 10px;
+                                            gap: 10px;
+                                            cursor: pointer;
+                                            transition: transform 0.15s ease, background 0.15s ease;
+                                        " onmouseenter="this.style.background='rgba(239, 68, 68, 0.15)'" onmouseleave="this.style.background='rgba(239, 68, 68, 0.08)'"
+                                           onclick="event.stopPropagation(); viewVaultPdf('${n.id}', ${p.index})" title="${isAr ? 'انقر لفتح واستعراض ملف الـ PDF' : 'Click to view & open PDF'}">
+                                            <div style="display: flex; align-items: center; gap: 10px; overflow: hidden; flex: 1;">
+                                                <span style="font-size: 1.6rem; flex-shrink: 0; line-height: 1;">📄</span>
+                                                <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                                    <div style="font-weight: 800; font-size: 0.84rem; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                                        ${escapeHtml(p.name)}
+                                                    </div>
+                                                    <div style="font-size: 0.72rem; color: #ef4444; font-weight: 800; display: flex; gap: 5px; align-items: center;">
+                                                        <span>PDF</span>
+                                                        <span>•</span>
+                                                        <span>${isAr ? 'انقر للمعاينة' : 'Click to View'}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0;">
+                                                <button type="button" onclick="event.stopPropagation(); downloadVaultPdf('${n.id}', ${p.index})"
+                                                    style="background: #ef4444; color: white; border: none; border-radius: 6px; padding: 4px 10px; font-size: 0.74rem; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 4px;"
+                                                    title="${isAr ? 'تحميل ملف PDF' : 'Download PDF'}">
+                                                    <span>📥</span> <span>${isAr ? 'تحميل' : 'Download'}</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            `;
+                        }
+
+                        let imagesHtml = '';
+                        if (images.length === 1) {
+                            const img0 = images[0];
+                            if (typeof preloadVaultNoteFile === 'function') preloadVaultNoteFile(n.id, img0.url);
+                            imagesHtml = `
                                 <div style="
                                     position: relative;
                                     cursor: pointer;
@@ -2832,8 +3015,8 @@ function renderVaultNotes() {
                                     margin-bottom: 12px;
                                     height: 160px;
                                     background: var(--input-bg);
-                                " onclick="openImageModal('${imgs[0]}')">
-                                    <img src="${imgs[0]}" alt="${safeTitle}" style="width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 10px; transition: transform 0.2s ease;" onmouseenter="this.style.transform='scale(1.03)'" onmouseleave="this.style.transform='none'">
+                                " onclick="openImageModal('${img0.url}')">
+                                    <img src="${img0.url}" alt="${safeTitle}" style="width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 10px; transition: transform 0.2s ease;" onmouseenter="this.style.transform='scale(1.03)'" onmouseleave="this.style.transform='none'">
                                     <div style="
                                         position: absolute;
                                         bottom: 8px;
@@ -2848,9 +3031,9 @@ function renderVaultNotes() {
                                     ">${isAr ? '🔍 تكبير' : '🔍 Zoom'}</div>
                                 </div>
                             `;
-                        } else {
-                            const gridCols = imgs.length === 2 ? '1fr 1fr' : 'repeat(auto-fit, minmax(70px, 1fr))';
-                            return `
+                        } else if (images.length > 1) {
+                            const gridCols = images.length === 2 ? '1fr 1fr' : 'repeat(auto-fit, minmax(70px, 1fr))';
+                            imagesHtml = `
                                 <div style="position: relative; margin-bottom: 12px;">
                                     <div style="
                                         display: grid;
@@ -2863,9 +3046,9 @@ function renderVaultNotes() {
                                         border-radius: 10px;
                                         border: 1px solid var(--border-color);
                                     ">
-                                        ${imgs.map(imgUrl => `
-                                            <div style="position: relative; height: 80px; cursor: pointer; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color);" onclick="openImageModal('${imgUrl}')">
-                                                <img src="${imgUrl}" style="width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.2s ease;" onmouseenter="this.style.transform='scale(1.05)'" onmouseleave="this.style.transform='none'">
+                                        ${images.map(img => `
+                                            <div style="position: relative; height: 80px; cursor: pointer; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color);" onclick="openImageModal('${img.url}')">
+                                                <img src="${img.url}" style="width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.2s ease;" onmouseenter="this.style.transform='scale(1.05)'" onmouseleave="this.style.transform='none'">
                                             </div>
                                         `).join('')}
                                     </div>
@@ -2875,10 +3058,12 @@ function renderVaultNotes() {
                                         font-size: 0.72rem;
                                         color: var(--text-muted);
                                         font-weight: 800;
-                                    ">📷 ${imgs.length} ${isAr ? 'صور مرفقة (انقر للتكبير)' : 'Photos attached (Click to view)'}</span>
+                                    ">📷 ${images.length} ${isAr ? 'صور مرفقة (انقر للتكبير)' : 'Photos attached (Click to view)'}</span>
                                 </div>
                             `;
                         }
+
+                        return pdfsHtml + imagesHtml;
                     })()}
 
                     <!-- Row 1: Category Badge & Action Buttons (Compact, Zero Overflow) -->
@@ -3022,6 +3207,113 @@ function deepCleanNoteText(str) {
 }
 window.deepCleanNoteText = deepCleanNoteText;
 
+var _activeVaultPdfBlobUrl = null;
+
+function viewVaultPdf(noteId, attIndex) {
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const note = (data.vaultNotes && data.vaultNotes[noteId]) ? data.vaultNotes[noteId] : {};
+    const attachments = (note.imageUrls && Array.isArray(note.imageUrls) && note.imageUrls.length > 0) ? note.imageUrls : (note.imageUrl ? [note.imageUrl] : []);
+    const item = attachments[attIndex];
+    if (!item) return;
+
+    const pdfUrl = getVaultAttachmentUrl(item);
+    const pdfName = getVaultAttachmentName(item, (note.title || 'Document') + '.pdf');
+
+    openVaultPdfModal(pdfUrl, pdfName);
+}
+window.viewVaultPdf = viewVaultPdf;
+
+function downloadVaultPdf(noteId, attIndex) {
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const note = (data.vaultNotes && data.vaultNotes[noteId]) ? data.vaultNotes[noteId] : {};
+    const attachments = (note.imageUrls && Array.isArray(note.imageUrls) && note.imageUrls.length > 0) ? note.imageUrls : (note.imageUrl ? [note.imageUrl] : []);
+    const item = attachments[attIndex];
+    if (!item) return;
+
+    const pdfUrl = getVaultAttachmentUrl(item);
+    const pdfName = getVaultAttachmentName(item, (note.title || 'Document') + '.pdf');
+
+    if (!pdfUrl) return;
+
+    if (pdfUrl.startsWith('data:')) {
+        const file = dataURLtoFile(pdfUrl, pdfName);
+        if (file) {
+            const blobUrl = URL.createObjectURL(file);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = pdfName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+            return;
+        }
+    }
+
+    const a = document.createElement('a');
+    a.href = pdfUrl;
+    a.download = pdfName;
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+window.downloadVaultPdf = downloadVaultPdf;
+
+function openVaultPdfModal(pdfUrl, title) {
+    if (!pdfUrl) return;
+    const modal = document.getElementById('vault-pdf-modal');
+    const titleEl = document.getElementById('vault-pdf-modal-title');
+    const frame = document.getElementById('vault-pdf-modal-frame');
+    const downloadBtn = document.getElementById('vault-pdf-modal-download-btn');
+
+    if (!modal || !frame) return;
+
+    if (titleEl) titleEl.textContent = title || 'Document.pdf';
+
+    if (_activeVaultPdfBlobUrl) {
+        URL.revokeObjectURL(_activeVaultPdfBlobUrl);
+        _activeVaultPdfBlobUrl = null;
+    }
+
+    let srcUrl = pdfUrl;
+    if (pdfUrl.startsWith('data:')) {
+        const file = dataURLtoFile(pdfUrl, title || 'document.pdf');
+        if (file) {
+            _activeVaultPdfBlobUrl = URL.createObjectURL(file);
+            srcUrl = _activeVaultPdfBlobUrl;
+        }
+    }
+
+    frame.src = srcUrl;
+
+    if (downloadBtn) {
+        downloadBtn.onclick = function() {
+            const a = document.createElement('a');
+            a.href = srcUrl;
+            a.download = title || 'document.pdf';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        };
+    }
+
+    modal.style.display = 'flex';
+}
+window.openVaultPdfModal = openVaultPdfModal;
+
+function closeVaultPdfModal() {
+    const modal = document.getElementById('vault-pdf-modal');
+    const frame = document.getElementById('vault-pdf-modal-frame');
+    if (modal) modal.style.display = 'none';
+    if (frame) frame.src = '';
+    if (_activeVaultPdfBlobUrl) {
+        URL.revokeObjectURL(_activeVaultPdfBlobUrl);
+        _activeVaultPdfBlobUrl = null;
+    }
+}
+window.closeVaultPdfModal = closeVaultPdfModal;
+
 function dataURLtoFile(dataurl, filename) {
     if (!dataurl || typeof dataurl !== 'string') return null;
     if (!dataurl.startsWith('data:')) return null;
@@ -3036,7 +3328,7 @@ function dataURLtoFile(dataurl, filename) {
         while (n--) {
             u8arr[n] = bstr.charCodeAt(n);
         }
-        const ext = mime.includes('png') ? 'png' : 'jpg';
+        const ext = mime.includes('pdf') ? 'pdf' : (mime.includes('png') ? 'png' : 'jpg');
         return new File([u8arr], filename || `note_attachment.${ext}`, { type: mime });
     } catch (e) {
         console.warn("dataURLtoFile error:", e);
@@ -3050,13 +3342,14 @@ window._vaultNoteFiles = window._vaultNoteFiles || {};
 function preloadVaultNoteFile(noteId, imgSrc) {
     if (!noteId || !imgSrc || typeof imgSrc !== 'string') return;
     if (imgSrc.startsWith('data:')) {
-        window._vaultNoteFiles[noteId] = dataURLtoFile(imgSrc, 'note_attachment.jpg');
+        const isPdf = imgSrc.startsWith('data:application/pdf');
+        window._vaultNoteFiles[noteId] = dataURLtoFile(imgSrc, isPdf ? 'document.pdf' : 'note_attachment.jpg');
         return;
     }
     if (imgSrc.startsWith('http') || imgSrc.startsWith('blob:')) {
         fetch(imgSrc).then(r => r.blob()).then(blob => {
             const mime = blob.type || 'image/jpeg';
-            const ext = mime.includes('png') ? 'png' : (mime.includes('webp') ? 'webp' : 'jpg');
+            const ext = mime.includes('pdf') ? 'pdf' : (mime.includes('png') ? 'png' : (mime.includes('webp') ? 'webp' : 'jpg'));
             window._vaultNoteFiles[noteId] = new File([blob], `note_attachment.${ext}`, { type: mime, lastModified: Date.now() });
         }).catch(() => {});
     }
@@ -3069,7 +3362,9 @@ function getFileFromImageSync(imgSrc, noteId) {
     }
     if (!imgSrc || typeof imgSrc !== 'string') return null;
     if (imgSrc.startsWith('data:')) {
-        const f = typeof dataURLtoFile === 'function' ? dataURLtoFile(imgSrc, 'note_attachment.jpg') : null;
+        const isPdf = imgSrc.startsWith('data:application/pdf');
+        const defaultName = isPdf ? 'document.pdf' : 'note_attachment.jpg';
+        const f = typeof dataURLtoFile === 'function' ? dataURLtoFile(imgSrc, defaultName) : null;
         if (noteId && f) window._vaultNoteFiles[noteId] = f;
         return f;
     }
@@ -3123,7 +3418,8 @@ function shareVaultNote(noteId) {
             shareText = cleanTitle || cleanDesc || '';
         }
 
-        const noteImage = (note && (note.imageUrl || (note.imageUrls && note.imageUrls[0]) || note.image || note.attachmentData)) || '';
+        const rawItem = (note && (note.imageUrl || (note.imageUrls && note.imageUrls[0]) || note.image || note.attachmentData)) || '';
+        const noteImage = (typeof getVaultAttachmentUrl === 'function' ? getVaultAttachmentUrl(rawItem) : (typeof rawItem === 'string' ? rawItem : (rawItem.url || ''))) || '';
 
         // 1. Android APK Native Bridge (Invokes Native Android System Chooser in APK with Image)
         const androidBridge = window.AndroidShare || window.AndroidInterface || window.Android;
