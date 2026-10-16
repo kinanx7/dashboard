@@ -15,6 +15,298 @@ var activeContractSignaturePad = null;
 var signatureDrawing = false;
 var signatureCanvasCtx = null;
 var signatureHasDrawn = false;
+var lastKnownContractStatuses = {};
+var contractsRealtimeRef = null;
+var contractInstRealtimeRef = null;
+
+// =========================================================================
+// INSTITUTION & LEGAL ENTITY TEMPLATE MANAGEMENT
+// =========================================================================
+const DEFAULT_CONTRACT_INSTITUTIONS = [
+    'مؤسسة إم في سي (MVC)',
+    'مؤسسة سمك بيتنا',
+    'مؤسسة برجروف (Burgeroov)',
+    'شركة إم في سي فريش (MVC Fresh)'
+];
+
+function getContractInstitutions() {
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    let customList = data.contractInstitutions || [];
+    if (!Array.isArray(customList)) {
+        if (typeof customList === 'object' && customList !== null) {
+            customList = Object.values(customList);
+        } else {
+            customList = [];
+        }
+    }
+    const combined = [...DEFAULT_CONTRACT_INSTITUTIONS];
+    customList.forEach(item => {
+        if (item && typeof item === 'string' && item.trim()) {
+            const clean = item.trim();
+            if (!combined.includes(clean)) {
+                combined.push(clean);
+            }
+        }
+    });
+    return combined;
+}
+window.getContractInstitutions = getContractInstitutions;
+
+function populateContractInstitutionsDropdown(selectedVal) {
+    const select = document.getElementById('contract-institution-select');
+    const input = document.getElementById('contract-institution-input');
+    const delBtn = document.getElementById('btn-delete-institution-template');
+    if (!select) return;
+
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const templates = getContractInstitutions();
+
+    let html = `<option value="">${isAr ? '-- اختر قالب منشأة محفوظ --' : '-- Choose Saved Institution Template --'}</option>`;
+    templates.forEach(t => {
+        html += `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`;
+    });
+    html += `<option value="__custom__">➕ ${isAr ? 'كتابة منشأة مخصصة...' : 'Custom Institution...'}</option>`;
+    select.innerHTML = html;
+
+    if (selectedVal) {
+        if (templates.includes(selectedVal)) {
+            select.value = selectedVal;
+            if (input) input.value = selectedVal;
+        } else {
+            select.value = '__custom__';
+            if (input) input.value = selectedVal;
+        }
+    } else if (input && input.value) {
+        const trimmed = input.value.trim();
+        if (templates.includes(trimmed)) {
+            select.value = trimmed;
+        } else {
+            select.value = '__custom__';
+        }
+    }
+
+    if (delBtn) {
+        const currentVal = select.value;
+        const isCustomDeletable = currentVal && currentVal !== '__custom__' && !DEFAULT_CONTRACT_INSTITUTIONS.includes(currentVal);
+        delBtn.style.display = isCustomDeletable ? 'inline-block' : 'none';
+    }
+}
+window.populateContractInstitutionsDropdown = populateContractInstitutionsDropdown;
+
+function onContractInstitutionSelectChange(val) {
+    const input = document.getElementById('contract-institution-input');
+    const delBtn = document.getElementById('btn-delete-institution-template');
+    if (!input) return;
+
+    if (val === '__custom__') {
+        input.value = '';
+        input.focus();
+        if (delBtn) delBtn.style.display = 'none';
+    } else if (val) {
+        input.value = val;
+        const isCustomDeletable = !DEFAULT_CONTRACT_INSTITUTIONS.includes(val);
+        if (delBtn) delBtn.style.display = isCustomDeletable ? 'inline-block' : 'none';
+    } else {
+        if (delBtn) delBtn.style.display = 'none';
+    }
+}
+window.onContractInstitutionSelectChange = onContractInstitutionSelectChange;
+
+function saveCurrentInstitutionAsTemplate() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const input = document.getElementById('contract-institution-input');
+    const name = input ? input.value.trim() : '';
+
+    if (!name) {
+        alert(isAr ? 'يرجى كتابة اسم المؤسسة / المنشأة أولاً لحفظها كقالب.' : 'Please enter institution name first to save as template.');
+        if (input) input.focus();
+        return;
+    }
+
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    let customList = data.contractInstitutions || [];
+    if (!Array.isArray(customList)) {
+        if (typeof customList === 'object' && customList !== null) customList = Object.values(customList);
+        else customList = [];
+    }
+
+    if (!customList.includes(name) && !DEFAULT_CONTRACT_INSTITUTIONS.includes(name)) {
+        customList.push(name);
+    }
+    data.contractInstitutions = customList;
+    if (typeof appData !== 'undefined' && currentCompany && appData[currentCompany]) {
+        appData[currentCompany].contractInstitutions = customList;
+    }
+
+    if (typeof db !== 'undefined' && currentCompany) {
+        db.ref(`companies/${currentCompany}/contractInstitutions`).set(customList).then(() => {
+            if (typeof showInAppNotification === 'function') {
+                showInAppNotification(isAr ? `🏛️ تم حفظ منشأة "${name}" كقالب بنجاح!` : `🏛️ Institution "${name}" saved as template!`);
+            }
+        }).catch(err => console.error('Error saving institution template:', err));
+    }
+
+    populateContractInstitutionsDropdown(name);
+}
+window.saveCurrentInstitutionAsTemplate = saveCurrentInstitutionAsTemplate;
+
+function deleteCurrentInstitutionTemplate() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const select = document.getElementById('contract-institution-select');
+    const name = select ? select.value : '';
+
+    if (!name || name === '__custom__' || DEFAULT_CONTRACT_INSTITUTIONS.includes(name)) {
+        return;
+    }
+
+    if (!confirm(isAr ? `هل أنت متأكد من حذف قالب المنشأة "${name}"؟` : `Delete template "${name}"?`)) {
+        return;
+    }
+
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    let customList = data.contractInstitutions || [];
+    if (!Array.isArray(customList)) {
+        if (typeof customList === 'object' && customList !== null) customList = Object.values(customList);
+        else customList = [];
+    }
+    customList = customList.filter(item => item !== name);
+    data.contractInstitutions = customList;
+    if (typeof appData !== 'undefined' && currentCompany && appData[currentCompany]) {
+        appData[currentCompany].contractInstitutions = customList;
+    }
+
+    if (typeof db !== 'undefined' && currentCompany) {
+        db.ref(`companies/${currentCompany}/contractInstitutions`).set(customList).then(() => {
+            if (typeof showInAppNotification === 'function') {
+                showInAppNotification(isAr ? `🗑️ تم حذف قالب "${name}".` : `🗑️ Template "${name}" deleted.`);
+            }
+        }).catch(err => console.error('Error deleting institution template:', err));
+    }
+
+    const input = document.getElementById('contract-institution-input');
+    if (input && input.value === name) input.value = '';
+    populateContractInstitutionsDropdown('');
+}
+window.deleteCurrentInstitutionTemplate = deleteCurrentInstitutionTemplate;
+
+// =========================================================================
+// REAL-TIME CONTRACT STATUS SYNC & INSTANT EVENT HANDLER
+// =========================================================================
+function onContractsRealtimeUpdate() {
+    const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
+    const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
+    const contractsObj = data.contracts || {};
+
+    let justSignedWorker = null;
+    let justSignedTitle = null;
+
+    Object.values(contractsObj).forEach(c => {
+        if (!c || !c.id) return;
+        const prevStatus = lastKnownContractStatuses[c.id];
+        // Detect transition from pending_signature to signed
+        if (prevStatus && prevStatus === 'pending_signature' && c.status === 'signed') {
+            justSignedWorker = c.workerName || (isAr ? 'الموظف' : 'Worker');
+            justSignedTitle = c.title || '';
+        }
+        lastKnownContractStatuses[c.id] = c.status;
+    });
+
+    // 1. Live re-render contracts section & instant counter badges update without reload
+    renderContractsSection();
+
+    // 2. Live re-render worker operations banner
+    if (typeof renderWorkerOperationsContractBanner === 'function') {
+        renderWorkerOperationsContractBanner();
+    }
+
+    // 3. If PDF viewer is open for this signed contract, refresh it in-place live
+    if (typeof currentViewingContractId !== 'undefined' && currentViewingContractId && contractsObj[currentViewingContractId]) {
+        const pdfModal = document.getElementById('modal-contract-pdf-viewer');
+        if (pdfModal && pdfModal.style.display !== 'none') {
+            viewContractAsPDF(currentViewingContractId);
+        }
+    }
+
+    // 4. In-App celebration notification if an employee signed
+    if (justSignedWorker && typeof showInAppNotification === 'function') {
+        showInAppNotification(isAr 
+            ? `✍️ قام الموظف (${justSignedWorker}) بتوقيع العقد "${justSignedTitle}" بنجاح!` 
+            : `✍️ Contract "${justSignedTitle}" digitally signed by (${justSignedWorker})!`);
+    }
+}
+window.onContractsRealtimeUpdate = onContractsRealtimeUpdate;
+
+function initContractsRealtimeSync() {
+    if (typeof db === 'undefined' || !currentCompany) return;
+
+    if (contractsRealtimeRef) {
+        try { contractsRealtimeRef.off(); } catch(e) {}
+    }
+    if (contractInstRealtimeRef) {
+        try { contractInstRealtimeRef.off(); } catch(e) {}
+    }
+
+    contractsRealtimeRef = db.ref(`companies/${currentCompany}/contracts`);
+    contractsRealtimeRef.on('value', snap => {
+        try {
+            const val = snap.val() || {};
+            const cleanObj = {};
+            if (Array.isArray(val)) {
+                val.forEach((c, idx) => {
+                    if (c && typeof c === 'object' && c.title) {
+                        const cId = String(c.id || ('contract_' + idx));
+                        c.id = cId;
+                        cleanObj[cId] = c;
+                    }
+                });
+            } else if (typeof val === 'object') {
+                Object.entries(val).forEach(([key, item]) => {
+                    if (item && typeof item === 'object' && item.title) {
+                        const cId = String(item.id || key);
+                        item.id = cId;
+                        cleanObj[cId] = item;
+                    }
+                });
+            }
+
+            const data = typeof getCompanyData === 'function' ? getCompanyData() : (appData[currentCompany] || {});
+            data.contracts = cleanObj;
+            if (typeof appData !== 'undefined' && currentCompany && appData[currentCompany]) {
+                appData[currentCompany].contracts = cleanObj;
+            }
+
+            onContractsRealtimeUpdate();
+        } catch(err) {
+            console.error('[Contracts Realtime Sync Error]:', err);
+        }
+    }, err => {
+        console.warn('[Contracts Realtime Listener Warning]:', err);
+    });
+
+    contractInstRealtimeRef = db.ref(`companies/${currentCompany}/contractInstitutions`);
+    contractInstRealtimeRef.on('value', snap => {
+        try {
+            let val = snap.val() || [];
+            if (!Array.isArray(val) && typeof val === 'object' && val !== null) {
+                val = Object.values(val);
+            }
+            if (!Array.isArray(val)) val = [];
+            val = val.filter(item => item && typeof item === 'string' && item.trim());
+
+            const data = typeof getCompanyData === 'function' ? getCompanyData() : (appData[currentCompany] || {});
+            data.contractInstitutions = val;
+            if (typeof appData !== 'undefined' && currentCompany && appData[currentCompany]) {
+                appData[currentCompany].contractInstitutions = val;
+            }
+            populateContractInstitutionsDropdown();
+        } catch(err) {
+            console.error('[Contract Institutions Sync Error]:', err);
+        }
+    }, err => {
+        console.warn('[Contract Institutions Listener Warning]:', err);
+    });
+}
+window.initContractsRealtimeSync = initContractsRealtimeSync;
 
 // 1. RENDER CONTRACTS SECTION (ADMIN ONLY)
 function renderContractsSection() {
@@ -47,7 +339,8 @@ function renderContractsSection() {
             const title = (c.title || '').toLowerCase();
             const worker = (c.workerName || '').toLowerCase();
             const type = (c.type || '').toLowerCase();
-            return title.includes(q) || worker.includes(q) || type.includes(q);
+            const inst = (c.institution || '').toLowerCase();
+            return title.includes(q) || worker.includes(q) || type.includes(q) || inst.includes(q);
         });
     }
 
@@ -96,6 +389,10 @@ function renderContractsSection() {
         const dateFormatted = c.createdAt ? new Date(c.createdAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
         const signedDateFormatted = c.signedAt ? new Date(c.signedAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
 
+        const compName = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany.toUpperCase() : 'MVC FRESH';
+        const instName = (c.institution && c.institution.trim()) ? c.institution.trim() : compName;
+        const instBadge = `<span style="background: rgba(99,102,241,0.12); color: #4338ca; border: 1px solid rgba(99,102,241,0.25); padding: 2px 8px; border-radius: 8px; font-size: 0.72rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;">🏛️ ${typeof escapeHtml === 'function' ? escapeHtml(instName) : instName}</span>`;
+
         const statusBadge = isSigned 
             ? `<span style="background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); padding: 4px 10px; border-radius: 20px; font-size: 0.76rem; font-weight: 800;">✅ ${isAr ? 'موقع ومكتمل' : 'Signed'}</span>`
             : (isPending 
@@ -117,7 +414,10 @@ function renderContractsSection() {
                 <div>
                     <!-- Header Badges -->
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; flex-wrap: wrap;">
-                        ${typeBadge}
+                        <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                            ${typeBadge}
+                            ${instBadge}
+                        </div>
                         ${statusBadge}
                     </div>
 
@@ -208,6 +508,13 @@ function openContractEditor(contractId, mode) {
     if (modeEl) modeEl.value = effectiveMode;
     toggleContractEditorMode(effectiveMode);
 
+    // Determine company default institution
+    const compKey = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany.toLowerCase() : '';
+    let defaultInst = 'مؤسسة إم في سي (MVC)';
+    if (compKey.includes('burgeroov')) defaultInst = 'مؤسسة برجروف (Burgeroov)';
+    else if (compKey.includes('mvcfresh') || compKey.includes('fresh')) defaultInst = 'شركة إم في سي فريش (MVC Fresh)';
+    else if (compKey.includes('mvc')) defaultInst = 'مؤسسة إم في سي (MVC)';
+
     if (contractId) {
         const data = typeof getCompanyData === 'function' ? getCompanyData() : {};
         const c = data.contracts?.[contractId];
@@ -218,6 +525,8 @@ function openContractEditor(contractId, mode) {
             if (workerSelect) workerSelect.value = c.workerId || '';
             if (modeEl) modeEl.value = c.type || 'text';
             toggleContractEditorMode(c.type || 'text');
+
+            populateContractInstitutionsDropdown(c.institution || defaultInst);
 
             if (c.imageUrl && previewImg && imageContainer) {
                 previewImg.src = c.imageUrl;
@@ -231,6 +540,7 @@ function openContractEditor(contractId, mode) {
     } else {
         if (editIdEl) editIdEl.value = '';
         if (titleInput) titleInput.value = '';
+        populateContractInstitutionsDropdown(defaultInst);
         if (textInput) {
             textInput.value = isAr 
                 ? `عقد عمل رسمي\n\nالطرف الأول: شركة ${typeof currentCompany !== 'undefined' ? currentCompany.toUpperCase() : 'MVC Fresh'}\nالطرف الثاني: [اسم الموظف]\n\nالبنود والشروط:\n1. يلتزم الطرف الثاني بأداء مهام عمله وفقاً للوائح والأنظمة المعمول بها في المنشأة.\n2. مدة هذا العقد سنة واحدة تبدأ من تاريخ توقيعه وتتجدد باتفاق الطرفين.\n3. يلتزم الطرف الثاني بالمحافظة على سرية بيانات ومعلومات العمل.\n4. يخضع هذا العقد لنظام العمل واللوائح المعتمدة بالمملكة العربية السعودية.`
@@ -290,6 +600,7 @@ function saveContract() {
     const textInput = document.getElementById('contract-input-text');
     const previewImg = document.getElementById('contract-image-preview');
     const workerSelect = document.getElementById('contract-worker-select');
+    const institutionInput = document.getElementById('contract-institution-input');
 
     const editingId = editIdEl ? editIdEl.value.trim() : '';
     const mode = modeEl ? modeEl.value : 'text';
@@ -297,6 +608,13 @@ function saveContract() {
     const content = textInput ? textInput.value.trim() : '';
     const imageUrl = previewImg ? previewImg.src : '';
     const workerId = workerSelect ? workerSelect.value : '';
+    const institution = institutionInput ? institutionInput.value.trim() : '';
+
+    if (!institution) {
+        alert(isAr ? 'يرجى كتابة أو اختيار اسم المنشأة / المؤسسة.' : 'Please enter or choose institution name.');
+        if (institutionInput) institutionInput.focus();
+        return;
+    }
 
     if (!title) {
         alert(isAr ? 'يرجى كتابة عنوان العقد.' : 'Please enter contract title.');
@@ -327,6 +645,7 @@ function saveContract() {
     const contractObj = {
         id: contractId,
         title: title,
+        institution: institution,
         type: mode,
         content: (mode === 'text') ? content : '',
         imageUrl: (mode === 'image') ? imageUrl : '',
@@ -347,6 +666,25 @@ function saveContract() {
     if (typeof appData !== 'undefined' && currentCompany && appData[currentCompany]) {
         if (!appData[currentCompany].contracts) appData[currentCompany].contracts = {};
         appData[currentCompany].contracts[contractId] = contractObj;
+    }
+
+    // Auto-remember this institution in template list if it's custom and not already saved
+    if (institution && !DEFAULT_CONTRACT_INSTITUTIONS.includes(institution)) {
+        let customList = data.contractInstitutions || [];
+        if (!Array.isArray(customList)) {
+            if (typeof customList === 'object' && customList !== null) customList = Object.values(customList);
+            else customList = [];
+        }
+        if (!customList.includes(institution)) {
+            customList.push(institution);
+            data.contractInstitutions = customList;
+            if (typeof appData !== 'undefined' && currentCompany && appData[currentCompany]) {
+                appData[currentCompany].contractInstitutions = customList;
+            }
+            if (typeof db !== 'undefined' && currentCompany) {
+                db.ref(`companies/${currentCompany}/contractInstitutions`).set(customList).catch(() => {});
+            }
+        }
     }
 
     closeContractEditor();
@@ -523,6 +861,7 @@ function viewContractAsPDF(contractId) {
 
     const isAdmin = (typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager' || currentUser.isAdmin));
     const compName = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany.toUpperCase() : 'MVC FRESH';
+    const instName = (c.institution && c.institution.trim()) ? c.institution.trim() : compName;
     const isSigned = (c.status === 'signed' || !!c.signatureDataUrl || !!c.signedAt);
     const dateStr = c.createdAt ? new Date(c.createdAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
     const signDateStr = c.signedAt ? new Date(c.signedAt).toLocaleDateString(isAr ? 'ar-SA' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : (c.signDate || '');
@@ -548,7 +887,7 @@ function viewContractAsPDF(contractId) {
             <!-- First Party (Company) -->
             <div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; background: #f8fafc; text-align: center;">
                 <div style="font-weight: 800; font-size: 0.9rem; color: #475569; margin-bottom: 6px;">طرف أول (المنشأة / الشركة)</div>
-                <div style="font-weight: 900; font-size: 1rem; color: #0f172a;">${compName}</div>
+                <div style="font-weight: 900; font-size: 1rem; color: #0f172a;">${escapeHtml(instName)}</div>
                 <div style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">ختم واعتماد الإدارة الإلكتروني ✅</div>
             </div>
 
@@ -596,7 +935,7 @@ function viewContractAsPDF(contractId) {
             <!-- A4 Document Official Header -->
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px double #0f172a; padding-bottom: 14px; margin-bottom: 20px;">
                 <div>
-                    <h1 style="margin: 0; font-size: 1.4rem; font-weight: 900; color: #0f172a; letter-spacing: 0.5px;">${compName}</h1>
+                    <h1 style="margin: 0; font-size: 1.4rem; font-weight: 900; color: #0f172a; letter-spacing: 0.5px;">${escapeHtml(instName)}</h1>
                     <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; margin-top: 2px;">إدارة الموارد البشرية والعمليات القانونية</div>
                 </div>
                 <div style="text-align: left; font-size: 0.78rem; color: #475569; font-weight: 700;">
@@ -620,7 +959,7 @@ function viewContractAsPDF(contractId) {
 
             <!-- Official Footer Watermark -->
             <div style="margin-top: 30px; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 10px; font-size: 0.72rem; color: #94a3b8; font-weight: 600;">
-                وثيقة رسمية صادرة من لوحة تحكم ${compName} - معتمدة ومحفوظة إلكترونياً
+                وثيقة رسمية صادرة من ${escapeHtml(instName)} - معتمدة ومحفوظة إلكترونياً
             </div>
         </div>
     `;
@@ -729,8 +1068,22 @@ function openWorkerContractSignModal(contractId) {
     }
 
     if (contractBodyContainer) {
+        const compName = (typeof currentCompany !== 'undefined' && currentCompany) ? currentCompany.toUpperCase() : 'MVC FRESH';
+        const instName = (c && c.institution && c.institution.trim()) ? c.institution.trim() : compName;
+        const instHeaderHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border-color); flex-wrap:wrap; gap:8px;">
+                <span style="font-size:0.85rem; font-weight:800; color:var(--primary); background:rgba(99,102,241,0.1); padding:4px 10px; border-radius:8px; display:inline-flex; align-items:center; gap:6px;">
+                    🏛️ <span>${typeof escapeHtml === 'function' ? escapeHtml(instName) : instName}</span>
+                </span>
+                <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">
+                    ${c ? `رقم المرجع: #${c.id.substring(0, 12).toUpperCase()}` : ''}
+                </span>
+            </div>
+        `;
+
         if (c && c.type === 'image') {
             contractBodyContainer.innerHTML = `
+                ${instHeaderHTML}
                 <div style="text-align:center; padding: 10px;">
                     <img src="${c.imageUrl}" style="max-width: 100%; border-radius: 8px; border: 1px solid var(--border-color);" alt="Contract" />
                 </div>
@@ -739,6 +1092,7 @@ function openWorkerContractSignModal(contractId) {
             const formattedText = (c.content || '').split('\n').map(p => p.trim() ? `<p style="margin-bottom: 12px; line-height: 1.7; font-size: 0.95rem; color: var(--text-main);">${typeof escapeHtml === 'function' ? escapeHtml(p) : p}</p>` : '<br/>').join('');
             contractBodyContainer.innerHTML = `
                 <div style="background: var(--input-bg); padding: 18px; border-radius: 12px; border: 1px solid var(--border-color); max-height: 280px; overflow-y: auto;">
+                    ${instHeaderHTML}
                     <h3 style="margin: 0 0 12px 0; color: var(--text-main); font-weight: 800; font-size: 1.1rem;">${typeof escapeHtml === 'function' ? escapeHtml(c.title) : c.title}</h3>
                     ${formattedText}
                 </div>
@@ -1124,10 +1478,12 @@ if (typeof document !== 'undefined') {
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
             if (typeof renderWorkerOperationsContractBanner === 'function') renderWorkerOperationsContractBanner();
+            if (typeof initContractsRealtimeSync === 'function') initContractsRealtimeSync();
         });
     } else {
         setTimeout(() => {
             if (typeof renderWorkerOperationsContractBanner === 'function') renderWorkerOperationsContractBanner();
+            if (typeof initContractsRealtimeSync === 'function') initContractsRealtimeSync();
         }, 150);
     }
 }

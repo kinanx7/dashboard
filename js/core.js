@@ -1498,6 +1498,7 @@ function selectCompany(companyId) {
             if (typeof zoomToActiveCompanyWorkZone === 'function') zoomToActiveCompanyWorkZone();
             if (typeof initVicardSystem === 'function') initVicardSystem();
             if (typeof checkVicardUrlParams === 'function') checkVicardUrlParams();
+            if (typeof initContractsRealtimeSync === 'function') initContractsRealtimeSync();
         });
     } else {
         listenToCloudData();
@@ -1508,6 +1509,7 @@ function selectCompany(companyId) {
         if (typeof zoomToActiveCompanyWorkZone === 'function') zoomToActiveCompanyWorkZone();
         if (typeof initVicardSystem === 'function') initVicardSystem();
         if (typeof checkVicardUrlParams === 'function') checkVicardUrlParams();
+        if (typeof initContractsRealtimeSync === 'function') initContractsRealtimeSync();
     }
 }
 
@@ -2374,6 +2376,15 @@ function ensureArraysExist(data) {
         data.contracts = {};
     }
 
+    if (data.contractInstitutions) {
+        if (!Array.isArray(data.contractInstitutions)) {
+            data.contractInstitutions = Object.values(data.contractInstitutions);
+        }
+        data.contractInstitutions = data.contractInstitutions.filter(ci => ci && typeof ci === 'string' && ci.trim());
+    } else {
+        data.contractInstitutions = [];
+    }
+
     if (!data.jobCatalog) data.jobCatalog = [];
     data.jobCatalog = data.jobCatalog.filter(j => j);
 
@@ -2758,12 +2769,21 @@ function listenToCloudData() {
                 if (typeof renderRanksTable === 'function') renderRanksTable(); 
                 if (typeof renderLeaderboard === 'function') renderLeaderboard(); 
             } },
-            { key: 'violationRules', render: () => { if (typeof renderViolationRules === 'function') renderViolationRules(); } }
+            { key: 'violationRules', render: () => { if (typeof renderViolationRules === 'function') renderViolationRules(); } },
+            { key: 'contracts', render: () => { 
+                if (typeof renderContractsSection === 'function') renderContractsSection(); 
+                if (typeof renderWorkerOperationsContractBanner === 'function') renderWorkerOperationsContractBanner();
+                if (typeof onContractsRealtimeUpdate === 'function') onContractsRealtimeUpdate();
+            } },
+            { key: 'contractInstitutions', render: () => {
+                if (typeof populateContractInstitutionsDropdown === 'function') populateContractInstitutionsDropdown();
+            } }
         ];
 
         const arrayNodeKeys = [
             'workers', 'warehouse', 'whCategories', 'driverVolumeRewards', 'branches', 'violationRules', 'jobCatalog',
-            'salesLogs', 'depositLogs', 'spendLogs', 'spendOrders', 'costLogs', 'incomeSources', 'disabledSalesMethods'
+            'salesLogs', 'depositLogs', 'spendLogs', 'spendOrders', 'costLogs', 'incomeSources', 'disabledSalesMethods',
+            'contractInstitutions'
         ];
         subNodes.forEach(node => {
             const nodeRef = db.ref(`companies/${currentCompany}/${node.key}`);
@@ -2778,7 +2798,7 @@ function listenToCloudData() {
                             if (!val) val = {};
                         }
                         appData[currentCompany][node.key] = val;
-                        if (['workers', 'driverVolumeRewards', 'violationRules', 'salesLogs', 'costLogs', 'depositLogs', 'spendLogs', 'spendOrders'].includes(node.key)) {
+                        if (['workers', 'driverVolumeRewards', 'violationRules', 'salesLogs', 'costLogs', 'depositLogs', 'spendLogs', 'spendOrders', 'contracts', 'contractInstitutions'].includes(node.key)) {
                             ensureArraysExist(appData[currentCompany]);
                         }
                     }

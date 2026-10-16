@@ -7515,6 +7515,34 @@
             <form onsubmit="event.preventDefault(); saveContract();" style="display:flex; flex-direction:column; gap:14px;">
                 <input type="hidden" id="contract-edit-id" value="" />
 
+                <!-- Institution / Legal Entity Selection & Template Management -->
+                <div class="form-group" style="margin:0; background:rgba(99,102,241,0.05); border:1px solid rgba(99,102,241,0.22); border-radius:14px; padding:12px 14px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+                        <label style="font-weight:800; font-size:0.88rem; color:#4f46e5; display:flex; align-items:center; gap:6px; margin:0;" data-i18n="label-contract-institution">
+                            <span>🏛️</span> <span>المنشأة أو المؤسسة (جهة إصدار العقد) *</span>
+                        </label>
+                        <span style="font-size:0.75rem; color:var(--text-muted);" data-i18n="desc-contract-institution-hint">
+                            (تظهر في ترويسة العقد وختم الطرف الأول)
+                        </span>
+                    </div>
+
+                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                        <select id="contract-institution-select" onchange="onContractInstitutionSelectChange(this.value)" style="flex:1; padding:9px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.9rem; font-weight:700; box-sizing: border-box;">
+                            <option value="">-- اختر قالب منشأة --</option>
+                        </select>
+                        <button type="button" id="btn-save-institution-template" onclick="saveCurrentInstitutionAsTemplate()" class="btn-outline" style="padding:9px 12px; border-radius:10px; font-weight:800; font-size:0.78rem; border:1px solid #4f46e5; color:#4f46e5; background:transparent; white-space:nowrap; cursor:pointer;" title="حفظ الاسم المكتوب كقالب دائم للمستقبل">
+                            <span>💾</span> <span data-i18n="btn-save-institution-template">حفظ كقالب</span>
+                        </button>
+                        <button type="button" id="btn-delete-institution-template" onclick="deleteCurrentInstitutionTemplate()" style="display:none; padding:9px 12px; border-radius:10px; font-weight:800; font-size:0.78rem; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); color:var(--danger); cursor:pointer;" title="حذف هذا القالب">
+                            🗑️
+                        </button>
+                    </div>
+
+                    <div>
+                        <input type="text" id="contract-institution-input" required placeholder="اكتب اسم المؤسسة أو المنشأة هنا (مثال: مؤسسة سمك بيتنا، مؤسسة إم في سي...)" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main); font-size:0.92rem; font-weight:700; box-sizing: border-box;" />
+                    </div>
+                </div>
+
                 <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px;">
                     <div class="form-group" style="margin:0;">
                         <label style="font-weight:700; font-size:0.85rem;" data-i18n="label-contract-title">Contract Title / عنوان العقد *</label>
@@ -9279,8 +9307,8 @@
     </div>
 
     <!-- APPLICATION JAVASCRIPT BUNDLE & TRANSLATIONS -->
-    <script src="translations.js?v=357"></script>
-    <script src="app.js?v=357"></script>
+    <script src="translations.js?v=358"></script>
+    <script src="app.js?v=358"></script>
 </body>
 
 </html>
