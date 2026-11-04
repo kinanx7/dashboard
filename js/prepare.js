@@ -2758,6 +2758,7 @@ function renderVaultNotes() {
     // Search input filtering
     const searchInput = document.getElementById('vault-search-input');
     const q = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    const normQ = q ? normalizeVaultArabic(q) : '';
 
     if (q) {
         notes = notes.filter(n => {
@@ -2768,9 +2769,10 @@ function renderVaultNotes() {
             const dateStr = n.createdAt ? new Date(n.createdAt).toLocaleDateString() : '';
             const fileMatch = (n.imageUrls || []).some(att => {
                 const name = typeof att === 'object' && att.name ? att.name.toLowerCase() : '';
-                return name.includes(q);
+                return name.includes(q) || (normQ && normalizeVaultArabic(name).includes(normQ));
             });
-            return t.includes(q) || txt.includes(q) || cat.includes(q) || dateStr.includes(q) || fileMatch;
+            return t.includes(q) || txt.includes(q) || cat.includes(q) || dateStr.includes(q) || fileMatch
+                || (normQ && (normalizeVaultArabic(t).includes(normQ) || normalizeVaultArabic(txt).includes(normQ) || normalizeVaultArabic(cat).includes(normQ)));
         });
     }
 
@@ -2868,54 +2870,42 @@ function renderVaultNotes() {
                 ${customFoldersList.length > 0 ? `<optgroup label="${isAr ? 'المجلدات المخصصة' : 'Custom Folders'}">${moveOptionsHtml}</optgroup>` : ''}
             </select>
         `;
+
+        const rawText = n.text || '';
+        const isLongText = rawText.length > 140 || (rawText.match(/\n/g) || []).length >= 3;
+        const normRawText = normalizeVaultArabic(rawText);
+        const isMatchInText = Boolean(q && (rawText.toLowerCase().includes(q) || (normQ && normRawText.includes(normQ))));
+        const isSnippetMode = Boolean(isMatchInText && isLongText);
+
         const safeTitle = typeof escapeHtml === 'function' ? escapeHtml(n.title) : (n.title || '');
-        const safeText = typeof escapeHtml === 'function' ? escapeHtml(n.text) : (n.text || '');
+        const safeText = typeof escapeHtml === 'function' ? escapeHtml(rawText) : rawText;
         const safeCreatedBy = typeof escapeHtml === 'function' ? escapeHtml(n.createdBy || (isAr ? 'المدير' : 'Admin')) : (n.createdBy || (isAr ? 'المدير' : 'Admin'));
 
         const displayTitle = q ? highlightVaultSearchMatch(safeTitle, q) : safeTitle;
         const displayText = q ? highlightVaultSearchMatch(safeText, q) : safeText;
         const displayCreatedBy = q ? highlightVaultSearchMatch(safeCreatedBy, q) : safeCreatedBy;
 
-        const rawText = n.text || '';
-        const isLongText = rawText.length > 140 || (rawText.match(/\n/g) || []).length >= 3;
-        const isMatchingSearch = q && rawText.toLowerCase().includes(q);
-        const startExpanded = isMatchingSearch;
-
-        const textStyle = startExpanded ? `
-            font-size: 0.88rem;
-            color: var(--text-main);
-            background: var(--input-bg);
-            padding: 10px 12px;
-            border-radius: 10px;
-            border: 1px dashed var(--border-color);
-            margin-top: 8px;
-            white-space: pre-wrap;
-            line-height: 1.5;
-            font-family: inherit;
-            display: block;
-            max-height: none;
-            overflow: visible;
-        ` : `
-            font-size: 0.88rem;
-            color: var(--text-main);
-            background: var(--input-bg);
-            padding: 10px 12px;
-            border-radius: 10px;
-            border: 1px dashed var(--border-color);
-            margin-top: 8px;
-            white-space: pre-wrap;
-            line-height: 1.5;
-            font-family: inherit;
-            display: -webkit-box;
-            -webkit-line-clamp: 4;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            max-height: 100px;
-            text-overflow: ellipsis;
-        `;
+        let snippetHtml = '';
+        if (isSnippetMode) {
+            const rawSnippet = getVaultSearchSnippet(rawText, q);
+            const safeSnippet = typeof escapeHtml === 'function' ? escapeHtml(rawSnippet) : rawSnippet;
+            const displaySnippet = highlightVaultSearchMatch(safeSnippet, q);
+            snippetHtml = `
+                <div id="vault-text-snippet-${n.id}" style="display: block;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dashed rgba(255,255,255,0.12); font-size: 0.72rem; color: #f59e0b; font-weight: 800;">
+                        <span>🔍 ${isAr ? 'مقتطف البحث من النص:' : 'Match Snippet:'}</span>
+                        <span style="font-size: 0.7rem; opacity: 0.9; text-decoration: underline;">${isAr ? 'انقر لتوسيع الملاحظة كاملة ⬇' : 'Click for full note ⬇'}</span>
+                    </div>
+                    <div style="line-height: 1.5; font-family: inherit;">${displaySnippet}</div>
+                </div>
+                <div id="vault-text-full-${n.id}" style="display: none;">
+                    <div style="line-height: 1.5; font-family: inherit;">${displayText}</div>
+                </div>
+            `;
+        }
 
         return `
-            <div class="ledger-card" ondblclick="if (!event.target.closest('button')) editVaultNote('${n.id}')" style="
+            <div class="ledger-card" ondblclick="if (!event.target.closest('button') && !event.target.closest('.vault-note-text-box')) editVaultNote('${n.id}')" style="
                 margin: 0;
                 padding: 14px;
                 border-radius: 14px;
@@ -2926,7 +2916,6 @@ function renderVaultNotes() {
                 justify-content: space-between;
                 box-shadow: var(--shadow-sm);
                 transition: transform 0.2s ease, box-shadow 0.2s ease;
-                cursor: pointer;
                 box-sizing: border-box;
                 width: 100%;
                 max-width: 100%;
@@ -3093,13 +3082,37 @@ function renderVaultNotes() {
                     </div>
 
                     <!-- Text Details directly UNDER Image & Title -->
-                    ${n.text ? `
-                        <div id="vault-text-${n.id}" class="${startExpanded ? 'expanded' : ''}" style="${textStyle}">${displayText}</div>
-                        ${isLongText ? `
-                            <button type="button" id="vault-toggle-btn-${n.id}" onclick="toggleVaultNoteExpand('${n.id}')" style="background:none; border:none; color:var(--primary); font-size:0.78rem; font-weight:800; cursor:pointer; margin-top:6px; padding:2px 4px; display:inline-flex; align-items:center; gap:4px;">
-                                📖 ${startExpanded ? (isAr ? 'طي الملاحظة' : 'Show Less') : (isAr ? 'عرض المزيد' : 'Show More')}
+                    ${rawText ? `
+                        <div id="vault-text-${n.id}" 
+                            class="vault-note-text-box" 
+                            ${(isSnippetMode || isLongText) ? `onclick="event.stopPropagation(); toggleVaultNoteExpand('${n.id}')"` : ''} 
+                            style="
+                                font-size: 0.88rem;
+                                color: var(--text-main);
+                                background: var(--input-bg);
+                                padding: 10px 12px;
+                                border-radius: 10px;
+                                border: 1px dashed var(--border-color);
+                                margin-top: 8px;
+                                white-space: pre-wrap;
+                                line-height: 1.5;
+                                font-family: inherit;
+                                ${(isSnippetMode || isLongText) ? 'cursor: pointer;' : ''}
+                                ${isSnippetMode ? 'display: block; max-height: none; overflow: visible;' : (isLongText ? 'display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; max-height: 100px; text-overflow: ellipsis;' : 'display: block; max-height: none; overflow: visible;')}
+                                transition: border-color 0.15s ease, background 0.15s ease;
+                            "
+                            ${(isSnippetMode || isLongText) ? `onmouseenter="this.style.borderColor='var(--primary)'" onmouseleave="this.style.borderColor='var(--border-color)'" title="${isAr ? 'انقر لتوسيع أو طي الملاحظة' : 'Click to expand or collapse'}"` : ''}>
+                            ${isSnippetMode ? snippetHtml : displayText}
+                        </div>
+                        ${isSnippetMode ? `
+                            <button type="button" id="vault-toggle-btn-${n.id}" onclick="event.stopPropagation(); toggleVaultNoteExpand('${n.id}')" style="background:none; border:none; color:var(--primary); font-size:0.78rem; font-weight:800; cursor:pointer; margin-top:6px; padding:2px 4px; display:inline-flex; align-items:center; gap:4px;">
+                                📖 ${isAr ? 'عرض الملاحظة كاملة' : 'Show Full Note'}
                             </button>
-                        ` : ''}
+                        ` : (isLongText ? `
+                            <button type="button" id="vault-toggle-btn-${n.id}" onclick="event.stopPropagation(); toggleVaultNoteExpand('${n.id}')" style="background:none; border:none; color:var(--primary); font-size:0.78rem; font-weight:800; cursor:pointer; margin-top:6px; padding:2px 4px; display:inline-flex; align-items:center; gap:4px;">
+                                📖 ${isAr ? 'عرض المزيد' : 'Show More'}
+                            </button>
+                        ` : '')}
                     ` : ''}
                 </div>
 
@@ -3123,13 +3136,94 @@ function renderVaultNotes() {
 }
 window.renderVaultNotes = renderVaultNotes;
 
+function normalizeVaultArabic(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/[إأآا]/g, 'ا')
+        .replace(/ة/g, 'ه')
+        .replace(/ى/g, 'ي')
+        .toLowerCase();
+}
+window.normalizeVaultArabic = normalizeVaultArabic;
+
+function getVaultSearchSnippet(rawText, query) {
+    if (!rawText || !query) return rawText || '';
+    const qTrimmed = String(query).trim();
+    if (!qTrimmed) return rawText;
+
+    const normText = normalizeVaultArabic(rawText);
+    const normQ = normalizeVaultArabic(qTrimmed);
+    let matchIdx = normText.indexOf(normQ);
+
+    if (matchIdx === -1) {
+        matchIdx = rawText.toLowerCase().indexOf(qTrimmed.toLowerCase());
+    }
+
+    if (matchIdx === -1) {
+        return rawText.length > 140 ? rawText.substring(0, 140) + '...' : rawText;
+    }
+
+    if (rawText.length <= 140 && (rawText.match(/\n/g) || []).length <= 2) {
+        return rawText;
+    }
+
+    const lines = rawText.split('\n');
+    let currentPos = 0;
+    let matchedLineIdx = -1;
+    for (let i = 0; i < lines.length; i++) {
+        const lineLen = lines[i].length + 1; // +1 for \n
+        if (matchIdx >= currentPos && matchIdx < currentPos + lineLen) {
+            matchedLineIdx = i;
+            break;
+        }
+        currentPos += lineLen;
+    }
+
+    if (matchedLineIdx !== -1 && lines.length > 2) {
+        const startLine = Math.max(0, matchedLineIdx - 1);
+        const endLine = Math.min(lines.length - 1, matchedLineIdx + 1);
+        let excerptLines = lines.slice(startLine, endLine + 1);
+
+        excerptLines = excerptLines.map((line, idx) => {
+            const actualLineIdx = startLine + idx;
+            if (actualLineIdx === matchedLineIdx && line.length > 160) {
+                const innerMatch = normalizeVaultArabic(line).indexOf(normQ);
+                const s = Math.max(0, innerMatch - 60);
+                const e = Math.min(line.length, innerMatch + normQ.length + 60);
+                return (s > 0 ? '... ' : '') + line.substring(s, e) + (e < line.length ? ' ...' : '');
+            } else if (line.length > 110) {
+                return line.substring(0, 105) + '...';
+            }
+            return line;
+        });
+
+        let result = excerptLines.join('\n');
+        if (startLine > 0) result = '...\n' + result;
+        if (endLine < lines.length - 1) result = result + '\n...';
+        return result;
+    }
+
+    const radius = 60;
+    const startIdx = Math.max(0, matchIdx - radius);
+    const endIdx = Math.min(rawText.length, matchIdx + normQ.length + radius);
+    let snippet = rawText.substring(startIdx, endIdx);
+    if (startIdx > 0) snippet = '... ' + snippet;
+    if (endIdx < rawText.length) snippet = snippet + ' ...';
+    return snippet;
+}
+window.getVaultSearchSnippet = getVaultSearchSnippet;
+
 function highlightVaultSearchMatch(text, query) {
     if (!text || !query) return text || '';
     const trimmed = String(query).trim();
     if (!trimmed) return text;
     try {
-        const escapedQuery = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(`(${escapedQuery})`, 'gi');
+        let pattern = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        pattern = pattern
+            .replace(/[إأآا]/g, '[إأآا]')
+            .replace(/[هة]/g, '[هة]')
+            .replace(/[يى]/g, '[يى]');
+        const regex = new RegExp(`(${pattern})`, 'gi');
         return String(text).replace(regex, '<mark style="background: #fde047; color: #713f12; padding: 2px 4px; border-radius: 4px; font-weight: 800; box-shadow: 0 1px 3px rgba(0,0,0,0.12);">$1</mark>');
     } catch(e) {
         return text;
@@ -3145,21 +3239,38 @@ function toggleVaultNoteExpand(noteId) {
     const isAr = (typeof currentAppLang !== 'undefined' && currentAppLang === 'ar');
     const isExpanded = textEl.classList.contains('expanded');
 
-    if (isExpanded) {
-        textEl.classList.remove('expanded');
-        textEl.style.display = '-webkit-box';
-        textEl.style.webkitLineClamp = '4';
-        textEl.style.webkitBoxOrient = 'vertical';
-        textEl.style.overflow = 'hidden';
-        textEl.style.maxHeight = '100px';
-        if (btnEl) btnEl.innerHTML = `📖 ${isAr ? 'عرض المزيد' : 'Show More'}`;
+    const snippetEl = document.getElementById(`vault-text-snippet-${noteId}`);
+    const fullEl = document.getElementById(`vault-text-full-${noteId}`);
+
+    if (snippetEl && fullEl) {
+        if (isExpanded) {
+            textEl.classList.remove('expanded');
+            snippetEl.style.display = 'block';
+            fullEl.style.display = 'none';
+            if (btnEl) btnEl.innerHTML = `📖 ${isAr ? 'عرض الملاحظة كاملة' : 'Show Full Note'}`;
+        } else {
+            textEl.classList.add('expanded');
+            snippetEl.style.display = 'none';
+            fullEl.style.display = 'block';
+            if (btnEl) btnEl.innerHTML = `📖 ${isAr ? 'طي الملاحظة (عرض المقتطف)' : 'Show Snippet'}`;
+        }
     } else {
-        textEl.classList.add('expanded');
-        textEl.style.display = 'block';
-        textEl.style.webkitLineClamp = 'none';
-        textEl.style.overflow = 'visible';
-        textEl.style.maxHeight = 'none';
-        if (btnEl) btnEl.innerHTML = `📖 ${isAr ? 'طي الملاحظة' : 'Show Less'}`;
+        if (isExpanded) {
+            textEl.classList.remove('expanded');
+            textEl.style.display = '-webkit-box';
+            textEl.style.webkitLineClamp = '4';
+            textEl.style.webkitBoxOrient = 'vertical';
+            textEl.style.overflow = 'hidden';
+            textEl.style.maxHeight = '100px';
+            if (btnEl) btnEl.innerHTML = `📖 ${isAr ? 'عرض المزيد' : 'Show More'}`;
+        } else {
+            textEl.classList.add('expanded');
+            textEl.style.display = 'block';
+            textEl.style.webkitLineClamp = 'none';
+            textEl.style.overflow = 'visible';
+            textEl.style.maxHeight = 'none';
+            if (btnEl) btnEl.innerHTML = `📖 ${isAr ? 'طي الملاحظة' : 'Show Less'}`;
+        }
     }
 }
 window.toggleVaultNoteExpand = toggleVaultNoteExpand;
