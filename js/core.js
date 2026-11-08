@@ -1086,27 +1086,33 @@ function renderCompanySelectionHUD() {
     const companies = Object.values(portalCompanies || {});
     const email = currentUser ? (currentUser.email || '').toLowerCase() : '';
     const isKinan = email === 'kinan.rahal@hotmail.com';
-    const isAdmin = isKinan || (currentUser && currentUser.role === 'admin');
+    const isAr = (typeof currentAppLang !== 'undefined' ? currentAppLang : 'en') === 'ar';
 
     let html = companies.map(c => {
-        const canAccess = isKinan || !window.userActiveCompanies || window.userActiveCompanies.includes(c.id);
-        const cardStyle = canAccess ? '' : 'display: none;';
+        // STRICT ACCESS: Kinan sees all. Regular users ONLY see companies in window.userActiveCompanies!
+        const canAccess = isKinan || (Array.isArray(window.userActiveCompanies) && window.userActiveCompanies.includes(c.id));
+        if (!canAccess) return '';
+
         const color = c.color || '#c5832b';
         const logoSrc = c.logo || 'burgeroov.png';
 
+        // Admin privileges on this specific company card:
+        // Only Kinan (super admin) or a verified admin of THIS specific company can edit/delete it!
+        const isCompanyAdmin = isKinan || (appData[c.id] && appData[c.id].admins && appData[c.id].admins[email.replace(/\./g, ',')] === true);
+
         return `
-            <div class="company-card" style="${cardStyle}; border-color: ${color}44; position: relative;" onclick="selectCompany('${c.id}')">
-                ${isAdmin ? `
+            <div class="company-card" style="border-color: ${color}44; position: relative;" onclick="selectCompany('${c.id}')">
+                ${isCompanyAdmin ? `
                     <div style="position: absolute; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 10;">
                         ${c.id !== 'burgeroov' ? `
                         <button type="button" onclick="event.stopPropagation(); confirmDeleteCompany('${c.id}')"
-                            class="company-card-delete-hud-btn" title="Delete Company"
+                            class="company-card-delete-hud-btn" title="${isAr ? 'حذف الشركة' : 'Delete Company'}"
                             style="background: rgba(239, 68, 68, 0.22); border: 1.5px solid rgba(239, 68, 68, 0.6); color: #ef4444; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.95rem; transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(0,0,0,0.4);">
                             🗑️
                         </button>
                         ` : ''}
                         <button type="button" onclick="event.stopPropagation(); openEditCompanyModal('${c.id}')"
-                            class="company-card-edit-btn" title="Edit Company Details & Logo"
+                            class="company-card-edit-btn" title="${isAr ? 'تعديل بيانات وشعار الشركة' : 'Edit Company Details & Logo'}"
                             style="position: static; width: 34px; height: 34px;">
                             ✏️
                         </button>
@@ -1118,21 +1124,22 @@ function renderCompanySelectionHUD() {
                 </div>
                 <h3 style="color: #ffffff; font-size: 1.25rem; font-weight: 800; margin: 0; line-height: 1.2;">${escapeHtml(c.name)}</h3>
                 <span style="display: inline-block; margin-top: 14px; background: ${color}26; color: ${color}; font-size: 0.8rem; font-weight: 700; padding: 6px 16px; border-radius: 100px; border: 1px solid ${color}44;">
-                    Enter Portal
+                    ${isAr ? 'دخول البوابة' : 'Enter Portal'}
                 </span>
             </div>
         `;
     }).join('');
 
-    if (isAdmin) {
+    // "Add New Company" card: ONLY visible to Super Admin (Kinan)
+    if (isKinan) {
         html += `
             <div class="company-card company-card-add" onclick="openAddCompanyModal()"
                 style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 220px; background: rgba(255,255,255,0.02); border: 2px dashed rgba(212,175,55,0.4); border-radius: 22px; cursor: pointer; transition: all 0.3s ease;">
                 <div style="width: 58px; height: 58px; border-radius: 50%; background: rgba(212,175,55,0.12); border: 1.5px solid rgba(212,175,55,0.4); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; color: #f5d77f; margin-bottom: 12px;">
                     ➕
                 </div>
-                <h3 style="color: #f5d77f; font-size: 1.15rem; font-weight: 800; margin: 0;">Add New Company</h3>
-                <span style="color: #94a3b8; font-size: 0.78rem; margin-top: 6px;">Create isolated portal workspace</span>
+                <h3 style="color: #f5d77f; font-size: 1.15rem; font-weight: 800; margin: 0;">${isAr ? 'إضافة شركة جديدة' : 'Add New Company'}</h3>
+                <span style="color: #94a3b8; font-size: 0.78rem; margin-top: 6px;">${isAr ? 'إنشاء مساحة بوابة معزولة' : 'Create isolated portal workspace'}</span>
             </div>
         `;
     }
@@ -1700,6 +1707,26 @@ function findMatchingWorker(workersList, userEmail, targetWorkerId) {
 window.findMatchingWorker = findMatchingWorker;
 
 function selectCompany(companyId) {
+    if (!companyId) return;
+
+    const email = currentUser ? (currentUser.email || '').toLowerCase() : '';
+    const isKinan = email === 'kinan.rahal@hotmail.com';
+
+    // Strict Access Control: Non-Kinan users can ONLY enter companies they are assigned to
+    if (!isKinan && Array.isArray(window.userActiveCompanies)) {
+        if (!window.userActiveCompanies.includes(companyId)) {
+            console.warn(`[Access Blocked] User "${email}" is not authorized for company "${companyId}".`);
+            if (window.userActiveCompanies.length > 0) {
+                companyId = window.userActiveCompanies[0];
+            } else {
+                if (typeof showUnassignedOverlay === 'function') {
+                    showUnassignedOverlay(email);
+                }
+                return;
+            }
+        }
+    }
+
     currentCompany = companyId;
     localStorage.setItem('selected_company', companyId);
 
@@ -1946,9 +1973,16 @@ function syncAllCompaniesAndWorkersGlobally() {
                     color: compMeta.color || '#c5832b'
                 };
 
+                const bWorkersSnap = (cId !== 'burgeroov' && cId !== 'mvc' && cId !== 'mvcfresh') ? (appData.burgeroov && appData.burgeroov.workers) : null;
+                const parentIds = new Set((bWorkersSnap || []).map(w => String(w.id)));
+                const parentEmails = new Set((bWorkersSnap || []).map(w => (w.email || '').trim().toLowerCase()));
+
                 workers.forEach(w => {
                     if (w && w.email) {
                         const cleanW = w.email.trim().toLowerCase();
+                        const isParentLeak = bWorkersSnap && (parentIds.has(String(w.id)) || parentEmails.has(cleanW));
+                        if (isParentLeak) return; // Never sync leaked parent workers to custom companies
+
                         const wKey = cleanW.replace(/\./g, ',');
                         updates[`customerCodes/workerAccess/${wKey}/${cId}`] = true;
                         updates[`portal_companies/${cId}/workers/${cleanW.replace(/\./g, ',')}`] = true;
@@ -2041,46 +2075,22 @@ function resolveUserActiveCompanies(email) {
             compKeys.forEach((cId, i) => {
                 const adminsList = parseAdminsSnap(adminSnaps[i]);
                 const workersList = parseWorkersSnap(workerSnaps[i]);
-                const userMapSnap = userMappingSnaps[i];
 
-                let inComp = false;
+                // STRICT MEMBERSHIP:
+                // 1. Is user in this company's admins?
+                const isAdmin = (adminsList[sanitizedEmail] === true);
 
-                // 1. Admin check
-                if (adminsList[sanitizedEmail] === true) inComp = true;
-
-                // 2. Workers array check
-                if (!inComp) {
-                    if (typeof findMatchingWorker === 'function' && findMatchingWorker(workersList, cleanEmail, targetWorkerId)) {
-                        inComp = true;
-                    } else if (workersList.some(w => w && w.email && w.email.trim().toLowerCase() === cleanEmail)) {
-                        inComp = true;
+                // 2. Is user in this company's workers roster?
+                let isWorker = false;
+                if (!isAdmin && workersList.length > 0) {
+                    if (workersList.some(w => w && w.email && w.email.trim().toLowerCase() === cleanEmail)) {
+                        isWorker = true;
+                    } else if (targetWorkerId && workersList.some(w => w && String(w.id) === String(targetWorkerId))) {
+                        isWorker = true;
                     }
                 }
 
-                // 3. User mapping key
-                if (!inComp && userMapSnap && userMapSnap.exists() && userMapSnap.val()) {
-                    inComp = true;
-                }
-
-                // 4. Global worker access index
-                if (!inComp && accessSnap && accessSnap.exists() && accessSnap.val() && accessSnap.val()[cId] === true) {
-                    inComp = true;
-                }
-
-                // 5. Worker passwords company
-                if (!inComp && pwdSnap && pwdSnap.exists() && pwdSnap.val() && pwdSnap.val().company === cId) {
-                    inComp = true;
-                }
-
-                // 6. Portal companies workers node
-                if (!inComp && portalSnap && portalSnap.exists()) {
-                    const pComp = portalSnap.val()[cId];
-                    if (pComp && pComp.workers && pComp.workers[sanitizedEmail] === true) {
-                        inComp = true;
-                    }
-                }
-
-                if (inComp) {
+                if (isAdmin || isWorker) {
                     activeCompanies.push(cId);
 
                     // Sync Firebase Auth password if an appPassword was set
@@ -2092,6 +2102,12 @@ function resolveUserActiveCompanies(email) {
                             auth.currentUser.updatePassword(matchedWorker.appPassword).catch(() => {});
                         }
                     }
+                } else {
+                    // Stale entry cleanup: user is NEITHER admin NOR worker in cId!
+                    // Proactively clean up any stale ghost records in RTDB
+                    db.ref(`customerCodes/workerAccess/${sanitizedEmail}/${cId}`).remove().catch(() => {});
+                    db.ref(`portal_companies/${cId}/workers/${sanitizedEmail}`).remove().catch(() => {});
+                    db.ref(`companies/${cId}/users/${sanitizedEmail}`).remove().catch(() => {});
                 }
             });
 
@@ -2100,11 +2116,12 @@ function resolveUserActiveCompanies(email) {
     });
 
     return Promise.all([serverPromise, rtdbPromise]).then(([serverResult, rtdbComps]) => {
-        const set = new Set(rtdbComps || []);
-        if (serverResult && serverResult.success && Array.isArray(serverResult.companies)) {
-            serverResult.companies.forEach(c => set.add(c));
+        let finalComps = rtdbComps || [];
+        // Only fallback to server if RTDB client returned nothing (e.g. offline/rules restricted)
+        if (finalComps.length === 0 && serverResult && serverResult.success && Array.isArray(serverResult.companies)) {
+            finalComps = serverResult.companies;
         }
-        return Array.from(set);
+        return Array.from(new Set(finalComps));
     });
 }
 window.resolveUserActiveCompanies = resolveUserActiveCompanies;
@@ -3108,8 +3125,29 @@ function sanitizeCompanyDataIsolation(cId) {
                     const key = w.email.trim().toLowerCase().replace(/\./g, ',');
                     db.ref(`companies/${cId}/users/${key}`).remove().catch(() => {});
                     db.ref(`portal_companies/${cId}/workers/${key}`).remove().catch(() => {});
+                    db.ref(`customerCodes/workerAccess/${key}/${cId}`).remove().catch(() => {});
                 }
             });
+
+            // Proactively sweep customerCodes/workerAccess to purge any stale access for unassigned workers
+            db.ref('customerCodes/workerAccess').once('value').then(wAccessSnap => {
+                if (wAccessSnap.exists()) {
+                    const allAccess = wAccessSnap.val();
+                    const validWorkerEmails = new Set(cleanedWorkers.map(cw => (cw.email || '').trim().toLowerCase()));
+                    Object.keys(allAccess).forEach(emailKey => {
+                        if (allAccess[emailKey] && allAccess[emailKey][cId]) {
+                            const normEmail = emailKey.replace(/,/g, '.');
+                            const isRealWorker = validWorkerEmails.has(normEmail);
+                            const isRealAdmin = cData.admins && cData.admins[emailKey] === true;
+                            if (!isRealWorker && !isRealAdmin) {
+                                db.ref(`customerCodes/workerAccess/${emailKey}/${cId}`).remove().catch(() => {});
+                                db.ref(`portal_companies/${cId}/workers/${emailKey}`).remove().catch(() => {});
+                                db.ref(`companies/${cId}/users/${emailKey}`).remove().catch(() => {});
+                            }
+                        }
+                    });
+                }
+            }).catch(() => {});
 
             return db.ref(`companies/${cId}`).update(updates).then(() => {
                 ensureArraysExist(cData);
