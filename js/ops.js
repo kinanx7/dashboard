@@ -154,12 +154,16 @@ function renderOpsWorkersTable() {
     const tbody = document.querySelector('#ops-workers-table tbody');
     if (!tbody) return;
     tbody.innerHTML = '';
-    const isAdmin = currentUser && currentUser.role === 'admin';
+    const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'super_admin' || document.body.classList.contains('role-admin'));
 
     const workersToRender = getVisibleWorkers();
 
-    if (workersToRender.length === 0 && !isAdmin) {
-        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;">${t('msg-account-not-linked')}</td></tr>`;
+    if (workersToRender.length === 0) {
+        const isAr = currentAppLang === 'ar';
+        const emptyMsg = isAdmin
+            ? (isAr ? 'لا يوجد موظفون في هذه الشركة حتى الآن. استخدم زر "إضافة موظف جديد" أدناه لتسجيل الموظفين.' : 'No workers in this company yet. Use "Add New Worker" below to register employees.')
+            : t('msg-account-not-linked');
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; padding: 24px; color: var(--text-muted); font-size: 0.88rem;">${emptyMsg}</td></tr>`;
         return;
     }
 

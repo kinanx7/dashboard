@@ -965,7 +965,21 @@ function getCompanyData() {
     if (!appData[currentCompany]) {
         appData[currentCompany] = { admins: { "kinan,rahal@hotmail,com": true }, branches: ['Main Branch'], workers: [], violationRules: [], jobCatalog: [], warehouse: [] };
     }
-    return appData[currentCompany];
+    const cData = appData[currentCompany];
+    if (!cData.workers || !Array.isArray(cData.workers)) {
+        if (cData.workers && typeof cData.workers === 'object') {
+            cData.workers = Object.values(cData.workers);
+        } else {
+            cData.workers = [];
+        }
+    }
+    if (!cData.activityLogs || typeof cData.activityLogs !== 'object') {
+        cData.activityLogs = {};
+    }
+    if (!cData.admins) {
+        cData.admins = { "kinan,rahal@hotmail,com": true };
+    }
+    return cData;
 }
 
 // =============================================
@@ -1030,6 +1044,10 @@ function updateCurrentCompanyHeader() {
     if (c.color) {
         document.documentElement.style.setProperty('--primary', c.color);
     }
+    const settingsDelBtn = document.getElementById('company-settings-delete-btn');
+    if (settingsDelBtn) {
+        settingsDelBtn.style.display = (currentCompany !== 'burgeroov') ? 'inline-flex' : 'none';
+    }
 }
 window.updateCurrentCompanyHeader = updateCurrentCompanyHeader;
 
@@ -1049,12 +1067,22 @@ function renderCompanySelectionHUD() {
         const logoSrc = c.logo || 'burgeroov.png';
 
         return `
-            <div class="company-card" style="${cardStyle}; border-color: ${color}44;" onclick="selectCompany('${c.id}')">
+            <div class="company-card" style="${cardStyle}; border-color: ${color}44; position: relative;" onclick="selectCompany('${c.id}')">
                 ${isAdmin ? `
-                    <button type="button" onclick="event.stopPropagation(); openEditCompanyModal('${c.id}')"
-                        class="company-card-edit-btn" title="Edit Company Details & Logo">
-                        ✏️
-                    </button>
+                    <div style="position: absolute; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 10;">
+                        ${c.id !== 'burgeroov' ? `
+                        <button type="button" onclick="event.stopPropagation(); confirmDeleteCompany('${c.id}')"
+                            class="company-card-delete-hud-btn" title="Delete Company"
+                            style="background: rgba(239, 68, 68, 0.22); border: 1.5px solid rgba(239, 68, 68, 0.6); color: #ef4444; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.95rem; transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(0,0,0,0.4);">
+                            🗑️
+                        </button>
+                        ` : ''}
+                        <button type="button" onclick="event.stopPropagation(); openEditCompanyModal('${c.id}')"
+                            class="company-card-edit-btn" title="Edit Company Details & Logo"
+                            style="position: static; width: 34px; height: 34px;">
+                            ✏️
+                        </button>
+                    </div>
                 ` : ''}
                 <div class="company-logo-wrap">
                     <img src="${logoSrc}" alt="${escapeHtml(c.name)}" onerror="this.src='burgeroov.png'"
@@ -1099,6 +1127,13 @@ function openAddCompanyModal() {
     document.getElementById('company-modal-logo-url').value = '';
     document.getElementById('company-modal-logo-preview').src = 'burgeroov.png';
     document.getElementById('company-modal-color').value = '#c5832b';
+
+    const deleteBtn = document.getElementById('company-modal-delete-btn');
+    if (deleteBtn) deleteBtn.style.display = 'none';
+
+    const resetBtn = document.getElementById('company-modal-reset-data-btn');
+    if (resetBtn) resetBtn.style.display = 'none';
+
     modal.style.display = 'flex';
 }
 window.openAddCompanyModal = openAddCompanyModal;
@@ -1119,9 +1154,199 @@ function openEditCompanyModal(cId) {
     document.getElementById('company-modal-logo-url').value = c.logo || '';
     document.getElementById('company-modal-logo-preview').src = c.logo || 'burgeroov.png';
     document.getElementById('company-modal-color').value = c.color || '#c5832b';
+
+    const deleteBtn = document.getElementById('company-modal-delete-btn');
+    if (deleteBtn) {
+        deleteBtn.style.display = (cId === 'burgeroov') ? 'none' : 'inline-flex';
+    }
+
+    const resetBtn = document.getElementById('company-modal-reset-data-btn');
+    if (resetBtn) {
+        resetBtn.style.display = (cId === 'burgeroov') ? 'none' : 'inline-flex';
+    }
+
     modal.style.display = 'flex';
 }
 window.openEditCompanyModal = openEditCompanyModal;
+
+function confirmDeleteCompany(companyId, companyName) {
+    if (!companyId) return;
+    if (companyId === 'burgeroov') {
+        alert("The master company (Burgeroov) cannot be deleted.");
+        return;
+    }
+    const cMeta = (portalCompanies && portalCompanies[companyId]) || {};
+    const displayName = companyName || cMeta.name || companyId;
+    const isAr = (typeof currentAppLang !== 'undefined' ? currentAppLang : 'en') === 'ar';
+    const confirmMsg = isAr
+        ? `⚠️ هل أنت متأكد من حذف شركة "${displayName}" نهائياً؟\nسيتم مسح جميع بيانات وموظفي الشركة بالكامل ولن يمكن استرجاعها.`
+        : `⚠️ Are you sure you want to permanently delete "${displayName}"?\nAll company data, workers, and records will be deleted permanently.`;
+
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+
+    deleteCompany(companyId);
+}
+window.confirmDeleteCompany = confirmDeleteCompany;
+
+function deleteCompany(companyId) {
+    if (!companyId || companyId === 'burgeroov') return;
+
+    const isAr = (typeof currentAppLang !== 'undefined' ? currentAppLang : 'en') === 'ar';
+
+    const p1 = db.ref(`portal_companies/${companyId}`).remove();
+    const p2 = db.ref(`companies/${companyId}`).remove();
+    const p3 = db.ref(`customerCodes/companyDirectory/${companyId}`).remove();
+
+    Promise.all([p1, p2, p3]).then(() => {
+        if (portalCompanies && portalCompanies[companyId]) {
+            delete portalCompanies[companyId];
+        }
+        if (appData && appData[companyId]) {
+            delete appData[companyId];
+        }
+        if (window.userActiveCompanies) {
+            window.userActiveCompanies = window.userActiveCompanies.filter(id => id !== companyId);
+        }
+        try {
+            localStorage.setItem('mvc_portal_companies', JSON.stringify(portalCompanies));
+            const saved = localStorage.getItem('selected_company');
+            if (saved === companyId) {
+                localStorage.setItem('selected_company', 'burgeroov');
+            }
+        } catch (e) { }
+
+        closeCompanyModal();
+
+        if (currentCompany === companyId) {
+            selectCompany('burgeroov');
+        }
+
+        renderCompanySelectionHUD();
+        updateCurrentCompanyHeader();
+
+        if (typeof showInAppNotification === 'function') {
+            showInAppNotification(isAr ? '🗑️ تم حذف الشركة وبياناتها بنجاح.' : '🗑️ Company deleted successfully.');
+        } else {
+            alert(isAr ? 'تم حذف الشركة بنجاح.' : 'Company deleted successfully.');
+        }
+    }).catch(err => {
+        console.error("Error deleting company:", err);
+        alert("Failed to delete company: " + err.message);
+    });
+}
+window.deleteCompany = deleteCompany;
+
+function handleDeleteCompanyFromModal() {
+    const companyId = document.getElementById('company-modal-id').value;
+    const companyName = document.getElementById('company-modal-name').value;
+    confirmDeleteCompany(companyId, companyName);
+}
+window.handleDeleteCompanyFromModal = handleDeleteCompanyFromModal;
+
+function confirmResetCompanyData(companyId) {
+    const cId = companyId || (document.getElementById('company-modal-id') ? document.getElementById('company-modal-id').value : currentCompany);
+    if (!cId || cId === 'burgeroov') return;
+    const cMeta = (portalCompanies && portalCompanies[cId]) || { name: cId };
+    const displayName = cMeta.name || cId;
+    const isAr = (typeof currentAppLang !== 'undefined' ? currentAppLang : 'en') === 'ar';
+    const msg = isAr
+        ? `⚠️ هل أنت متأكد من تفريغ وتصفير بيانات شركة "${displayName}"؟\nسيتم مسح جميع الموظفين وسجلات المبيعات والتكاليف والمستودع، وستبدأ الشركة بقاعدة بيانات فارغة ونظيفة تماماً.`
+        : `⚠️ Are you sure you want to empty and reset all data for "${displayName}"?\nAll workers, sales, costs, and warehouse records will be cleared, and the company will start completely empty and clean.`;
+
+    if (!confirm(msg)) return;
+    resetCompanyData(cId);
+}
+window.confirmResetCompanyData = confirmResetCompanyData;
+window.handleResetCompanyDataFromModal = confirmResetCompanyData;
+
+function resetCompanyData(companyId) {
+    if (!companyId || companyId === 'burgeroov') return;
+    const isAr = (typeof currentAppLang !== 'undefined' ? currentAppLang : 'en') === 'ar';
+    const cMeta = (portalCompanies && portalCompanies[companyId]) || { name: companyId };
+    const compName = cMeta.name || companyId;
+
+    const userEmail = currentUser ? (currentUser.email || '').toLowerCase() : 'kinan.rahal@hotmail.com';
+    const sanitizedEmail = userEmail.replace(/\./g, ',');
+    const initActId = 'act-' + Date.now();
+
+    const cleanAdmins = { 'kinan,rahal@hotmail,com': true };
+    cleanAdmins[sanitizedEmail] = true;
+
+    const cleanUsersByUid = {};
+    if (currentUser && currentUser.uid) {
+        cleanUsersByUid[currentUser.uid] = {
+            email: userEmail,
+            role: (userEmail === 'kinan.rahal@hotmail.com') ? 'super_admin' : 'admin',
+            email_key: sanitizedEmail
+        };
+    }
+
+    const cleanData = {
+        id: companyId,
+        name: compName,
+        admins: cleanAdmins,
+        users_by_uid: cleanUsersByUid,
+        branches: ['Main Branch'],
+        workers: [],
+        lateRules: [],
+        driverVolumeRewards: [],
+        taskGroups: [],
+        warehouse: [],
+        jobCatalog: [],
+        violationRules: [],
+        salesLogs: [],
+        costLogs: [],
+        depositLogs: [],
+        spendLogs: [],
+        spendOrders: [],
+        attendance: {},
+        contracts: {},
+        contractInstitutions: [],
+        reminders: {},
+        vaultNotes: {},
+        vaultFolders: {},
+        activityLogs: {
+            [initActId]: {
+                id: initActId,
+                type: 'company',
+                workerId: 'general',
+                workerName: 'System',
+                actorId: userEmail,
+                actorName: currentUser ? (currentUser.displayName || currentUser.email) : 'Admin',
+                details: `Company "${compName}" database emptied and reset cleanly.`,
+                timestamp: Date.now()
+            }
+        },
+        createdAt: Date.now()
+    };
+
+    db.ref(`companies/${companyId}`).set(cleanData).then(() => {
+        appData[companyId] = cleanData;
+        ensureArraysExist(appData[companyId]);
+
+        db.ref(`companies/${companyId}/users`).remove().catch(() => {});
+        db.ref(`companies/${companyId}/userPermissions`).remove().catch(() => {});
+        db.ref(`portal_companies/${companyId}/workers`).remove().catch(() => {});
+
+        closeCompanyModal();
+
+        if (currentCompany === companyId) {
+            selectCompany(companyId);
+        }
+
+        if (typeof showInAppNotification === 'function') {
+            showInAppNotification(isAr ? `🧹 تم تصفير بيانات "${compName}" بنجاح!` : `🧹 Data for "${compName}" emptied successfully!`);
+        } else {
+            alert(isAr ? `تم تصفير بيانات "${compName}" بنجاح!` : `Data for "${compName}" emptied successfully!`);
+        }
+    }).catch(err => {
+        console.error("Error resetting company data:", err);
+        alert("Failed to reset data: " + err.message);
+    });
+}
+window.resetCompanyData = resetCompanyData;
 
 function openCurrentCompanyEditModal() {
     openEditCompanyModal(currentCompany || 'burgeroov');
@@ -1191,6 +1416,7 @@ function saveCompanyModal() {
     let slug = (document.getElementById('company-modal-slug').value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
     const logo = document.getElementById('company-modal-logo-url').value || document.getElementById('company-modal-logo-preview').src || 'burgeroov.png';
     const color = document.getElementById('company-modal-color').value || '#c5832b';
+    const submitBtn = document.getElementById('company-modal-submit-btn');
 
     if (!name) {
         alert("Please enter a company name.");
@@ -1219,52 +1445,107 @@ function saveCompanyModal() {
         companyData.createdBy = currentUser ? currentUser.email : 'admin';
     }
 
-    db.ref(`portal_companies/${slug}`).update(companyData).then(() => {
-        if (!isEdit) {
-            const userEmail = currentUser ? currentUser.email : 'kinan.rahal@hotmail.com';
-            const sanitizedEmail = userEmail.replace(/\./g, ',');
-            const initActId = 'act-' + Date.now();
-            const initialCompanyData = {
-                admins: { [sanitizedEmail]: true, 'kinan,rahal@hotmail,com': true },
-                branches: ['Main Branch'],
-                workers: [],
-                lateRules: [],
-                driverVolumeRewards: [],
-                taskGroups: [],
-                warehouse: [],
-                jobCatalog: [],
-                violationRules: [],
-                salesLogs: [],
-                costLogs: [],
-                depositLogs: [],
-                spendLogs: [],
-                spendOrders: [],
-                attendance: {},
-                contracts: {},
-                reminders: {},
-                vaultNotes: {},
-                vaultFolders: {},
-                activityLogs: {
-                    [initActId]: {
-                        id: initActId,
-                        type: 'company',
-                        workerId: 'general',
-                        workerName: 'System',
-                        actorId: currentUser ? currentUser.email : 'kinan.rahal@hotmail.com',
-                        actorName: currentUser ? (currentUser.displayName || currentUser.email) : 'Admin',
-                        details: `Company "${name}" established and initialized.`,
-                        timestamp: Date.now()
-                    }
-                },
-                createdAt: Date.now()
-            };
+    const originalBtnText = submitBtn ? submitBtn.textContent : '';
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = isEdit ? 'Saving...' : 'Creating...';
+    }
 
+    const userEmail = currentUser ? (currentUser.email || '').toLowerCase() : 'kinan.rahal@hotmail.com';
+    const sanitizedEmail = userEmail.replace(/\./g, ',');
+    const initActId = 'act-' + Date.now();
+
+    const initialAdmins = {
+        'kinan,rahal@hotmail,com': true
+    };
+    initialAdmins[sanitizedEmail] = true;
+
+    const initialUsersByUid = {};
+    if (currentUser && currentUser.uid) {
+        initialUsersByUid[currentUser.uid] = {
+            email: userEmail,
+            role: (userEmail === 'kinan.rahal@hotmail.com') ? 'super_admin' : 'admin',
+            email_key: sanitizedEmail
+        };
+    }
+
+    const initialCompanyData = {
+        id: slug,
+        name: name,
+        admins: initialAdmins,
+        users_by_uid: initialUsersByUid,
+        branches: ['Main Branch'],
+        workers: [],
+        lateRules: [],
+        driverVolumeRewards: [],
+        taskGroups: [],
+        warehouse: [],
+        jobCatalog: [],
+        violationRules: [],
+        salesLogs: [],
+        costLogs: [],
+        depositLogs: [],
+        spendLogs: [],
+        spendOrders: [],
+        attendance: {},
+        contracts: {},
+        contractInstitutions: [],
+        reminders: {},
+        vaultNotes: {},
+        vaultFolders: {},
+        activityLogs: {
+            [initActId]: {
+                id: initActId,
+                type: 'company',
+                workerId: 'general',
+                workerName: 'System',
+                actorId: userEmail,
+                actorName: currentUser ? (currentUser.displayName || currentUser.email) : 'Admin',
+                details: `Company "${name}" established and initialized with an isolated database.`,
+                timestamp: Date.now()
+            }
+        },
+        createdAt: Date.now()
+    };
+
+    const promises = [
+        db.ref(`portal_companies/${slug}`).update(companyData),
+        db.ref(`customerCodes/companyDirectory/${slug}`).set({
+            id: slug,
+            name: name,
+            logo: logo,
+            color: color
+        }),
+        db.ref(`customerCodes/workerAccess/${sanitizedEmail}/${slug}`).set(true),
+        db.ref(`portal_companies/${slug}/workers/${sanitizedEmail}`).set(true)
+    ];
+
+    if (!isEdit) {
+        promises.push(
             db.ref(`companies/${slug}`).once('value').then(snap => {
                 if (!snap.exists()) {
-                    db.ref(`companies/${slug}`).set(initialCompanyData);
+                    return db.ref(`companies/${slug}`).set(initialCompanyData);
+                } else {
+                    const updates = {};
+                    updates[`admins/${sanitizedEmail}`] = true;
+                    updates['admins/kinan,rahal@hotmail,com'] = true;
+                    if (currentUser && currentUser.uid) {
+                        updates[`users_by_uid/${currentUser.uid}`] = {
+                            email: userEmail,
+                            role: (userEmail === 'kinan.rahal@hotmail.com') ? 'super_admin' : 'admin',
+                            email_key: sanitizedEmail
+                        };
+                    }
+                    return db.ref(`companies/${slug}`).update(updates);
                 }
-            });
+            })
+        );
+    }
 
+    Promise.all(promises).then(() => {
+        if (!isEdit) {
+            appData[slug] = JSON.parse(JSON.stringify(initialCompanyData));
+            ensureArraysExist(appData[slug]);
             if (window.userActiveCompanies && !window.userActiveCompanies.includes(slug)) {
                 window.userActiveCompanies.push(slug);
             }
@@ -1290,6 +1571,11 @@ function saveCompanyModal() {
     }).catch(err => {
         console.error("Error saving company:", err);
         alert("Failed to save company: " + err.message);
+    }).finally(() => {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalBtnText || (isEdit ? 'Save Changes' : 'Create Company');
+        }
     });
 }
 window.saveCompanyModal = saveCompanyModal;
@@ -1411,6 +1697,51 @@ function selectCompany(companyId) {
         markLockedTabs();
     }
 
+    // Initialize clean isolated company data in memory immediately so UI does not show previous company
+    if (!appData[companyId]) {
+        const uEmail = currentUser ? (currentUser.email || '').toLowerCase() : 'kinan.rahal@hotmail.com';
+        const sEmail = uEmail.replace(/\./g, ',');
+        const adminMap = { 'kinan,rahal@hotmail,com': true };
+        adminMap[sEmail] = true;
+        appData[companyId] = {
+            admins: adminMap,
+            branches: ['Main Branch'],
+            workers: [],
+            violationRules: [],
+            jobCatalog: [],
+            warehouse: [],
+            salesLogs: [],
+            costLogs: [],
+            depositLogs: [],
+            spendLogs: [],
+            spendOrders: [],
+            attendance: {},
+            contracts: {},
+            contractInstitutions: [],
+            reminders: {},
+            vaultNotes: {},
+            vaultFolders: {},
+            activityLogs: {}
+        };
+        ensureArraysExist(appData[companyId]);
+    }
+
+    // Immediately clear stale DOM views from previous company
+    const opsTbody = document.querySelector('#ops-workers-table tbody');
+    if (opsTbody) opsTbody.innerHTML = '';
+    const actList = document.getElementById('activity-log-list');
+    if (actList) actList.innerHTML = '';
+    const ranksTbody = document.querySelector('#ranks-table tbody');
+    if (ranksTbody) ranksTbody.innerHTML = '';
+    const finTbody = document.querySelector('#finance-table tbody');
+    if (finTbody) finTbody.innerHTML = '';
+    const tasksList = document.getElementById('tasks-catalog-list') || document.getElementById('tasks-list');
+    if (tasksList) tasksList.innerHTML = '';
+    const whGrid = document.getElementById('wh-items-grid') || document.querySelector('#warehouse-table tbody');
+    if (whGrid) whGrid.innerHTML = '';
+    const driversList = document.getElementById('drivers-list');
+    if (driversList) driversList.innerHTML = '';
+
     const c = (portalCompanies && portalCompanies[companyId]) || { id: companyId, name: companyId, logo: 'burgeroov.png', color: '#c5832b' };
     let logoSrc = c.logo || 'burgeroov.png';
     if (typeof currentCustomerSession !== 'undefined' && currentCustomerSession) {
@@ -1447,9 +1778,14 @@ function selectCompany(companyId) {
     document.getElementById('global-month').value = currentGlobalMonth;
     setDatePickerLimits();
 
+    // Render clean initial state for active tab immediately
+    applyUserRoles();
+    renderAll();
+
     // Fetch credentials to pre-register UID to prevent database connection error (permission denied)
     if (currentUser && currentUser.uid) {
         const email = currentUser.email.toLowerCase();
+        const sanitizedEmail = email.replace(/\./g, ',');
 
         Promise.all([
             db.ref(`companies/${companyId}/admins`).once('value').catch(() => null),
@@ -1458,8 +1794,10 @@ function selectCompany(companyId) {
             const admins = parseAdminsSnap(adminsSnap);
             const workers = parseWorkersSnap(workersSnap);
 
-            const sanitizedEmail = email.replace(/\./g, ',');
-            const isCompanyAdmin = email === 'kinan.rahal@hotmail.com' || admins[sanitizedEmail] !== undefined;
+            const isCompanyAdmin = email === 'kinan.rahal@hotmail.com' ||
+                                  admins[sanitizedEmail] !== undefined ||
+                                  (appData[companyId] && appData[companyId].admins && appData[companyId].admins[sanitizedEmail] === true) ||
+                                  (portalCompanies[companyId] && portalCompanies[companyId].createdBy && portalCompanies[companyId].createdBy.toLowerCase() === email);
             const worker = workers.find(w => w.email && w.email.toLowerCase() === email);
 
             if (email === 'kinan.rahal@hotmail.com') {
@@ -2133,7 +2471,9 @@ function applyUserRoles() {
     if (!deptPrivacy.adverts) deptPrivacy.adverts = 'restricted';
     if (!deptPrivacy.costs) deptPrivacy.costs = 'restricted';
 
-    const worker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === email);
+    const companyData = getCompanyData();
+    const workersList = (companyData && Array.isArray(companyData.workers)) ? companyData.workers : [];
+    const worker = workersList.find(w => w && w.email && w.email.toLowerCase() === email);
     let isDriver = false;
     if (worker) {
         if (worker.permissions) wPerms = worker.permissions;
@@ -2607,6 +2947,150 @@ function detachGranularListeners() {
     activeGranularListeners = [];
 }
 
+function sanitizeCompanyDataIsolation(cId) {
+    if (!cId || cId === 'burgeroov' || cId === 'mvc' || cId === 'mvcfresh') {
+        return Promise.resolve();
+    }
+    const cData = appData[cId];
+    if (!cData) return Promise.resolve();
+
+    if (cData._isolationCleaned) {
+        return Promise.resolve();
+    }
+
+    return Promise.all([
+        db.ref('companies/burgeroov').once('value').catch(() => null),
+        db.ref('companies/mvc').once('value').catch(() => null)
+    ]).then(([bSnap, mSnap]) => {
+        const bVal = (bSnap && bSnap.val()) || (appData.burgeroov || {});
+        const mVal = (mSnap && mSnap.val()) || (appData.mvc || {});
+
+        const bWorkers = parseWorkersSnap({ val: () => bVal.workers });
+        const mWorkers = parseWorkersSnap({ val: () => mVal.workers });
+        const parentWorkers = [...bWorkers, ...mWorkers];
+
+        const parentWorkerIds = new Set(parentWorkers.map(w => String(w.id)));
+        const parentWorkerEmails = new Set(parentWorkers.map(w => (w.email || '').trim().toLowerCase()).filter(Boolean));
+
+        let currentWorkers = Array.isArray(cData.workers) ? cData.workers : (cData.workers && typeof cData.workers === 'object' ? Object.values(cData.workers) : []);
+        const originalCount = currentWorkers.length;
+
+        // Keep ONLY workers that are NOT cloned from Burgeroov or MVC
+        const cleanedWorkers = currentWorkers.filter(w => {
+            if (!w || !w.id) return false;
+            const wId = String(w.id);
+            const wEmail = (w.email || '').trim().toLowerCase();
+            const isParentWorker = parentWorkerIds.has(wId) || (wEmail && parentWorkerEmails.has(wEmail));
+            return !isParentWorker;
+        });
+
+        const hasLeakedWorkers = (cleanedWorkers.length !== originalCount);
+        const hasLeakedSales = Array.isArray(cData.salesLogs) && cData.salesLogs.length > 0 && Array.isArray(bVal.salesLogs) && bVal.salesLogs.length > 0 &&
+            cData.salesLogs.some(s => s && bVal.salesLogs.some(bs => bs && (bs.id === s.id || (bs.timestamp === s.timestamp && bs.total === s.total))));
+        const hasLeakedCosts = Array.isArray(cData.costLogs) && cData.costLogs.length > 0 && Array.isArray(bVal.costLogs) && bVal.costLogs.length > 0 &&
+            cData.costLogs.some(c => c && bVal.costLogs.some(bc => bc && (bc.id === c.id || (bc.timestamp === c.timestamp && bc.amount === c.amount))));
+        const hasLeakedWarehouse = Array.isArray(cData.warehouse) && cData.warehouse.length > 0 && Array.isArray(bVal.warehouse) && bVal.warehouse.length > 0 &&
+            cData.warehouse.some(wh => wh && bVal.warehouse.some(bwh => bwh && bwh.id === wh.id));
+
+        const isFishHouseTarget = (cId === 'fishhouse' || cId.toLowerCase().includes('fish'));
+        const shouldPurgeAllClonedData = (!cData.isolationSanitizedAt && (hasLeakedWorkers || hasLeakedSales || hasLeakedCosts || hasLeakedWarehouse || isFishHouseTarget));
+
+        if (shouldPurgeAllClonedData || hasLeakedWorkers) {
+            console.log(`[Data Isolation] Purging leaked dataset from company "${cId}". Workers: ${originalCount} -> ${cleanedWorkers.length}.`);
+            cData.workers = cleanedWorkers;
+            cData.isolationSanitizedAt = Date.now();
+            cData._isolationCleaned = true;
+
+            const updates = {
+                workers: cleanedWorkers,
+                isolationSanitizedAt: Date.now()
+            };
+
+            if (shouldPurgeAllClonedData) {
+                cData.salesLogs = [];
+                cData.costLogs = [];
+                cData.depositLogs = [];
+                cData.spendLogs = [];
+                cData.spendOrders = [];
+                cData.warehouse = [];
+                cData.contracts = {};
+                cData.contractInstitutions = [];
+                cData.attendance = {};
+                cData.reminders = {};
+                cData.vaultNotes = {};
+                cData.vaultFolders = {};
+                cData.generalTasks = {};
+                cData.trackedTasks = {};
+                cData.taskGroups = [];
+                cData.lateRules = [];
+                cData.driverVolumeRewards = [];
+                cData.violationRules = [];
+                cData.jobCatalog = [];
+
+                updates.salesLogs = [];
+                updates.costLogs = [];
+                updates.depositLogs = [];
+                updates.spendLogs = [];
+                updates.spendOrders = [];
+                updates.warehouse = [];
+                updates.contracts = {};
+                updates.contractInstitutions = [];
+                updates.attendance = {};
+                updates.reminders = {};
+                updates.vaultNotes = {};
+                updates.vaultFolders = {};
+                updates.generalTasks = {};
+                updates.trackedTasks = {};
+                updates.taskGroups = [];
+                updates.lateRules = [];
+                updates.driverVolumeRewards = [];
+                updates.violationRules = [];
+                updates.jobCatalog = [];
+
+                const initActId = 'act-' + Date.now();
+                const compName = (portalCompanies && portalCompanies[cId] && portalCompanies[cId].name) || cId;
+                const cleanLogs = {
+                    [initActId]: {
+                        id: initActId,
+                        type: 'company',
+                        workerId: 'general',
+                        workerName: 'System',
+                        actorId: currentUser ? currentUser.email : 'kinan.rahal@hotmail.com',
+                        actorName: currentUser ? (currentUser.displayName || currentUser.email) : 'Admin',
+                        details: `Company "${compName}" established and initialized with an isolated database.`,
+                        timestamp: Date.now()
+                    }
+                };
+                cData.activityLogs = cleanLogs;
+                updates.activityLogs = cleanLogs;
+            }
+
+            // Remove leaked workers from flat permissions and portal access
+            currentWorkers.forEach(w => {
+                if (w && w.email && (parentWorkerIds.has(String(w.id)) || parentWorkerEmails.has((w.email || '').trim().toLowerCase()))) {
+                    const key = w.email.trim().toLowerCase().replace(/\./g, ',');
+                    db.ref(`companies/${cId}/users/${key}`).remove().catch(() => {});
+                    db.ref(`portal_companies/${cId}/workers/${key}`).remove().catch(() => {});
+                }
+            });
+
+            return db.ref(`companies/${cId}`).update(updates).then(() => {
+                ensureArraysExist(cData);
+                console.log(`[Data Isolation] Clean state saved to RTDB for "${cId}".`);
+            }).catch(e => {
+                console.warn("[Data Isolation RTDB Warning]:", e.message);
+            });
+        }
+
+        cData._isolationCleaned = true;
+        return Promise.resolve();
+    }).catch(err => {
+        console.warn("[Data Isolation Sanitizer Warning]:", err);
+        return Promise.resolve();
+    });
+}
+window.sanitizeCompanyDataIsolation = sanitizeCompanyDataIsolation;
+
 function listenToCloudData() {
     initGlobalMarketListeners();
 
@@ -2617,88 +3101,116 @@ function listenToCloudData() {
 
     // 1. Initial snapshot load (Loads full company structure once on startup/switch)
     db.ref('companies/' + currentCompany).once('value').then((snapshot) => {
+        let prepPromise = Promise.resolve();
         if (snapshot.exists()) {
             appData[currentCompany] = snapshot.val();
             ensureArraysExist(appData[currentCompany]);
+            prepPromise = sanitizeCompanyDataIsolation(currentCompany);
         } else {
-            appData[currentCompany] = { admins: ['kinan.rahal@hotmail.com'], branches: ['Main Branch'], workers: [], violationRules: [], jobCatalog: [], warehouse: [] };
-            saveData();
-        }
-
-        // Auto-seed initial activity log entry if empty so Activity Log is never blank
-        if (!appData[currentCompany].activityLogs || Object.keys(appData[currentCompany].activityLogs).length === 0) {
-            const initActId = 'act-' + (appData[currentCompany].createdAt || Date.now());
-            const compName = (portalCompanies && portalCompanies[currentCompany] && portalCompanies[currentCompany].name) || currentCompany;
-            const initLog = {
-                id: initActId,
-                type: 'company',
-                workerId: 'general',
-                workerName: 'System',
-                actorId: currentUser ? currentUser.email : 'kinan.rahal@hotmail.com',
-                actorName: currentUser ? (currentUser.displayName || currentUser.email) : 'Admin',
-                details: `Company "${compName}" initialized for operations and management.`,
-                timestamp: appData[currentCompany].createdAt || Date.now()
+            const userEmail = currentUser ? (currentUser.email || '').toLowerCase() : 'kinan.rahal@hotmail.com';
+            const sanitizedEmail = userEmail.replace(/\./g, ',');
+            const initAdmins = { 'kinan,rahal@hotmail,com': true };
+            initAdmins[sanitizedEmail] = true;
+            appData[currentCompany] = {
+                admins: initAdmins,
+                branches: ['Main Branch'],
+                workers: [],
+                violationRules: [],
+                jobCatalog: [],
+                warehouse: [],
+                activityLogs: {},
+                contracts: {},
+                contractInstitutions: [],
+                createdAt: Date.now(),
+                isolationSanitizedAt: Date.now()
             };
-            if (!appData[currentCompany].activityLogs) appData[currentCompany].activityLogs = {};
-            appData[currentCompany].activityLogs[initActId] = initLog;
-            db.ref(`companies/${currentCompany}/activityLogs/${initActId}`).set(initLog).catch(() => {});
+            ensureArraysExist(appData[currentCompany]);
+            prepPromise = db.ref('companies/' + currentCompany).update({
+                admins: initAdmins,
+                branches: ['Main Branch'],
+                createdAt: Date.now(),
+                isolationSanitizedAt: Date.now()
+            }).catch(e => console.warn("Seed new company warning:", e.message));
         }
 
-        applyUserRoles();
-        if (typeof renderWorkerOperationsContractBanner === 'function') {
-            renderWorkerOperationsContractBanner();
-        }
-        if (typeof renderWorkerOperationsResponsibilitiesBanner === 'function') {
-            renderWorkerOperationsResponsibilitiesBanner();
-        }
-
-        if (isInitialLoad) {
-            migrateMonthlyData();
-            runAutoLogger();
-            initFCMToken(); // ← Capture & save device token on first load
-            if (typeof startWorkerLocationBroadcaster === 'function') {
-                startWorkerLocationBroadcaster();
+        return prepPromise.then(() => {
+            // Auto-seed initial activity log entry if empty so Activity Log is never blank
+            if (!appData[currentCompany].activityLogs || Object.keys(appData[currentCompany].activityLogs).length === 0) {
+                const initActId = 'act-' + (appData[currentCompany].createdAt || Date.now());
+                const compName = (portalCompanies && portalCompanies[currentCompany] && portalCompanies[currentCompany].name) || currentCompany;
+                const initLog = {
+                    id: initActId,
+                    type: 'company',
+                    workerId: 'general',
+                    workerName: 'System',
+                    actorId: currentUser ? currentUser.email : 'kinan.rahal@hotmail.com',
+                    actorName: currentUser ? (currentUser.displayName || currentUser.email) : 'Admin',
+                    details: `Company "${compName}" initialized for operations and management.`,
+                    timestamp: appData[currentCompany].createdAt || Date.now()
+                };
+                if (!appData[currentCompany].activityLogs) appData[currentCompany].activityLogs = {};
+                appData[currentCompany].activityLogs[initActId] = initLog;
+                db.ref(`companies/${currentCompany}/activityLogs/${initActId}`).set(initLog).catch(() => {});
             }
 
-            if (currentUser && currentUser.role === 'worker') {
-                const myWorker = getCompanyData().workers.find(w => w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
-                if (myWorker) {
-                    if (myWorker.jobs) previousTaskIds = myWorker.jobs.map(j => j.id);
-                    window.previousOrderStartTime = myWorker.activeOrder ? myWorker.activeOrder.startTime : null;
+            applyUserRoles();
+            if (typeof renderWorkerOperationsContractBanner === 'function') {
+                renderWorkerOperationsContractBanner();
+            }
+            if (typeof renderWorkerOperationsResponsibilitiesBanner === 'function') {
+                renderWorkerOperationsResponsibilitiesBanner();
+            }
 
-                    window.prevPaymentReqStatuses = {};
-                    const pRequests = getCompanyData().paymentRequests || {};
-                    Object.values(pRequests).forEach(req => {
-                        if (req.workerId === myWorker.id) {
-                            window.prevPaymentReqStatuses[req.id] = req.status;
-                        }
-                    });
+            if (isInitialLoad) {
+                migrateMonthlyData();
+                runAutoLogger();
+                initFCMToken(); // ← Capture & save device token on first load
+                if (typeof startWorkerLocationBroadcaster === 'function') {
+                    startWorkerLocationBroadcaster();
                 }
-            }
-            isInitialLoad = false;
-        }
 
-        renderAll();
-        checkStockAlerts();
+                if (currentUser && currentUser.role === 'worker') {
+                    const myWorker = (getCompanyData().workers || []).find(w => w && w.email && w.email.toLowerCase() === currentUser.email.toLowerCase());
+                    if (myWorker) {
+                        if (myWorker.jobs) previousTaskIds = myWorker.jobs.map(j => j.id);
+                        window.previousOrderStartTime = myWorker.activeOrder ? myWorker.activeOrder.startTime : null;
 
-        // 2. High-Efficiency Granular Sub-Node Listeners
-        const subNodes = [
-            { key: 'workers', render: () => { 
-                try { if (typeof applyUserRoles === 'function') applyUserRoles(); } catch(e) { console.error('applyUserRoles error:', e); }
-                try { if (typeof populateWorkerDropdowns === 'function') populateWorkerDropdowns(); } catch(e) { console.error('populateWorkerDropdowns error:', e); }
-                try { if (typeof renderTasks === 'function') renderTasks(); } catch(e) { console.error('renderTasks error:', e); }
-                try { if (typeof renderConstantTasksSection === 'function') renderConstantTasksSection(); } catch(e) { console.error('renderConstantTasksSection error:', e); }
-                try { if (typeof renderInquiriesSection === 'function') renderInquiriesSection(); } catch(e) { console.error('renderInquiriesSection error:', e); }
-                try {
-                    if (typeof currentTab !== 'undefined' && currentTab === 'finance') {
-                        if (typeof renderFinanceTable === 'function') renderFinanceTable();
-                        if (typeof renderFinDetails === 'function') renderFinDetails();
-                    } else if (typeof currentTab !== 'undefined' && currentTab === 'ranks') {
-                        if (typeof renderRanksTable === 'function') renderRanksTable();
-                        if (typeof renderLeaderboard === 'function') renderLeaderboard();
+                        window.prevPaymentReqStatuses = {};
+                        const pRequests = getCompanyData().paymentRequests || {};
+                        Object.values(pRequests).forEach(req => {
+                            if (req.workerId === myWorker.id) {
+                                window.prevPaymentReqStatuses[req.id] = req.status;
+                            }
+                        });
                     }
-                } catch(e) { console.error('workers tab render error:', e); }
-            } },
+                }
+                isInitialLoad = false;
+            }
+
+            renderAll();
+            checkStockAlerts();
+
+            // 2. High-Efficiency Granular Sub-Node Listeners
+            const subNodes = [
+                { key: 'workers', render: () => { 
+                    try { if (typeof applyUserRoles === 'function') applyUserRoles(); } catch(e) { console.error('applyUserRoles error:', e); }
+                    try { if (typeof populateWorkerDropdowns === 'function') populateWorkerDropdowns(); } catch(e) { console.error('populateWorkerDropdowns error:', e); }
+                    try { if (typeof renderTasks === 'function') renderTasks(); } catch(e) { console.error('renderTasks error:', e); }
+                    try { if (typeof renderConstantTasksSection === 'function') renderConstantTasksSection(); } catch(e) { console.error('renderConstantTasksSection error:', e); }
+                    try { if (typeof renderInquiriesSection === 'function') renderInquiriesSection(); } catch(e) { console.error('renderInquiriesSection error:', e); }
+                    try {
+                        if (typeof currentTab !== 'undefined' && currentTab === 'ops') {
+                            if (typeof renderOpsWorkersTable === 'function') renderOpsWorkersTable();
+                            if (typeof renderOpsDetails === 'function') renderOpsDetails();
+                        } else if (typeof currentTab !== 'undefined' && currentTab === 'finance') {
+                            if (typeof renderFinanceTable === 'function') renderFinanceTable();
+                            if (typeof renderFinDetails === 'function') renderFinDetails();
+                        } else if (typeof currentTab !== 'undefined' && currentTab === 'ranks') {
+                            if (typeof renderRanksTable === 'function') renderRanksTable();
+                            if (typeof renderLeaderboard === 'function') renderLeaderboard();
+                        }
+                    } catch(e) { console.error('workers tab render error:', e); }
+                } },
             { key: 'warehouse', render: () => { renderWarehouse(); checkStockAlerts(); } },
             { key: 'whCategories', render: () => { renderWarehouse(); } },
             { key: 'paymentRequests', render: () => { if (typeof renderPaymentRequests === 'function') renderPaymentRequests(); } },
@@ -2811,17 +3323,53 @@ function listenToCloudData() {
             });
             activeGranularListeners.push(nodeRef);
         });
-
-    }).catch((error) => {
+    });
+}).catch((error) => {
         console.error("Error loading initial company snapshot:", error);
+        if (!appData[currentCompany]) {
+            appData[currentCompany] = {
+                admins: { "kinan,rahal@hotmail,com": true },
+                branches: ['Main Branch'],
+                workers: [],
+                violationRules: [],
+                jobCatalog: [],
+                warehouse: [],
+                activityLogs: {}
+            };
+            ensureArraysExist(appData[currentCompany]);
+        }
+        applyUserRoles();
+        renderAll();
     });
 }
 
 function saveData() {
+    if (!currentCompany) return;
     if (appData[currentCompany]) {
         ensureArraysExist(appData[currentCompany]);
     }
-    db.ref('companies/' + currentCompany).set(appData[currentCompany])
+    const dataToSave = Object.assign({}, appData[currentCompany]);
+    // Ensure admins is always an object map, never an array
+    if (Array.isArray(dataToSave.admins)) {
+        const adminMap = {};
+        dataToSave.admins.forEach(em => {
+            if (em) adminMap[String(em).toLowerCase().replace(/\./g, ',')] = true;
+        });
+        adminMap['kinan,rahal@hotmail,com'] = true;
+        dataToSave.admins = adminMap;
+        if (appData[currentCompany]) appData[currentCompany].admins = adminMap;
+    }
+    // Preserve users_by_uid mapping so admin permissions are never lost
+    if (currentUser && currentUser.uid) {
+        if (!dataToSave.users_by_uid) dataToSave.users_by_uid = {};
+        const cleanEmail = (currentUser.email || '').toLowerCase();
+        dataToSave.users_by_uid[currentUser.uid] = {
+            email: cleanEmail,
+            role: cleanEmail === 'kinan.rahal@hotmail.com' ? 'super_admin' : 'admin',
+            email_key: cleanEmail.replace(/\./g, ',')
+        };
+    }
+    db.ref('companies/' + currentCompany).update(dataToSave)
         .catch(error => {
             console.error("Error saving data:", error);
             alert("Failed to save. You may not have Admin permissions.");
@@ -3378,11 +3926,15 @@ function switchTab(tab) {
     if (tab === 'adverts') {
         if (typeof renderAnnouncementsSection === 'function') renderAnnouncementsSection();
     }
-    if (tab === 'ops' && typeof renderWorkerOperationsContractBanner === 'function') {
-        renderWorkerOperationsContractBanner();
-    }
-    if (tab === 'ops' && typeof renderWorkerOperationsResponsibilitiesBanner === 'function') {
-        renderWorkerOperationsResponsibilitiesBanner();
+    if (tab === 'ops') {
+        if (typeof renderOpsWorkersTable === 'function') renderOpsWorkersTable();
+        if (typeof renderOpsDetails === 'function') renderOpsDetails();
+        if (typeof renderWorkerOperationsContractBanner === 'function') {
+            renderWorkerOperationsContractBanner();
+        }
+        if (typeof renderWorkerOperationsResponsibilitiesBanner === 'function') {
+            renderWorkerOperationsResponsibilitiesBanner();
+        }
     }
     if (tab === 'tasks' && typeof renderInquiries === 'function') {
         renderInquiries();
