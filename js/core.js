@@ -966,12 +966,40 @@ function getCompanyData() {
         appData[currentCompany] = { admins: { "kinan,rahal@hotmail,com": true }, branches: ['Main Branch'], workers: [], violationRules: [], jobCatalog: [], warehouse: [] };
     }
     const cData = appData[currentCompany];
+    if (!cData.branches || !Array.isArray(cData.branches)) {
+        if (cData.branches && typeof cData.branches === 'object') {
+            cData.branches = Object.values(cData.branches);
+        } else {
+            cData.branches = ['Main Branch'];
+        }
+    }
+    if (cData.branches.length === 0) {
+        cData.branches = ['Main Branch'];
+    }
     if (!cData.workers || !Array.isArray(cData.workers)) {
         if (cData.workers && typeof cData.workers === 'object') {
             cData.workers = Object.values(cData.workers);
         } else {
             cData.workers = [];
         }
+    }
+    if (!cData.violationRules || !Array.isArray(cData.violationRules)) {
+        cData.violationRules = [];
+    }
+    if (!cData.jobCatalog || !Array.isArray(cData.jobCatalog)) {
+        cData.jobCatalog = [];
+    }
+    if (!cData.warehouse || !Array.isArray(cData.warehouse)) {
+        cData.warehouse = [];
+    }
+    if (!cData.salesLogs || !Array.isArray(cData.salesLogs)) {
+        cData.salesLogs = [];
+    }
+    if (!cData.costLogs || !Array.isArray(cData.costLogs)) {
+        cData.costLogs = [];
+    }
+    if (!cData.contracts || typeof cData.contracts !== 'object') {
+        cData.contracts = {};
     }
     if (!cData.activityLogs || typeof cData.activityLogs !== 'object') {
         cData.activityLogs = {};
@@ -1723,8 +1751,8 @@ function selectCompany(companyId) {
             vaultFolders: {},
             activityLogs: {}
         };
-        ensureArraysExist(appData[companyId]);
     }
+    ensureArraysExist(appData[companyId]);
 
     // Immediately clear stale DOM views from previous company
     const opsTbody = document.querySelector('#ops-workers-table tbody');
@@ -2625,8 +2653,17 @@ function ensureArraysExist(data) {
         data.admins = map;
     }
     if (!data.admins) data.admins = { "kinan,rahal@hotmail,com": true };
-    if (!data.branches) data.branches = [];
-    data.branches = data.branches.filter(b => b);
+    if (!data.branches || !Array.isArray(data.branches)) {
+        if (data.branches && typeof data.branches === 'object') {
+            data.branches = Object.values(data.branches);
+        } else {
+            data.branches = ['Main Branch'];
+        }
+    }
+    data.branches = data.branches.filter(b => b && typeof b === 'string' && b.trim() !== '');
+    if (data.branches.length === 0) {
+        data.branches = ['Main Branch'];
+    }
 
     if (data.workers && !Array.isArray(data.workers)) {
         data.workers = Object.values(data.workers);

@@ -95,15 +95,27 @@ function renderBranches() {
     const list = document.getElementById('branches-list');
     const select = document.getElementById('w-branch');
     const editSelect = document.getElementById('ops-edit-branch');
-    list.innerHTML = '';
-    select.innerHTML = '';
+    if (list) list.innerHTML = '';
+    if (select) select.innerHTML = '';
     if (editSelect) editSelect.innerHTML = '';
-    getCompanyData().branches.forEach(branch => {
-        const li = document.createElement('li'); li.className = 'flex-between list-item';
-        li.innerHTML = `<span style="font-weight: 500; color: var(--text-main);">${branch}</span> <button class="btn-outline-danger admin-only" style="padding: 4px 10px; font-size: 0.75rem;" onclick="deleteBranch('${branch}')">Remove</button>`;
-        list.appendChild(li);
-        const option = document.createElement('option'); option.value = branch; option.textContent = branch; select.appendChild(option);
 
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : null;
+    let branches = (companyData && Array.isArray(companyData.branches)) ? companyData.branches : [];
+    if (branches.length === 0) {
+        branches = ['Main Branch'];
+        if (companyData) companyData.branches = branches;
+    }
+
+    branches.forEach(branch => {
+        if (!branch) return;
+        if (list) {
+            const li = document.createElement('li'); li.className = 'flex-between list-item';
+            li.innerHTML = `<span style="font-weight: 500; color: var(--text-main);">${escapeHtml(branch)}</span> <button class="btn-outline-danger admin-only" style="padding: 4px 10px; font-size: 0.75rem;" onclick="deleteBranch('${escapeHtml(branch)}')">Remove</button>`;
+            list.appendChild(li);
+        }
+        if (select) {
+            const option = document.createElement('option'); option.value = branch; option.textContent = branch; select.appendChild(option);
+        }
         if (editSelect) {
             const editOption = document.createElement('option');
             editOption.value = branch;
@@ -114,8 +126,8 @@ function renderBranches() {
 }
 
 function populateWorkerDropdowns() {
-    const opsSelect = document.getElementById('ops-worker-select'); const opsVal = opsSelect.value;
-    const finSelect = document.getElementById('fin-worker-select'); const finVal = finSelect.value;
+    const opsSelect = document.getElementById('ops-worker-select'); const opsVal = opsSelect ? opsSelect.value : '';
+    const finSelect = document.getElementById('fin-worker-select'); const finVal = finSelect ? finSelect.value : '';
     const taskSelect = document.getElementById('task-worker-select'); const taskVal = taskSelect ? taskSelect.value : '';
     const permSelect = document.getElementById('perm-worker-select'); const permVal = permSelect ? permSelect.value : '';
     const sysSelect = document.getElementById('sys-viol-worker-select'); const sysVal = sysSelect ? sysSelect.value : '';
@@ -130,7 +142,11 @@ function populateWorkerDropdowns() {
     if (attSelect) attSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
     if (vacSelect) vacSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
 
-    getCompanyData().workers.forEach(worker => {
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : null;
+    const workers = (companyData && Array.isArray(companyData.workers)) ? companyData.workers : [];
+
+    workers.forEach(worker => {
+        if (!worker || !worker.name) return;
         if (opsSelect) opsSelect.appendChild(new Option(worker.name, worker.id));
         if (finSelect) finSelect.appendChild(new Option(worker.name, worker.id));
         if (taskSelect) taskSelect.appendChild(new Option(worker.name, worker.id));

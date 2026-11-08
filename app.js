@@ -966,12 +966,40 @@ function getCompanyData() {
         appData[currentCompany] = { admins: { "kinan,rahal@hotmail,com": true }, branches: ['Main Branch'], workers: [], violationRules: [], jobCatalog: [], warehouse: [] };
     }
     const cData = appData[currentCompany];
+    if (!cData.branches || !Array.isArray(cData.branches)) {
+        if (cData.branches && typeof cData.branches === 'object') {
+            cData.branches = Object.values(cData.branches);
+        } else {
+            cData.branches = ['Main Branch'];
+        }
+    }
+    if (cData.branches.length === 0) {
+        cData.branches = ['Main Branch'];
+    }
     if (!cData.workers || !Array.isArray(cData.workers)) {
         if (cData.workers && typeof cData.workers === 'object') {
             cData.workers = Object.values(cData.workers);
         } else {
             cData.workers = [];
         }
+    }
+    if (!cData.violationRules || !Array.isArray(cData.violationRules)) {
+        cData.violationRules = [];
+    }
+    if (!cData.jobCatalog || !Array.isArray(cData.jobCatalog)) {
+        cData.jobCatalog = [];
+    }
+    if (!cData.warehouse || !Array.isArray(cData.warehouse)) {
+        cData.warehouse = [];
+    }
+    if (!cData.salesLogs || !Array.isArray(cData.salesLogs)) {
+        cData.salesLogs = [];
+    }
+    if (!cData.costLogs || !Array.isArray(cData.costLogs)) {
+        cData.costLogs = [];
+    }
+    if (!cData.contracts || typeof cData.contracts !== 'object') {
+        cData.contracts = {};
     }
     if (!cData.activityLogs || typeof cData.activityLogs !== 'object') {
         cData.activityLogs = {};
@@ -1723,8 +1751,8 @@ function selectCompany(companyId) {
             vaultFolders: {},
             activityLogs: {}
         };
-        ensureArraysExist(appData[companyId]);
     }
+    ensureArraysExist(appData[companyId]);
 
     // Immediately clear stale DOM views from previous company
     const opsTbody = document.querySelector('#ops-workers-table tbody');
@@ -2625,8 +2653,17 @@ function ensureArraysExist(data) {
         data.admins = map;
     }
     if (!data.admins) data.admins = { "kinan,rahal@hotmail,com": true };
-    if (!data.branches) data.branches = [];
-    data.branches = data.branches.filter(b => b);
+    if (!data.branches || !Array.isArray(data.branches)) {
+        if (data.branches && typeof data.branches === 'object') {
+            data.branches = Object.values(data.branches);
+        } else {
+            data.branches = ['Main Branch'];
+        }
+    }
+    data.branches = data.branches.filter(b => b && typeof b === 'string' && b.trim() !== '');
+    if (data.branches.length === 0) {
+        data.branches = ['Main Branch'];
+    }
 
     if (data.workers && !Array.isArray(data.workers)) {
         data.workers = Object.values(data.workers);
@@ -16501,15 +16538,27 @@ function renderBranches() {
     const list = document.getElementById('branches-list');
     const select = document.getElementById('w-branch');
     const editSelect = document.getElementById('ops-edit-branch');
-    list.innerHTML = '';
-    select.innerHTML = '';
+    if (list) list.innerHTML = '';
+    if (select) select.innerHTML = '';
     if (editSelect) editSelect.innerHTML = '';
-    getCompanyData().branches.forEach(branch => {
-        const li = document.createElement('li'); li.className = 'flex-between list-item';
-        li.innerHTML = `<span style="font-weight: 500; color: var(--text-main);">${branch}</span> <button class="btn-outline-danger admin-only" style="padding: 4px 10px; font-size: 0.75rem;" onclick="deleteBranch('${branch}')">Remove</button>`;
-        list.appendChild(li);
-        const option = document.createElement('option'); option.value = branch; option.textContent = branch; select.appendChild(option);
 
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : null;
+    let branches = (companyData && Array.isArray(companyData.branches)) ? companyData.branches : [];
+    if (branches.length === 0) {
+        branches = ['Main Branch'];
+        if (companyData) companyData.branches = branches;
+    }
+
+    branches.forEach(branch => {
+        if (!branch) return;
+        if (list) {
+            const li = document.createElement('li'); li.className = 'flex-between list-item';
+            li.innerHTML = `<span style="font-weight: 500; color: var(--text-main);">${escapeHtml(branch)}</span> <button class="btn-outline-danger admin-only" style="padding: 4px 10px; font-size: 0.75rem;" onclick="deleteBranch('${escapeHtml(branch)}')">Remove</button>`;
+            list.appendChild(li);
+        }
+        if (select) {
+            const option = document.createElement('option'); option.value = branch; option.textContent = branch; select.appendChild(option);
+        }
         if (editSelect) {
             const editOption = document.createElement('option');
             editOption.value = branch;
@@ -16520,8 +16569,8 @@ function renderBranches() {
 }
 
 function populateWorkerDropdowns() {
-    const opsSelect = document.getElementById('ops-worker-select'); const opsVal = opsSelect.value;
-    const finSelect = document.getElementById('fin-worker-select'); const finVal = finSelect.value;
+    const opsSelect = document.getElementById('ops-worker-select'); const opsVal = opsSelect ? opsSelect.value : '';
+    const finSelect = document.getElementById('fin-worker-select'); const finVal = finSelect ? finSelect.value : '';
     const taskSelect = document.getElementById('task-worker-select'); const taskVal = taskSelect ? taskSelect.value : '';
     const permSelect = document.getElementById('perm-worker-select'); const permVal = permSelect ? permSelect.value : '';
     const sysSelect = document.getElementById('sys-viol-worker-select'); const sysVal = sysSelect ? sysSelect.value : '';
@@ -16536,7 +16585,11 @@ function populateWorkerDropdowns() {
     if (attSelect) attSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
     if (vacSelect) vacSelect.innerHTML = `<option value="">${t('opt-choose-employee')}</option>`;
 
-    getCompanyData().workers.forEach(worker => {
+    const companyData = typeof getCompanyData === 'function' ? getCompanyData() : null;
+    const workers = (companyData && Array.isArray(companyData.workers)) ? companyData.workers : [];
+
+    workers.forEach(worker => {
+        if (!worker || !worker.name) return;
         if (opsSelect) opsSelect.appendChild(new Option(worker.name, worker.id));
         if (finSelect) finSelect.appendChild(new Option(worker.name, worker.id));
         if (taskSelect) taskSelect.appendChild(new Option(worker.name, worker.id));
